@@ -1,0 +1,62 @@
+# --- Build Artifacts ---
+# Ignore the main build directory from CMake/Ninja
+build/
+dist/
+
+# Ignore compiled binaries, libraries, and object files
+*.o
+*.obj
+*.exe
+*.dll
+*.pyd
+*.so
+*.lib
+*.a
+
+# --- Python ---
+# Ignore bytecode and caches
+__pycache__/
+*.pyc
+*.pyo
+
+# Ignore virtual environments
+.venv/
+venv/
+env/
+
+# Ignore testing and packaging artifacts
+.pytest_cache/
+.eggs/
+*.egg-info/
+
+# --- Conda ---
+# Conda environments are typically outside the project, but ignore them if created locally
+hpc_workspace/
+
+# --- IDE and Editor Files ---
+# Visual Studio Code
+.vscode/*
+!/.vscode/settings.json
+!/.vscode/tasks.json
+!/.vscode/launch.json
+!/.vscode/extensions.json
+
+# JetBrains (CLion, PyCharm)
+.idea/
+
+# --- OS-Specific Files ---
+# Windows
+Thumbs.db
+desktop.ini
+
+# Linux
+*~
+core
+
+# macOS
+.DS_Store
+
+# --- Logging and Temporary Files ---
+*.log
+*.tmp
+*.swp

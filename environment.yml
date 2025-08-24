@@ -1,0 +1,36 @@
+name: cuda_workspace
+channels:
+  - nvidia
+  - conda-forge
+dependencies:
+  # 1. Core Build & Runtime Dependencies
+  # We use explicit channel prefixes (e.g., conda-forge::) to force the solver
+  # to look in the right place, eliminating ambiguity.
+  - conda-forge::python=3.11
+  - conda-forge::cmake
+  - conda-forge::ninja
+  - conda-forge::pip
+
+  # 2. CUDA Toolchain Components (The Key Fix)
+  # Instead of the single 'cudatoolkit' meta-package, we install the
+  # specific components required for compilation from the nvidia channel.
+  - nvidia::cuda-compiler=13.0
+  - nvidia::cuda-libraries=13.0
+  - nvidia::cuda-nvcc=13.0
+  - nvidia::cuda-nvtx=13.0
+  
+  # 3. C/C++ Compiler Toolchain
+  # This ensures CMake can find a compatible host compiler.
+  - conda-forge::c-compiler
+  - conda-forge::cxx-compiler
+
+  # 4. Python packages
+  - conda-forge::numpy
+  - conda-forge::tqdm
+  - conda-forge::colorama
+  - conda-forge::iniconfig
+  - conda-forge::packaging
+  - conda-forge::pluggy
+  - conda-forge::pybind11
+  - conda-forge::pygments
+  - conda-forge::pytest
