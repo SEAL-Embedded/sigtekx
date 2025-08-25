@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================================
-# ionosense-hpc-lib • Linux CLI (feature-parity with cli.ps1)
+# ionosense-hpc-lib • Linux CLI
 # ----------------------------------------------------------------------------
 # Modern, portable task runner for building, testing, benchmarking, and
 # profiling the CUDA/pybind11 project on Linux/WSL2.
@@ -12,13 +12,10 @@
 # • Nsight Systems profiling helpers
 # • "doctor" diagnostics + Conda dev shell
 #
-# Reference docs (for your future self):
+# Reference docs:
 #   CMake CLI:        https://cmake.org/cmake/help/latest/manual/cmake.1.html
 #   CTest:            https://cmake.org/cmake/help/latest/manual/ctest.1.html
 #   CUDA Toolkit:     https://docs.nvidia.com/cuda/
-#   cuFFT:            https://docs.nvidia.com/cuda/cufft/index.html
-#   CUDA Graphs:      https://docs.nvidia.com/cuda/cuda-graphs/index.html
-#   Nsight Systems:   https://docs.nvidia.com/nsight-systems/UserGuide/
 #   pybind11:         https://pybind11.readthedocs.io/
 #   Conda envs:       https://conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html
 # ============================================================================
@@ -36,7 +33,7 @@ CONDA_ENV_NAME=${CONDA_ENV_NAME:-ionosense-hpc}
 ENV_FILE=${ENV_FILE:-"${PROJECT_ROOT}/environment.yml"}
 PYTHON=${PYTHON:-python3}
 
-# Demo/benchmark scripts (keep names here in one place)
+# Demo/benchmark scripts
 PY_FFT_RT="${PROJECT_ROOT}/python/benchmarks/fft_realtime.py"
 PY_FFT_RAW="${PROJECT_ROOT}/python/benchmarks/fft_raw.py"
 PY_UTILS="${PROJECT_ROOT}/python/benchmarks/utils.py"
@@ -45,7 +42,7 @@ PY_SCALE_B="${PROJECT_ROOT}/python/benchmarks/benchmark_scaling.py"
 PY_GRAPHS="${PROJECT_ROOT}/python/benchmarks/fft_graphs_comp.py"
 PY_VERIFY="${PROJECT_ROOT}/python/benchmarks/verify_accuracy.py"
 
-# Profiles out dir (mirrors the Windows layout from cli.ps1 tooling)
+# Profiles out dir
 PROFILE_DIR_NSYS="${PROJECT_ROOT}/build/nsight_reports/nsys_reports"
 mkdir -p "${PROFILE_DIR_NSYS}"
 
@@ -217,10 +214,6 @@ cmd_dev() {
 }
 
 # --- Benchmarks & Profiling --------------------------------------------------
-# Scalable, professionalized bench runner using a small registry. Keeps
-# legacy aliases (bench:rt, bench:raw) for muscle memory.
-
-# Back-compat: keep quick file existence checks for core demos
 ensure_bench_scripts_exist() {
   [[ -f "$PY_FFT_RT" ]]  || { err "Missing: $PY_FFT_RT";  exit 3; }
   [[ -f "$PY_FFT_RAW" ]] || { err "Missing: $PY_FFT_RAW"; exit 3; }
