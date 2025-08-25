@@ -5,7 +5,7 @@
 #include <string>
 #include <sstream>
 
-#include "../fft/cuda_fft.h"
+#include "cuda_fft.h"
 
 namespace py = pybind11;
 

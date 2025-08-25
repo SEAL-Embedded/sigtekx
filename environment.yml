@@ -22,11 +22,9 @@ dependencies:
   - cuda-libraries=13.0
   - cuda-nvcc=13.0
   - cuda-nvtx=13.0
-  - cuda-cufft=13.0        # Runtime library
-  - cuda-cufft-dev=13.0    # Development headers - THIS WAS MISSING!
-  - cuda-cudart=13.0       # CUDA runtime
+  - libcufft-dev=12.0      # Development headers for cuFFT
   - cuda-cudart-dev=13.0   # CUDA runtime headers
-  
+
   # 3. Python packages for testing and bindings
   - numpy
   - pytest

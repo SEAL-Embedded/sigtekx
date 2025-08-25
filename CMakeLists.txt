@@ -7,6 +7,14 @@ project(ionosense-hpc-lib LANGUAGES CXX CUDA)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CUDA_STANDARD 17)
 set(CMAKE_CUDA_ARCHITECTURES 75 86 89)
+
+# Build all targets as PIC so static libs can be linked into shared modules
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+# Prefer shared CUDA runtime for Python extensions (avoids static cudart issues)
+# Values: Shared | Static | None
+set(CMAKE_CUDA_RUNTIME_LIBRARY Shared)
+
 if(MSVC)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
 endif()
@@ -14,72 +22,48 @@ endif()
 # ============================================================================
 # 2. PYTHON CONFIGURATION
 # ============================================================================
-find_package(Python3 3.11 REQUIRED COMPONENTS Interpreter Development)
+find_package(Python3 3.11 REQUIRED COMPONENTS Interpreter Development Development.Module Development.Embed)
 
 # ============================================================================
-# 3. CUDA TOOLKIT CONFIGURATION
+# 3. CUDA TOOLKIT
 # ============================================================================
-if (DEFINED ENV{CONDA_PREFIX})
-    # Add the conda environment to CMake's search path
-    list(APPEND CMAKE_PREFIX_PATH $ENV{CONDA_PREFIX})
-    message(STATUS "Conda environment detected at: $ENV{CONDA_PREFIX}")
-endif()
-
-# Find the CUDA Toolkit - this will set CUDAToolkit_INCLUDE_DIRS correctly
 find_package(CUDAToolkit REQUIRED)
-message(STATUS "CUDAToolkit include dirs: ${CUDAToolkit_INCLUDE_DIRS}")
-message(STATUS "CUDAToolkit library dir: ${CUDAToolkit_LIBRARY_DIR}")
-
-# Manually find cuFFT library since Conda's package doesn't create the imported target
-find_library(CUFFT_LIBRARY
-    NAMES cufft
-    PATHS ${CUDAToolkit_LIBRARY_DIR}
-          $ENV{CONDA_PREFIX}/lib
-          $ENV{CONDA_PREFIX}/lib64
-    REQUIRED
-)
-message(STATUS "Found cuFFT library: ${CUFFT_LIBRARY}")
-
-# Find CUDA runtime library as well
-find_library(CUDART_LIBRARY
-    NAMES cudart
-    PATHS ${CUDAToolkit_LIBRARY_DIR}
-          $ENV{CONDA_PREFIX}/lib
-          $ENV{CONDA_PREFIX}/lib64
-    REQUIRED
-)
-message(STATUS "Found CUDA runtime library: ${CUDART_LIBRARY}")
 
 # ============================================================================
-# 4. EXTERNAL DEPENDENCIES (pybind11)
+# 4. DEPENDENCIES (pybind11, gtest)
 # ============================================================================
 include(FetchContent)
+
+# pybind11
 FetchContent_Declare(
-  pybind11
-  GIT_REPOSITORY https://github.com/pybind/pybind11
-  GIT_TAG        v2.12.0
+    pybind11
+    URL https://github.com/pybind/pybind11/archive/refs/tags/v2.12.0.zip
 )
 FetchContent_MakeAvailable(pybind11)
 
+# googletest
+FetchContent_Declare(
+    googletest
+    URL https://github.com/google/googletest/archive/03597a01ee50ed33e9dfd640b249b4be3799d395.zip
+)
+FetchContent_MakeAvailable(googletest)
+
 # ============================================================================
-# 5. CORE FFT ENGINE (CUDA)
+# 5. CORE LIB (CUDA FFT ENGINE)
 # ============================================================================
 add_library(fft_engine STATIC
     src/fft/cuda_fft.cu
     src/fft/cuda_fft.h
 )
 
-# Use the include directories found by CUDAToolkit
-target_include_directories(fft_engine PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/fft
-    ${CUDAToolkit_INCLUDE_DIRS}  # This is the key fix
+# Export the public include path so consumers (#include "cuda_fft.h") just work
+target_include_directories(fft_engine
+    PUBLIC ${PROJECT_SOURCE_DIR}/src/fft
 )
 
-# Link against CUDA libraries properly
-target_link_libraries(fft_engine 
-    PUBLIC
-        ${CUDART_LIBRARY}
-        ${CUFFT_LIBRARY}
+# Modern, target-based linking (lets CMake handle cudart/cufft variants)
+target_link_libraries(fft_engine
+    PUBLIC CUDA::cufft CUDA::cudart
 )
 
 # ============================================================================
@@ -88,31 +72,32 @@ target_link_libraries(fft_engine
 pybind11_add_module(cuda_lib SHARED
     src/bindings/bindings.cpp
 )
+
+# Only need to link our engine; pybind11 module target already carries Python
 target_link_libraries(cuda_lib PRIVATE
     fft_engine
     pybind11::module
 )
+
+# Ensure correct SONAME and rpaths are handled by CMake; no manual flags needed
 set_target_properties(cuda_lib PROPERTIES
-    PREFIX ""
+    OUTPUT_NAME "cuda_lib"
 )
 
 # ============================================================================
-# 7. TESTING SETUP
+# 7. TESTS (GoogleTest)
 # ============================================================================
 enable_testing()
-FetchContent_Declare(
-    googletest
-    URL https://github.com/google/googletest/archive/03597a01ee50ed33e9dfd640b249b4be3799d395.zip
-    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-)
-FetchContent_MakeAvailable(googletest)
 
 add_executable(run_cpp_tests
     tests/test_fft.cpp
 )
+
+# Consumers get fft_engine’s PUBLIC includes & links (fixes "cuda_fft.h" not found)
 target_link_libraries(run_cpp_tests PRIVATE
     GTest::gtest_main
     fft_engine
 )
+
 include(GoogleTest)
 gtest_discover_tests(run_cpp_tests)

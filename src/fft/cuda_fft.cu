@@ -15,6 +15,7 @@
 #include <stdexcept>
 #include <vector>
 #include <cstdio>
+#include <cstdint> // // Include for uint64_t and UINT64_MAX definitions.
 
 
  /* ------------------------------------------------------------------------- *
