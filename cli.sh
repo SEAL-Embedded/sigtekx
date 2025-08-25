@@ -1,235 +1,365 @@
-#!/bin/bash
-
-# =================================================================================================
+#!/usr/bin/env bash
+# ============================================================================
+# ionosense-hpc-lib • Linux CLI (feature-parity with cli.ps1)
+# ----------------------------------------------------------------------------
+# Modern, portable task runner for building, testing, benchmarking, and
+# profiling the CUDA/pybind11 project on Linux/WSL2.
 #
-# ionosense-hpc-lib Command-Line Interface (CLI)
+# Highlights
+# • Ninja + ccache (if available)
+# • Clean rebuilds, multi-config builds, configurable CUDA arch list
+# • Adds build/ to PYTHONPATH automatically for Python demos/benchmarks
+# • Nsight Systems profiling helpers
+# • "doctor" diagnostics + Conda dev shell
 #
-# This script provides a set of commands to manage the development lifecycle of the
-# ionosense-hpc-lib project, including setup, building, testing, and cleaning.
-# It is designed to be run in a Bash environment, particularly within WSL2.
-#
-# =================================================================================================
+# Reference docs (for your future self):
+#   CMake CLI:        https://cmake.org/cmake/help/latest/manual/cmake.1.html
+#   CTest:            https://cmake.org/cmake/help/latest/manual/ctest.1.html
+#   CUDA Toolkit:     https://docs.nvidia.com/cuda/
+#   cuFFT:            https://docs.nvidia.com/cuda/cufft/index.html
+#   CUDA Graphs:      https://docs.nvidia.com/cuda/cuda-graphs/index.html
+#   Nsight Systems:   https://docs.nvidia.com/nsight-systems/UserGuide/
+#   pybind11:         https://pybind11.readthedocs.io/
+#   Conda envs:       https://conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html
+# ============================================================================
+set -Eeuo pipefail
+IFS=$'\n\t'
 
-# --- Script Configuration and Helpers ---
+# --- Paths & Defaults --------------------------------------------------------
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BUILD_DIR=${BUILD_DIR:-"${PROJECT_ROOT}/build"}
+BUILD_TYPE=${BUILD_TYPE:-Release}     # Debug | Release | RelWithDebInfo | MinSizeRel
+GENERATOR=${GENERATOR:-auto}          # auto | Ninja | Unix Makefiles
+CUDA_ARCHS=${CUDA_ARCHS:-""}         # e.g. "86;89" (empty = CMakeLists default)
+CONDA_ENV_NAME=${CONDA_ENV_NAME:-ionosense-hpc}
+ENV_FILE=${ENV_FILE:-"${PROJECT_ROOT}/environment.yml"}
+PYTHON=${PYTHON:-python3}
 
-# Exit immediately if a command exits with a non-zero status.
-set -e
+# Demo/benchmark scripts (keep names here in one place)
+PY_FFT_RT="${PROJECT_ROOT}/python/benchmarks/fft_realtime.py"
+PY_FFT_RAW="${PROJECT_ROOT}/python/benchmarks/fft_raw.py"
+PY_UTILS="${PROJECT_ROOT}/python/benchmarks/utils.py"
+PY_SCALE_A="${PROJECT_ROOT}/python/benchmarks/fft_batch_scaling.py"
+PY_SCALE_B="${PROJECT_ROOT}/python/benchmarks/benchmark_scaling.py"
+PY_GRAPHS="${PROJECT_ROOT}/python/benchmarks/fft_graphs_comp.py"
+PY_VERIFY="${PROJECT_ROOT}/python/benchmarks/verify_accuracy.py"
 
-# Get the root directory of the project (the directory where this script is located)
-# This makes the script runnable from any subdirectory.
-PROJECT_ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+# Profiles out dir (mirrors the Windows layout from cli.ps1 tooling)
+PROFILE_DIR_NSYS="${PROJECT_ROOT}/cuda/cuda_core/fft/profiles/nsys_reports"
+mkdir -p "${PROFILE_DIR_NSYS}"
 
-# --- Color Codes for Output ---
-COLOR_RESET='\033[0m'
-COLOR_RED='\033[0;31m'
-COLOR_GREEN='\033[0;32m'
-COLOR_YELLOW='\033[0;33m'
-COLOR_CYAN='\033[0;36m'
-COLOR_BOLD='\033[1m'
+# --- Pretty logging ----------------------------------------------------------
+C0='\033[0m'; CRED='\033[0;31m'; CGRN='\033[0;32m'; CYEL='\033[0;33m'; CCYN='\033[0;36m'; CBLD='\033[1m'
+log()       { echo -e "${CCYN}[INFO]${C0}  $*"; }
+warn()      { echo -e "${CYEL}[WARN]${C0}  $*"; }
+err()       { echo -e "${CRED}[ERR ]${C0}  $*" 1>&2; }
+ok()        { echo -e "${CGRN}[OK  ]${C0}  $*"; }
+section()   { echo -e "\n${CBLD}== $* ==${C0}"; }
 
-# Helper function for logging messages
-log() {
-    echo -e "${COLOR_CYAN}[INFO]${COLOR_RESET} $1"
+trap 'err "Command failed on line $LINENO"' ERR
+
+# --- Helpers -----------------------------------------------------------------
+need() { command -v "$1" >/dev/null 2>&1 || { err "Required tool '$1' not found"; exit 127; }; }
+
+choose_generator() {
+  if [[ "$GENERATOR" == auto ]]; then
+    if command -v ninja >/dev/null 2>&1; then echo Ninja; else echo "Unix Makefiles"; fi
+  else
+    echo "$GENERATOR"
+  fi
 }
 
-# Helper function for success messages
-log_success() {
-    echo -e "${COLOR_GREEN}[SUCCESS]${COLOR_RESET} $1"
+maybe_ccache_flags() {
+  if command -v ccache >/dev/null 2>&1; then
+    echo "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_CUDA_COMPILER_LAUNCHER=ccache"
+  else
+    echo ""
+  fi
 }
 
-# Helper function for warning messages
-log_warn() {
-    echo -e "${COLOR_YELLOW}[WARNING]${COLOR_RESET} $1"
+cmake_arch_flags() {
+  if [[ -n "$CUDA_ARCHS" ]]; then
+    echo "-DCMAKE_CUDA_ARCHITECTURES=${CUDA_ARCHS}"
+  else
+    echo ""  # Use project defaults from CMakeLists.txt
+  fi
 }
 
-# Helper function for error messages and exiting
-log_error() {
-    echo -e "${COLOR_RED}[ERROR]${COLOR_RESET} $1" >&2
+ensure_conda_loaded() {
+  if command -v conda >/dev/null 2>&1; then
+    # shellcheck disable=SC1091
+    source "$(conda info --base)/etc/profile.d/conda.sh"
+  fi
+}
+
+activate_env() {
+  ensure_conda_loaded
+  if command -v conda >/dev/null 2>&1; then
+    # If already in the desired env, don't re-activate (prevents nested-activate bugs)
+    if [[ "${CONDA_DEFAULT_ENV-}" == "$CONDA_ENV_NAME" ]]; then
+      return 0
+    fi
+    # Guard against unbound vars in third-party activate/deactivate hooks
+    set +u
+    conda activate "$CONDA_ENV_NAME"
+    set -u
+  else
+    warn "Conda not found. Using system Python."
+  fi
+}
+
+with_pythonpath() {
+  # Ensure Python can import the freshly built pybind11 module from build dir
+  export PYTHONPATH="${BUILD_DIR}:${PYTHONPATH-}"
+  "$@"
+}
+
+# --- Core actions ------------------------------------------------------------
+cmd_doctor() {
+  section "Environment Diagnostics"
+  for t in gcc g++ nvcc cmake ninja ${PYTHON}; do
+    if command -v "$t" >/dev/null 2>&1; then "$t" --version 2>/dev/null | head -n1 || true; else warn "$t not found"; fi
+  done
+  if command -v nsys >/dev/null 2>&1; then nsys --version | head -n1; else warn "nsys not found"; fi
+  if command -v conda >/dev/null 2>&1; then conda info | sed -n '1,12p'; else warn "conda not found"; fi
+}
+
+cmd_setup() {
+  section "Environment Setup (Conda)"
+  ensure_conda_loaded
+  if ! command -v conda >/dev/null 2>&1; then
+    err "Conda not found. Install Miniconda: https://docs.conda.io/en/latest/miniconda.html"
     exit 1
-}
-
-# --- Project-Specific Variables ---
-CONDA_ENV_NAME="ionosense-hpc"
-ENV_FILE="environment.yml"
-BUILD_DIR="build"
-
-# --- Command Functions ---
-
-#
-# Display the help message
-#
-function show_help() {
-    echo -e "${COLOR_BOLD}ionosense-hpc-lib CLI${COLOR_RESET}"
-    echo "A script to manage the project's development lifecycle."
-    echo
-    echo "Usage: ./cli.sh [command]"
-    echo
-    echo "Commands:"
-    echo -e "  ${COLOR_GREEN}setup${COLOR_RESET}      - Installs Miniconda (if needed) and creates the Conda environment."
-    echo -e "  ${COLOR_GREEN}build${COLOR_RESET}      - Configures and builds the C++/CUDA source code using CMake."
-    echo -e "  ${COLOR_GREEN}test${COLOR_RESET}       - Runs C++ and Python tests."
-    echo -e "  ${COLOR_GREEN}clean${COLOR_RESET}      - Removes build artifacts and temporary files."
-    echo -e "  ${COLOR_GREEN}dev${COLOR_RESET}        - Activates the Conda environment to start a development shell."
-    echo -e "  ${COLOR_GREEN}help${COLOR_RESET}       - Shows this help message."
-    echo
-}
-
-#
-# Set up the development environment
-#
-function setup_environment() {
-    log "Starting project setup..."
-
-    # 1. Check for Conda
-    if ! command -v conda &> /dev/null; then
-        log_warn "Conda not found. Attempting to install Miniconda."
-        # Download and install Miniconda
-        local miniconda_installer="Miniconda3-latest-Linux-x86_64.sh"
-        wget "https://repo.anaconda.com/miniconda/${miniconda_installer}" -O "/tmp/${miniconda_installer}"
-        bash "/tmp/${miniconda_installer}" -b -p "${HOME}/miniconda"
-        rm "/tmp/${miniconda_installer}"
-
-        # Add conda to PATH for the current session and for future sessions
-        export PATH="${HOME}/miniconda/bin:${PATH}"
-        echo 'export PATH="${HOME}/miniconda/bin:${PATH}"' >> ~/.bashrc
-        log_success "Miniconda installed successfully. Please restart your shell or run 'source ~/.bashrc' for changes to take effect."
+  fi
+  if [[ -f "$ENV_FILE" ]]; then
+    if conda env list | grep -q "^${CONDA_ENV_NAME}\s"; then
+      log "Updating existing env '${CONDA_ENV_NAME}' from $ENV_FILE ..."
+      conda env update -n "$CONDA_ENV_NAME" -f "$ENV_FILE" --prune
     else
-        log "Conda is already installed."
+      log "Creating env '${CONDA_ENV_NAME}' from $ENV_FILE ..."
+      conda env create -n "$CONDA_ENV_NAME" -f "$ENV_FILE"
     fi
+    ok "Conda env ready. Launch with: ./cli.sh dev"
+  else
+    err "Environment file not found: $ENV_FILE"
+    exit 2
+  fi
+}
 
-    # 2. Check if the environment already exists
-    if conda env list | grep -q "${CONDA_ENV_NAME}"; then
-        log "Conda environment '${CONDA_ENV_NAME}' already exists. Updating..."
-        conda env update --name "${CONDA_ENV_NAME}" --file "${PROJECT_ROOT}/${ENV_FILE}" --prune
+# Configure + build (no clean)
+cmd_build() {
+  local bt=${1:-$BUILD_TYPE}
+  section "Configuring CMake (${bt})"
+  need cmake
+  local gen; gen=$(choose_generator)
+  mkdir -p "$BUILD_DIR"
+  local CCACHE_FLAGS; CCACHE_FLAGS=$(maybe_ccache_flags)
+  local ARCH_FLAGS; ARCH_FLAGS=$(cmake_arch_flags)
+  cmake -S "$PROJECT_ROOT" -B "$BUILD_DIR" \
+    -G "$gen" -DCMAKE_BUILD_TYPE="$bt" $CCACHE_FLAGS $ARCH_FLAGS
+
+  section "Building"
+  cmake --build "$BUILD_DIR" --config "$bt" --parallel --verbose
+  ok "Build finished -> $BUILD_DIR"
+}
+
+# Clean build dir then build
+cmd_rebuild() {
+  local bt=${1:-$BUILD_TYPE}
+  section "Rebuilding (${bt})"
+  rm -rf "$BUILD_DIR"
+  cmd_build "$bt"
+}
+
+cmd_clean() {
+  section "Cleaning"
+  rm -rf "$BUILD_DIR" .pytest_cache **/__pycache__ 2>/dev/null || true
+  find "$PROJECT_ROOT" -name "*.pyc" -delete 2>/dev/null || true
+  ok "Workspace cleaned"
+}
+
+cmd_test() {
+  section "Running C++ & Python tests"
+  need ctest
+  (cd "$BUILD_DIR" && ctest --output-on-failure)
+  if [[ -d "${PROJECT_ROOT}/tests" ]]; then
+    activate_env
+    with_pythonpath "$PYTHON" -m pytest -q "${PROJECT_ROOT}/tests" || true
+  else
+    warn "No Python tests folder found"
+  fi
+}
+
+cmd_dev() {
+  section "Conda Dev Shell (${CONDA_ENV_NAME})"
+  activate_env
+  bash -i
+}
+
+# --- Benchmarks & Profiling --------------------------------------------------
+# Scalable, professionalized bench runner using a small registry. Keeps
+# legacy aliases (bench:rt, bench:raw) for muscle memory.
+
+# Back-compat: keep quick file existence checks for core demos
+ensure_bench_scripts_exist() {
+  [[ -f "$PY_FFT_RT" ]]  || { err "Missing: $PY_FFT_RT";  exit 3; }
+  [[ -f "$PY_FFT_RAW" ]] || { err "Missing: $PY_FFT_RAW"; exit 3; }
+  [[ -f "$PY_UTILS" ]]   || { err "Missing: $PY_UTILS";   exit 3; }
+}
+
+# Registry (name -> script path). `scale` resolves preferred/fallback names.
+declare -A BENCH_SCRIPTS=(
+  [rt]="$PY_FFT_RT"
+  [raw]="$PY_FFT_RAW"
+  [scale]=""       # resolved dynamically (A or B)
+  [graphs]="$PY_GRAPHS"
+  [verify]="$PY_VERIFY"
+)
+
+bench_resolve() {
+  local name="$1"; local path="${BENCH_SCRIPTS[$name]:-}"
+  if [[ "$name" == scale ]]; then
+    if [[ -f "$PY_SCALE_A" ]]; then path="$PY_SCALE_A"; elif [[ -f "$PY_SCALE_B" ]]; then path="$PY_SCALE_B"; fi
+  fi
+  [[ -n "$path" && -f "$path" ]] && { echo "$path"; return 0; }
+  return 1
+}
+
+ensure_utils() {
+  [[ -f "$PY_UTILS" ]] || { err "Missing: $PY_UTILS"; exit 3; }
+}
+
+cmd_bench_list() {
+  section "Available benchmarks"
+  local k
+  for k in "${!BENCH_SCRIPTS[@]}"; do
+    if bench_resolve "$k" >/dev/null; then
+      printf "  • %-8s %s
+" "$k" "$(bench_resolve "$k")"
     else
-        log "Creating Conda environment '${CONDA_ENV_NAME}' from ${ENV_FILE}..."
-        conda env create --name "${CONDA_ENV_NAME}" --file "${PROJECT_ROOT}/${ENV_FILE}"
+      printf "  • %-8s %s
+" "$k" "(script missing)"
     fi
-
-    log_success "Environment setup complete. Activate it with: ./cli.sh dev"
+  done | sort
 }
 
-#
-# Build the C++/CUDA source code
-#
-function build_project() {
-    log "Building the project..."
-    
-    # Activate conda environment to ensure CMake finds the correct dependencies
-    source "$(conda info --base)/etc/profile.d/conda.sh"
-    conda activate "${CONDA_ENV_NAME}"
-
-    log "Configuring CMake..."
-    cmake -S "${PROJECT_ROOT}" -B "${PROJECT_ROOT}/${BUILD_DIR}" \
-          -DCMAKE_BUILD_TYPE=Release
-
-    log "Compiling with CMake..."
-    cmake --build "${PROJECT_ROOT}/${BUILD_DIR}" --parallel --verbose
-
-    conda deactivate
-    log_success "Project built successfully in '${BUILD_DIR}/'."
+cmd_bench_run() {
+  ensure_utils; activate_env
+  local name="${1:-}"; shift || true
+  [[ -n "$name" ]] || { err "Usage: bench run <name> [args]"; exit 64; }
+  local script
+  if ! script=$(bench_resolve "$name"); then err "Unknown or missing bench: $name"; cmd_bench_list; exit 66; fi
+  section "Benchmark: $name"
+  with_pythonpath "$PYTHON" "$script" "$@"
 }
 
-#
-# Run all tests
-#
-function run_tests() {
-    log "Running tests..."
-    # Activate conda environment for python dependencies
-    source "$(conda info --base)/etc/profile.d/conda.sh"
-    conda activate "${CONDA_ENV_NAME}"
+# Legacy shorthand wrappers (still supported)
+cmd_bench_rt()    { cmd_bench_run rt     "$@"; }
+cmd_bench_raw()   { cmd_bench_run raw    "$@"; }
+cmd_bench_scale() { cmd_bench_run scale  "$@"; }
+cmd_bench_graphs(){ cmd_bench_run graphs "$@"; }
+cmd_bench_verify(){ cmd_bench_run verify "$@"; }
 
-    # Run C++ tests via CTest
-    log "Running C++ tests..."
-    (cd "${PROJECT_ROOT}/${BUILD_DIR}" && ctest --output-on-failure)
+nsys_or_die() { command -v nsys >/dev/null 2>&1 || { err "Nsight Systems (nsys) not found"; exit 4; }; }
 
-    # Run Python tests via pytest
-    log "Running Python tests..."
-    pytest "${PROJECT_ROOT}/tests/"
-
-    conda deactivate
-    log_success "All tests passed."
+cmd_profile() {
+  nsys_or_die; ensure_utils; activate_env
+  local name="${1:-}"; shift || true
+  [[ -n "$name" ]] || { err "Usage: profile <name> [args]"; exit 64; }
+  local script
+  if ! script=$(bench_resolve "$name"); then err "Unknown or missing bench: $name"; cmd_bench_list; exit 66; fi
+  local stamp; stamp=$(date +%Y%m%d_%H%M%S)
+  local out="${PROFILE_DIR_NSYS}/${name}_${stamp}"
+  section "Nsight Systems • $name"
+  with_pythonpath nsys profile -o "$out" --trace=cuda,nvtx,osrt --sample=none --cpuctxsw=none \
+    "$PYTHON" "$script" "$@"
+  ok "Report: ${out}.qdrep"
 }
 
-#
-# Clean build artifacts
-#
-function clean_project() {
-    log "Cleaning project..."
-    if [ -d "${PROJECT_ROOT}/${BUILD_DIR}" ]; then
-        rm -rf "${PROJECT_ROOT}/${BUILD_DIR}"
-        log "Removed build directory: ${BUILD_DIR}"
-    else
-        log "Build directory not found, nothing to clean."
-    fi
+# Back-compat explicit aliases retained
+cmd_profile_rt()     { cmd_profile rt     "$@"; }
+cmd_profile_raw()    { cmd_profile raw    "$@"; }
+cmd_profile_scale()  { cmd_profile scale  "$@"; }
+cmd_profile_graphs() { cmd_profile graphs "$@"; }
+cmd_profile_verify() { cmd_profile verify "$@"; }
+# --- Usage -------------------------------------------------------------------
+usage() {
+  cat <<EOF
+${CBLD}ionosense-hpc-lib CLI${C0}
+Usage: ./cli.sh <command> [args]
 
-    # Remove Python cache files
-    find . -type d -name "__pycache__" -exec rm -r {} + 2>/dev/null || true
-    find . -type f -name "*.pyc" -delete 2>/dev/null || true
-    log "Removed Python cache files."
+Core:
+  setup                    Create/update Conda env (${CONDA_ENV_NAME}) from environment.yml
+  build [TYPE]             Configure & build (TYPE: Debug/Release/RelWithDebInfo)
+  rebuild [TYPE]           Clean build/ then build
+  clean                    Remove build artifacts & caches
+  test                     Run C++ (ctest) and Python tests (pytest if tests/ exists)
+  dev                      Open an interactive shell with Conda env activated
+  doctor                   Print toolchain diagnostics (cmake/nvcc/nsys/etc.)
 
-    log_success "Project cleaned."
+Benchmarks (registry):
+  bench list               List available benchmarks and their scripts
+  bench run <name> [args]  Run a benchmark by name (rt, raw, scale, graphs, verify)
+
+Shortcuts:
+  bench:rt [args]          Real-time latency (fft_realtime.py)
+  bench:raw [args]         Raw throughput (fft_raw.py)
+  bench:scale [args]       Batch-scaling sweep (fft_batch_scaling.py / benchmark_scaling.py)
+  bench:graphs [args]      CUDA Graphs vs No-Graphs A/B (fft_graphs_comp.py)
+  bench:verify [args]      Numerical accuracy & perf sanity (verify_accuracy.py)
+
+Profiling (Nsight Systems):
+  profile <name> [args]    Profile any registered bench -> ${PROFILE_DIR_NSYS}/<name>_<ts>.qdrep
+  profile:rt|raw|scale|graphs|verify  Legacy explicit aliases
+
+Env overrides (optional):
+  BUILD_TYPE=${BUILD_TYPE}  GENERATOR=${GENERATOR}  CUDA_ARCHS="${CUDA_ARCHS}"
+  CONDA_ENV_NAME=${CONDA_ENV_NAME}  BUILD_DIR=${BUILD_DIR}
+
+Examples:
+  ./cli.sh build Debug
+  CUDA_ARCHS="86;89" ./cli.sh rebuild RelWithDebInfo
+  ./cli.sh bench list
+  ./cli.sh bench run scale --nfft 4096 --min-batch 2 --max-batch 256 -k 5 -d 3 -o scaling.csv
+  ./cli.sh profile graphs -n 4096 -b 8 -i 2000 -d 5
+EOF
 }
 
-#
-# Enter development shell
-#
-function start_dev_shell() {
-    log "Activating development shell for '${CONDA_ENV_NAME}'..."
-    log "Type 'exit' or press Ctrl+D to leave the shell."
-
-    # Activate the conda environment and start a new interactive bash shell
-    source "$(conda info --base)/etc/profile.d/conda.sh"
-    conda activate "${CONDA_ENV_NAME}"
-    
-    # The `bash -i` command starts a new interactive shell.
-    # The environment variables, including the activated conda env, are inherited.
-    bash -i
-    
-    conda deactivate
-    log "Development shell closed."
-}
-
-
-# --- Main Script Logic ---
-#
-# Parses the first command-line argument and calls the corresponding function.
-#
+# --- Router ------------------------------------------------------------------
 main() {
-    cd "${PROJECT_ROOT}" # Ensure script operations run from the project root
-
-    if [ $# -eq 0 ]; then
-        log_error "No command provided. See usage below."
-        show_help
-        exit 1
-    fi
-
-    case "$1" in
-        setup)
-            setup_environment
-            ;;
-        build)
-            build_project
-            ;;
-        test)
-            run_tests
-            ;;
-        clean)
-            clean_project
-            ;;
-        dev)
-            start_dev_shell
-            ;;
-        help|--help|-h)
-            show_help
-            ;;
-        *)
-            log_error "Unknown command: $1"
-            show_help
-            exit 1
-            ;;
-    esac
+  cd "$PROJECT_ROOT"
+  local cmd=${1:-help}; shift || true
+  case "$cmd" in
+    help|-h|--help) usage ;;
+    doctor)         cmd_doctor ;;
+    setup)          cmd_setup ;;
+    build)          cmd_build "${1:-$BUILD_TYPE}" ;;
+    rebuild)        cmd_rebuild "${1:-$BUILD_TYPE}" ;;
+    clean)          cmd_clean ;;
+    test)           cmd_test ;;
+    dev)            cmd_dev ;;
+    # bench registry entrypoints
+    bench)          sub=${1:-}; shift || true;
+                    case "$sub" in
+                      list) cmd_bench_list ;;
+                      run)  cmd_bench_run "$@" ;;
+                      *)    err "Usage: bench {list|run <name> [args]}"; exit 64 ;;
+                    esac ;;
+    # shorthand bench aliases
+    bench:rt)       cmd_bench_rt "$@" ;;
+    bench:raw)      cmd_bench_raw "$@" ;;
+    bench:scale)    cmd_bench_scale "$@" ;;
+    bench:graphs)   cmd_bench_graphs "$@" ;;
+    bench:verify)   cmd_bench_verify "$@" ;;
+    # profiler
+    profile)        cmd_profile "$@" ;;
+    profile:rt)     cmd_profile_rt "$@" ;;
+    profile:raw)    cmd_profile_raw "$@" ;;
+    profile:scale)  cmd_profile_scale "$@" ;;
+    profile:graphs) cmd_profile_graphs "$@" ;;
+    profile:verify) cmd_profile_verify "$@" ;;
+    *)              err "Unknown command: $cmd"; usage; exit 64 ;;
+  esac
 }
 
-# Execute the main function with all provided command-line arguments
 main "$@"
