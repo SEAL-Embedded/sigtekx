@@ -23,7 +23,8 @@
 #   Conda envs:       https://conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html
 # ============================================================================
 set -Eeuo pipefail
-IFS=$'\n\t'
+IFS=$'
+	'
 
 # --- Paths & Defaults --------------------------------------------------------
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -45,16 +46,17 @@ PY_GRAPHS="${PROJECT_ROOT}/python/benchmarks/fft_graphs_comp.py"
 PY_VERIFY="${PROJECT_ROOT}/python/benchmarks/verify_accuracy.py"
 
 # Profiles out dir (mirrors the Windows layout from cli.ps1 tooling)
-PROFILE_DIR_NSYS="${PROJECT_ROOT}/cuda/cuda_core/fft/profiles/nsys_reports"
+PROFILE_DIR_NSYS="${PROJECT_ROOT}/build/nsight_reports/nsys_reports"
 mkdir -p "${PROFILE_DIR_NSYS}"
 
 # --- Pretty logging ----------------------------------------------------------
-C0='\033[0m'; CRED='\033[0;31m'; CGRN='\033[0;32m'; CYEL='\033[0;33m'; CCYN='\033[0;36m'; CBLD='\033[1m'
+C0='[0m'; CRED='[0;31m'; CGRN='[0;32m'; CYEL='[0;33m'; CCYN='[0;36m'; CBLD='[1m'
 log()       { echo -e "${CCYN}[INFO]${C0}  $*"; }
 warn()      { echo -e "${CYEL}[WARN]${C0}  $*"; }
 err()       { echo -e "${CRED}[ERR ]${C0}  $*" 1>&2; }
 ok()        { echo -e "${CGRN}[OK  ]${C0}  $*"; }
-section()   { echo -e "\n${CBLD}== $* ==${C0}"; }
+section()   { echo -e "
+${CBLD}== $* ==${C0}"; }
 
 trap 'err "Command failed on line $LINENO"' ERR
 
@@ -153,13 +155,31 @@ cmd_build() {
   need cmake
   local gen; gen=$(choose_generator)
   mkdir -p "$BUILD_DIR"
-  local CCACHE_FLAGS; CCACHE_FLAGS=$(maybe_ccache_flags)
-  local ARCH_FLAGS; ARCH_FLAGS=$(cmake_arch_flags)
-  cmake -S "$PROJECT_ROOT" -B "$BUILD_DIR" \
-    -G "$gen" -DCMAKE_BUILD_TYPE="$bt" $CCACHE_FLAGS $ARCH_FLAGS
+
+  # Build CMake args as an array to avoid launcher quoting bugs
+  local -a CMAKE_ARGS
+  CMAKE_ARGS=( -S "$PROJECT_ROOT" -B "$BUILD_DIR" -G "$gen" -DCMAKE_BUILD_TYPE="$bt" )
+
+  # ccache launchers if available (each as its own arg)
+  if command -v ccache >/dev/null 2>&1; then
+    CMAKE_ARGS+=( -DCMAKE_CXX_COMPILER_LAUNCHER=ccache )
+    CMAKE_ARGS+=( -DCMAKE_CUDA_COMPILER_LAUNCHER=ccache )
+  fi
+
+  # CUDA arch list if provided
+  if [[ -n "${CUDA_ARCHS}" ]]; then
+    CMAKE_ARGS+=( -DCMAKE_CUDA_ARCHITECTURES="${CUDA_ARCHS}" )
+  fi
+
+  cmake "${CMAKE_ARGS[@]}"
 
   section "Building"
-  cmake --build "$BUILD_DIR" --config "$bt" --parallel --verbose
+  # Only pass --config for multi-config generators (VS/Xcode/Ninja Multi-Config)
+  if [[ "$gen" == "Ninja" || "$gen" == "Unix Makefiles" ]]; then
+    cmake --build "$BUILD_DIR" --parallel --verbose
+  else
+    cmake --build "$BUILD_DIR" --config "$bt" --parallel --verbose
+  fi
   ok "Build finished -> $BUILD_DIR"
 }
 

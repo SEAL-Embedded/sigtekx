@@ -1,103 +1,101 @@
 ﻿cmake_minimum_required(VERSION 3.18)
 project(ionosense-hpc-lib LANGUAGES CXX CUDA)
 
-# ============================================================================
-# 1. PROJECT-WIDE SETTINGS
-# ============================================================================
+# ========= Project-wide =========
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CUDA_STANDARD 17)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_CUDA_RUNTIME_LIBRARY Shared)
+# your arch list — keep as-is
 set(CMAKE_CUDA_ARCHITECTURES 75 86 89)
 
-# Build all targets as PIC so static libs can be linked into shared modules
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-
-# Prefer shared CUDA runtime for Python extensions (avoids static cudart issues)
-# Values: Shared | Static | None
-set(CMAKE_CUDA_RUNTIME_LIBRARY Shared)
-
-if(MSVC)
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+# ========= FetchContent speed knobs (safe) =========
+if (POLICY CMP0135)
+  cmake_policy(SET CMP0135 NEW)  # avoid timestamp warning for URL zips
 endif()
+set(FETCHCONTENT_UPDATES_DISCONNECTED ON CACHE BOOL "" FORCE)
 
-# ============================================================================
-# 2. PYTHON CONFIGURATION
-# ============================================================================
+# we'll set FULLY_DISCONNECTED automatically later if cache exists
+
+# Trim googletest unless you actually use gmock
+set(BUILD_GMOCK   OFF CACHE BOOL "" FORCE)
+set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+
+# ========= Python / CUDA =========
 find_package(Python3 3.11 REQUIRED COMPONENTS Interpreter Development Development.Module Development.Embed)
-
-# ============================================================================
-# 3. CUDA TOOLKIT
-# ============================================================================
 find_package(CUDAToolkit REQUIRED)
 
-# ============================================================================
-# 4. DEPENDENCIES (pybind11, gtest)
-# ============================================================================
+# ========= Dependencies (prefer find_package; fallback to FetchContent) =========
+include(CMakeDependentOption)
 include(FetchContent)
 
-# pybind11
-FetchContent_Declare(
-    pybind11
-    URL https://github.com/pybind/pybind11/archive/refs/tags/v2.12.0.zip
-)
-FetchContent_MakeAvailable(pybind11)
+# Try conda/system first (fast path)
+find_package(pybind11 CONFIG QUIET)
+find_package(GTest CONFIG QUIET) # provides GTest::gtest, GTest::gtest_main
 
-# googletest
-FetchContent_Declare(
-    googletest
-    URL https://github.com/google/googletest/archive/03597a01ee50ed33e9dfd640b249b4be3799d395.zip
-)
-FetchContent_MakeAvailable(googletest)
+# If missing, fetch (one-time) and then go fully offline automatically
+if (NOT pybind11_FOUND OR NOT GTest_FOUND)
+  # Where FetchContent will put sources by default
+  set(_fc_base "${FETCHCONTENT_BASE_DIR}")
+  if(NOT _fc_base)
+    set(_fc_base "${CMAKE_BINARY_DIR}/_deps")
+  endif()
 
-# ============================================================================
-# 5. CORE LIB (CUDA FFT ENGINE)
-# ============================================================================
+  # Decls with timestamp flag to silence CMP0135 warnings
+  if (NOT pybind11_FOUND)
+    FetchContent_Declare(
+      pybind11
+      URL https://github.com/pybind/pybind11/archive/refs/tags/v2.12.0.zip
+      DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    )
+  endif()
+
+  if (NOT GTest_FOUND)
+    FetchContent_Declare(
+      googletest
+      URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
+      DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    )
+  endif()
+
+  # First populate (online if needed)
+  if (NOT pybind11_FOUND)
+    FetchContent_MakeAvailable(pybind11)   # defines pybind11 targets/macros
+  endif()
+  if (NOT GTest_FOUND)
+    FetchContent_MakeAvailable(googletest) # defines GTest::gtest(_main)
+  endif()
+
+  # After the first populate, flip fully offline for subsequent config runs
+  if (EXISTS "${_fc_base}/pybind11-src/CMakeLists.txt" AND
+      EXISTS "${_fc_base}/googletest-src/CMakeLists.txt")
+    set(FETCHCONTENT_FULLY_DISCONNECTED ON CACHE BOOL "" FORCE)
+  endif()
+endif()
+
+# ========= Core lib =========
 add_library(fft_engine STATIC
-    src/fft/cuda_fft.cu
-    src/fft/cuda_fft.h
+  src/fft/cuda_fft.cu
+  src/fft/cuda_fft.h
 )
+target_include_directories(fft_engine PUBLIC ${PROJECT_SOURCE_DIR}/src/fft)
+target_link_libraries(fft_engine PUBLIC CUDA::cufft CUDA::cudart)
 
-# Export the public include path so consumers (#include "cuda_fft.h") just work
-target_include_directories(fft_engine
-    PUBLIC ${PROJECT_SOURCE_DIR}/src/fft
-)
+# ========= Python module =========
+# pybind11 adds the helper macro when either found or fetched
+pybind11_add_module(cuda_lib SHARED src/bindings/bindings.cpp)
+target_link_libraries(cuda_lib PRIVATE fft_engine pybind11::module)
+set_target_properties(cuda_lib PROPERTIES OUTPUT_NAME "cuda_lib")
 
-# Modern, target-based linking (lets CMake handle cudart/cufft variants)
-target_link_libraries(fft_engine
-    PUBLIC CUDA::cufft CUDA::cudart
-)
-
-# ============================================================================
-# 6. PYTHON BINDINGS (pybind11)
-# ============================================================================
-pybind11_add_module(cuda_lib SHARED
-    src/bindings/bindings.cpp
-)
-
-# Only need to link our engine; pybind11 module target already carries Python
-target_link_libraries(cuda_lib PRIVATE
+# ========= Tests (optional toggle; default ON to preserve behavior) =========
+option(IONO_BUILD_TESTS "Build unit tests" ON)
+if (IONO_BUILD_TESTS)
+  enable_testing()
+  add_executable(run_cpp_tests tests/test_fft.cpp)
+  target_link_libraries(run_cpp_tests PRIVATE
     fft_engine
-    pybind11::module
-)
-
-# Ensure correct SONAME and rpaths are handled by CMake; no manual flags needed
-set_target_properties(cuda_lib PROPERTIES
-    OUTPUT_NAME "cuda_lib"
-)
-
-# ============================================================================
-# 7. TESTS (GoogleTest)
-# ============================================================================
-enable_testing()
-
-add_executable(run_cpp_tests
-    tests/test_fft.cpp
-)
-
-# Consumers get fft_engine’s PUBLIC includes & links (fixes "cuda_fft.h" not found)
-target_link_libraries(run_cpp_tests PRIVATE
-    GTest::gtest_main
-    fft_engine
-)
-
-include(GoogleTest)
-gtest_discover_tests(run_cpp_tests)
+    GTest::gtest_main  # available whether we found or fetched
+  )
+  include(GoogleTest)
+  gtest_discover_tests(run_cpp_tests)
+endif()
