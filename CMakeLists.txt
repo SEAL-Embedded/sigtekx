@@ -1,5 +1,5 @@
 ﻿cmake_minimum_required(VERSION 3.18)
-project(CudaWorkspace LANGUAGES CXX CUDA)
+project(ionosense-hpc-lib LANGUAGES CXX CUDA)
 
 # ============================================================================
 # 1. PROJECT-WIDE SETTINGS
@@ -14,93 +14,105 @@ endif()
 # ============================================================================
 # 2. PYTHON CONFIGURATION
 # ============================================================================
-if(DEFINED Python3_EXECUTABLE)
-    message(STATUS "Using specified Python: ${Python3_EXECUTABLE}")
-elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.venv/Scripts/python.exe")
-    set(Python3_EXECUTABLE "${CMAKE_CURRENT_SOURCE_DIR}/.venv/Scripts/python.exe")
-    message(STATUS "Auto-detected venv Python: ${Python3_EXECUTABLE}")
-endif()
 find_package(Python3 3.11 REQUIRED COMPONENTS Interpreter Development)
 
 # ============================================================================
-# 3. CUDA CONFIGURATION
+# 3. CUDA TOOLKIT CONFIGURATION
 # ============================================================================
-find_package(CUDAToolkit 13.0 REQUIRED)
+if (DEFINED ENV{CONDA_PREFIX})
+    # Add the conda environment to CMake's search path
+    list(APPEND CMAKE_PREFIX_PATH $ENV{CONDA_PREFIX})
+    message(STATUS "Conda environment detected at: $ENV{CONDA_PREFIX}")
+endif()
+
+# Find the CUDA Toolkit - this will set CUDAToolkit_INCLUDE_DIRS correctly
+find_package(CUDAToolkit REQUIRED)
+message(STATUS "CUDAToolkit include dirs: ${CUDAToolkit_INCLUDE_DIRS}")
+message(STATUS "CUDAToolkit library dir: ${CUDAToolkit_LIBRARY_DIR}")
+
+# Manually find cuFFT library since Conda's package doesn't create the imported target
+find_library(CUFFT_LIBRARY
+    NAMES cufft
+    PATHS ${CUDAToolkit_LIBRARY_DIR}
+          $ENV{CONDA_PREFIX}/lib
+          $ENV{CONDA_PREFIX}/lib64
+    REQUIRED
+)
+message(STATUS "Found cuFFT library: ${CUFFT_LIBRARY}")
+
+# Find CUDA runtime library as well
+find_library(CUDART_LIBRARY
+    NAMES cudart
+    PATHS ${CUDAToolkit_LIBRARY_DIR}
+          $ENV{CONDA_PREFIX}/lib
+          $ENV{CONDA_PREFIX}/lib64
+    REQUIRED
+)
+message(STATUS "Found CUDA runtime library: ${CUDART_LIBRARY}")
 
 # ============================================================================
-# 4. EXTERNAL DEPENDENCIES
+# 4. EXTERNAL DEPENDENCIES (pybind11)
 # ============================================================================
 include(FetchContent)
-
-# Pybind11 for Python bindings
-FetchContent_Declare(pybind11 GIT_REPOSITORY https://github.com/pybind/pybind11.git GIT_TAG v2.12.0)
-
-# GoogleTest for C++ unit testing
-FetchContent_Declare(googletest GIT_REPOSITORY https://github.com/google/googletest.git GIT_TAG v1.14.0)
-
-FetchContent_MakeAvailable(pybind11 googletest)
+FetchContent_Declare(
+  pybind11
+  GIT_REPOSITORY https://github.com/pybind/pybind11
+  GIT_TAG        v2.12.0
+)
+FetchContent_MakeAvailable(pybind11)
 
 # ============================================================================
-# 5. CORE ENGINE LIBRARY (fft_engine)
+# 5. CORE FFT ENGINE (CUDA)
 # ============================================================================
-# Create a static library for the core FFT engine.
-# This allows both the Python module and the C++ tests to link against it.
 add_library(fft_engine STATIC
     src/fft/cuda_fft.cu
+    src/fft/cuda_fft.h
 )
 
-# Link the engine against required CUDA libraries
-target_link_libraries(fft_engine PRIVATE CUDA::cufft CUDA::cudart)
-
-# Expose the include directory for other targets (like our tests)
+# Use the include directories found by CUDAToolkit
 target_include_directories(fft_engine PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/fft
+    ${CUDAToolkit_INCLUDE_DIRS}  # This is the key fix
 )
 
+# Link against CUDA libraries properly
+target_link_libraries(fft_engine 
+    PUBLIC
+        ${CUDART_LIBRARY}
+        ${CUFFT_LIBRARY}
+)
 
 # ============================================================================
-# 6. CREATE PYTHON MODULE (cuda_lib)
+# 6. PYTHON BINDINGS (pybind11)
 # ============================================================================
 pybind11_add_module(cuda_lib SHARED
     src/bindings/bindings.cpp
 )
-
-# Link the Python module against our core engine library
-target_link_libraries(cuda_lib PRIVATE fft_engine CUDA::cudart)
-
-
-# ============================================================================
-# 7. DEPENDENCY DEPLOYMENT
-# ============================================================================
-if(WIN32)
-    set(REQUIRED_DLLS cufft64_12.dll cudart64_13.dll)
-    
-foreach(DLL_NAME ${REQUIRED_DLLS})
-    # Use a unique variable name for each find_file call to avoid issues in the loop
-    find_file(DLL_PATH_${DLL_NAME} NAMES ${DLL_NAME} HINTS "${CUDAToolkit_BIN_DIR}")
-    
-    if(DLL_PATH_${DLL_NAME})
-        message(STATUS "Found CUDA dependency: ${DLL_PATH_${DLL_NAME}}")
-        add_custom_command(TARGET cuda_lib POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${DLL_PATH_${DLL_NAME}}"
-                "$<TARGET_FILE_DIR:cuda_lib>"
-            COMMENT "Deploying ${DLL_NAME} to output directory..."
-        )
-    else()
-        message(WARNING "Could not find required CUDA DLL: ${DLL_NAME}")
-    endif()
-endforeach()
-endif()
+target_link_libraries(cuda_lib PRIVATE
+    fft_engine
+    pybind11::module
+)
+set_target_properties(cuda_lib PROPERTIES
+    PREFIX ""
+)
 
 # ============================================================================
-# 8. TESTING SETUP
+# 7. TESTING SETUP
 # ============================================================================
-# Enable CTest and define the BUILD_TESTING option (defaults to ON)
-include(CTest)
+enable_testing()
+FetchContent_Declare(
+    googletest
+    URL https://github.com/google/googletest/archive/03597a01ee50ed33e9dfd640b249b4be3799d395.zip
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
+FetchContent_MakeAvailable(googletest)
 
-# Only add the tests subdirectory if the user has testing enabled.
-# This is the standard way to make testing modular and optional.
-if(BUILD_TESTING)
-    add_subdirectory(tests)
-endif()
+add_executable(run_cpp_tests
+    tests/test_fft.cpp
+)
+target_link_libraries(run_cpp_tests PRIVATE
+    GTest::gtest_main
+    fft_engine
+)
+include(GoogleTest)
+gtest_discover_tests(run_cpp_tests)
