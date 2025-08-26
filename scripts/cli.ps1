@@ -1,271 +1,255 @@
 ﻿# ============================================================================
-# ionosense-hpc-lib • Windows CLI (Restructured)
+# ionosense-hpc-lib • Project CLI (Windows)
+# ----------------------------------------------------------------------------
+# Features smart discovery for benchmarks and other scripts.
+# Parallels the structure of cli.sh for a consistent cross-platform UX.
 # ============================================================================
-param(
-    [string]$Command,
-    [string[]]$Args
-)
 
-# Configuration
-$VenvDir = ".\.venv"
-$BuildDir = ".\build"
-$BuildPreset = if ($env:BUILD_PRESET) { $env:BUILD_PRESET } else { "windows-rel" }
-$PythonExe = "$VenvDir\Scripts\python.exe"
+# --- Paths & Defaults --------------------------------------------------------
+$ProjectRoot = (Get-Item -Path (Join-Path $PSScriptRoot "..")).FullName
+$BuildDir = Join-Path $ProjectRoot "build"
+$VenvDir = Join-Path $ProjectRoot ".venv"
+$PythonDir = Join-Path $ProjectRoot "python"
+$PythonExe = Join-Path $VenvDir "Scripts" "python.exe"
+$BuildPreset = $env:BUILD_PRESET | Out-String -Default "windows-rel"
+
+# --- Pretty logging ----------------------------------------------------------
+# Text styling requires a compatible terminal (e.g., Windows Terminal)
+Function log     { param($Message) Write-Host "✅ [INFO] $Message" -ForegroundColor Cyan }
+Function warn    { param($Message) Write-Host "⚠️ [WARN] $Message" -ForegroundColor Yellow }
+Function err     { param($Message) Write-Host "❌ [ERR ] $Message" -ForegroundColor Red }
+Function ok      { param($Message) Write-Host "👍 [OK  ] $Message" -ForegroundColor Green }
+Function section { param($Message) Write-Host "`n💪 == $Message ==`n" -ForegroundColor Magenta }
+
+# Trap errors for better debugging
 $ErrorActionPreference = 'Stop'
 
-# Profiler paths
-$Config = @{
-    NcuPath  = (Get-Command ncu.exe -ErrorAction SilentlyContinue).Source
-    NsysPath = (Get-Command nsys.exe -ErrorAction SilentlyContinue).Source
-}
-
-# Functions
-function Get-ModulePath {
-    param([string]$Preset = $BuildPreset)
-    
-    $presetPath = "$BuildDir\$Preset"
-    
-    # Check for .pyd file
-    if ((Test-Path $presetPath) -and (Get-ChildItem -Path $presetPath -Filter "*.pyd" -ErrorAction SilentlyContinue)) {
-        return (Get-Item -Path $presetPath).FullName
+# --- Helpers -----------------------------------------------------------------
+# Activates the virtual environment for the current scope
+Function Activate-Venv {
+    if (-not (Test-Path $PythonExe)) {
+        err "Python virtual environment not found. Please run: .\scripts\cli.ps1 setup"
+        throw "Venv missing."
     }
-    
-    throw "ERROR: Could not find compiled module in '$presetPath'. Please run a build."
+    # This is a simplified activation for script execution context
 }
 
-function Get-PythonDllPath {
-    $pythonBase = & $PythonExe -c "import sys; print(sys.base_prefix)"
-    $pythonDll = Join-Path $pythonBase "python311.dll"
+# Sets PYTHONPATH and executes a command
+Function With-PythonPath {
+    param(
+        [scriptblock]$Command
+    )
+    $oldPath = $env:PYTHONPATH
+    $modulePath = Join-Path $BuildDir $BuildPreset
+    $env:PYTHONPATH = "$modulePath;$PythonDir;$oldPath"
     
-    if (-not (Test-Path $pythonDll)) {
-        $pythonDll = Join-Path $pythonBase "DLLs\python311.dll"
+    try {
+        & $Command
+    } finally {
+        $env:PYTHONPATH = $oldPath
     }
-    
-    if (Test-Path $pythonDll) {
-        return (Split-Path $pythonDll -Parent)
+}
+
+# Smartly find a script by its name, searching recursively
+Function Find-Script {
+    param(
+        [string]$Type, # e.g., "Benchmark"
+        [string]$Dir,  # e.g., (Join-Path $PythonDir "benchmarks")
+        [string]$Name  # e.g., "raw_throughput"
+    )
+    $foundFiles = Get-ChildItem -Path $Dir -Recurse -Filter "${Name}.py"
+    if ($foundFiles.Count -eq 0) {
+        err "$Type script not found: ${Name}.py"
+        log "Use '.\scripts\cli.ps1 list benchmarks' to see available scripts."
+        throw "Script not found."
+    } elseif ($foundFiles.Count -gt 1) {
+        err "Ambiguous script name: '$Name'. Multiple matches found:"
+        $foundFiles.FullName | ForEach-Object { Write-Host $_ }
+        throw "Ambiguous script."
     }
-    
-    Write-Warning "Could not locate python311.dll"
-    return $pythonBase
+    return $foundFiles.FullName
 }
 
-function Verify-Build {
-    param([string]$Preset = $BuildPreset)
-    
-    Write-Host "`n→ Verifying build artifacts..." -ForegroundColor Cyan
-    $modulePath = Get-ModulePath -Preset $Preset
-    $pydFile = Get-ChildItem -Path $modulePath -Filter "*.pyd" | Select-Object -First 1
-    Write-Host "✓ Found module: $($pydFile.FullName)" -ForegroundColor Green
-    
-    $env:PYTHONPATH = $modulePath
-    $testScript = "import cuda_lib; print(f'✓ Module imported successfully!')"
-    & $PythonExe -c $testScript
-}
-
-function Do-Clean {
-    Write-Host "`n========================= Cleaning Workspace =========================" -ForegroundColor Yellow
-    if (Test-Path $BuildDir) {
-        Write-Host "→ Removing directory: $BuildDir" -ForegroundColor Yellow
-        Remove-Item -Path $BuildDir -Recurse -Force
-    }
-    
-    # Clean Python cache
-    Get-ChildItem -Path . -Include __pycache__,.pytest_cache -Directory -Recurse -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-    Get-ChildItem -Path . -Include *.pyc -File -Recurse -Force | Remove-Item -Force -ErrorAction SilentlyContinue
-    
-    Write-Host "✓ Workspace cleaned." -ForegroundColor Green
-}
-
-function Do-Setup {
-    Write-Host "`n========================= Setting Up Environment =========================" -ForegroundColor Yellow
-    
+# --- Core actions ------------------------------------------------------------
+Function cmd_setup {
+    section "Environment Setup (Python venv)"
     if (-not (Test-Path $VenvDir)) {
-        Write-Host "→ Creating Python virtual environment..."
+        log "Creating Python virtual environment..."
         python -m venv $VenvDir
     }
-    
-    Write-Host "→ Installing Python dependencies..."
-    & $PythonExe -m pip install --upgrade pip setuptools wheel
-    & $PythonExe -m pip install numpy pytest pybind11 tqdm colorama
-    
-    Write-Host "✓ Setup complete!" -ForegroundColor Green
+    log "Activating environment and installing dependencies from requirements.txt..."
+    & $PythonExe -m pip install --upgrade pip
+    & $PythonExe -m pip install -r (Join-Path $ProjectRoot "requirements.txt")
+    ok "Python environment is ready."
 }
 
-function Do-Build {
+Function cmd_build {
     param([string]$Preset = $BuildPreset)
-    
-    Write-Host "`n========================= Building Project ($Preset) =========================" -ForegroundColor Yellow
-    
-    if (-not (Test-Path $PythonExe)) { 
-        throw "Virtual environment not found. Please run '.\scripts\cli.ps1 setup' first." 
-    }
-    
-    $pythonAbsPath = (Get-Item $PythonExe).FullName
-    
-    Write-Host "→ Configuring with preset: $Preset"
-    cmake --preset $Preset -DPython3_EXECUTABLE="$pythonAbsPath"
-    
-    Write-Host "→ Building..."
-    cmake --build --preset $Preset --parallel
-    
-    Verify-Build -Preset $Preset
-    Write-Host "✓ Build complete and verified!" -ForegroundColor Green
+    section "Configuring & Building (preset: ${Preset})"
+    cmake --preset $Preset
+    cmake --build --preset $Preset --parallel --verbose
+    ok "Build finished -> $($BuildDir)\$($Preset)"
 }
 
-function Do-Rebuild {
+Function cmd_rebuild {
     param([string]$Preset = $BuildPreset)
-    
-    Write-Host "`n========================= Rebuilding ($Preset) =========================" -ForegroundColor Yellow
-    
-    # Remove only the specific preset directory
-    $presetDir = "$BuildDir\$Preset"
+    section "Clean Rebuild (preset: ${Preset})"
+    $presetDir = Join-Path $BuildDir $Preset
     if (Test-Path $presetDir) {
-        Write-Host "→ Removing $presetDir"
+        log "Removing $presetDir"
         Remove-Item -Path $presetDir -Recurse -Force
     }
-    
-    Do-Build -Preset $Preset
+    cmd_build -Preset $Preset
 }
 
-function Do-Test {
-    param([string]$Preset = $BuildPreset)
+Function cmd_test {
+    section "Running All Tests"
+    # C++ Tests
+    log "Running C++ tests..."
+    ctest --preset "windows-tests" --output-on-failure
     
-    Write-Host "`n========================= Running Tests ($Preset) =========================" -ForegroundColor Yellow
-    
-    # Build if needed
-    $presetDir = "$BuildDir\$Preset"
-    if (-not (Test-Path $presetDir)) {
-        Do-Build -Preset $Preset
+    # Python Tests
+    if (Test-Path (Join-Path $PythonDir "tests")) {
+        log "Running Python tests..."
+        Activate-Venv
+        With-PythonPath -Command {
+            & $PythonExe -m pytest -q (Join-Path $PythonDir "tests")
+        }
     }
-    
-    Write-Host "→ Running CTest..."
-    $testPreset = $Preset -replace "windows-", "windows-tests"
-    ctest --preset $testPreset --output-on-failure
-    
-    Write-Host "✓ Tests complete." -ForegroundColor Green
+    ok "All tests completed."
 }
 
-function Invoke-Benchmark {
-    param(
-        [string]$BenchmarkName,
-        [string[]]$BenchmarkArgs,
-        [string]$Preset = $BuildPreset,
-        [string]$ProfilerExe = $null,
-        [string[]]$ProfilerArgs = $null
-    )
-    
-    $ScriptPath = ".\python\benchmarks\$BenchmarkName.py"
-    if (-not (Test-Path $ScriptPath)) { 
-        throw "ERROR: Benchmark script not found at '$ScriptPath'." 
+Function cmd_list {
+    param([string[]]$Args)
+    if ($Args[0] -ne "benchmarks") {
+        err "Usage: list benchmarks"
+        return
     }
-    
-    # Set up environment
-    $modulePath = Get-ModulePath -Preset $Preset
-    $pythonDllPath = Get-PythonDllPath
-    
-    $env:PATH = "$modulePath;$pythonDllPath;$($env:PATH)"
-    $env:PYTHONPATH = $modulePath
-    
-    Write-Host "[INFO] Module path: $modulePath" -ForegroundColor Gray
-    Write-Host "[INFO] Python DLL path: $pythonDllPath" -ForegroundColor Gray
-    
-    $allArgs = @()
-    if ($ProfilerExe) {
-        $allArgs += $ProfilerArgs
-        $allArgs += $PythonExe
-        $allArgs += $ScriptPath
-        if ($BenchmarkArgs) { $allArgs += $BenchmarkArgs }
-    } else {
-        $allArgs += $ScriptPath
-        if ($BenchmarkArgs) { $allArgs += $BenchmarkArgs }
+    section "Available Benchmarks"
+    $benchmarkDir = Join-Path $PythonDir "benchmarks"
+    Get-ChildItem -Path $benchmarkDir -Recurse -Filter "*.py" | 
+        Where-Object { $_.Name -ne "__init__.py" } |
+        ForEach-Object { $_.FullName.Substring($benchmarkDir.Length + 1).Replace(".py", "") } |
+        Sort-Object
+}
+
+Function cmd_bench {
+    param([string[]]$Args)
+    if ($Args.Count -lt 1) {
+        err "Usage: bench <script_name> [args...]"
+        return
     }
+    $scriptName = $Args[0]
+    $scriptArgs = $Args[1..($Args.Length - 1)]
     
-    $commandToRun = if ($ProfilerExe) { $ProfilerExe } else { $PythonExe }
-    Write-Host "[RUN] Executing: $commandToRun $($allArgs -join ' ')" -ForegroundColor Cyan
+    $scriptPath = Find-Script "Benchmark" (Join-Path $PythonDir "benchmarks") $scriptName
     
-    & $commandToRun $allArgs
-    
-    if ($LASTEXITCODE -ne 0) {
-        throw "Benchmark script failed."
+    section "Running Benchmark: $scriptName"
+    Activate-Venv
+    With-PythonPath -Command {
+        & $PythonExe $scriptPath $scriptArgs
     }
 }
 
-function Show-Usage {
+Function cmd_profile {
+    param([string[]]$Args)
+    if ($Args.Count -lt 2) {
+        err "Usage: profile <nsys|ncu> <script_name> [args...]"
+        return
+    }
+    $tool = $Args[0]
+    $scriptName = $Args[1]
+    $scriptArgs = $Args[2..($Args.Length - 1)]
+
+    $scriptPath = Find-Script "Benchmark" (Join-Path $PythonDir "benchmarks") $scriptName
+    $outDir = Join-Path $BuildDir "profiles" $tool
+    New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+    $outFile = Join-Path $outDir "$($scriptName)_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
+    
+    section "Profiling ($tool): $scriptName"
+    Activate-Venv
+    
+    switch ($tool) {
+        "nsys" {
+            With-PythonPath -Command {
+                nsys profile -o "$outFile" --trace=cuda,nvtx -f true --wait=all $PythonExe "$scriptPath" $scriptArgs
+            }
+            ok "Nsight Systems report saved to ${outFile}.nsys-rep"
+        }
+        "ncu" {
+             With-PythonPath -Command {
+                ncu --set full --target-processes all -o "$outFile" $PythonExe "$scriptPath" $scriptArgs
+            }
+            ok "Nsight Compute report saved to ${outFile}.ncu-rep"
+        }
+        default {
+            err "Unknown profiler: '$tool'. Use 'nsys' or 'ncu'."
+        }
+    }
+}
+
+Function cmd_clean {
+    section "Cleaning Workspace"
+    if(Test-Path $BuildDir) {
+        log "Removing build directory: $BuildDir"
+        Remove-Item -Path $BuildDir -Recurse -Force
+    }
+    # Clean Python cache
+    Get-ChildItem -Path $ProjectRoot -Include __pycache__,.pytest_cache -Directory -Recurse -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+    Get-ChildItem -Path $ProjectRoot -Include *.pyc -File -Recurse -Force | Remove-Item -Force -ErrorAction SilentlyContinue
+    ok "Workspace cleaned."
+}
+
+
+# --- Usage & Main ------------------------------------------------------------
+Function Show-Usage {
     Write-Host @"
+IONOSENSE-HPC • Scalable Project CLI (Windows)
+Usage: ./scripts/cli.ps1 <command> [options]
 
-ionosense-hpc-lib CLI (Windows, Restructured)
-Usage: .\scripts\cli.ps1 <command> [options]
+CORE WORKFLOW
+  setup                    Initialize Python venv and install dependencies
+  build [preset]           Configure & build the project (default: $($BuildPreset))
+  rebuild [preset]         Clean and rebuild
+  test                     Run all C++ and Python unit tests
+  
+BENCHMARKING & PROFILING
+  list benchmarks          Discover and list all available benchmark scripts
+  bench <name> [args...]   Run a benchmark by its name (without .py)
+  profile <tool> <name>    Profile a benchmark with 'nsys' or 'ncu'
 
-Core Commands:
-  clean              Remove build artifacts
-  setup              Create Python venv and install dependencies  
-  build [preset]     Build the project (default: $BuildPreset)
-                    Presets: windows-rel, windows-debug, windows-vs
-  rebuild [preset]   Clean and rebuild
-  test [preset]      Run tests
+UTILITIES
+  clean                    Remove all build and cache files
 
-Benchmarks:
-  bench <name> [args...]  Run a Python benchmark
-    Example: .\scripts\cli.ps1 bench fft_raw -b 32
-
-Profiling:
-  profile <tool> <name> [args...]  Profile a benchmark
-    Tools: nsys, ncu
-    Example: .\scripts\cli.ps1 profile nsys fft_raw
-
+EXAMPLES
+  .\scripts\cli.ps1 test
+  .\scripts\cli.ps1 list benchmarks
+  .\scripts\cli.ps1 bench raw_throughput -n 4096
+  .\scripts\cli.ps1 profile nsys graphs_comparison
 "@
 }
 
-# Main dispatcher
-try {
-    switch ($Command) {
-        "clean"   { Do-Clean }
-        "setup"   { Do-Setup }
-        "build"   { Do-Build -Preset $(if ($Args[0]) { $Args[0] } else { $BuildPreset }) }
-        "rebuild" { Do-Rebuild -Preset $(if ($Args[0]) { $Args[0] } else { $BuildPreset }) }
-        "test"    { Do-Test -Preset $(if ($Args[0]) { $Args[0] } else { $BuildPreset }) }
-        
-        "bench" {
-            if ($Args.Count -lt 1) { throw "ERROR: 'bench' requires a benchmark name." }
-            $benchName = $Args[0]
-            $benchArgs = if ($Args.Count -gt 1) { $Args[1..($Args.Count-1)] } else { @() }
-            Invoke-Benchmark -BenchmarkName $benchName -BenchmarkArgs $benchArgs
-        }
-        
-        "profile" {
-            if ($Args.Count -lt 2) { throw "ERROR: 'profile' requires a tool and benchmark name." }
-            $tool = $Args[0]
-            $benchName = $Args[1]
-            $benchArgs = if ($Args.Count -gt 2) { $Args[2..($Args.Count-1)] } else { @() }
-            
-            $ReportDir = "$BuildDir\nsight_reports\${tool}_reports"
-            New-Item -ItemType Directory -Path $ReportDir -Force -ErrorAction SilentlyContinue | Out-Null
-            
-            $Timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-            $ReportPath = "$ReportDir\${benchName}_${Timestamp}"
-            
-            $profilerExe, $profilerArgs = switch ($tool) {
-                'ncu'  { 
-                    $Config.NcuPath, @("--set", "full", "--target-processes", "all", "-o", $ReportPath) 
-                }
-                'nsys' { 
-                    $Config.NsysPath, @("profile", "--trace=cuda,nvtx", "-o", "$ReportPath") 
-                }
-                default { throw "Unknown profiler: $tool (use nsys or ncu)" }
-            }
-            
-            if (-not (Test-Path $profilerExe)) { 
-                throw "ERROR: Profiler not found at '$profilerExe'." 
-            }
-            
-            Write-Host "[PROFILE] Report will be saved to '$ReportPath'" -ForegroundColor Magenta
-            Invoke-Benchmark -BenchmarkName $benchName -BenchmarkArgs $benchArgs `
-                            -ProfilerExe $profilerExe -ProfilerArgs $profilerArgs
-        }
-        
-        default { Show-Usage }
+# --- Main Dispatcher ---
+$Command = if ($Args.Count -gt 0) { $Args[0] } else { "help" }
+$CommandArgs = if ($Args.Count -gt 1) { $Args[1..($Args.Length - 1)] } else { @() }
+
+Set-Location $ProjectRoot
+
+switch ($Command) {
+    "help"      { Show-Usage }
+    "-h"        { Show-Usage }
+    "--help"    { Show-Usage }
+    "setup"     { cmd_setup }
+    "build"     { cmd_build -Preset ($CommandArgs[0] | Out-String -Default $BuildPreset) }
+    "rebuild"   { cmd_rebuild -Preset ($CommandArgs[0] | Out-String -Default $BuildPreset) }
+    "test"      { cmd_test }
+    "clean"     { cmd_clean }
+    "list"      { cmd_list -Args $CommandArgs }
+    "bench"     { cmd_bench -Args $CommandArgs }
+    "profile"   { cmd_profile -Args $CommandArgs }
+    default     {
+        err "Unknown command: $Command"
+        Show-Usage
+        exit 1
     }
-} catch {
-    Write-Host "`n✗ ERROR: $_" -ForegroundColor Red
-    exit 1
 }
