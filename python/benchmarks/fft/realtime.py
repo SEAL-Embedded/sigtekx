@@ -81,10 +81,11 @@ def run_rt_benchmark(mode: str, nfft: int, hop: int, sr: int, duration: float,
                         offset = total_pairs_processed * hop
                         ch1_frames = [sig["ch1"][offset + i*hop : offset + i*hop + nfft] for i in range(pairs_per_batch)]
                         ch2_frames = [sig["ch2"][offset + i*hop : offset + i*hop + nfft] for i in range(pairs_per_batch)]
-                        input_batch = np.concatenate(ch1_frames + ch2_frames)
+                        input_batch = np.concatenate(ch1_frames + ch2_frames).astype(np.float32, copy=False)
                         
                         # Asynchronously execute
-                        eng.pinned_input(stream_idx)[:] = input_batch
+                        dst = eng.pinned_input(stream_idx)      # (batch, nfft) view
+                        dst.ravel()[:] = input_batch            # flatten dest so shapes match (B*N,)
                         eng.execute_async(stream_idx)
                     else: # CPU
                         offset = total_pairs_processed * hop

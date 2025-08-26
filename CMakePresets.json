@@ -1,0 +1,125 @@
+{
+  "version": 5,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 24,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "linux-rel",
+      "inherits": "base",
+      "displayName": "Linux Release",
+      "description": "Linux release build with Ninja",
+      "binaryDir": "${sourceDir}/build/linux-rel",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "IONO_WITH_TESTS": "ON",
+        "IONO_WITH_GRAPHS": "ON",
+        "IONO_WITH_PYTHON": "ON"
+      }
+    },
+    {
+      "name": "linux-debug",
+      "inherits": "base",
+      "displayName": "Linux Debug",
+      "description": "Linux debug build with Ninja",
+      "binaryDir": "${sourceDir}/build/linux-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "IONO_WITH_TESTS": "ON",
+        "IONO_WITH_GRAPHS": "ON",
+        "IONO_WITH_PYTHON": "ON"
+      }
+    },
+    {
+      "name": "windows-rel",
+      "displayName": "Windows Release",
+      "description": "Windows release build with Ninja",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/windows-rel",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "IONO_WITH_TESTS": "ON",
+        "IONO_WITH_GRAPHS": "ON",
+        "IONO_WITH_PYTHON": "ON"
+      }
+    },
+    {
+      "name": "windows-debug",
+      "displayName": "Windows Debug",
+      "description": "Windows debug build with Ninja",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/windows-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "IONO_WITH_TESTS": "ON",
+        "IONO_WITH_GRAPHS": "ON",
+        "IONO_WITH_PYTHON": "ON"
+      }
+    },
+    {
+      "name": "windows-vs",
+      "displayName": "Windows Visual Studio",
+      "description": "Windows build with Visual Studio generator",
+      "generator": "Visual Studio 17 2022",
+      "binaryDir": "${sourceDir}/build/windows-vs",
+      "cacheVariables": {
+        "IONO_WITH_TESTS": "ON",
+        "IONO_WITH_GRAPHS": "ON",
+        "IONO_WITH_PYTHON": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "linux-rel",
+      "configurePreset": "linux-rel",
+      "configuration": "Release"
+    },
+    {
+      "name": "linux-debug",
+      "configurePreset": "linux-debug",
+      "configuration": "Debug"
+    },
+    {
+      "name": "windows-rel",
+      "configurePreset": "windows-rel",
+      "configuration": "Release"
+    },
+    {
+      "name": "windows-debug",
+      "configurePreset": "windows-debug",
+      "configuration": "Debug"
+    },
+    {
+      "name": "windows-vs",
+      "configurePreset": "windows-vs",
+      "configuration": "Release"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "linux-tests",
+      "configurePreset": "linux-rel",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "windows-tests",
+      "configurePreset": "windows-rel",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

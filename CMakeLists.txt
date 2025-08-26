@@ -1,93 +1,131 @@
-﻿cmake_minimum_required(VERSION 3.18)
-project(ionosense-hpc-lib LANGUAGES CXX CUDA)
+﻿cmake_minimum_required(VERSION 3.24)
+project(ionosense_hpc LANGUAGES CXX CUDA)
 
-# ========= Project-wide =========
+# ============================================================================
+# Global setup
+# ============================================================================
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CUDA_STANDARD 17)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-set(CMAKE_CUDA_RUNTIME_LIBRARY Shared)
-set(CMAKE_CUDA_ARCHITECTURES 86 89)
 
-# ========= FetchContent knobs (safe) =========
-if (POLICY CMP0135)
-  cmake_policy(SET CMP0135 NEW)  # avoid timestamp warning for URL zips
-endif()
-set(FETCHCONTENT_UPDATES_DISCONNECTED ON CACHE BOOL "" FORCE)
+option(IONO_WITH_TESTS   "Build tests"            ON)
+option(IONO_WITH_GRAPHS  "Enable CUDA Graphs"     ON)
+option(IONO_WITH_PYTHON  "Build Python bindings"  ON)
 
-# ========= Python / CUDA =========
-find_package(Python3 3.11 REQUIRED COMPONENTS Interpreter Development Development.Module Development.Embed)
+# Target SMs
+set(CMAKE_CUDA_ARCHITECTURES 75 86 89)
+
+# --- Hard-disable IPO globally (some toolchains auto-enable) ---
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF)
+
+# --- Strip out Conda toolchain's -flto=auto that gets appended after target opts ---
+foreach(var CMAKE_CXX_FLAGS_RELEASE CMAKE_CXX_FLAGS_RELWITHDEBINFO
+            CMAKE_CUDA_FLAGS_RELEASE CMAKE_CUDA_FLAGS_RELWITHDEBINFO)
+  if(DEFINED ${var})
+    string(REPLACE "-flto=auto" "" _tmp "${${var}}")
+    set(${var} "${_tmp}" CACHE STRING "" FORCE)
+  endif()
+endforeach()
+
+# ============================================================================
+# Deps
+# ============================================================================
 find_package(CUDAToolkit REQUIRED)
+find_package(Python3 3.11 REQUIRED COMPONENTS Interpreter Development)
+find_package(GTest REQUIRED)
+find_package(pybind11 REQUIRED)
 
-# ========= Dependencies (prefer find_package; fallback to FetchContent) =========
-include(CMakeDependentOption)
-include(FetchContent)
+# ============================================================================
+# Core static lib with CUDA kernels
+# ============================================================================
+add_library(ion_engine STATIC
+    src/fft_engine.cpp
+    src/ops_fft.cu
+)
 
-# Fast path: use preinstalled packages (Conda/system)
-find_package(pybind11 CONFIG QUIET)   # provides pybind11_add_module + targets
-find_package(GTest CONFIG QUIET)      # provides GTest::gtest, GTest::gtest_main
+target_include_directories(ion_engine PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
 
-# Fallback only if missing
-if (NOT pybind11_FOUND OR NOT GTest_FOUND)
-  # Where FetchContent will put sources by default
-  set(_fc_base "${FETCHCONTENT_BASE_DIR}")
-  if(NOT _fc_base)
-    set(_fc_base "${CMAKE_BINARY_DIR}/_deps")
-  endif()
+set_target_properties(ion_engine PROPERTIES
+    CUDA_SEPARABLE_COMPILATION ON
+    INTERPROCEDURAL_OPTIMIZATION OFF
+)
 
-  if (NOT pybind11_FOUND)
-    FetchContent_Declare(
-      pybind11
-      URL https://github.com/pybind/pybind11/archive/refs/tags/v2.12.0.zip
-      DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+# Be explicit: no LTO anywhere on this target
+target_compile_options(ion_engine PRIVATE
+    $<$<COMPILE_LANGUAGE:CXX>:-fno-lto>
+    $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fno-lto>
+)
+target_link_options(ion_engine PRIVATE
+    $<$<LINK_LANGUAGE:CXX>:-fno-lto>
+    $<$<LINK_LANGUAGE:CUDA>:-fno-lto>            # <— NOTE: plain -fno-lto for link; CMake/NVCC will wrap as needed
+)
+
+target_link_libraries(ion_engine PUBLIC CUDA::cufft)
+
+# ============================================================================
+# Python module (pybind11)
+# ============================================================================
+if(IONO_WITH_PYTHON)
+    pybind11_add_module(cuda_lib SHARED
+        bindings/bindings.cpp
     )
-  endif()
 
-  if (NOT GTest_FOUND)
-    FetchContent_Declare(
-      googletest
-      URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
-      DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    set_target_properties(cuda_lib PROPERTIES
+        CUDA_SEPARABLE_COMPILATION ON
+        CUDA_RESOLVE_DEVICE_SYMBOLS ON           # ensure device link on final .so
+        INTERPROCEDURAL_OPTIMIZATION OFF
     )
-    # Trim extras
-    set(BUILD_GMOCK   OFF CACHE BOOL "" FORCE)
-    set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
-  endif()
 
-  if (NOT pybind11_FOUND)
-    FetchContent_MakeAvailable(pybind11)
-  endif()
-  if (NOT GTest_FOUND)
-    FetchContent_MakeAvailable(googletest)
-  endif()
+    # No LTO during compile or link
+    target_compile_options(cuda_lib PRIVATE
+        $<$<COMPILE_LANGUAGE:CXX>:-fno-lto>
+        $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fno-lto>
+    )
+    target_link_options(cuda_lib PRIVATE
+        $<$<LINK_LANGUAGE:CXX>:-fno-lto>
+        $<$<LINK_LANGUAGE:CUDA>:-fno-lto>       # <— plain form; avoids "-Xcompiler=-Xcompiler=..."
+    )
 
-  # After first populate, go fully offline next time to speed up configure
-  if (EXISTS "${_fc_base}/pybind11-src/CMakeLists.txt")
-    set(FETCHCONTENT_FULLY_DISCONNECTED ON CACHE BOOL "" FORCE)
-  endif()
+    # Pull in ALL objects from ion_engine so device fatbins can't be dropped
+    target_link_libraries(cuda_lib PRIVATE
+        $<LINK_LIBRARY:WHOLE_ARCHIVE,ion_engine>
+        pybind11::module
+        CUDA::cudart_static
+    )
 endif()
 
-# ========= Core lib =========
-add_library(fft_engine STATIC
-  src/fft/cuda_fft.cu
-  src/fft/cuda_fft.h
-)
-target_include_directories(fft_engine PUBLIC ${PROJECT_SOURCE_DIR}/src/fft)
-target_link_libraries(fft_engine PUBLIC CUDA::cufft CUDA::cudart)
+# ============================================================================
+# Tests
+# ============================================================================
+if(IONO_WITH_TESTS)
+    enable_testing()
 
-# ========= Python module =========
-pybind11_add_module(cuda_lib SHARED src/bindings/bindings.cpp)
-target_link_libraries(cuda_lib PRIVATE fft_engine pybind11::module)
-set_target_properties(cuda_lib PROPERTIES OUTPUT_NAME "cuda_lib")
+    add_executable(test_fft
+        tests/test_fft_engine.cpp
+    )
 
-# ========= Tests (default ON to keep behavior the same) =========
-option(IONO_BUILD_TESTS "Build unit tests" ON)
-if (IONO_BUILD_TESTS)
-  enable_testing()
-  add_executable(run_cpp_tests tests/test_fft.cpp)
-  target_link_libraries(run_cpp_tests PRIVATE
-    fft_engine
-    GTest::gtest_main
-  )
-  include(GoogleTest)
-  gtest_discover_tests(run_cpp_tests)
+    set_target_properties(test_fft PROPERTIES
+        CUDA_RESOLVE_DEVICE_SYMBOLS ON
+        INTERPROCEDURAL_OPTIMIZATION OFF
+    )
+
+    target_compile_options(test_fft PRIVATE
+        $<$<COMPILE_LANGUAGE:CXX>:-fno-lto>
+        $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fno-lto>
+    )
+    target_link_options(test_fft PRIVATE
+        $<$<LINK_LANGUAGE:CXX>:-fno-lto>
+        $<$<LINK_LANGUAGE:CUDA>:-fno-lto>
+    )
+
+    target_link_libraries(test_fft PRIVATE
+        $<LINK_LIBRARY:WHOLE_ARCHIVE,ion_engine>
+        GTest::gtest_main
+        CUDA::cudart_static
+    )
+
+    include(GoogleTest)
+    gtest_discover_tests(test_fft)
 endif()
