@@ -38,7 +38,7 @@ Function cmd_setup {
 Function cmd_build {
     param([string]$Preset = $BuildPreset)
     section "Configuring & Building (preset: ${Preset})"
-    cmake --preset $Preset -DPython3_EXECUTABLE="$PythonExe"
+    cmake --preset $Preset -DPython3_EXECUTABLE="$PythonExe" # Use the venv Python - Important!
     cmake --build --preset $Preset --parallel --verbose
     ok "Build finished -> $($BuildDir)\$($Preset)"
 }
@@ -56,14 +56,45 @@ Function cmd_rebuild {
 
 Function cmd_test {
     section "Running All Tests"
-    log "Running C++ tests..."
-    ctest --preset "windows-tests" --output-on-failure
-    
-    if (Test-Path (Join-Path $PythonDir "tests")) {
+
+    # Store the original PATH so we can restore it later
+    $oldPath = $env:PATH
+
+    try {
+        # 1. Find the CUDA Toolkit path
+        $CudaPath = $env:CUDA_PATH
+        if (-not $CudaPath) {
+            # Fallback for when the environment variable isn't set
+            $CudaPath = "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.0"
+        }
+        if (-not (Test-Path $CudaPath)) {
+            err "CUDA_PATH not found. Please set the environment variable or install to the default location."
+            return
+        }
+
+        # 2. Add the CUDA bin directory to the PATH for any C++ test deps (safe to keep)
+        $CudaBin = Join-Path $CudaPath "bin"
+        $env:PATH = "$CudaBin;$oldPath"
+        log "Temporarily added $CudaBin to PATH"
+
+        # 3. Run the C++ tests first
+        log "Running C++ tests..."
+        ctest --preset "windows-tests" --output-on-failure
+        ok "C++ tests completed."
+
+        # 4. Run the Python tests (no PYTHONPATH hacks needed)
         log "Running Python tests..."
-        & $PythonExe -m pytest -q (Join-Path $PythonDir "tests")
+        & $PythonExe -m pytest -v (Join-Path $ProjectRoot "python\tests") --tb=short
+        ok "Python tests completed."
     }
-    ok "All tests completed."
+    catch {
+        err "A test failed: $_"
+        exit 1
+    }
+    finally {
+        $env:PATH = $oldPath
+        log "Restored original environment."
+    }
 }
 
 Function cmd_list {
@@ -99,7 +130,6 @@ Function cmd_bench {
     & $PythonExe $scriptPath $scriptArgs
 }
 
-# (Other functions like profile, clean, and usage remain the same)
 Function cmd_profile {
     param([string[]]$Args)
     if ($Args.Count -lt 2) {
@@ -141,13 +171,12 @@ Function cmd_clean {
     section "Cleaning Workspace"
     if(Test-Path $BuildDir) {
         log "Removing build directory: $BuildDir"
-        Remove-Item -Path $BuildDir -Recurse -Force
+        Remove-Item -Path $BuildDir -Recurse -Force -ErrorAction SilentlyContinue
     }
     Get-ChildItem -Path $ProjectRoot -Include __pycache__,.pytest_cache -Directory -Recurse -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
     Get-ChildItem -Path $ProjectRoot -Include *.pyc -File -Recurse -Force | Remove-Item -Force -ErrorAction SilentlyContinue
     ok "Workspace cleaned."
 }
-
 
 Function Show-Usage {
     Write-Host @"

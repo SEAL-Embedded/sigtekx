@@ -6,48 +6,57 @@ project(ionosense_hpc LANGUAGES CXX CUDA)
 # ============================================================================
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CUDA_STANDARD 17)
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_CUDA_ARCHITECTURES 75 86 89) # NVIDIA Turing, Ampere, Ada Lovelace
+
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)     # (PIC) For ion_engine static lib to be used in _engine shared lib - Important!
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF) # (IPO) Interferes with nvcc's own LTO; Can damage _engine bindings; Do not enable!
+set(CMAKE_CUDA_RUNTIME_LIBRARY Static)		# Use static runtime for CUDA; For Windows builds to avoid dependency on cudart64_*.DLL - Important!
 
 option(IONO_WITH_TESTS   "Build tests"            ON)
 option(IONO_WITH_GRAPHS  "Enable CUDA Graphs"     ON)
 option(IONO_WITH_PYTHON  "Build Python bindings"  ON)
 
-set(CMAKE_CUDA_ARCHITECTURES 75 86 89)
-set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF)
 
 # ============================================================================
-# Deps (Python/pybind11, CUDA, GTest)
+# Deps (Python, CUDA, Pybind11, GTest)
 # ============================================================================
-set(Python3_FIND_VIRTUALENV FIRST)
-find_package(Python3 3.11 REQUIRED COMPONENTS Interpreter Development)
-find_package(CUDAToolkit REQUIRED)
+set(Python3_FIND_VIRTUALENV FIRST)      # Prefer venv/conda over system Python; Important!
+find_package(Python3 3.11 REQUIRED      # provides [ Python3_EXECUTABLE, Python3_INCLUDE_DIRS, Python3_LIBRARIES ]
+    COMPONENTS Interpreter Development)
 
-# --- Robust pybind11 discovery ---
+find_package(CUDAToolkit REQUIRED)      # provides [ CUDAToolkit_INCLUDE_DIRS, CUDA::cudart_static, CUDA::cufft ]
+
+# --- Robust pybind11 discovery ---     # provides [ pybind11::module, pybind11::embed, ... ]
+# 1. lowkey try to find pybind11 via CMake first
 find_package(pybind11 CONFIG QUIET)
+
 if (NOT pybind11_FOUND)
-  execute_process(
-    COMMAND "${Python3_EXECUTABLE}" -c "import pybind11, sys; sys.stdout.write(pybind11.get_cmake_dir())"
-    OUTPUT_VARIABLE pybind11_CMAKE_DIR
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-  )
-  if (EXISTS "${pybind11_CMAKE_DIR}")
-    list(APPEND CMAKE_PREFIX_PATH "${pybind11_CMAKE_DIR}")
-    find_package(pybind11 CONFIG REQUIRED)
-  else()
-    message(FATAL_ERROR "pybind11 not found in ${Python3_EXECUTABLE}")
-  endif()
+    # 2. run a Python command to get the pybind11 cmake dir
+    execute_process(
+        COMMAND "${Python3_EXECUTABLE}" -c "import pybind11, sys; sys.stdout.write(pybind11.get_cmake_dir())"
+        OUTPUT_VARIABLE pybind11_CMAKE_DIR
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+
+    # 3. If the directory exists, add it to CMAKE_PREFIX_PATH and try to find pybind11 again via CMake
+    if (EXISTS "${pybind11_CMAKE_DIR}")
+        list(APPEND CMAKE_PREFIX_PATH "${pybind11_CMAKE_DIR}")
+        find_package(pybind11 CONFIG REQUIRED)
+    else()
+        message(FATAL_ERROR "pybind11 not found in ${Python3_EXECUTABLE}")
+    endif()
 endif()
 
-# --- Build GTest from source using FetchContent ---
+# --- Build GTest from source using FetchContent --- # provides [ GTest::gtest, GTest::gtest_main, ... ]
 include(FetchContent)
 FetchContent_Declare(
-  googletest
-  GIT_REPOSITORY https://github.com/google/googletest.git
-  GIT_TAG    v1.14.0
+    googletest
+    GIT_REPOSITORY https://github.com/google/googletest.git
+    GIT_TAG    v1.14.0
 )
-# For Windows: Prevent overriding the parent project's compiler options
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE) # Windows: Prevent overriding the parent project's compiler options - Important!
 FetchContent_MakeAvailable(googletest)
+
 
 # ============================================================================
 # Core static lib with CUDA kernels
@@ -60,41 +69,122 @@ target_include_directories(ion_engine PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CUDAToolkit_INCLUDE_DIRS}
 )
-set_target_properties(ion_engine PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+set_target_properties(ion_engine PROPERTIES CUDA_SEPARABLE_COMPILATION ON) # Enables device code linking between .cu files - Important!
 target_link_libraries(ion_engine PUBLIC CUDA::cufft)
+
 
 # ============================================================================
 # Python module (pybind11)
 # ============================================================================
 if(IONO_WITH_PYTHON)
-    pybind11_add_module(cuda_lib SHARED bindings/bindings.cpp)
-    target_include_directories(cuda_lib PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-    set_target_properties(cuda_lib PROPERTIES
+    pybind11_add_module(_engine SHARED bindings/bindings.cpp) # produces [ _engine.pyd (Win) / _engine.so (linux) ]
+
+    # Where the Python extension should live at build time
+    set(_ION_PY_OUT "${CMAKE_CURRENT_SOURCE_DIR}/python/ionosense_hpc/core")
+
+    set_target_properties(_engine PROPERTIES
+        LIBRARY_OUTPUT_DIRECTORY  "${_ION_PY_OUT}"
+        RUNTIME_OUTPUT_DIRECTORY  "${_ION_PY_OUT}"
         CUDA_SEPARABLE_COMPILATION ON
         CUDA_RESOLVE_DEVICE_SYMBOLS ON
     )
+    target_include_directories(_engine PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include) # Add include dirs - Important!
+
+    # Link against the core static lib + CUDA + pybind11
     if(MSVC)
-        set_target_properties(cuda_lib PROPERTIES LINK_FLAGS "/WHOLEARCHIVE:ion_engine")
+        # Keep all symbols from our static core lib
+        set_target_properties(_engine PROPERTIES LINK_FLAGS "/WHOLEARCHIVE:ion_engine")
+        target_link_libraries(_engine PRIVATE
+          ion_engine
+          pybind11::module
+          CUDA::cudart_static        # static runtime -> no cudart DLL required
+          CUDA::cufft                # cuFFT stays dynamic on Windows
+        )
     else()
-        target_link_libraries(cuda_lib PRIVATE "-Wl,--whole-archive" ion_engine "-Wl,--no-whole-archive")
+        target_link_libraries(_engine PRIVATE
+          "-Wl,--whole-archive" ion_engine "-Wl,--no-whole-archive"
+          pybind11::module
+          CUDA::cudart_static
+          CUDA::cufft
+        )
     endif()
-    target_link_libraries(cuda_lib PRIVATE ion_engine pybind11::module CUDA::cudart_static CUDA::cufft)
+
+    # ---------------- Windows: stage NVIDIA runtime DLLs beside the .pyd ----------------
+    if (WIN32)
+        # Candidate dirs (covers both new and older CUDA layouts)
+        set(_CUDA_DIRS
+            "${CUDAToolkit_BIN_DIR}"
+            "${CUDAToolkit_BIN_DIR}/x64"
+            "$ENV{CUDA_PATH}/bin"
+            "$ENV{CUDA_PATH}/bin/x64"
+        )
+
+        set(_STAGE_DLLS)
+        foreach(_D IN LISTS _CUDA_DIRS)
+            if(EXISTS "${_D}")
+                # cuFFT is the one we truly need (dynamic on Windows)
+                file(GLOB _HIT_CUFFT "${_D}/cufft64_*.dll")
+                list(APPEND _STAGE_DLLS ${_HIT_CUFFT})
+
+                # Optional: if anyone flips to dynamic cudart later, ship it too (harmless if present)
+                file(GLOB _HIT_CUDART "${_D}/cudart64_*.dll")
+                list(APPEND _STAGE_DLLS ${_HIT_CUDART})
+            endif()
+        endforeach()
+        list(REMOVE_DUPLICATES _STAGE_DLLS)
+
+        if(_STAGE_DLLS)
+            message(STATUS "Staging CUDA DLLs beside _engine: ${_STAGE_DLLS}")
+            add_custom_command(TARGET _engine POST_BUILD
+                  COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:_engine>"
+                  COMMAND ${CMAKE_COMMAND} -E copy_if_different ${_STAGE_DLLS} "$<TARGET_FILE_DIR:_engine>"
+                  COMMAND ${CMAKE_COMMAND} -E echo "CUDA DLLs copied to: $<TARGET_FILE_DIR:_engine>"
+                  COMMAND_EXPAND_LISTS
+            )
+        else()
+        message(WARNING
+            "Couldn't find CUDA runtime DLLs in any of:\n  ${_CUDA_DIRS}\n"
+            "Windows import may fail; ensure Toolkit is installed and contains cuFFT runtime.")
+        endif()
+    endif()
+
 endif()
 
+
 # ============================================================================
-# Tests
+# Unit Tests (CTest, GTest)
 # ============================================================================
 if(IONO_WITH_TESTS)
     enable_testing()
-    add_executable(test_fft tests/test_fft_engine.cpp)
-    target_include_directories(test_fft PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-    set_target_properties(test_fft PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+
+    add_executable(test_engine tests/test_fft_engine.cpp)
+
+    # Add include dirs and set CUDA properties for the test executable - Important!
+    target_include_directories(test_engine PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    set_target_properties(test_engine PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+
+    # Link all dependencies to the test executable
     if(MSVC)
-        set_target_properties(test_fft PROPERTIES LINK_FLAGS "/WHOLEARCHIVE:ion_engine")
+        # On Windows: set the whole-archive property against ion_engine...
+        set_target_properties(test_engine PROPERTIES LINK_FLAGS "/WHOLEARCHIVE:ion_engine")
+        # ...then link all libraries.
+        target_link_libraries(test_engine PRIVATE
+            ion_engine
+            GTest::gtest_main
+            CUDA::cudart_static
+            CUDA::cufft
+        )
     else()
-        target_link_libraries(test_fft PRIVATE "-Wl,--whole-archive" ion_engine "-Wl,--no-whole-archive")
+        # On Linux: list all link items in the correct order.
+        # Force whole-archive linking for ion_engine to avoid losing dead code - Important!
+        target_link_libraries(test_engine PRIVATE
+            "-Wl,--whole-archive" ion_engine "-Wl,--no-whole-archive"
+            GTest::gtest_main
+            CUDA::cudart_static
+            CUDA::cufft
+        )
     endif()
-    target_link_libraries(test_fft PRIVATE ion_engine GTest::gtest_main CUDA::cudart_static CUDA::cufft)
+
     include(GoogleTest)
-    gtest_discover_tests(test_fft)
+    gtest_discover_tests(test_engine)
 endif()

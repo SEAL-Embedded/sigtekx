@@ -5,15 +5,16 @@ Keeps both new (RtFft*) and legacy (CudaFft*) names working.
 from __future__ import annotations
 
 try:
-    from cuda_lib import RtFftEngine, RtFftConfig  # preferred modern names
-except Exception as e1:
-    # fallback to legacy names if the module only exposes those
+    from ._engine import RtFftEngine, RtFftConfig
+except ImportError:
     try:
-        from cuda_lib import CudaFftEngine as RtFftEngine, CudaFftConfig as RtFftConfig
-    except Exception as e2:
+        from ._engine import CudaFftEngine as RtFftEngine, CudaFftConfig as RtFftConfig
+    except ImportError as e:
         raise ImportError(
-            f"Failed to import Ionosense CUDA engine symbols.\n"
-            f"Primary error: {e1}\nSecondary error: {e2}"
+            "\nFailed to import Ionosense CUDA engine symbols from _engine.pyd."
+            "\nThis typically means the C++ module has not been compiled."
+            "\nRun './scripts/cli.ps1 build' and try again."
+            f"\nOriginal error: {e}"
         )
 
-__all__ = ["RtFftEngine", "RtFftConfig"]
+__all__ = ['RtFftEngine', 'RtFftConfig']

@@ -21,7 +21,7 @@ static inline py::buffer_info make_buf(float* ptr, int rows, int cols) {
     );
 }
 
-PYBIND11_MODULE(cuda_lib, m) {
+PYBIND11_MODULE(_engine, m) {
     m.doc() = "High-performance CUDA FFT engine for Ionosense";
 
     // ---------------------------

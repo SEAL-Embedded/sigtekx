@@ -42,9 +42,9 @@
     },
     {
       "name": "windows-rel",
+      "inherits": "base",
       "displayName": "Windows Release",
       "description": "Windows release build with Ninja",
-      "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/windows-rel",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
@@ -55,9 +55,9 @@
     },
     {
       "name": "windows-debug",
+      "inherits": "base",
       "displayName": "Windows Debug",
       "description": "Windows debug build with Ninja",
-      "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/windows-debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
@@ -68,8 +68,6 @@
     },
     {
       "name": "windows-vs",
-      "displayName": "Windows Visual Studio",
-      "description": "Windows build with Visual Studio generator",
       "generator": "Visual Studio 17 2022",
       "binaryDir": "${sourceDir}/build/windows-vs",
       "cacheVariables": {
