@@ -1,35 +1,56 @@
-# The name of the conda environment for this project.
+# =============================================================================
+# Conda Environment for the ionosense-hpc-lib Project
+#
+# To create/update, run: conda env update --name ionosense-hpc --file environment.yml
+# =============================================================================
 name: ionosense-hpc
 
-# The channels Conda will search for packages, in order of priority.
 channels:
-  - nvidia
-  - conda-forge
-  - defaults
+  - nvidia      # Highest priority for official CUDA packages
+  - conda-forge # Primary channel for a consistent cross-platform toolchain
+  - defaults    # Fallback for any packages not in other channels
 
 dependencies:
-  # 1. Core Build & Runtime Dependencies
+  # ---------------------------------------------------------------------------
+  # 1. Core Language & Environment
+  # ---------------------------------------------------------------------------
   - python=3.11
+  - pip
+
+  # ---------------------------------------------------------------------------
+  # 2. Cross-Platform Build Toolchain
+  #
+  # Defines the compilers and build tools needed to compile the C++/CUDA code.
+  # ---------------------------------------------------------------------------
   - cmake
   - ninja
-  - pip
-  - c-compiler
-  - cxx-compiler
+  - c-compiler       # [linux] GCC toolchain on Linux
+  - cxx-compiler     # [linux]
+  - vs2022_win-64    # [win]   MSVC v143 toolchain on Windows
 
-  # 2. CUDA Toolchain
+  # ---------------------------------------------------------------------------
+  # 3. NVIDIA CUDA Toolkit
+  #
+  # Specifies the CUDA compiler and the development libraries (headers/libs)
+  # needed for linking against cuFFT, cuDART, etc.
+  # ---------------------------------------------------------------------------
   - cuda-compiler=13.0
-  - cuda-libraries=13.0
-  - cuda-nvcc=13.0
-  - cuda-nvtx=13.0
-  - libcufft-dev=12.0
-  - cuda-cudart-dev=13.0
+  - cuda-libraries-dev=13.0  # Metapackage for all dev libs (cuFFT, cuBLAS, etc.)
 
-  # 3. Python packages for testing and bindings
+  # ---------------------------------------------------------------------------
+  # 4. C++ Libraries & Testing
+  # ---------------------------------------------------------------------------
+  - gtest
+
+  # ---------------------------------------------------------------------------
+  # 5. Core Python Libraries (for bindings, numerics, and HPC)
+  # ---------------------------------------------------------------------------
   - numpy
-  - pytest
   - pybind11
+
+  # ---------------------------------------------------------------------------
+  # 6. Utility Python Libraries (for scripting, testing, and UI)
+  # ---------------------------------------------------------------------------
+  - pytest
   - tqdm
   - colorama
-
-  # 4. C++ Testing Framework
-  - gtest 

@@ -5,10 +5,9 @@
 # --- Paths & Defaults --------------------------------------------------------
 $ProjectRoot = (Get-Item -Path (Join-Path $PSScriptRoot "..")).FullName
 $BuildDir    = Join-Path $ProjectRoot "build"
-$VenvDir     = Join-Path $ProjectRoot ".venv"
 $PythonDir   = Join-Path $ProjectRoot "python"
-$PythonExe   = Join-Path (Join-Path $VenvDir "Scripts") "python.exe"
 $BuildPreset = if ($env:BUILD_PRESET) { $env:BUILD_PRESET } else { "windows-rel" }
+$CondaEnvName = "ionosense-hpc" # Match environment.yml
 $CMakePresetsPath = Join-Path $ProjectRoot "CMakePresets.json"
 
 # --- Pretty logging ----------------------------------------------------------
@@ -71,26 +70,34 @@ Function Find-BenchmarkScript {
 
 # --- Core actions ------------------------------------------------------------
 Function cmd_setup {
-    section "Environment Setup (Python venv)"
-    if (-not (Test-Path $VenvDir)) {
-        log "Creating Python virtual environment..."
-        python -m venv $VenvDir
+    section "Environment Setup (Mamba)"
+    if (-not (Get-Command mamba -ErrorAction SilentlyContinue)) {
+        err "Mamba not found. Please ensure Miniconda is installed and run 'conda install mamba -n base -c conda-forge'."
+        exit 1
     }
-    log "Installing dependencies from requirements.txt..."
-    & $PythonExe -m pip install --upgrade pip
-    & $PythonExe -m pip install -r (Join-Path $ProjectRoot "requirements.txt")
-
-    log "Installing project in editable mode..."
-    & $PythonExe -m pip install -e (Join-Path $ProjectRoot "python")
-    ok "Python environment is ready."
+    log "Creating/Updating Conda environment '$CondaEnvName' with Mamba..."
+    log "This may take several minutes on the first run..."
+    # Use mamba for a faster, more robust solver
+    mamba env update --name $CondaEnvName --file (Join-Path $ProjectRoot "environment.yml") --prune
+    ok "Conda environment '$CondaEnvName' is ready."
+    log "Activate it with: conda activate $CondaEnvName"
 }
 
 Function cmd_build {
     param([string]$Preset = $BuildPreset)
     section "Configuring & Building (preset: ${Preset})"
-    # For non-workflow builds, keep forcing the venv Python
-    cmake --preset $Preset -DPython3_EXECUTABLE="$PythonExe"
-    cmake --build  --preset $Preset --parallel --verbose
+
+    if (-not $env:CONDA_PREFIX -or ($env:CONDA_DEFAULT_ENV -ne $CondaEnvName)) {
+        err "Conda environment '$CondaEnvName' is not activated. Please run 'conda activate $CondaEnvName' first."
+        exit 1
+    }
+
+    # The VS Native Tools prompt guarantees cl.exe is on the PATH.
+    # The activated Conda env guarantees cmake and ninja are on the PATH.
+    # No special logic is needed.
+    cmake --preset $Preset
+    cmake --build --preset $Preset --parallel --verbose
+
     ok "Build finished -> $($BuildDir)\$($Preset)"
 }
 
@@ -102,6 +109,7 @@ Function cmd_rebuild {
         log "Removing $presetDir"
         Remove-Item -Path $presetDir -Recurse -Force
     }
+    # Call the updated build command without the venv-specific flag
     cmd_build -Preset $Preset
 }
 
@@ -109,47 +117,15 @@ Function cmd_test {
     param([string]$Preset = $BuildPreset)
     section "Running All Tests"
 
-    $oldPath = $env:PATH
-    try {
-        $wfPreset = Get-WorkflowPresetFor -ConfigurePresetName $Preset
-        if ($wfPreset) {
-            log "Using CMake workflow preset: $wfPreset"
-            # Make venv Python first on PATH so FindPython3 picks it up during configure step
-            $oldPathForWorkflow = $env:PATH
-            $env:PATH = (Join-Path $VenvDir "Scripts") + ";" + $env:PATH
-            cmake --workflow --preset $wfPreset
-            $env:PATH = $oldPathForWorkflow
-            ok "C++ tests (ctest) completed via workflow."
-        } else {
-            log "No workflow preset found for '$Preset' — falling back to build + ctest."
-            cmake --preset $Preset -DPython3_EXECUTABLE="$PythonExe"
-            cmake --build  --preset $Preset --parallel --verbose
-            ctest --preset "${Preset.Replace('rel','tests').Replace('debug','tests')}" --output-on-failure
-            ok "C++ tests (ctest) completed."
-        }
+    log "Running C++ tests..."
+    # Correctly pass the preset name and the output flag as separate arguments
+    $testPreset = $Preset.Replace('rel','tests').Replace('debug','tests')
+    ctest --preset $testPreset --output-on-failure
+    ok "C++ tests (ctest) completed."
 
-        # CUDA DLLs for Python tests (safe even if staged by CMake)
-        $CudaPath = if ($env:CUDA_PATH) { $env:CUDA_PATH } else { "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.0" }
-        if (Test-Path $CudaPath) {
-            $CudaBin = Join-Path $CudaPath "bin"
-            $env:PATH = "$CudaBin;$oldPath"
-            log "Temporarily added $CudaBin to PATH"
-        } else {
-            warn "CUDA_PATH not found at '$CudaPath' (Python tests may still pass if DLLs are staged)."
-        }
-
-        log "Running Python tests..."
-        & $PythonExe -m pytest -v (Join-Path $ProjectRoot "python\tests") --tb=short
-        ok "Python tests completed."
-    }
-    catch {
-        err "A test failed: $_"
-        exit 1
-    }
-    finally {
-        $env:PATH = $oldPath
-        log "Restored original environment."
-    }
+    log "Running Python tests..."
+    pytest -v (Join-Path $ProjectRoot "python\tests") --tb=short
+    ok "Python tests completed."
 }
 
 Function cmd_list {
@@ -181,7 +157,8 @@ Function cmd_bench {
     $scriptPath = Find-BenchmarkScript -Name $scriptName
 
     section "Running Benchmark: $scriptName"
-    & $PythonExe $scriptPath $scriptArgs
+    # Call 'python' directly, which will be resolved from the activated Conda env
+    & python $scriptPath $scriptArgs
 }
 
 
@@ -204,11 +181,13 @@ Function cmd_profile {
     section "Profiling ($tool): $scriptName"
     switch ($tool) {
         "nsys" {
-            nsys profile -o "$outFile" --trace=cuda,nvtx -f true --wait=all $PythonExe $scriptPath $scriptArgs
+            # Call 'python' directly, which will be resolved from the activated Conda env
+            nsys profile -o "$outFile" --trace=cuda,nvtx -f true --wait=all python $scriptPath $scriptArgs
             ok "Nsight Systems report saved to ${outFile}.nsys-rep"
         }
         "ncu" {
-            ncu --set full --target-processes all -o "$outFile" $PythonExe $scriptPath $scriptArgs
+            # Call 'python' directly, which will be resolved from the activated Conda env
+            ncu --set full --target-processes all -o "$outFile" python $scriptPath $scriptArgs
             ok "Nsight Compute report saved to ${outFile}.ncu-rep"
         }
         default {
@@ -220,12 +199,24 @@ Function cmd_profile {
 
 Function cmd_clean {
     section "Cleaning Workspace"
+    
+    # Remove the main build directory
     if (Test-Path $BuildDir) {
         log "Removing build directory: $BuildDir"
         Remove-Item -Path $BuildDir -Recurse -Force -ErrorAction SilentlyContinue
     }
+    
+    # Remove the old virtual environment directory
+    $OldVenvDir = Join-Path $ProjectRoot ".venv"
+    if (Test-Path $OldVenvDir) {
+        log "Removing old .venv directory: $OldVenvDir"
+        Remove-Item -Path $OldVenvDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    # Remove Python cache files and directories
     Get-ChildItem -Path $ProjectRoot -Include __pycache__,.pytest_cache -Directory -Recurse -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
     Get-ChildItem -Path $ProjectRoot -Include *.pyc -File -Recurse -Force | Remove-Item -Force -ErrorAction SilentlyContinue
+    
     ok "Workspace cleaned."
 }
 

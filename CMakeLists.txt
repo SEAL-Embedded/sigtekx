@@ -12,6 +12,11 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)     # (PIC) For ion_engine static lib to
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF) # (IPO) Interferes with nvcc's own LTO; Can damage _engine bindings; Do not enable!
 set(CMAKE_CUDA_RUNTIME_LIBRARY Static)		# Use static runtime for CUDA; For Windows builds to avoid dependency on cudart64_*.DLL - Important!
 
+# Use the static C-Runtime on MSVC to match CUDA::cudart_static and avoid DLL dependencies
+if(MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
+
 option(IONO_WITH_TESTS   "Build tests"            ON)
 option(IONO_WITH_GRAPHS  "Enable CUDA Graphs"     ON)
 option(IONO_WITH_PYTHON  "Build Python bindings"  ON)
@@ -54,14 +59,12 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/google/googletest.git
     GIT_TAG    v1.14.0
 )
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE) # Windows: Prevent overriding the parent project's compiler options - Important!
-FetchContent_MakeAvailable(googletest)
 
 
 # ============================================================================
 # Core static lib with CUDA kernels
 # ============================================================================
-add_library(ion_engine STATIC
+add_library(ion_engine OBJECT
     src/fft_engine.cpp
     src/ops_fft.cu
 )
@@ -88,26 +91,16 @@ if(IONO_WITH_PYTHON)
         CUDA_SEPARABLE_COMPILATION ON
         CUDA_RESOLVE_DEVICE_SYMBOLS ON
     )
+
     target_include_directories(_engine PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include) # Add include dirs - Important!
 
-    # Link against the core static lib + CUDA + pybind11
-    if(MSVC)
-        # Keep all symbols from our static core lib
-        set_target_properties(_engine PROPERTIES LINK_FLAGS "/WHOLEARCHIVE:ion_engine")
-        target_link_libraries(_engine PRIVATE
-          ion_engine
-          pybind11::module
-          CUDA::cudart_static        # static runtime -> no cudart DLL required
-          CUDA::cufft                # cuFFT stays dynamic on Windows
-        )
-    else()
-        target_link_libraries(_engine PRIVATE
-          "-Wl,--whole-archive" ion_engine "-Wl,--no-whole-archive"
-          pybind11::module
-          CUDA::cudart_static
-          CUDA::cufft
-        )
-    endif()
+    # Link against the object files from ion_engine directly + pybind11 + CUDA
+    target_link_libraries(_engine PRIVATE
+        "$<TARGET_OBJECTS:ion_engine>"
+        pybind11::module
+        CUDA::cudart_static
+        CUDA::cufft
+    )
 
     # ---------------- Windows: stage NVIDIA runtime DLLs beside the .pyd ----------------
     if (WIN32)
@@ -157,33 +150,21 @@ endif()
 if(IONO_WITH_TESTS)
     enable_testing()
 
+    FetchContent_MakeAvailable(googletest)
+
     add_executable(test_engine tests/test_fft_engine.cpp)
+    set_target_properties(test_engine PROPERTIES CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 
     # Add include dirs and set CUDA properties for the test executable - Important!
     target_include_directories(test_engine PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-    set_target_properties(test_engine PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 
-    # Link all dependencies to the test executable
-    if(MSVC)
-        # On Windows: set the whole-archive property against ion_engine...
-        set_target_properties(test_engine PROPERTIES LINK_FLAGS "/WHOLEARCHIVE:ion_engine")
-        # ...then link all libraries.
-        target_link_libraries(test_engine PRIVATE
-            ion_engine
-            GTest::gtest_main
-            CUDA::cudart_static
-            CUDA::cufft
-        )
-    else()
-        # On Linux: list all link items in the correct order.
-        # Force whole-archive linking for ion_engine to avoid losing dead code - Important!
-        target_link_libraries(test_engine PRIVATE
-            "-Wl,--whole-archive" ion_engine "-Wl,--no-whole-archive"
-            GTest::gtest_main
-            CUDA::cudart_static
-            CUDA::cufft
-        )
-    endif()
+    # Link against the object files from ion_engine directly + GTest + CUDA
+    target_link_libraries(test_engine PRIVATE
+        "$<TARGET_OBJECTS:ion_engine>"
+        GTest::gtest_main
+        CUDA::cudart_static
+        CUDA::cufft
+    )
 
     include(GoogleTest)
     gtest_discover_tests(test_engine)
