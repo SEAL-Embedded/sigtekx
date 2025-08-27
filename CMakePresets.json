@@ -1,8 +1,8 @@
 {
-  "version": 5,
+  "version": 6,
   "cmakeMinimumRequired": {
     "major": 3,
-    "minor": 24,
+    "minor": 25,
     "patch": 0
   },
   "configurePresets": [
@@ -118,6 +118,25 @@
       "output": {
         "outputOnFailure": true
       }
+    }
+  ],
+  "workflowPresets": [
+    {
+      "name": "windows-rel-workflow",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "windows-rel"
+        },
+        {
+          "type": "build",
+          "name": "windows-rel"
+        },
+        {
+          "type": "test",
+          "name": "windows-tests"
+        }
+      ]
     }
   ]
 }
