@@ -1,0 +1,27 @@
+name: ionosense-hpc
+channels:
+  - nvidia
+  - conda-forge
+  - defaults
+dependencies:
+  # Core language
+  - python=3.11
+
+  # Build tools
+  - cmake>=3.26
+  - ninja
+  - gxx_linux-64=14.*
+
+  # CUDA toolchain (NVCC + dev libs)
+  - cuda-compiler=13.0
+  - cuda-libraries-dev=13.0
+
+  # C++ testing
+  - gtest
+
+  # Python stack
+  - numpy
+  - pybind11
+  - pytest
+  - tqdm
+  - colorama

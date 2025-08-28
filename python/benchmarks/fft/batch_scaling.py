@@ -17,7 +17,7 @@ import os
 
 # Import all shared components from the new utils file
 from utils import (
-    CudaFftEngine,
+    RtFftEngine,
     build_signal
 )
 

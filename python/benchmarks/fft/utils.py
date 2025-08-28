@@ -34,7 +34,7 @@ except ImportError:
 
 # Centralized C++ engine import with clear error messaging.
 try:
-    from cuda_lib import CudaFftEngine
+    from ionosense_hpc.core.engine import RtFftEngine as CudaFftEngine
 except ImportError as e:
     print("FATAL: Could not import 'CudaFftEngine' from 'cuda_lib'.", file=sys.stderr)
     print(f"  - Error: {e}", file=sys.stderr)

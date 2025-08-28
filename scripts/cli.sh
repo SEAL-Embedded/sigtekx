@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================================
-# ionosense-hpc-lib • Project CLI
-# ----------------------------------------------------------------------------
-# Features smart discovery for benchmarks and other scripts.
+# ionosense-hpc-lib • Project CLI (Linux/WSL) — Mamba-first with Conda fallback
 # ============================================================================
 set -Eeuo pipefail
 IFS=$'\n\t'
@@ -10,200 +8,232 @@ IFS=$'\n\t'
 # --- Paths & Defaults --------------------------------------------------------
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="${PROJECT_ROOT}/build"
-BUILD_PRESET=${BUILD_PRESET:-"linux-rel"}
-CONDA_ENV_NAME=${CONDA_ENV_NAME:-ionosense-hpc}
 PYTHON_DIR="${PROJECT_ROOT}/python"
+DEFAULT_PRESET="linux-rel"
+CONDA_ENV_NAME="${CONDA_ENV_NAME:-ionosense-hpc}"
 
-# --- Pretty logging ----------------------------------------------------------
+NSIGHT_DIR="${BUILD_DIR}/nsight_reports"
+NSYS_DIR="${NSIGHT_DIR}/nsys_reports"
+NCU_DIR="${NSIGHT_DIR}/ncu_reports"
+
 C0='\033[0m'; CRED='\033[0;31m'; CGRN='\033[0;32m'; CYEL='\033[0;33m'; CCYN='\033[0;36m'; CBLD='\033[1m'
-log()       { echo -e "${CCYN}[INFO]${C0}  $*"; }
-warn()      { echo -e "${CYEL}[WARN]${C0}  $*"; }
-err()       { echo -e "${CRED}[ERR ]${C0}  $*" 1>&2; }
-ok()        { echo -e "${CGRN}[OK  ]${C0}  $*"; }
-section()   { echo -e "\n${CBLD}== $* ==${C0}"; }
-
+log()     { echo -e "${CCYN}[INFO]${C0}  $*"; }
+warn()    { echo -e "${CYEL}[WARN]${C0}  $*"; }
+err()     { echo -e "${CRED}[ERR ]${C0}  $*" 1>&2; }
+ok()      { echo -e "${CGRN}[OK  ]${C0}  $*"; }
+section() { echo -e "\n${CBLD}== $* ==${C0}"; }
 trap 'err "Command failed on line $LINENO"' ERR
 
-# --- Helpers -----------------------------------------------------------------
+# --- Env file selection (Linux) ---------------------------------------------
+env_file() {
+  if [[ -f "${PROJECT_ROOT}/environment.linux.yml" ]]; then
+    echo "${PROJECT_ROOT}/environment.linux.yml"
+  elif [[ -f "${PROJECT_ROOT}/environment.yml" ]]; then
+    echo "${PROJECT_ROOT}/environment.yml"
+  else
+    err "No environment file found (environment.linux.yml or environment.yml)."
+    exit 1
+  fi
+}
+
+# --- Conda shell (for activation), safe with set -u --------------------------
+conda_source() {
+  set +u
+  if command -v conda >/dev/null 2>&1; then
+    # shellcheck disable=SC1091
+    source "$(conda info --base)/etc/profile.d/conda.sh"
+  elif [[ -d "$HOME/miniconda3" ]]; then
+    # shellcheck disable=SC1091
+    source "$HOME/miniconda3/etc/profile.d/conda.sh"
+  else
+    set -u
+    err "Conda shell not found. Install Miniconda/Mambaforge."
+    exit 1
+  fi
+  set -u
+}
+
+# --- Solver selection (Linux ONLY allows fallback to conda) ------------------
+solver() {
+  if command -v mamba >/dev/null 2>&1; then
+    echo "mamba"
+  elif command -v conda >/dev/null 2>&1; then
+    warn "mamba not found; falling back to conda for env ops on Linux."
+    echo "conda"
+  else
+    err "Neither mamba nor conda found."
+    exit 1
+  fi
+}
+
+# --- Helpers ----------------------------------------------------------------
+env_exists() {
+  conda env list | awk '{print $1}' | grep -qx "$CONDA_ENV_NAME"
+}
+
 activate_env() {
-    if [[ "${CONDA_DEFAULT_ENV-}" != "$CONDA_ENV_NAME" ]]; then
-        log "Activating Conda environment: $CONDA_ENV_NAME"
-        # shellcheck disable=SC1091
-        source "$(conda info --base)/etc/profile.d/conda.sh"
-        conda activate "$CONDA_ENV_NAME"
-    fi
+  conda_source
+  if [[ "${CONDA_DEFAULT_ENV-}" != "$CONDA_ENV_NAME" ]]; then
+    log "Activating Conda environment: $CONDA_ENV_NAME"
+    conda activate "$CONDA_ENV_NAME"
+  fi
 }
 
 with_pythonpath() {
-    export PYTHONPATH="${BUILD_DIR}/${BUILD_PRESET}:${PYTHON_DIR}:${PYTHONPATH-}"
-    "$@"
+  export PYTHONPATH="${BUILD_DIR}/${DEFAULT_PRESET}:${PYTHON_DIR}:${PYTHONPATH-}"
+  "$@"
 }
 
-# Smartly find a script by its name, searching recursively
 find_script() {
-    local type="$1" # e.g., "Benchmark"
-    local dir="$2"  # e.g., "${PYTHON_DIR}/benchmarks"
-    local name="$3" # e.g., "raw_throughput"
-    local found_files
-    
-    found_files=$(find "$dir" -type f -name "${name}.py")
-    local count
-    count=$(echo "$found_files" | wc -l)
-
-    if [[ $count -eq 0 ]]; then
-        err "$type script not found: ${name}.py"
-        log "Use './scripts/cli.sh list benchmarks' to see available scripts."
-        exit 1
-    elif [[ $count -gt 1 ]]; then
-        err "Ambiguous script name: '${name}'. Multiple matches found:"
-        echo "$found_files"
-        exit 1
-    fi
+  local type="$1" dir="$2" name="$3"
+  local found_files
+  found_files=$(find "$dir" -type f -name "${name}.py" 2>/dev/null || true)
+  local count
+  count=$(echo "$found_files" | sed '/^\s*$/d' | wc -l)
+  if [[ $count -eq 0 ]]; then
+    err "$type script not found: ${name}.py"
+    log "Use './scripts/cli.sh list benchmarks' to see available scripts."
+    exit 1
+  elif [[ $count -gt 1 ]]; then
+    err "Ambiguous script name: '${name}'. Multiple matches found:"
     echo "$found_files"
+    exit 1
+  fi
+  echo "$found_files"
 }
 
-# --- Core actions ------------------------------------------------------------
+# --- Commands ----------------------------------------------------------------
 cmd_setup() {
-    section "Environment Setup (Conda)"
-    if ! command -v conda >/dev/null 2>&1; then
-        err "Conda not found. Please install it first."
-        exit 1
-    fi
-    # shellcheck disable=SC1091
-    source "$(conda info --base)/etc/profile.d/conda.sh"
-    conda env update -n "$CONDA_ENV_NAME" -f "${PROJECT_ROOT}/environment.yml" --prune
-    ok "Conda env ready. Activate with: conda activate $CONDA_ENV_NAME"
+  section "Environment Setup (Linux)"
+  conda_source
+  local PKG; PKG="$(solver)"
+  local FILE; FILE="$(env_file)"
+  log "Using solver: $PKG"
+  log "Using environment file: $(basename "$FILE")"
+
+  if env_exists; then
+    "$PKG" env update -n "$CONDA_ENV_NAME" -f "$FILE" --prune
+  else
+    "$PKG" env create -n "$CONDA_ENV_NAME" -f "$FILE"
+  fi
+  ok "Environment ready. Activate with: conda activate $CONDA_ENV_NAME"
 }
 
 cmd_build() {
-    local preset="${1:-$BUILD_PRESET}"
-    section "Configuring & Building (preset: ${preset})"
-    cmake --preset "$preset"
-    cmake --build --preset "$preset" --parallel --verbose
-    ok "Build finished -> ${BUILD_DIR}/${preset}"
+  local preset="${1:-$DEFAULT_PRESET}"
+  section "Configuring & Building (preset: ${preset})"
+  cmake --preset "$preset"
+  cmake --build --preset "$preset" --parallel --verbose
+  ok "Build finished -> ${BUILD_DIR}/${preset}"
 }
 
 cmd_rebuild() {
-    local preset="${1:-$BUILD_PRESET}"
-    section "Clean Rebuild (preset: ${preset})"
-    if [[ -d "${BUILD_DIR}/${preset}" ]]; then
-        log "Removing ${BUILD_DIR}/${preset}"
-        rm -rf "${BUILD_DIR}/${preset}"
-    fi
-    cmd_build "$preset"
+  local preset="${1:-$DEFAULT_PRESET}"
+  section "Clean Rebuild (preset: ${preset})"
+  if [[ -d "${BUILD_DIR}/${preset}" ]]; then
+    log "Removing ${BUILD_DIR}/${preset}"
+    rm -rf "${BUILD_DIR:?}/${preset}"
+  fi
+  cmd_build "$preset"
 }
 
 cmd_test() {
-    section "Running All Tests"
-    # C++ Tests
-    log "Running C++ tests..."
-    ctest --preset "linux-tests" --output-on-failure
-    
-    # Python Tests
-    if [[ -d "${PYTHON_DIR}/tests" ]]; then
-        log "Running Python tests..."
-        activate_env
-        with_pythonpath python3 -m pytest -q "${PYTHON_DIR}/tests"
-    fi
-    ok "All tests completed."
+  section "Running All Tests (Linux)"
+  log "Running C++ tests via CTest preset..."
+  ctest --preset "linux-tests" --output-on-failure || true
+  if [[ -d "${PYTHON_DIR}/tests" ]]; then
+    log "Running Python tests..."
+    activate_env
+    with_pythonpath python3 -m pytest -q "${PYTHON_DIR}/tests"
+  fi
+  ok "Tests completed."
 }
 
 cmd_list() {
-    case "$1" in
-        benchmarks)
-            section "Available Benchmarks"
-            find "${PYTHON_DIR}/benchmarks" -type f -name "*.py" ! -name "__init__.py" | \
-                sed "s|${PYTHON_DIR}/benchmarks/||; s|.py||" | sort
-            ;;
-        *)
-            err "Usage: list <benchmarks>"
-            ;;
-    esac
+  case "${1-}" in
+    benchmarks)
+      section "Available Benchmarks"
+      find "${PYTHON_DIR}/benchmarks" -type f -name "*.py" ! -name "__init__.py" | \
+        sed "s|${PYTHON_DIR}/benchmarks/||; s|.py||" | sort
+      ;;
+    *) err "Usage: list <benchmarks>" ;;
+  esac
 }
 
 cmd_bench() {
-    local script_name="${1-}"
-    shift || true
-    [[ -z "$script_name" ]] && { err "Usage: bench <script_name> [args...]"; exit 1; }
-    
-    local script_path
-    script_path=$(find_script "Benchmark" "${PYTHON_DIR}/benchmarks" "$script_name")
-    
-    section "Running Benchmark: $script_name"
-    activate_env
-    with_pythonpath python3 "$script_path" "$@"
+  local script_name="${1-}"; shift || true
+  [[ -z "$script_name" ]] && { err "Usage: bench <script_name> [args...]"; exit 1; }
+  local script_path; script_path=$(find_script "Benchmark" "${PYTHON_DIR}/benchmarks" "$script_name")
+  section "Running Benchmark: $script_name"
+  activate_env
+  with_pythonpath python3 "$script_path" "$@"
 }
 
 cmd_profile() {
-    local tool="${1-}"
-    local script_name="${2-}"
-    shift 2 || true
-    [[ -z "$tool" || -z "$script_name" ]] && { err "Usage: profile <nsys|ncu> <script_name> [args...]"; exit 1; }
+  local tool="${1-}" script_name="${2-}"; shift 2 || true
+  [[ -z "$tool" || -z "$script_name" ]] && { err "Usage: profile <nsys|ncu> <script_name> [args...]"; exit 1; }
+  local script_path; script_path=$(find_script "Benchmark" "${PYTHON_DIR}/benchmarks" "$script_name")
+  mkdir -p "$NSYS_DIR" "$NCU_DIR"
+  local stamp; stamp="$(date +%Y%m%d_%H%M%S)"
+  local base="${script_name}_${stamp}"
 
-    local script_path
-    script_path=$(find_script "Benchmark" "${PYTHON_DIR}/benchmarks" "$script_name")
-    local out_dir="${BUILD_DIR}/profiles/${tool}"
-    mkdir -p "$out_dir"
-    local out_file="${out_dir}/${script_name}_$(date +%Y%m%d_%H%M%S)"
-    
-    section "Profiling ($tool): $script_name"
-    activate_env
-    
-    case "$tool" in
-        nsys)
-            with_pythonpath nsys profile -o "$out_file" --trace=cuda,nvtx -f true \
-                python3 "$script_path" "$@"
-            ok "Nsight Systems report saved to ${out_file}.nsys-rep"
-            ;;
-        ncu)
-            with_pythonpath ncu --set full --target-processes all -o "$out_file" \
-                python3 "$script_path" "$@"
-            ok "Nsight Compute report saved to ${out_file}.ncu-rep"
-            ;;
-        *)
-            err "Unknown profiler: '$tool'. Use 'nsys' or 'ncu'."
-            exit 1
-            ;;
-    esac
+  section "Profiling ($tool): $script_name"
+  activate_env
+  case "$tool" in
+    nsys)
+      with_pythonpath nsys profile -o "${NSYS_DIR}/${base}" --trace=cuda,nvtx -f true \
+        python3 "$script_path" "$@"
+      ok "Nsight Systems report -> ${NSYS_DIR}/${base}.nsys-rep"
+      ;;
+    ncu)
+      with_pythonpath ncu --set full --target-processes all -o "${NCU_DIR}/${base}" \
+        python3 "$script_path" "$@"
+      ok "Nsight Compute report -> ${NCU_DIR}/${base}.ncu-rep"
+      ;;
+    *)
+      err "Unknown profiler: '$tool'. Use 'nsys' or 'ncu'."
+      ;;
+  esac
 }
 
-# --- Usage & Main ------------------------------------------------------------
+cmd_clean() {
+  section "Cleaning Workspace"
+  if [[ -d "${BUILD_DIR}" ]]; then
+    log "Removing build directory: ${BUILD_DIR}"
+    rm -rf "${BUILD_DIR}"
+  fi
+  ok "Workspace cleaned."
+}
+
 usage() {
-    cat <<EOF
-${CBLD}IONOSENSE-HPC • Scalable Project CLI${C0}
+  cat <<EOF
+${CBLD}IONOSENSE-HPC • Linux CLI${C0}
 Usage: ./scripts/cli.sh <command> [options]
 
-${CBLD}CORE WORKFLOW${C0}
-  setup                    Update Conda environment from environment.yml
-  build [preset]           Configure & build the project (default: ${BUILD_PRESET})
-  rebuild [preset]         Clean and rebuild
-  test                     Run all C++ and Python unit tests
-  
-${CBLD}BENCHMARKING & PROFILING${C0}
-  list benchmarks          Discover and list all available benchmark scripts
-  bench <name> [args...]   Run a benchmark by its name (without .py)
-  profile <tool> <name>    Profile a benchmark with 'nsys' or 'ncu'
+CORE
+  setup                      Create/update env from environment.linux.yml (or environment.yml)
+  build [preset]             Configure & build (default: ${DEFAULT_PRESET})
+  rebuild [preset]           Clean & rebuild
+  test                       Run C++ & Python tests
 
-${CBLD}UTILITIES${C0}
-  clean                    Remove all build and cache files
+BENCH & PROFILING
+  list benchmarks            List benchmark scripts
+  bench <name> [args...]     Run benchmark by name
+  profile <nsys|ncu> <name>  Profile a benchmark; outputs under build/nsight_reports/{nsys,ncu}_reports
 
-${CBLD}EXAMPLES${C0}
-  ./scripts/cli.sh test
-  ./scripts/cli.sh list benchmarks
-  ./scripts/cli.sh bench raw_throughput -n 4096
-  ./scripts/cli.sh profile nsys graphs_comparison
+UTIL
+  clean                      Remove all build outputs
 EOF
 }
 
 main() {
-    cd "$PROJECT_ROOT"
-    local cmd="${1-help}"; shift || true
-    
-    case "$cmd" in
-        help|-h|--help) usage ;;
-        setup|build|rebuild|test|clean|list|bench|profile) "cmd_$cmd" "$@" ;;
-        *) err "Unknown command: $cmd"; usage; exit 1 ;;
-    esac
+  cd "$PROJECT_ROOT"
+  local cmd="${1-help}"; shift || true
+  case "$cmd" in
+    help|-h|--help) usage ;;
+    setup|build|rebuild|test|clean|list|bench|profile) "cmd_$cmd" "$@" ;;
+    *) err "Unknown command: $cmd"; usage; exit 1 ;;
+  esac
 }
 
 main "$@"

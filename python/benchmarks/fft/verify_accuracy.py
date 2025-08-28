@@ -17,7 +17,7 @@ import numpy as np
 import sys
 
 from utils import (
-    CudaFftEngine,
+    RtFftEngine,
     nvtx_range,
     build_signal,
     print_header,
