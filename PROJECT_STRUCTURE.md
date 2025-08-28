@@ -61,7 +61,7 @@ ionosense-hpc-lib/
 ### another diagram, just the code structure
 
 <p align="center">
-  <img src="./docs/.software-architecture.svg" alt="Component Map" width="800"/>
+  <img src="./docs/.software-architecture.svg" alt="Component Map" height="1000" width="800"/>
 </p>
 
 
