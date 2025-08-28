@@ -15,7 +15,7 @@ from typing import Dict
 
 # Import all shared components from the utils file
 from utils import (
-    RtFftEngine, nvtx_range, build_signal, print_header, 
+    CudaFftEngine, nvtx_range, build_signal, print_header, 
     print_separator, create_engine, tqdm, is_profiler_attached, safe_print
 )
 

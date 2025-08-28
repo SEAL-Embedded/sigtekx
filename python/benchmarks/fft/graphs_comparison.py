@@ -17,7 +17,7 @@ import sys
 
 # Import shared components from the utils module
 from utils import (
-    RtFftEngine,
+    CudaFftEngine,
     compute_stats,
     fmt_t,
     print_header,

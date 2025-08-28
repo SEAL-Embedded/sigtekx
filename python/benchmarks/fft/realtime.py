@@ -14,7 +14,7 @@ import sys
 from typing import Dict
 
 from utils import (
-    RtFftEngine, nvtx_range, build_signal, compute_stats, fmt_t, 
+    CudaFftEngine, nvtx_range, build_signal, compute_stats, fmt_t, 
     print_header, print_separator, create_engine, tqdm, is_profiler_attached, safe_print
 )
 
