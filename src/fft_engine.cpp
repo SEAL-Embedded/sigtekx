@@ -90,20 +90,20 @@ struct RtFftEngine::Impl {
         
         // Initialize all pointers to nullptr
         for (int i = 0; i < kNumStreams; ++i) {
-            streams_[i] = nullptr;
-            events_[i] = nullptr;
-            plans_[i] = 0;
-            h_inputs_[i] = nullptr;
-            h_outputs_[i] = nullptr;
-            d_inputs_[i] = nullptr;
-            d_specs_[i] = nullptr;
-            d_mags_[i] = nullptr;
-            d_window_[i] = nullptr;
-            graphs_[i] = nullptr;
-            graphs_execs_[i] = nullptr;
-            cufft_workspaces_[i] = nullptr;
-            prof_start_[i] = nullptr;
-            prof_end_[i] = nullptr;
+            streams_[i]           =  nullptr;
+            events_[i]            =  nullptr;
+            plans_[i]             =  0;
+            h_inputs_[i]          =  nullptr;
+            h_outputs_[i]         =  nullptr;
+            d_inputs_[i]          =  nullptr;
+            d_specs_[i]           =  nullptr;
+            d_mags_[i]            =  nullptr;
+            d_window_[i]          =  nullptr;
+            graphs_[i]            =  nullptr;
+            graphs_execs_[i]      =  nullptr;
+            cufft_workspaces_[i]  =  nullptr;
+            prof_start_[i]        =  nullptr;
+            prof_end_[i]          =  nullptr;
         }
         
         init_resources();
@@ -204,13 +204,13 @@ struct RtFftEngine::Impl {
         const size_t out_bytes = sizeof(float) * bins * batch_;
         
         // Get resources for the specified stream index
-        cudaStream_t stream = streams_[idx];
-        cufftHandle plan = plans_[idx];
-        float* h_in = h_inputs_[idx];
-        float* h_out = h_outputs_[idx];
-        cufftReal* d_in = d_inputs_[idx];
-        cufftComplex* d_spec = d_specs_[idx];
-        float* d_mag = d_mags_[idx];
+        cudaStream_t   stream =    streams_[idx];
+        cufftHandle      plan =      plans_[idx];
+        float*           h_in =   h_inputs_[idx];
+        float*          h_out =  h_outputs_[idx];
+        cufftReal*       d_in =   d_inputs_[idx];
+        cufftComplex*  d_spec =    d_specs_[idx];
+        float*          d_mag =     d_mags_[idx];
         
         // 1. H2D Copy
         CUDA_CHECK(cudaMemcpyAsync(d_in, h_in, in_bytes, cudaMemcpyHostToDevice, stream));
