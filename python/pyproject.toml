@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ionosense-hpc"
+version = "0.1.0"
+description = "A high-performance CUDA FFT engine and benchmarking suite."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+    { name = "Kevin Rahsaz" }
+]
+dependencies = [
+    "numpy>=1.24"
+]
+
+[project.urls]
+Homepage = "https://github.com/SEAL-Embedded/ionosense-hpc-lib"
+
+[tool.setuptools]
+# This tells setuptools to find all packages under the current directory
+packages = { find = { where = ["."], include = ["ionosense_hpc*"] } }
+# This is crucial for including the compiled .pyd/.so and future .dll files
+include-package-data = true
