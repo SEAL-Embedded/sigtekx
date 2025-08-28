@@ -55,7 +55,7 @@ ionosense-hpc-lib/
 ## Component Map
 
 <p align="center">
-  <img src="./docs/.component-map.svg" alt="Component Map" width="600"/>
+  <img src="./docs/.component-map.svg" alt="Component Map" width="800"/>
 </p>
 
 
