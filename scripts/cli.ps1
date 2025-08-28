@@ -78,7 +78,7 @@ Function cmd_setup {
     log "Creating/Updating Conda environment '$CondaEnvName' with Mamba..."
     log "This may take several minutes on the first run..."
     # Use mamba for a faster, more robust solver
-    mamba env update --name $CondaEnvName --file (Join-Path $ProjectRoot "environment.yml") --prune
+    mamba env update --name $CondaEnvName --file (Join-Path $ProjectRoot "environment.win.yml") --prune
     ok "Conda environment '$CondaEnvName' is ready."
     log "Activate it with: conda activate $CondaEnvName"
 }
