@@ -122,20 +122,19 @@
   ],
   "workflowPresets": [
     {
+      "name": "linux-rel-workflow",
+      "steps": [
+        { "type": "configure", "name": "linux-rel" },
+        { "type": "build",     "name": "linux-rel" },
+        { "type": "test",      "name": "linux-tests" }
+      ]
+    },
+    {
       "name": "windows-rel-workflow",
       "steps": [
-        {
-          "type": "configure",
-          "name": "windows-rel"
-        },
-        {
-          "type": "build",
-          "name": "windows-rel"
-        },
-        {
-          "type": "test",
-          "name": "windows-tests"
-        }
+        { "type": "configure", "name": "windows-rel" },
+        { "type": "build",     "name": "windows-rel" },
+        { "type": "test",      "name": "windows-tests" }
       ]
     }
   ]
