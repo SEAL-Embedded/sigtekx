@@ -6,7 +6,7 @@ High-performance CUDA FFT engine for dual-channel ULF/VLF antenna signal process
 
 - **Real-time Processing**: <200 μs latency per dual-channel FFT pair
 - **CUDA Optimization**: Multi-stream concurrency with CUDA Graphs support
-- **Research-Grade**: IEEE 754 float32 accuracy, validated against FFTW/MKL
+- **Research-Grade**: IEEE 754 float32 accuracy, validated against FFTW/MKL (not yet)
 - **Python Integration**: Zero-copy NumPy interface via pybind11
 - **Cross-Platform**: Linux-first development, Windows deployment support
 
@@ -96,4 +96,5 @@ If you use this software in your research, please cite:
   institution = {University of Washington},
   url = {https://github.com/SEAL-Embedded/ionosense-hpc-lib}
 }
+
 ```
