@@ -103,42 +103,46 @@ if(IONO_WITH_PYTHON)
     )
 
     # ---------------- Windows: stage NVIDIA runtime DLLs beside the .pyd ----------------
-    if (WIN32)
-        # Candidate dirs (covers both new and older CUDA layouts)
-        set(_CUDA_DIRS
-            "${CUDAToolkit_BIN_DIR}"
-            "${CUDAToolkit_BIN_DIR}/x64"
-            "$ENV{CUDA_PATH}/bin"
-            "$ENV{CUDA_PATH}/bin/x64"
+    if(WIN32)
+        set(_LIBS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/python/ionosense_hpc/.libs/windows")
+        file(MAKE_DIRECTORY ${_LIBS_DIR})
+
+        # --- Step 1: Verify Conda Environment and Set the Correct Path ---
+        if(NOT DEFINED ENV{CONDA_PREFIX})
+            message(FATAL_ERROR "[ionosense] FATAL: CONDA_PREFIX environment variable not set.")
+        endif()
+        
+        # Set the precise, user-provided path for the DLLs
+        set(_CONDA_BIN_DIR "$ENV{CONDA_PREFIX}/Library/bin/x64")
+        message(STATUS "[ionosense] Searching for CUDA DLLs in the correct path: ${_CONDA_BIN_DIR}")
+
+        # --- Step 2: Locate DLLs using a controlled GLOB ---
+        file(GLOB CUFFT_DLLS "${_CONDA_BIN_DIR}/cufft*.dll")
+        file(GLOB CUDART_DLLS "${_CONDA_BIN_DIR}/cudart*.dll")
+
+        # --- Step 3: Verify the DLLs were found ---
+        if(NOT CUFFT_DLLS OR NOT CUDART_DLLS)
+            message(FATAL_ERROR "[ionosense] FATAL: Could not locate CUDA runtime DLLs in the specific path '${_CONDA_BIN_DIR}'.\n"
+                            "    Please manually verify the files exist in that exact folder.")
+        endif()
+
+        message(STATUS "[ionosense] Found cuFFT DLL(s):  ${CUFFT_DLLS}")
+        message(STATUS "[ionosense] Found CUDArt DLL(s): ${CUDART_DLLS}")
+
+        set(_REQUIRED_DLLS ${CUFFT_DLLS} ${CUDART_DLLS})
+
+        # --- Step 4: Add post-build commands for staging and validation ---
+        add_custom_command(TARGET _engine POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${_REQUIRED_DLLS} "${_LIBS_DIR}"
+            COMMENT "[ionosense] Staging CUDA DLLs to '${_LIBS_DIR}'"
+            COMMAND_EXPAND_LISTS
         )
 
-        set(_STAGE_DLLS)
-        foreach(_D IN LISTS _CUDA_DIRS)
-            if(EXISTS "${_D}")
-                # cuFFT is the one we truly need (dynamic on Windows)
-                file(GLOB _HIT_CUFFT "${_D}/cufft64_*.dll")
-                list(APPEND _STAGE_DLLS ${_HIT_CUFFT})
-
-                # Optional: if anyone flips to dynamic cudart later, ship it too (harmless if present)
-                file(GLOB _HIT_CUDART "${_D}/cudart64_*.dll")
-                list(APPEND _STAGE_DLLS ${_HIT_CUDART})
-            endif()
-        endforeach()
-        list(REMOVE_DUPLICATES _STAGE_DLLS)
-
-        if(_STAGE_DLLS)
-            message(STATUS "Staging CUDA DLLs beside _engine: ${_STAGE_DLLS}")
-            add_custom_command(TARGET _engine POST_BUILD
-                  COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:_engine>"
-                  COMMAND ${CMAKE_COMMAND} -E copy_if_different ${_STAGE_DLLS} "$<TARGET_FILE_DIR:_engine>"
-                  COMMAND ${CMAKE_COMMAND} -E echo "CUDA DLLs copied to: $<TARGET_FILE_DIR:_engine>"
-                  COMMAND_EXPAND_LISTS
-            )
-        else()
-        message(WARNING
-            "Couldn't find CUDA runtime DLLs in any of:\n  ${_CUDA_DIRS}\n"
-            "Windows import may fail; ensure Toolkit is installed and contains cuFFT runtime.")
-        endif()
+        add_custom_command(TARGET _engine POST_BUILD
+            COMMAND ${Python3_EXECUTABLE} -c "import sys; sys.path.insert(0, '${CMAKE_CURRENT_SOURCE_DIR}/python'); import ionosense_hpc; print('[ionosense] Python extension import validated successfully.')"
+            COMMENT "[ionosense] Validating Python extension import"
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        )
     endif()
 
 endif()

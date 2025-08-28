@@ -1,21 +1,30 @@
 name: ionosense-hpc
 channels:
-  - conda-forge
   - nvidia
+  - conda-forge
 channel_priority: strict
 dependencies:
   # Core
   - python=3.11
-  - cmake
+  - cmake>=3.26
   - ninja
-  # C++
-  - pybind11
-  # Python Libs
+
+  # VS Build tools
+  - vs2022_win-64
+
+  # CUDA toolchain (NVCC + dev libs)
+  - cuda-compiler=13.0
+  - cuda-libraries-dev=13.0
+
+  # Python stack
   - numpy
+  - pybind11
+  - pytest
+  - tqdm
+  - colorama
   - scipy
-  - matplotlib
   - pandas
-  - py-cpuinfo
+  - matplotlib
   # Testing
   - pytest
   - pytest-xdist

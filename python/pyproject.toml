@@ -5,22 +5,53 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ionosense-hpc"
 version = "0.1.0"
-description = "A high-performance CUDA FFT engine and benchmarking suite."
+description = "High-performance CUDA FFT engine for dual-channel ULF/VLF antenna signal processing."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [
-    { name = "Kevin Rahsaz" }
+    { name = "Kevin Rahsaz", email = "rahsaz.kevin@gmail.com"}
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: C++",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
 ]
 dependencies = [
-    "numpy>=1.24"
+    "numpy>=1.24,<2.0",  # Lock for ABI compatibility
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "pytest-benchmark>=4.0",
+    "memory-profiler>=0.61",
 ]
 
 [project.urls]
-Homepage = "https://github.com/SEAL-Embedded/ionosense-hpc-lib"
+Repository = "https://github.com/SEAL-Embedded/ionosense-hpc-lib"
 
 [tool.setuptools]
-# This tells setuptools to find all packages under the current directory
+zip-safe = false  # Binary extensions cannot be zip-safe
 packages = { find = { where = ["."], include = ["ionosense_hpc*"] } }
-# This is crucial for including the compiled .pyd/.so and future .dll files
-include-package-data = true
+
+[tool.setuptools.package-data]
+"ionosense_hpc" = [
+    # Include the type hint marker
+    "py.typed",
+    # Include compiled extensions from the core directory
+    "core/*.pyd",
+    "core/*.so",
+    # Include all runtime libraries from the .libs directory
+    ".libs/windows/*.dll",
+    ".libs/linux/*.so",
+]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["python/tests"]
+addopts = "-v --tb=short --color=yes"
