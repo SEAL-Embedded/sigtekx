@@ -226,17 +226,7 @@ tqdm            # Progress bars
 
 | Metric | Target | Current |
 |--------|--------|---------|
-| Latency (dual FFT) | <200 μs | ~180 μs |
+| Latency (dual FFT) | <110 μs | ~180 μs |
 | Throughput (4K FFT) | >1M/s | 1.2M/s |
 | Memory Transfer | <40% time | 38% |
 | RMS Error | <1e-5 | 8.3e-6 |
-
-## License
-
-MIT License - See [LICENSE](LICENSE) file.
-
-## Support
-
-- Issues: [GitHub Issues](https://github.com/SEAL-Embedded/ionosense-hpc-lib/issues)
-- Documentation: [This file](PROJECT_STRUCTURE.md)
-- Contact: SEAL Lab, University of Washington
