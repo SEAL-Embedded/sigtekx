@@ -5,9 +5,13 @@
 # Keep source, configs, and docs. Anchors (leading /) mean "repo root only".
 
 # --- Build & Packaging Artifacts ---
+# Root build trees
 /build/                  # CMake/Ninja build tree at repo root
 /dist/                   # Packaging output at repo root
 cmake-build-*/           # CLion out-of-source builds
+/build/**
+/out/
+/out/**
 CMakeFiles/
 CMakeCache.txt
 *.ninja
@@ -52,6 +56,10 @@ pip-wheel-metadata/
 coverage.xml
 htmlcov/
 .ipynb_checkpoints/
+
+# Python extension modules in core/ (Windows + Linux)
+python/src/ionosense_hpc/core/*.pyd
+python/src/ionosense_hpc/core/*.so
 
 # --- Virtual Envs / Local Python ---
 .venv/
