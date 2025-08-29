@@ -1,49 +1,58 @@
-# pyproject.toml (Located in the project root)
+# pyproject.toml
 
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "ionosense-hpc"
 version = "0.1.0"
-description = "High-performance CUDA FFT engine for dual-channel ULF/VLF antenna signal processing."
+description = "High-performance CUDA FFT engine + Python bindings for real-time ULF/VLF signal processing."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
-authors = [
-    { name = "Kevin Rahsaz", email = "rahsaz.kevin@gmail.com"}
-]
+authors = [{ name = "Kevin Rahsaz", email = "rahsaz.kevin@gmail.com" }]
+
 dependencies = [
-    "numpy>=1.24,<2.0",
+  "numpy>=1.24,<2",
+  "pynvml>=11.5",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.4",
-    "pynvml>=11.5.0"
+  "pytest>=8.0",
+  "pytest-xdist>=3.5",
+  "pytest-timeout>=2.3",
+  "build>=1.2",
+  "wheel>=0.43",
+  "ruff>=0.4",
+  "mypy>=1.10",
 ]
+
+[project.urls]
+Homepage = "https://github.com/uw-seal/ionosense-hpc-lib"
 
 [tool.setuptools]
-zip-safe = false
-package-dir = {"" = "python/src"}
-packages = { find = { where = ["python/src"] } }
+package-dir = { "" = "python/src" }
+# If you ever add MANIFEST.in and want it respected, you can set:
+# include-package-data = true
 
+[tool.setuptools.packages.find]
+where = ["python/src"]
+include = ["ionosense_hpc*"]
+exclude = ["ionosense_hpc.tests*"]
+
+# ✅ Keys must be python module names. Patterns are relative to that package dir.
 [tool.setuptools.package-data]
 "ionosense_hpc" = [
-    "py.typed",
-    "core/*.pyd",
-    "core/*.so",
-    ".libs/windows/*.dll",
-    ".libs/linux/*.so",
+  "py.typed",
+  ".libs/windows/*.dll",
+  ".libs/linux/*.so",
+]
+"ionosense_hpc.core" = [
+  "_engine*.pyd",
+  "_engine*.so",
 ]
 
-[tool.pytest.ini_options]
-minversion = "7.0"
-testpaths = ["python/tests"]
-pythonpath = ["python/src"]
-# THE FIX: Register the custom 'config' mark.
-markers = [
-    "config: tests for the configuration module"
-]
-addopts = "-v --tb=short --color=yes"
+[tool.setuptools.exclude-package-data]
+"ionosense_hpc" = ["tests/*", "__pycache__/*", "*.pyc"]
