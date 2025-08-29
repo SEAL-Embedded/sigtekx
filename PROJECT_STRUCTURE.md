@@ -11,7 +11,7 @@ ionosense-hpc-lib/
 ├── bindings/                  # C++ to Python bindings (pybind11)
 ├── include/                   # C++ header files for the core library
 ├── src/                       # C++/CUDA source code implementation
-├── tests/                     # C++ unit tests (e.g., using Catch2 or GTest)
+├── tests/                     # C++ unit tests (GTest)
 │
 ├── python/                    # Python package, scripts, and tests
 │   ├── benchmarks/            # Executable benchmark scripts
