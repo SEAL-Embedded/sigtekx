@@ -1,0 +1,49 @@
+# pyproject.toml (Located in the project root)
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ionosense-hpc"
+version = "0.1.0"
+description = "High-performance CUDA FFT engine for dual-channel ULF/VLF antenna signal processing."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+    { name = "Kevin Rahsaz", email = "rahsaz.kevin@gmail.com"}
+]
+dependencies = [
+    "numpy>=1.24,<2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "pynvml>=11.5.0"
+]
+
+[tool.setuptools]
+zip-safe = false
+package-dir = {"" = "python/src"}
+packages = { find = { where = ["python/src"] } }
+
+[tool.setuptools.package-data]
+"ionosense_hpc" = [
+    "py.typed",
+    "core/*.pyd",
+    "core/*.so",
+    ".libs/windows/*.dll",
+    ".libs/linux/*.so",
+]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["python/tests"]
+pythonpath = ["python/src"]
+# THE FIX: Register the custom 'config' mark.
+markers = [
+    "config: tests for the configuration module"
+]
+addopts = "-v --tb=short --color=yes"

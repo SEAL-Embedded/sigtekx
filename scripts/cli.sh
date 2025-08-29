@@ -159,7 +159,7 @@ cmd_test() {
   section "Running All Tests (Linux)"
   log "Running C++ tests via CTest preset..."
   ctest --preset "linux-tests" --output-on-failure
-  if [[ -d "${PYTHON_DIR}/tests" ]]; then
+  if [[ -d "${PYTHON_DIR}/ionosense_hpc/tests" ]]; then
     log "Running Python tests..."
     activate_env
     with_pythonpath python3 -m pytest -q "${PYTHON_DIR}/tests"

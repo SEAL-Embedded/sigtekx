@@ -83,7 +83,7 @@ if(IONO_WITH_PYTHON)
     pybind11_add_module(_engine SHARED bindings/bindings.cpp) # produces [ _engine.pyd (Win) / _engine.so (linux) ]
 
     # Where the Python extension should live at build time
-    set(_ION_PY_OUT "${CMAKE_CURRENT_SOURCE_DIR}/python/ionosense_hpc/core")
+    set(_ION_PY_OUT "${CMAKE_CURRENT_SOURCE_DIR}/python/src/ionosense_hpc/core")
 
     set_target_properties(_engine PROPERTIES
         LIBRARY_OUTPUT_DIRECTORY  "${_ION_PY_OUT}"
@@ -104,7 +104,7 @@ if(IONO_WITH_PYTHON)
 
     # ---------------- Windows: stage NVIDIA runtime DLLs beside the .pyd ----------------
     if(WIN32)
-        set(_LIBS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/python/ionosense_hpc/.libs/windows")
+        set(_LIBS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/python/src/ionosense_hpc/.libs/windows")
         file(MAKE_DIRECTORY ${_LIBS_DIR})
 
         # --- Step 1: Verify Conda Environment and Set the Correct Path ---
