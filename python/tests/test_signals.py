@@ -7,7 +7,7 @@ import pytest
 from numpy.testing import assert_allclose
 
 # Import the functions and classes to be tested
-from ionosense_hpc.core.signals import (
+from ionosense_hpc.utils.signals import (
     SignalParameters,
     generate_test_signal,
     apply_window,

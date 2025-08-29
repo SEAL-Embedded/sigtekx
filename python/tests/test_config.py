@@ -6,8 +6,8 @@ import pytest
 from dataclasses import FrozenInstanceError
 from unittest.mock import patch
 
-# CORRECTED IMPORT PATH: Now points to ionosense_hpc.utils.config
-from ionosense_hpc.utils.config import ProcessingConfig, PYNVML_AVAILABLE
+# CORRECTED IMPORT PATH: Now points to ionosense_hpc.core.config
+from ionosense_hpc.core.config import ProcessingConfig, PYNVML_AVAILABLE
 
 pytestmark = pytest.mark.config
 
@@ -48,9 +48,9 @@ def test_batch_size_validation():
 def test_string_option_validation():
     """Tests that invalid string options for window/output raise a ValueError."""
     with pytest.raises(ValueError, match="Unsupported window function"):
-        ProcessingConfig(window='invalid_window')
+        ProcessingConfig(window='invalid_window') # type: ignore
     with pytest.raises(ValueError, match="Unsupported output type"):
-        ProcessingConfig(output_type='invalid_output')
+        ProcessingConfig(output_type='invalid_output') # type: ignore
 
 
 def test_immutability():
@@ -68,11 +68,12 @@ def test_get_engine_params():
         'nfft': 8192,
         'batch': 8,
         'use_graphs': False,
+        'verbose': False # Add verbose, defaulting to false
     }
     assert params == expected_params
 
 
-@patch('ionosense_hpc.utils.config.PYNVML_AVAILABLE', False)
+@patch('ionosense_hpc.core.config.PYNVML_AVAILABLE', False)
 def test_auto_tune_batch_size_fallback():
     """
     Tests the fallback auto-tuning logic when pynvml is not available.
@@ -90,5 +91,3 @@ def test_auto_tune_with_pynvml():
     assert config.batch_size is not None
     assert config.batch_size > 0
     assert config.batch_size % 2 == 0
-    print(f"\n(PYNVML) Auto-tuned batch size to: {config.batch_size}")
-
