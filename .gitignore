@@ -61,7 +61,9 @@ desktop.ini
 
 # Linux
 *~
-core
+core                 # ignore core dump files named "core"
+!**/core/            # but DO NOT ignore directories named core
+!**/core/**
 
 # macOS
 .DS_Store
