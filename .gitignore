@@ -1,74 +1,100 @@
-# --- Build Artifacts ---
-# Ignore the main build directory from CMake/Ninja
-build/
-dist/
+# ============================
+# ionosense-hpc-lib .gitignore
+# ============================
+# Guiding idea: ignore generated artifacts, caches, and IDE cruft.
+# Keep source, configs, and docs. Anchors (leading /) mean "repo root only".
 
-# Ignore compiled binaries, libraries, and object files
+# --- Build & Packaging Artifacts ---
+/build/                  # CMake/Ninja build tree at repo root
+/dist/                   # Packaging output at repo root
+cmake-build-*/           # CLion out-of-source builds
+CMakeFiles/
+CMakeCache.txt
+*.ninja
+.ninja_*
+*.cmake
+*.rsp
+compile_commands.json    # Generated; re-create as needed
+
+# --- Compiled Binaries & Objects (C/C++/CUDA) ---
 *.o
 *.obj
-*.exe
-*.dll
-*.pyd
-*.so
-*.lib
 *.a
+*.lib
+*.dll
+*.so
+*.dylib
+*.exp
+*.pdb
+*.ilk
+*.pch
+*.exe
+# CUDA byproducts (keep .cu/.cuh sources)
+/*.fatbin
+*.cubin
+*.ptx
+*.cudafe*
+*.module_id
 
-# --- Python ---
-# Ignore bytecode and caches
+# --- Python Artifacts ---
 __pycache__/
 *.pyc
 *.pyo
+*.pyd                   # Windows extension modules (like .so)
+*.egg-info/
+.eggs/
+build/                  # Python packaging builds inside subdirs
+pip-wheel-metadata/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+.ipynb_checkpoints/
 
-# Ignore virtual environments
+# --- Virtual Envs / Local Python ---
 .venv/
 venv/
 env/
-
-# Ignore testing and packaging artifacts
-.pytest_cache/
-.eggs/
-*.egg-info/
-
-# --- Conda ---
-# Conda environments are typically outside the project, but ignore them if created locally
+# Conda: typically outside repo, but ignore if local
 hpc_workspace/
 
-# --- IDE and Editor Files ---
-# Visual Studio 2022
-.vs/
-*.vcxproj*
-*.sln
-*.user
-*.suo
-*.ncb
-*.opensdf
-*.sdf
-
-# Visual Studio Code
+# --- IDE / Editor ---
+# VS Code
 .vscode/*
 !/.vscode/settings.json
 !/.vscode/tasks.json
 !/.vscode/launch.json
 !/.vscode/extensions.json
 
-# JetBrains (CLion, PyCharm)
+# Visual Studio (keep project files out of this repo)
+.vs/
+*.sln
+*.vcxproj*
+*.user
+*.suo
+*.ncb
+*.opensdf
+*.sdf
+
+# JetBrains
 .idea/
 
-# --- OS-Specific Files ---
+# --- OS junk ---
 # Windows
 Thumbs.db
 desktop.ini
-
-# Linux
-*~
-core                 # ignore core dump files named "core"
-!**/core/            # but DO NOT ignore directories named core
-!**/core/**
-
 # macOS
 .DS_Store
+# Linux
+*~
+# Core dumps (files only; DO NOT ignore directories named "core")
+core.[0-9]*
+vgcore.*
 
-# --- Logging and Temporary Files ---
+# --- Logs / Temps ---
 *.log
 *.tmp
 *.swp
+*.swo
