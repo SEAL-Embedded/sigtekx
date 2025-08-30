@@ -101,38 +101,34 @@ if(IONO_WITH_PYTHON)
         CUDA::cufft
     )
 
-# ---------------- Windows: stage NVIDIA runtime DLLs beside the .pyd ----------------
-if(WIN32)
-    set(_LIBS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/python/src/ionosense_hpc/.libs/windows")
-    file(MAKE_DIRECTORY ${_LIBS_DIR})
+    # ---------------- Windows: stage NVIDIA runtime DLLs beside the .pyd ----------------
+    if(WIN32)
+        set(_LIBS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/python/src/ionosense_hpc/.libs/windows")
+        file(MAKE_DIRECTORY ${_LIBS_DIR})
 
-    if(NOT DEFINED ENV{CONDA_PREFIX})
-        message(FATAL_ERROR "[ionosense] FATAL: CONDA_PREFIX environment variable not set.")
+        if(NOT DEFINED ENV{CONDA_PREFIX})
+            message(FATAL_ERROR "[ionosense] FATAL: CONDA_PREFIX environment variable not set.")
+        endif()
+
+        set(_CONDA_BIN_DIR "$ENV{CONDA_PREFIX}/Library/bin/x64")
+        message(STATUS "[ionosense] Searching for CUDA DLLs in the correct path: ${_CONDA_BIN_DIR}")
+
+        file(GLOB CUFFT_DLLS "${_CONDA_BIN_DIR}/cufft*.dll")
+        file(GLOB CUDART_DLLS "${_CONDA_BIN_DIR}/cudart*.dll")
+
+        if(NOT CUFFT_DLLS OR NOT CUDART_DLLS)
+            message(FATAL_ERROR "[ionosense] FATAL: Could not locate CUDA runtime DLLs in '${_CONDA_BIN_DIR}'.")
+        endif()
+
+        message(STATUS "[ionosense] Found cuFFT DLL(s):  ${CUFFT_DLLS}")
+        message(STATUS "[ionosense] Found CUDArt DLL(s): ${CUDART_DLLS}")
+
+        add_custom_command(TARGET _engine POST_BUILD
+            COMMAND ${Python3_EXECUTABLE} -c "import sys; sys.path.insert(0, '${CMAKE_CURRENT_SOURCE_DIR}/python'); import ionosense_hpc; print('[ionosense] Python extension import validated successfully.')"
+            COMMENT "[ionosense] Validating Python extension import"
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        )
     endif()
-
-    set(_CONDA_BIN_DIR "$ENV{CONDA_PREFIX}/Library/bin/x64")
-    message(STATUS "[ionosense] Searching for CUDA DLLs in the correct path: ${_CONDA_BIN_DIR}")
-
-    file(GLOB CUFFT_DLLS "${_CONDA_BIN_DIR}/cufft*.dll")
-    file(GLOB CUDART_DLLS "${_CONDA_BIN_DIR}/cudart*.dll")
-
-    if(NOT CUFFT_DLLS OR NOT CUDART_DLLS)
-        message(FATAL_ERROR "[ionosense] FATAL: Could not locate CUDA runtime DLLs in '${_CONDA_BIN_DIR}'.")
-    endif()
-
-    message(STATUS "[ionosense] Found cuFFT DLL(s):  ${CUFFT_DLLS}")
-    message(STATUS "[ionosense] Found CUDArt DLL(s): ${CUDART_DLLS}")
-
-    # Keep your copy/staging here if you want; not required for the Ninja fix.
-
-    # ✅ Single, newline-free validation command using bracket quotes so semicolons don't split args
-    add_custom_command(TARGET _engine POST_BUILD
-        COMMAND "${Python3_EXECUTABLE}" -c
-        [=[import sys; sys.path.insert(0, r'${CMAKE_CURRENT_SOURCE_DIR}/python'); import ionosense_hpc; print('[ionosense] Python extension import validated successfully.')]=]
-        COMMENT "[ionosense] Validating Python extension import"
-        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-    )
-endif()
 
 
 endif()
@@ -146,7 +142,11 @@ if(IONO_WITH_TESTS)
 
     FetchContent_MakeAvailable(googletest)
 
-    add_executable(test_engine tests/test_fft_engine.cpp)
+    add_executable(test_engine
+        tests/test_pipeline_engine.cpp
+        tests/test_processing_stage.cpp
+        tests/test_cuda_wrappers.cpp
+    )
     set_target_properties(test_engine PROPERTIES CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 
     # Add include dirs and set CUDA properties for the test executable - Important!

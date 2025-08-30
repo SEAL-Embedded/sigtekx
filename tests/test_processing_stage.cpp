@@ -60,10 +60,14 @@ TEST_F(ProcessingStageTest, FftStageInitialization) {
     auto stage = std::make_unique<FftProcessingStage>();
     stage->configure(config);
 
-    // Initialization requires a valid CUDA stream
-    cuda::Stream stream;
-    ASSERT_NO_THROW(stage->initialize(stream));
+    // FIX: The initialize method now requires a vector of streams.
+    // Create a vector with one stream to satisfy the new API for this test.
+    std::vector<cuda::Stream> streams;
+    streams.emplace_back();
+
+    ASSERT_NO_THROW(stage->initialize(streams));
     
     // Double initialization should be a no-op and not throw
-    ASSERT_NO_THROW(stage->initialize(stream));
+    ASSERT_NO_THROW(stage->initialize(streams));
 }
+

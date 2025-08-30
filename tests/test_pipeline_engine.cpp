@@ -116,7 +116,7 @@ TEST_F(PipelineEngineTest, AutoStreamCycling) {
 }
 
 TEST_F(PipelineEngineTest, GraphToggle) {
-    auto engine = builder->with_graphs(false)->build();
+    auto engine = builder->with_graphs(false).build();
     EXPECT_FALSE(engine->config().use_graphs);
     engine->prepare();
     // After prepare, enabling graphs should re-prepare/capture

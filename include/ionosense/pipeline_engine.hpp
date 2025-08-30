@@ -45,7 +45,7 @@ public:
 
     void prepare();
 
-    // returns the stream index used (or -1 style sentinel as per .cpp)
+    // returns the stream index used
     int  execute_async();
     void execute_async(int stream_idx);
 
@@ -85,7 +85,6 @@ public:
 
     std::unique_ptr<PipelineEngine> build();
 
-    // Access (used by legacy wrapper)
     const PipelineConfig& config() const { return config_; }
 
 private:
@@ -94,7 +93,7 @@ private:
 };
 
 // ==== Legacy FFT wrapper API maintained for compatibility ====
-
+// NOTE: This legacy API is now just a thin wrapper around the modern PipelineEngine
 struct RtFftConfig {
     int  nfft            = 0;
     int  batch           = 0;
@@ -102,36 +101,28 @@ struct RtFftConfig {
     bool enable_profiling= false;
     bool use_graphs      = false;
     bool verbose         = false;
+    std::vector<float> window{};
 
-    std::vector<float> window{}; // optional window
-
-    // Implemented in src/pipeline_engine.cpp
     PipelineConfig to_pipeline_config() const;
 };
 
 class RtFftEngine {
 public:
-    // Implementations in src/pipeline_engine.cpp
     explicit RtFftEngine(const RtFftConfig& cfg);
     ~RtFftEngine();
     RtFftEngine(RtFftEngine&&) noexcept;
     RtFftEngine& operator=(RtFftEngine&&) noexcept;
 
     void prepare_for_execution();
-
     void execute_async(int stream_idx);
     void sync_stream(int stream_idx);
     void synchronize_all_streams();
-
     float* pinned_input(int stream_idx) const;
     float* pinned_output(int stream_idx) const;
-
     void  set_window(const float* h_window_data);
-
     void  set_use_graphs(bool enabled);
     bool  get_use_graphs() const;
     bool  graphs_ready() const;
-
     int   get_fft_size() const;
     int   get_batch_size() const;
     int   get_num_streams() const;

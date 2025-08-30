@@ -388,7 +388,9 @@ public:
         return size;
     }
     
-    void execute_r2c(cufftReal* input, cufftComplex* output) {
+    // FIX: This method doesn't modify the FftPlan object's state,
+    // so it should be marked 'const'.
+    void execute_r2c(cufftReal* input, cufftComplex* output) const {
         IONO_CUFFT_CHECK(cufftExecR2C(plan_, input, output));
     }
     
@@ -467,4 +469,3 @@ private:
 
 } // namespace cuda
 } // namespace ionosense
-
