@@ -67,7 +67,7 @@ ionosense-hpc-lib/
 ### and now c++/cuda source architecture
 
 <p align="center">
-  <img src="./docs/.cuda-structure.svg" alt="Component Map" height="1000" width="800"/>
+  <img src="./docs/.cuda-structure.svg" alt="Component Map" height="2000" width="2000"/>
 </p>
 
 
