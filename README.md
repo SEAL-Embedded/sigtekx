@@ -5,7 +5,6 @@
 [![CUDA](https://img.shields.io/badge/CUDA-13.0+-green.svg)](https://developer.nvidia.com/cuda-toolkit)
 [![CMake](https://img.shields.io/badge/CMake-3.26+-blue.svg)](https://cmake.org)
 [![Python](https://img.shields.io/badge/Python-3.11-blue.svg)](https://www.python.org)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ## Overview
 
@@ -541,4 +540,5 @@ If you use this software in your research, please cite:
   institution = {University of Washington},
   url = {https://github.com/SEAL-Embedded/ionosense-hpc-lib}
 }
+
 ```
