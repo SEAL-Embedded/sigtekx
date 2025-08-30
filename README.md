@@ -185,7 +185,7 @@ Then close and reopen PowerShell to activate Conda.
 ```powershell
 # Install mamba for faster environment solving
 conda install mamba -n base -c conda-forge
-(agree to all)
+(run as administrator and agree to all)
 
 # Configure channels
 conda config --set channel_priority strict
@@ -556,3 +556,4 @@ If you use this software in your research, please cite:
 }
 
 ```
+
