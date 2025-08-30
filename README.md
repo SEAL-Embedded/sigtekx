@@ -153,19 +153,33 @@ Download and install [Visual Studio Build Tools 2022](https://visualstudio.micro
 
 #### 3. Miniconda Installation
 
+Download the [Miniconda installer](https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe) and run it directly in PowerShell:
+
 ```powershell
-# Download installer (run in PowerShell as Administrator)
-Invoke-WebRequest -Uri https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe -OutFile miniconda.exe
+# Run installer (PowerShell in the same directory)
+.\miniconda.exe
+```
 
-# Install silently to default location
-Start-Process -FilePath ".\miniconda.exe" -ArgumentList "/S" -Wait
+Follow the GUI installation steps:
 
-# Add to PATH (restart PowerShell after this)
-[Environment]::SetEnvironmentVariable("Path", "$env:Path;C:\ProgramData\miniconda3;C:\ProgramData\miniconda3\Scripts", [System.EnvironmentVariableTarget]::User)
+1. **Agree** to the license terms.
+2. Select **"Just Me (recommended)"**.
+3. Set the destination folder to:
+   ```
+   C:\Users\<your-username>\miniconda3
+   ```
+4. Check the following options:
+   - **Create shortcuts (supported packages only)**
+   - **Clear the package cache upon completion**
+5. Click **Install** and finish the setup.
 
-# Initialize conda for PowerShell
+Once complete, restart PowerShell and run:
+
+```powershell
 conda init powershell
 ```
+
+Then close and reopen PowerShell to activate Conda.
 
 #### 4. Mamba Installation
 
