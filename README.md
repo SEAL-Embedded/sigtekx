@@ -188,9 +188,9 @@ conda install mamba -n base -c conda-forge
 (agree to all)
 
 # Configure channels
-mamba config --set channel_priority strict
-mamba config --add channels conda-forge
-mamba config --add channels nvidia
+conda config --set channel_priority strict
+conda config --add channels conda-forge
+conda config --add channels nvidia
 ```
 
 #### 5. Configure 64-bit Development Terminal (Critical)
