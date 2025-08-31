@@ -13,19 +13,40 @@ ionosense-hpc-lib/
 ├── src/                       # C++/CUDA source code implementation
 ├── tests/                     # C++ unit tests (GTest)
 │
-├── python/                    # Python package, scripts, and tests
-│   ├── benchmarks/            # Executable benchmark scripts
-│   │   ├── fft/               # Generic FFT/engine benchmarks
-│   │   └── ionosense/         # Application-specific antenna system benchmarks
-│   │
-│   ├── ionosense_hpc/         # Main package (pip installable)
-│   │   ├── __init__.py
-│   │   ├── core/              # Core infrastructure modules
-│   │   ├── benchmarks/        # Reusable benchmark framework classes
-│   │   └── utils/             # Support utilities for the Python package
-│   │
-│   ├── tests/                 # Unit tests for the Python package
-│   └── pyproject.toml         # Python package build configuration
+├── python/
+│    ├── src/
+│    │   └── ionosense_hpc/
+│    │       ├── __init__.py
+│    │       │
+│    │       ├── benchmarks/
+│    │       │   ├── __init__.py
+│    │       │   ├── accuracy.py
+│    │       │   ├── base.py
+│    │       │   ├── latency.py
+│    │       │   └── throughput.py
+│    │       │
+│    │       ├── core/
+│    │       │   ├── __init__.py
+│    │       │   ├── config.py
+│    │       │   ├── exceptions.py
+│    │       │   ├── fft_processor.py
+│    │       │   ├── pipelines.py
+│    │       │   └── profiling.py
+│    │       │
+│    │       └── utils/
+│    │           ├── __init__.py
+│    │           ├── console.py
+│    │           ├── data_export.py
+│    │           ├── device.py
+│    │           ├── signals.py
+│    │           └── validation.py
+│    │
+│    └── tests/
+│        ├── conftest.py
+│        ├── test_config.py
+│        ├── test_fft_processor.py
+│        ├── test_integration.py
+│        └── test_pipelines.py
 │
 ├── research/                  # Experiments, analysis, and reports
 │   ├── notebooks/             # Exploratory notebooks and visualizations
