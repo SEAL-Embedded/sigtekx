@@ -40,18 +40,17 @@ struct PipelineEngine::Impl {
     void execute_async(int stream_idx);
     void sync_stream(int stream_idx);
     void synchronize_all();
-
     void set_window(const float* h_window, size_t size);
     
-    float*   get_input_buffer(int idx)         { return h_inputs_.at(idx).get(); }
-    float*   get_output_buffer(int idx)        { return h_outputs_.at(idx).get(); }
-    const    PipelineConfig& config() const    { return config_; }
-    const    PipelineStats& stats() const      { return stats_; }
-    void     reset_stats()                     { stats_.reset(); }
-    bool     is_prepared() const               { return prepared_; }
-    void     set_use_graphs(bool enable);
-    const    IProcessingStage* stage() const   { return stage_.get(); }
-    uint64_t get_total_executions() const      { return stats_.total_executions; }
+    float* get_input_buffer(int idx) { return h_inputs_.at(idx).get(); }
+    float* get_output_buffer(int idx) { return h_outputs_.at(idx).get(); }
+    const PipelineConfig& config() const { return config_; }
+    const PipelineStats& stats() const { return stats_; }
+    void reset_stats() { stats_.reset(); }
+    bool is_prepared() const { return prepared_; }
+    void set_use_graphs(bool enable);
+    const IProcessingStage* stage() const { return stage_.get(); }
+    uint64_t get_total_executions() const { return stats_.total_executions; }
 
 private:
     PipelineConfig config_;
@@ -60,24 +59,26 @@ private:
     int num_streams_;
     bool prepared_ = false;
     
-    std::vector<cuda::Stream>                 streams_;
-    std::vector<cuda::Event>        completion_events_;
-    std::vector<cuda::Event>               prof_start_;
-    std::vector<cuda::Event>                 prof_end_;
-    std::vector<cuda::Graph>                   graphs_;
-    std::vector<cuda::PinnedMemory<float>>   h_inputs_;
-    std::vector<cuda::PinnedMemory<float>>  h_outputs_;
-    std::vector<cuda::DeviceMemory<float>>   d_inputs_;
-    std::vector<cuda::DeviceMemory<float>>  d_outputs_;
-
-    std::vector<float> pending_window_;
-    bool               has_pending_window_ = false;
-     
+    std::vector<cuda::Stream> streams_;
+    std::vector<cuda::Event> completion_events_;
+    std::vector<cuda::Event> prof_start_;
+    std::vector<cuda::Event> prof_end_;
+    std::vector<cuda::Graph> graphs_;
+    std::vector<cuda::PinnedMemory<float>> h_inputs_;
+    std::vector<cuda::PinnedMemory<float>> h_outputs_;
+    std::vector<cuda::DeviceMemory<float>> d_inputs_;
+    std::vector<cuda::DeviceMemory<float>> d_outputs_;
+    
+    // CPU-side window for applying to pinned memory
+    std::vector<float> h_window_;
+    bool has_window_ = false;
+    
     void init_resources();
     void configure_memory_pool();
     void execute_traditional(int idx);
     void capture_graphs();
     void update_stats(float latency_ms);
+    void apply_window_cpu(float* h_data, int stream_idx);
 };
 
 // ============================================================================
@@ -111,7 +112,6 @@ void PipelineEngine::Impl::init_resources() {
         completion_events_.emplace_back();
         graphs_.emplace_back();
         if (config_.enable_profiling) {
-            // NOTE: Event constructor with `0` enables timing.
             prof_start_.emplace_back(0);
             prof_end_.emplace_back(0);
         }
@@ -122,6 +122,11 @@ void PipelineEngine::Impl::init_resources() {
     }
 
     stage_->initialize(streams_);
+
+    // Initialize default window (unity)
+    const int nfft = config_.stage_config.nfft;
+    h_window_.resize(nfft, 1.0f);
+    has_window_ = true;
 
     if (config_.use_graphs) {
         configure_memory_pool();
@@ -136,57 +141,86 @@ void PipelineEngine::Impl::configure_memory_pool() {
 }
 
 void PipelineEngine::Impl::set_window(const float* h_window, size_t size) {
-    if (!stage_) {
-        throw cuda::StateError("No processing stage set.");
-    }
-    // Validate against your stage config (nfft)
     if (size != static_cast<size_t>(config_.stage_config.nfft)) {
         throw cuda::ConfigurationError("Window size must match FFT size.");
     }
+    
+    // Store window CPU-side for applying to pinned memory
+    h_window_.assign(h_window, h_window + size);
+    has_window_ = true;
+    
+    // Note: We do NOT upload window to GPU since windowing happens CPU-side
+}
 
-    // If stage is not initialized yet, defer until prepare()
-    try {
-        stage_->set_window(h_window, size);  // host→device copy inside the stage
-    } catch (const cuda::StateError&) {
-        pending_window_.assign(h_window, h_window + size);
-        has_pending_window_ = true;
+void PipelineEngine::Impl::apply_window_cpu(float* h_data, int stream_idx) {
+    if (!has_window_) return;
+    
+    const int nfft = config_.stage_config.nfft;
+    const int batch = config_.stage_config.batch_size;
+    
+    // Apply window to each batch element in pinned memory
+    for (int b = 0; b < batch; ++b) {
+        float* batch_ptr = h_data + b * nfft;
+        for (int i = 0; i < nfft; ++i) {
+            batch_ptr[i] *= h_window_[i];
+        }
     }
 }
 
-
-
-// in Impl::prepare()
 void PipelineEngine::Impl::prepare() {
     if (prepared_) throw cuda::StateError("Pipeline already prepared.");
-    // warmup path to build graphs etc. stays the same
-    for (int i = 0; i < num_streams_; ++i) { execute_traditional(i); streams_[i].synchronize(); }
-    if (config_.use_graphs) capture_graphs();
-
-    // Apply any deferred window now that stage is initialized
-    if (has_pending_window_) {
-        stage_->set_window(pending_window_.data(), pending_window_.size());
-        has_pending_window_ = false;
-        pending_window_.clear();
+    
+    // Warm-up runs
+    for (int i = 0; i < num_streams_; ++i) {
+        // Initialize with test data
+        std::fill(h_inputs_[i].get(), h_inputs_[i].get() + stage_->input_size(), 1.0f);
+        apply_window_cpu(h_inputs_[i].get(), i);
+        
+        d_inputs_[i].copy_from_host(h_inputs_[i].get(), streams_[i].get());
+        execute_traditional(i);
+        d_outputs_[i].copy_to_host(h_outputs_[i].get(), streams_[i].get());
+        streams_[i].synchronize();
     }
-
+    
+    if (config_.use_graphs) {
+        capture_graphs();
+    }
+    
     prepared_ = true;
     stats_.reset();
-    if (config_.verbose) { std::cout << "[Pipeline] Prepared with "
-        << num_streams_ << " streams, graphs=" << (config_.use_graphs?"enabled":"disabled") << std::endl; }
+    
+    if (config_.verbose) {
+        std::cout << "[Pipeline] Prepared with " << num_streams_ 
+                  << " streams, graphs=" << (config_.use_graphs ? "enabled" : "disabled") 
+                  << std::endl;
+    }
 }
 
 void PipelineEngine::Impl::execute_traditional(int idx) {
-    d_inputs_[idx].copy_from_host(h_inputs_[idx].get(), streams_[idx].get());
+    // Only FFT and magnitude - NO windowing (that happens CPU-side)
     stage_->enqueue_work(streams_[idx], idx, d_inputs_[idx].get(), d_outputs_[idx].get());
-    d_outputs_[idx].copy_to_host(h_outputs_[idx].get(), streams_[idx].get());
 }
 
 void PipelineEngine::Impl::capture_graphs() {
+    IONO_CUDA_CHECK(cudaDeviceSynchronize());
+    
     for (int i = 0; i < num_streams_; ++i) {
-        graphs_[i].begin_capture(streams_[i].get());
-        execute_traditional(i);
-        graphs_[i].end_capture(streams_[i].get());
+        // Capture only the FFT+magnitude operations
+        graphs_[i].begin_capture(streams_[i].get(), cudaStreamCaptureModeGlobal);
+        
+        try {
+            execute_traditional(i);  // Just FFT + magnitude
+            graphs_[i].end_capture(streams_[i].get());
+        } catch (...) {
+            cudaGraph_t temp_graph = nullptr;
+            cudaStreamEndCapture(streams_[i].get(), &temp_graph);
+            if (temp_graph) cudaGraphDestroy(temp_graph);
+            throw;
+        }
+        
+        streams_[i].synchronize();
     }
+    
     if (config_.verbose) {
         std::cout << "[Pipeline] Captured " << num_streams_ << " CUDA graphs." << std::endl;
     }
@@ -197,11 +231,19 @@ void PipelineEngine::Impl::execute_async(int stream_idx) {
     if (stream_idx < 0 || stream_idx >= num_streams_) throw std::out_of_range("Invalid stream index.");
     
     stats_.total_executions++;
-
+    
+    // CRITICAL: Apply window CPU-side BEFORE copying to GPU
+    // Assume data is already in h_inputs_[stream_idx]
+    apply_window_cpu(h_inputs_[stream_idx].get(), stream_idx);
+    
+    // Copy windowed data to device
+    d_inputs_[stream_idx].copy_from_host(h_inputs_[stream_idx].get(), streams_[stream_idx].get());
+    
     if (config_.enable_profiling) {
         prof_start_[stream_idx].record(streams_[stream_idx]);
     }
     
+    // Execute FFT+magnitude (via graph or traditional)
     if (config_.use_graphs && graphs_[stream_idx].is_instantiated()) {
         graphs_[stream_idx].launch(streams_[stream_idx]);
     } else {
@@ -211,6 +253,10 @@ void PipelineEngine::Impl::execute_async(int stream_idx) {
     if (config_.enable_profiling) {
         prof_end_[stream_idx].record(streams_[stream_idx]);
     }
+    
+    // Copy results back
+    d_outputs_[stream_idx].copy_to_host(h_outputs_[stream_idx].get(), streams_[stream_idx].get());
+    
     completion_events_[stream_idx].record(streams_[stream_idx]);
 }
 

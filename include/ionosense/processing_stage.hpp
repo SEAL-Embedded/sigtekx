@@ -25,12 +25,9 @@ struct ProcessingConfig {
 class IProcessingStage {
 public:
     virtual ~IProcessingStage() = default;
-
     virtual void initialize(const std::vector<cuda::Stream>& streams) = 0;
-    virtual void set_window(const float* h_window_data, size_t size) = 0;
     virtual void enqueue_work(const cuda::Stream& stream, int stream_idx,
                               float* d_input, float* d_output) = 0;
-
     virtual void configure(const ProcessingConfig& cfg) = 0;
     virtual void validate_config() const = 0;
     virtual void shutdown() = 0;
@@ -45,7 +42,6 @@ public:
     ~FftProcessingStage() override = default;
 
     void initialize(const std::vector<cuda::Stream>& streams) override;
-    void set_window(const float* h_window_data, size_t size) override;
     void enqueue_work(const cuda::Stream& stream, int stream_idx,
                       float* d_input, float* d_output) override;
 
@@ -62,12 +58,9 @@ private:
     ProcessingConfig config_{};
     bool initialized_ = false;
     
-    cuda::DeviceMemory<float> d_window_;
+    // Removed d_window_ - windowing happens CPU-side now
     std::vector<cuda::FftPlan> plans_;
     std::vector<cuda::DeviceMemory<std::byte>> d_workspaces_;
-
-    // FIX: The intermediate spectrum buffer must be duplicated for each stream
-    // to prevent race conditions during concurrent execution.
     std::vector<cuda::DeviceMemory<cufftComplex>> d_spectrums_;
 };
 
@@ -76,4 +69,3 @@ struct ProcessingStageFactory {
 };
 
 } // namespace ionosense
-

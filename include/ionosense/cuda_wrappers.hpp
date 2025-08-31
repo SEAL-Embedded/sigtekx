@@ -112,6 +112,14 @@ public:
         } \
     } while(0)
 
+#define IONO_CUDA_ASSERT() \
+    do { \
+        cudaError_t e = cudaGetLastError(); \
+        if (e != cudaSuccess) { \
+            throw ::ionosense::cuda::CudaError(e, __FILE__, __LINE__); \
+        } \
+} while(0)
+
 // ============================================================================
 // RAII Wrapper Classes
 // ============================================================================
@@ -371,6 +379,10 @@ public:
                                        nullptr, istride, idist,
                                        nullptr, ostride, odist,
                                        CUFFT_R2C, batch));
+        
+        // FIX: Disable auto-allocation immediately after plan creation
+        // to make the plan safe for CUDA graph capture.
+        IONO_CUFFT_CHECK(cufftSetAutoAllocation(plan_, 0));
     }
     
     void set_stream(cudaStream_t stream) {
@@ -378,7 +390,7 @@ public:
     }
     
     void set_work_area(void* workspace) {
-        IONO_CUFFT_CHECK(cufftSetAutoAllocation(plan_, 0));
+        // Auto-allocation is now disabled during plan creation.
         IONO_CUFFT_CHECK(cufftSetWorkArea(plan_, workspace));
     }
     
@@ -388,8 +400,8 @@ public:
         return size;
     }
     
-    // FIX: This method doesn't modify the FftPlan object's state,
-    // so it should be marked 'const'.
+    // This method doesn't modify the FftPlan object's state,
+    // so it is correctly marked 'const'.
     void execute_r2c(cufftReal* input, cufftComplex* output) const {
         IONO_CUFFT_CHECK(cufftExecR2C(plan_, input, output));
     }
@@ -431,9 +443,9 @@ public:
         return *this;
     }
     
-    void begin_capture(cudaStream_t stream) {
+    void begin_capture(cudaStream_t stream, cudaStreamCaptureMode mode = cudaStreamCaptureModeGlobal) {
         destroy();
-        IONO_CUDA_CHECK(cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal));
+        IONO_CUDA_CHECK(cudaStreamBeginCapture(stream, mode));
     }
     
     void end_capture(cudaStream_t stream) {

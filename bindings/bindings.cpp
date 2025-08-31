@@ -15,6 +15,7 @@
 #include <memory>
 #include <sstream>
 #include <vector>
+#include <iostream>
 
 namespace py = pybind11;
 using namespace ionosense;

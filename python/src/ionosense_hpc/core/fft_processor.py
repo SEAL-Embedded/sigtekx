@@ -110,9 +110,7 @@ class FFTProcessor:
         return self._pipeline.get_output_buffer(stream_idx).copy()
 
     def set_window(self, window: Union[str, FFTArray]) -> None:
-        """
-        Set or change the window function used for processing.
-        """
+        """Set or change the window function used for processing."""
         if isinstance(window, str):
             self._window_data = create_window(window, self.fft_size)
         else:
@@ -120,7 +118,7 @@ class FFTProcessor:
             if window_array.shape != (self.fft_size,):
                 raise ValueError(f"Window shape {window_array.shape} != ({self.fft_size},)")
             self._window_data = np.ascontiguousarray(window_array)
-
+        
         # Set the window on the already-prepared pipeline
         if self._pipeline.is_prepared and self._window_data is not None:
             self._pipeline.set_window(self._window_data)
