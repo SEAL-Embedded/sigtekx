@@ -1,6 +1,6 @@
-# ============================
+# =============================
 # ionosense-hpc-lib .gitignore
-# ============================
+# =============================
 # Guiding idea: ignore generated artifacts, caches, and IDE cruft.
 # Keep source, configs, and docs. Anchors (leading /) mean "repo root only".
 
