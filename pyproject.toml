@@ -28,6 +28,10 @@ dev = [
   "ruff>=0.4",
   "mypy>=1.10",
 ]
+export = [
+  "h5py>=3.10",
+  "pandas>=2.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/uw-seal/ionosense-hpc-lib"

@@ -74,6 +74,17 @@ void FftProcessingStage::initialize(const std::vector<cuda::Stream>& streams) {
     initialized_ = true;
 }
 
+void FftProcessingStage::set_window(const float* h_window_data, size_t size) {
+    if (!initialized_) {
+        throw cuda::StateError("Stage must be initialized before setting the window.");
+    }
+    if (size != static_cast<size_t>(config_.nfft)) {
+        throw cuda::ConfigurationError("Window size must match FFT size.");
+    }
+    // Copy the user-provided window from host to the stage's device buffer.
+    d_window_.copy_from_host(h_window_data);
+}
+
 void FftProcessingStage::enqueue_work(const cuda::Stream& stream, int stream_idx,
                                       float* d_input, float* d_output) {
     if (!initialized_) {

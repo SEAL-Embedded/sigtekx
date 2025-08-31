@@ -40,16 +40,18 @@ struct PipelineEngine::Impl {
     void execute_async(int stream_idx);
     void sync_stream(int stream_idx);
     void synchronize_all();
+
+    void set_window(const float* h_window, size_t size);
     
-    float* get_input_buffer(int idx) { return h_inputs_.at(idx).get(); }
-    float* get_output_buffer(int idx) { return h_outputs_.at(idx).get(); }
-    const PipelineConfig& config() const { return config_; }
-    const PipelineStats& stats() const { return stats_; }
-    void reset_stats() { stats_.reset(); }
-    bool is_prepared() const { return prepared_; }
-    void set_use_graphs(bool enable);
-    const IProcessingStage* stage() const { return stage_.get(); }
-    uint64_t get_total_executions() const { return stats_.total_executions; }
+    float*   get_input_buffer(int idx)         { return h_inputs_.at(idx).get(); }
+    float*   get_output_buffer(int idx)        { return h_outputs_.at(idx).get(); }
+    const    PipelineConfig& config() const    { return config_; }
+    const    PipelineStats& stats() const      { return stats_; }
+    void     reset_stats()                     { stats_.reset(); }
+    bool     is_prepared() const               { return prepared_; }
+    void     set_use_graphs(bool enable);
+    const    IProcessingStage* stage() const   { return stage_.get(); }
+    uint64_t get_total_executions() const      { return stats_.total_executions; }
 
 private:
     PipelineConfig config_;
@@ -58,16 +60,19 @@ private:
     int num_streams_;
     bool prepared_ = false;
     
-    std::vector<cuda::Stream> streams_;
-    std::vector<cuda::Event> completion_events_;
-    std::vector<cuda::Event> prof_start_;
-    std::vector<cuda::Event> prof_end_;
-    std::vector<cuda::Graph> graphs_;
-    std::vector<cuda::PinnedMemory<float>> h_inputs_;
-    std::vector<cuda::PinnedMemory<float>> h_outputs_;
-    std::vector<cuda::DeviceMemory<float>> d_inputs_;
-    std::vector<cuda::DeviceMemory<float>> d_outputs_;
-    
+    std::vector<cuda::Stream>                 streams_;
+    std::vector<cuda::Event>        completion_events_;
+    std::vector<cuda::Event>               prof_start_;
+    std::vector<cuda::Event>                 prof_end_;
+    std::vector<cuda::Graph>                   graphs_;
+    std::vector<cuda::PinnedMemory<float>>   h_inputs_;
+    std::vector<cuda::PinnedMemory<float>>  h_outputs_;
+    std::vector<cuda::DeviceMemory<float>>   d_inputs_;
+    std::vector<cuda::DeviceMemory<float>>  d_outputs_;
+
+    std::vector<float> pending_window_;
+    bool               has_pending_window_ = false;
+     
     void init_resources();
     void configure_memory_pool();
     void execute_traditional(int idx);
@@ -130,22 +135,44 @@ void PipelineEngine::Impl::configure_memory_pool() {
     IONO_CUDA_CHECK(cudaMemPoolSetAttribute(mempool, cudaMemPoolAttrReleaseThreshold, &threshold));
 }
 
+void PipelineEngine::Impl::set_window(const float* h_window, size_t size) {
+    if (!stage_) {
+        throw cuda::StateError("No processing stage set.");
+    }
+    // Validate against your stage config (nfft)
+    if (size != static_cast<size_t>(config_.stage_config.nfft)) {
+        throw cuda::ConfigurationError("Window size must match FFT size.");
+    }
+
+    // If stage is not initialized yet, defer until prepare()
+    try {
+        stage_->set_window(h_window, size);  // host→device copy inside the stage
+    } catch (const cuda::StateError&) {
+        pending_window_.assign(h_window, h_window + size);
+        has_pending_window_ = true;
+    }
+}
+
+
+
+// in Impl::prepare()
 void PipelineEngine::Impl::prepare() {
     if (prepared_) throw cuda::StateError("Pipeline already prepared.");
-    for (int i = 0; i < num_streams_; ++i) {
-        execute_traditional(i);
-        streams_[i].synchronize();
+    // warmup path to build graphs etc. stays the same
+    for (int i = 0; i < num_streams_; ++i) { execute_traditional(i); streams_[i].synchronize(); }
+    if (config_.use_graphs) capture_graphs();
+
+    // Apply any deferred window now that stage is initialized
+    if (has_pending_window_) {
+        stage_->set_window(pending_window_.data(), pending_window_.size());
+        has_pending_window_ = false;
+        pending_window_.clear();
     }
-    if (config_.use_graphs) {
-        capture_graphs();
-    }
+
     prepared_ = true;
     stats_.reset();
-    if (config_.verbose) {
-        std::cout << "[Pipeline] Prepared with " << num_streams_ 
-                  << " streams, graphs=" << (config_.use_graphs ? "enabled" : "disabled") 
-                  << std::endl;
-    }
+    if (config_.verbose) { std::cout << "[Pipeline] Prepared with "
+        << num_streams_ << " streams, graphs=" << (config_.use_graphs?"enabled":"disabled") << std::endl; }
 }
 
 void PipelineEngine::Impl::execute_traditional(int idx) {
@@ -181,8 +208,6 @@ void PipelineEngine::Impl::execute_async(int stream_idx) {
         execute_traditional(stream_idx);
     }
     
-    // THE DEFINITIVE FIX: The completion event MUST be the last thing recorded.
-    // We must record the profiling end event BEFORE the completion event.
     if (config_.enable_profiling) {
         prof_end_[stream_idx].record(streams_[stream_idx]);
     }
@@ -222,11 +247,12 @@ void PipelineEngine::Impl::update_stats(float latency_ms) {
     }
 }
 
-// ... Public Method Implementations (unchanged) ...
+// ... Public Method Implementations ...
 PipelineEngine::PipelineEngine(const PipelineConfig& config, std::unique_ptr<IProcessingStage> stage) : impl_(std::make_unique<Impl>(config, std::move(stage))) {}
 PipelineEngine::~PipelineEngine() = default;
 PipelineEngine::PipelineEngine(PipelineEngine&&) noexcept = default;
 PipelineEngine& PipelineEngine::operator=(PipelineEngine&&) noexcept = default;
+void PipelineEngine::set_window(const float* h_window, size_t size) { impl_->set_window(h_window, size); }
 void PipelineEngine::prepare() { impl_->prepare(); }
 int PipelineEngine::execute_async() { int idx = impl_->config().num_streams > 0 ? impl_->get_total_executions() % impl_->config().num_streams : 0; impl_->execute_async(idx); return idx; }
 void PipelineEngine::execute_async(int stream_idx) { impl_->execute_async(stream_idx); }
@@ -243,32 +269,8 @@ const IProcessingStage* PipelineEngine::stage() const { return impl_->stage(); }
 const PipelineConfig& PipelineEngine::config() const { return impl_->config(); }
 void PipelineEngine::set_use_graphs(bool enable) { impl_->set_use_graphs(enable); }
 
-// ... Builder and Legacy Wrapper (unchanged) ...
-PipelineBuilder& PipelineBuilder::with_streams(int num) { config_.num_streams = num; return *this; }
-PipelineBuilder& PipelineBuilder::with_graphs(bool enable) { config_.use_graphs = enable; return *this; }
-PipelineBuilder& PipelineBuilder::with_profiling(bool enable) { config_.enable_profiling = enable; return *this; }
-PipelineBuilder& PipelineBuilder::with_fft(int size, int batch) { config_.stage_config.nfft = size; config_.stage_config.batch_size = batch; stage_type_ = "FFT"; return *this; }
-PipelineBuilder& PipelineBuilder::with_stage(const std::string& type) { stage_type_ = type; return *this; }
-PipelineBuilder& PipelineBuilder::with_param(const std::string& key, float value) { config_.stage_config.params[key] = value; return *this; }
-std::unique_ptr<PipelineEngine> PipelineBuilder::build() { auto stage = ProcessingStageFactory::create(stage_type_); return std::make_unique<PipelineEngine>(config_, std::move(stage)); }
-PipelineConfig RtFftConfig::to_pipeline_config() const { PipelineConfig cfg; cfg.num_streams = num_streams; cfg.use_graphs = use_graphs; cfg.enable_profiling = enable_profiling; cfg.verbose = verbose; cfg.stage_config.nfft = nfft; cfg.stage_config.batch_size = batch; cfg.stage_config.verbose = verbose; return cfg; }
-RtFftEngine::RtFftEngine(const RtFftConfig& config) : legacy_config_(config) { PipelineConfig new_config = config.to_pipeline_config(); auto stage = ProcessingStageFactory::create("FFT"); engine_ = std::make_unique<PipelineEngine>(new_config, std::move(stage)); }
-RtFftEngine::~RtFftEngine() = default;
-RtFftEngine::RtFftEngine(RtFftEngine&&) noexcept = default;
-RtFftEngine& RtFftEngine::operator=(RtFftEngine&&) noexcept = default;
-void RtFftEngine::prepare_for_execution() { engine_->prepare(); }
-void RtFftEngine::execute_async(int stream_idx) { engine_->execute_async(stream_idx); }
-void RtFftEngine::sync_stream(int stream_idx) { engine_->sync_stream(stream_idx); }
-void RtFftEngine::synchronize_all_streams() { engine_->synchronize_all(); }
-float* RtFftEngine::pinned_input(int idx) const { return engine_->get_input_buffer(idx); }
-float* RtFftEngine::pinned_output(int idx) const { return engine_->get_output_buffer(idx); }
-void RtFftEngine::set_window(const float* h_window_data) { /* This would now need to delegate to the stage, which is a more advanced feature. */ }
-void RtFftEngine::set_use_graphs(bool enable) { engine_->set_use_graphs(enable); }
-bool RtFftEngine::get_use_graphs() const { return engine_->config().use_graphs; }
-bool RtFftEngine::graphs_ready() const { return engine_->is_prepared(); }
-int RtFftEngine::get_fft_size() const { return legacy_config_.nfft; }
-int RtFftEngine::get_batch_size() const { return legacy_config_.batch; }
-int RtFftEngine::get_num_streams() const { return engine_->config().num_streams; }
-
+std::unique_ptr<PipelineEngine> PipelineBuilder::build() {
+    auto stage = ProcessingStageFactory::create(stage_type_);
+    return std::make_unique<PipelineEngine>(config_, std::move(stage));
+}
 } // namespace ionosense
-

@@ -1,100 +1,63 @@
-# python/tests/test_pipeline.py
 """
-Integration tests for the FFTPipeline.
-
-These tests verify that the pipeline correctly orchestrates the C++ engine,
-buffer management, and signal processing to produce valid results.
+Unit tests for the low-level Pipeline and PipelineBuilder APIs.
 """
-import numpy as np
 import pytest
+import numpy as np
+import re  # Import the 're' module
+from ionosense_hpc.core.pipelines import Pipeline, PipelineBuilder
+from ionosense_hpc.core.config import PipelineConfig, FFTConfig
+from ionosense_hpc.core.exceptions import StateError
 
-from ionosense_hpc.core.config import ProcessingConfig
-from ionosense_hpc.core.pipeline import FFTPipeline
-from ionosense_hpc.utils.signals import generate_test_signal, SignalParameters
+def test_pipeline_builder(default_fft_config):
+    """Tests the fluent builder pattern for creating a Pipeline."""
+    builder = PipelineBuilder()
+    pipeline = (builder
+        .with_streams(2)
+        .with_graphs(False)
+        .with_profiling(True)
+        .with_fft(default_fft_config.nfft, default_fft_config.batch_size)
+        .build())
 
-# Mark all tests in this file as belonging to the 'pipeline' suite
-pytestmark = pytest.mark.pipeline
+    assert pipeline is not None
+    assert pipeline.num_streams == 2
+    assert not pipeline.use_graphs
 
+def test_pipeline_prepare(pipeline_instance: Pipeline):
+    """Tests that the pipeline prepares correctly and handles double-prepare."""
+    assert pipeline_instance.is_prepared
+    # No change needed here, this was correct
+    with pytest.raises(StateError, match="State Error: Pipeline already prepared."):
+        pipeline_instance.prepare()
 
-@pytest.fixture(scope="module")
-def pipeline_instance() -> FFTPipeline:
-    """
-    Pytest fixture that creates a reusable FFTPipeline instance.
-
-    This is scoped to the module to avoid the overhead of re-initializing
-    the CUDA engine and capturing graphs for every single test function.
-    """
-    config = ProcessingConfig(
-        fft_size=4096,
-        batch_size=8,
-        window='hann',
-        use_graphs=False  # CUDA graphs are incompatible with Python's runtime memory modification
-    )
-    return FFTPipeline(config)
-
-
-def test_pipeline_execution(pipeline_instance: FFTPipeline):
-    """
-    Tests a single, successful execution of the pipeline with random data.
-    Verifies output shape, type, and metadata.
-    """
-    config = pipeline_instance.config
+def test_pipeline_execute_before_prepare():
+    """Tests that calling execute before prepare raises a StateError."""
+    pipeline = PipelineBuilder().with_fft(1024, 2).build() # Don't call prepare()
     
-    # 1. Create a batch of random data matching the pipeline's config
-    test_data = np.random.randn(config.batch_size, config.fft_size).astype(np.float32)
+    # FIX: Escape the special regex characters in the expected error message
+    expected_error = "State Error: Pipeline not prepared. Call prepare() first."
+    with pytest.raises(StateError, match=re.escape(expected_error)):
+        pipeline.execute_async(0)
 
-    # 2. Process the batch
-    result = pipeline_instance.process_batch(test_data)
+def test_pipeline_buffer_access(pipeline_instance: Pipeline):
+    """Tests that buffer accessors return valid NumPy arrays with correct shapes."""
+    nfft = pipeline_instance._config.stage_config.nfft
+    batch = pipeline_instance._config.stage_config.batch_size
+    n_bins = nfft // 2 + 1
 
-    # 3. Validate the results
-    assert result.output.shape == (config.batch_size, config.fft_size // 2 + 1)
-    assert result.output.dtype == np.float32
-    assert result.latency_ms > 0
-    assert 0 <= result.stream_id < pipeline_instance.engine.num_streams
-    assert result.metadata['fft_size'] == config.fft_size
-    assert result.metadata['window'] == config.window
+    input_buf = pipeline_instance.get_input_buffer(0)
+    output_buf = pipeline_instance.get_output_buffer(0)
 
+    assert isinstance(input_buf, np.ndarray)
+    assert isinstance(output_buf, np.ndarray)
+    assert input_buf.shape == (batch, nfft)
+    assert output_buf.shape == (batch, n_bins)
+    assert input_buf.dtype == np.float32
+    assert output_buf.dtype == np.float32
 
-def test_pipeline_incorrect_input_shape(pipeline_instance: FFTPipeline):
-    """Tests that the pipeline correctly raises a ValueError for mismatched input."""
-    wrong_shape_data = np.zeros((4, 1024), dtype=np.float32) # Incorrect shape
-
-    with pytest.raises(ValueError, match="Input data has shape"):
-        pipeline_instance.process_batch(wrong_shape_data)
-
-
-def test_pipeline_accuracy(pipeline_instance: FFTPipeline):
-    """
-    Tests the numerical accuracy of the pipeline using a known signal.
-    """
-    config = pipeline_instance.config
-    sample_rate = 100_000 # A typical sample rate
-
-    # 1. Generate a known signal: a 7kHz sine wave
-    params = SignalParameters(
-        sample_rate=sample_rate,
-        duration=1.0, # Long enough to get many frames
-        frequencies=(7000.0, 1000.0), # We only care about the first channel
-        noise_level=0.0
-    )
-    signals = generate_test_signal(params)
-    single_frame = signals['ch1'][:config.fft_size]
-
-    # 2. Create a full batch, with our known signal in the first slot
-    #    and zeros everywhere else.
-    batch_data = np.zeros((config.batch_size, config.fft_size), dtype=np.float32)
-    batch_data[0, :] = single_frame
-    
-    # 3. Process the batch
-    result = pipeline_instance.process_batch(batch_data)
-    
-    # 4. Analyze the output for our known signal
-    spectrum = result.output[0] # Extract the first FFT result from the batch
-
-    # 5. Verify the peak frequency
-    # The expected frequency bin is calculated as: (frequency * fft_size / sample_rate)
-    expected_bin = int(params.frequencies[0] * config.fft_size / sample_rate)
-    found_bin = np.argmax(spectrum)
-
-    # Allow for a small tolerance (e.g., 1 bin) due to windowing effects
-    assert abs(found_bin - expected_bin) <= 1, f"Peak at bin {found_bin}, expected {expected_bin}±1"
+def test_pipeline_synchronize_all(pipeline_instance: Pipeline):
+    """Tests that synchronize_all runs without errors."""
+    # Simple test to ensure the method call is wired up correctly.
+    # A more complex test would involve multiple streams and events.
+    pipeline_instance.execute_async(0)
+    pipeline_instance.synchronize_all()
+    # No assert needed, if it doesn't hang or throw, it's working at a basic level.

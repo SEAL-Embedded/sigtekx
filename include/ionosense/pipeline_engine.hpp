@@ -52,6 +52,8 @@ public:
     void sync_stream(int stream_idx);
     void synchronize_all();
 
+    void set_window(const float* h_window, size_t size);
+
     float* get_input_buffer(int stream_idx);
     const float* get_input_buffer(int stream_idx) const;
 
@@ -74,14 +76,32 @@ private:
 
 class PipelineBuilder {
 public:
-    // Implementations in src/pipeline_engine.cpp (no inline bodies here)
-    PipelineBuilder& with_streams(int n);
-    PipelineBuilder& with_graphs(bool enabled);
-    PipelineBuilder& with_profiling(bool enabled);
-
-    PipelineBuilder& with_fft(int size, int batch);
-    PipelineBuilder& with_stage(const std::string& type);
-    PipelineBuilder& with_param(const std::string& key, float value);
+    PipelineBuilder& with_streams(int n) {
+        config_.num_streams = n;
+        return *this;
+    }
+    PipelineBuilder& with_graphs(bool enabled) {
+        config_.use_graphs = enabled;
+        return *this;
+    }
+    PipelineBuilder& with_profiling(bool enabled) {
+        config_.enable_profiling = enabled;
+        return *this;
+    }
+    PipelineBuilder& with_fft(int size, int batch) {
+        config_.stage_config.nfft = size;
+        config_.stage_config.batch_size = batch;
+        stage_type_ = "FFT";
+        return *this;
+    }
+    PipelineBuilder& with_stage(const std::string& type) {
+        stage_type_ = type;
+        return *this;
+    }
+    PipelineBuilder& with_param(const std::string& key, float value) {
+        config_.stage_config.params[key] = value;
+        return *this;
+    }
 
     std::unique_ptr<PipelineEngine> build();
 
@@ -91,45 +111,4 @@ private:
     PipelineConfig  config_{};
     std::string     stage_type_{};
 };
-
-// ==== Legacy FFT wrapper API maintained for compatibility ====
-// NOTE: This legacy API is now just a thin wrapper around the modern PipelineEngine
-struct RtFftConfig {
-    int  nfft            = 0;
-    int  batch           = 0;
-    int  num_streams     = 1;
-    bool enable_profiling= false;
-    bool use_graphs      = false;
-    bool verbose         = false;
-    std::vector<float> window{};
-
-    PipelineConfig to_pipeline_config() const;
-};
-
-class RtFftEngine {
-public:
-    explicit RtFftEngine(const RtFftConfig& cfg);
-    ~RtFftEngine();
-    RtFftEngine(RtFftEngine&&) noexcept;
-    RtFftEngine& operator=(RtFftEngine&&) noexcept;
-
-    void prepare_for_execution();
-    void execute_async(int stream_idx);
-    void sync_stream(int stream_idx);
-    void synchronize_all_streams();
-    float* pinned_input(int stream_idx) const;
-    float* pinned_output(int stream_idx) const;
-    void  set_window(const float* h_window_data);
-    void  set_use_graphs(bool enabled);
-    bool  get_use_graphs() const;
-    bool  graphs_ready() const;
-    int   get_fft_size() const;
-    int   get_batch_size() const;
-    int   get_num_streams() const;
-
-private:
-    std::unique_ptr<PipelineEngine> engine_;
-    RtFftConfig                     legacy_config_;
-};
-
 } // namespace ionosense

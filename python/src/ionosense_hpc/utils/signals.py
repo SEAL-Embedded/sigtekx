@@ -1,105 +1,169 @@
-# python/src/ionosense_hpc/utils/signals.py
 """
-Signal generation and I/O utilities for testing and validation.
+ionosense_hpc.utils.signals: Signal generation and windowing utilities.
+
+Provides functions for generating test signals and window functions
+for validation and benchmarking.
 """
+
 from __future__ import annotations
-
 from dataclasses import dataclass
-from typing import Dict, Iterator, Literal, Optional, Tuple
-
+from typing import Dict, Literal, Optional, Tuple
 import numpy as np
 from numpy.typing import NDArray
 
-# Define literal types for valid window functions
 WindowFunction = Literal['hann', 'hamming', 'blackman', 'bartlett', 'kaiser', 'rectangular']
 
 
 @dataclass(frozen=True)
 class SignalParameters:
     """
-    Immutable parameters for generating synthetic dual-channel signals.
-
+    Parameters for synthetic signal generation.
+    
     Attributes:
-        sample_rate: The sampling rate in Hz.
-        duration: The signal duration in seconds.
-        frequencies: A tuple of (channel_1_freq_hz, channel_2_freq_hz).
-        amplitudes: A tuple of (channel_1_amplitude, channel_2_amplitude).
-        noise_level: Standard deviation of Gaussian noise to add to the signal.
-        dtype: The numpy data type for the signal (e.g., np.float32).
+        sample_rate: Sampling rate in Hz.
+        duration: Signal duration in seconds.
+        frequencies: (ch1_freq, ch2_freq) in Hz.
+        amplitudes: (ch1_amp, ch2_amp).
+        noise_level: Gaussian noise standard deviation.
+        phase_offset: Phase offset between channels in radians.
+        dtype: NumPy data type (must be float32 for GPU).
     """
     sample_rate: int = 100_000
     duration: float = 1.0
     frequencies: Tuple[float, float] = (7000.0, 1000.0)
     amplitudes: Tuple[float, float] = (1.0, 1.0)
     noise_level: float = 0.01
+    phase_offset: float = 0.0
     dtype: np.dtype = np.float32
 
 
 def generate_test_signal(
-    params: SignalParameters | None = None,
+    params: Optional[SignalParameters] = None,
+    seed: Optional[int] = None
 ) -> Dict[str, NDArray[np.float32]]:
     """
-    Generates a dual-channel test signal based on the provided parameters.
-
+    Generate dual-channel test signals.
+    
     Args:
-        params: A SignalParameters object. If None, default parameters are used.
-
+        params: Signal parameters. Uses defaults if None.
+        seed: Random seed for reproducibility.
+    
     Returns:
-        A dictionary with 'ch1' and 'ch2' keys, each containing a NumPy array
-        representing the time-domain signal.
+        Dictionary with 'ch1' and 'ch2' arrays.
+    
+    Example:
+        >>> signals = generate_test_signal(seed=42)
+        >>> print(f"Generated {len(signals['ch1'])} samples")
     """
     if params is None:
         params = SignalParameters()
-
+    
     n_samples = int(params.sample_rate * params.duration)
     t = np.arange(n_samples, dtype=params.dtype) / params.sample_rate
-
-    # Generate pure tones for each channel
+    
+    # Generate pure tones
     ch1 = params.amplitudes[0] * np.sin(2 * np.pi * params.frequencies[0] * t)
-    ch2 = params.amplitudes[1] * np.sin(2 * np.pi * params.frequencies[1] * t)
-
-    # Add Gaussian noise if requested
+    ch2 = params.amplitudes[1] * np.sin(
+        2 * np.pi * params.frequencies[1] * t + params.phase_offset
+    )
+    
+    # Add noise if specified
     if params.noise_level > 0:
-        noise_gen = np.random.default_rng()
-        ch1 += noise_gen.normal(scale=params.noise_level, size=n_samples)
-        ch2 += noise_gen.normal(scale=params.noise_level, size=n_samples)
+        rng = np.random.default_rng(seed)
+        ch1 += rng.normal(0, params.noise_level, n_samples).astype(params.dtype)
+        ch2 += rng.normal(0, params.noise_level, n_samples).astype(params.dtype)
+    
+    return {
+        "ch1": ch1.astype(params.dtype),
+        "ch2": ch2.astype(params.dtype)
+    }
 
-    return {"ch1": ch1.astype(params.dtype), "ch2": ch2.astype(params.dtype)}
 
-
-def apply_window(
-    signal: NDArray[np.float32],
-    window_type: WindowFunction = 'hann',
+def create_window(
+    window_type: WindowFunction,
+    size: int,
+    **kwargs
 ) -> NDArray[np.float32]:
     """
-    Applies a window function to a signal.
-
-    This is a CPU-based operation, typically used for pre-processing or
-    validation. The main HPC pipeline applies the window on the GPU.
-
-    Args:
-        signal: The input signal as a 1D NumPy array.
-        window_type: The type of window function to apply.
-
-    Returns:
-        The windowed signal.
-    """
-    n_samples = len(signal)
+    Create a window function array.
     
-    # Using a dictionary lookup is a clean way to handle multiple cases
+    Args:
+        window_type: Type of window function.
+        size: Window size.
+        **kwargs: Additional parameters (e.g., beta for Kaiser).
+    
+    Returns:
+        Window array of shape (size,).
+    
+    Raises:
+        ValueError: If window type is unknown.
+    
+    Example:
+        >>> window = create_window('hann', 4096)
+        >>> assert window.shape == (4096,)
+    """
     window_funcs = {
         'hann': np.hanning,
         'hamming': np.hamming,
         'blackman': np.blackman,
         'bartlett': np.bartlett,
-        'kaiser': lambda size: np.kaiser(size, beta=14), # beta=14 is a common choice
+        'kaiser': lambda n: np.kaiser(n, kwargs.get('beta', 14.0)),
         'rectangular': np.ones,
     }
-
+    
     if window_type not in window_funcs:
-        raise ValueError(f"Unknown window type: '{window_type}'. "
-                         f"Valid options are: {list(window_funcs.keys())}")
+        raise ValueError(
+            f"Unknown window '{window_type}'. "
+            f"Choose from: {list(window_funcs.keys())}"
+        )
+    
+    return window_funcs[window_type](size).astype(np.float32)
 
-    window = window_funcs[window_type](n_samples).astype(signal.dtype)
-    return signal * window
 
+def compute_snr(
+    signal: NDArray[np.float32],
+    noise: NDArray[np.float32]
+) -> float:
+    """
+    Compute signal-to-noise ratio in dB.
+    
+    Args:
+        signal: Clean signal array.
+        noise: Noise array.
+    
+    Returns:
+        SNR in decibels.
+    """
+    signal_power = np.mean(signal ** 2)
+    noise_power = np.mean(noise ** 2)
+    
+    if noise_power == 0:
+        return float('inf')
+    
+    return 10 * np.log10(signal_power / noise_power)
+
+
+def generate_chirp(
+    f0: float,
+    f1: float,
+    duration: float,
+    sample_rate: int = 100_000,
+    method: Literal['linear', 'quadratic', 'logarithmic'] = 'linear'
+) -> NDArray[np.float32]:
+    """
+    Generate a frequency sweep signal.
+    
+    Args:
+        f0: Starting frequency in Hz.
+        f1: Ending frequency in Hz.
+        duration: Sweep duration in seconds.
+        sample_rate: Sampling rate in Hz.
+        method: Sweep method.
+    
+    Returns:
+        Chirp signal array.
+    """
+    from scipy.signal import chirp
+    
+    t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
+    return chirp(t, f0, duration, f1, method=method).astype(np.float32)

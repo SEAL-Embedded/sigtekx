@@ -27,7 +27,7 @@ public:
     virtual ~IProcessingStage() = default;
 
     virtual void initialize(const std::vector<cuda::Stream>& streams) = 0;
-    
+    virtual void set_window(const float* h_window_data, size_t size) = 0;
     virtual void enqueue_work(const cuda::Stream& stream, int stream_idx,
                               float* d_input, float* d_output) = 0;
 
@@ -45,7 +45,7 @@ public:
     ~FftProcessingStage() override = default;
 
     void initialize(const std::vector<cuda::Stream>& streams) override;
-    
+    void set_window(const float* h_window_data, size_t size) override;
     void enqueue_work(const cuda::Stream& stream, int stream_idx,
                       float* d_input, float* d_output) override;
 
