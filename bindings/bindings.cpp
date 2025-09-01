@@ -204,7 +204,8 @@ PYBIND11_MODULE(_engine, m) {
     
     py::enum_<ionosense::StageConfig::ScalePolicy>(m, "ScalePolicy")
         .value("NONE", ionosense::StageConfig::ScalePolicy::NONE)
-        .value("ONE_OVER_N", ionosense::StageConfig::ScalePolicy::ONE_OVER_N);
+        .value("ONE_OVER_N", ionosense::StageConfig::ScalePolicy::ONE_OVER_N)
+        .value("ONE_OVER_SQRT_N", ionosense::StageConfig::ScalePolicy::ONE_OVER_SQRT_N);
     
     py::enum_<ionosense::StageConfig::OutputMode>(m, "OutputMode")
         .value("MAGNITUDE", ionosense::StageConfig::OutputMode::MAGNITUDE)

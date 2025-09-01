@@ -102,66 +102,66 @@ public:
         stats_.is_warmup = false;
     }
 
-void process(const float* input, float* output, size_t num_samples) {
-    if (!initialized_) {
-        throw std::runtime_error("Engine not initialized");
+    void process(const float* input, float* output, size_t num_samples) {
+        if (!initialized_) {
+            throw std::runtime_error("Engine not initialized");
+        }
+
+        const auto start_time = std::chrono::high_resolution_clock::now();
+
+        // --- Resource Selection ---
+        const int buffer_idx = static_cast<int>(frame_counter_ % config_.pinned_buffer_count);
+        auto& d_input        = d_input_buffers_[buffer_idx];
+        auto& d_output       = d_output_buffers_[buffer_idx];
+        auto& d_intermediate = d_intermediate_buffers_[buffer_idx];
+
+        const int h2d_stream_idx     = 0;
+        const int compute_stream_idx = (streams_.size() > 1) ? 1 : 0;
+        const int d2h_stream_idx     = (streams_.size() > 2) ? 2 : compute_stream_idx;
+
+        auto& e_h2d_done     = events_[buffer_idx * 2 + 0];
+        auto& e_compute_done = events_[buffer_idx * 2 + 1];
+
+        // --- Asynchronous Pipeline ---
+
+        // 1. Host-to-Device Transfer
+        d_input.copy_from_host(input, num_samples, streams_[h2d_stream_idx].get());
+        e_h2d_done.record(streams_[h2d_stream_idx].get());
+
+        // 2. Processing Pipeline (on compute stream)
+        IONO_CUDA_CHECK(cudaStreamWaitEvent(streams_[compute_stream_idx].get(), e_h2d_done.get(), 0));
+
+        // Stage 1: Window (In-Place)
+        // Applies Hann window directly onto the d_input buffer.
+        stages_[0]->process(d_input.get(), d_input.get(), num_samples, streams_[compute_stream_idx].get());
+
+        // Stage 2: FFT (Real-to-Complex, Out-of-Place)
+        // Reads windowed real data from d_input, writes complex spectrum to d_intermediate.
+        stages_[1]->process(d_input.get(), d_intermediate.get(), num_samples, streams_[compute_stream_idx].get());
+
+        // Stage 3: Magnitude (Complex-to-Real, Out-of-Place)
+        // Reads complex spectrum from d_intermediate, writes float magnitudes to d_output.
+        const size_t complex_elements = static_cast<size_t>(config_.num_output_bins()) * config_.batch;
+        stages_[2]->process(d_intermediate.get(), d_output.get(), complex_elements, streams_[compute_stream_idx].get());
+
+        e_compute_done.record(streams_[compute_stream_idx].get());
+
+        // 3. Device-to-Host Transfer
+        IONO_CUDA_CHECK(cudaStreamWaitEvent(streams_[d2h_stream_idx].get(), e_compute_done.get(), 0));
+        d_output.copy_to_host(output, complex_elements, streams_[d2h_stream_idx].get());
+        
+        // 4. Final Synchronization
+        IONO_CUDA_CHECK(cudaStreamSynchronize(streams_[d2h_stream_idx].get()));
+
+        // --- Statistics ---
+        const auto end_time    = std::chrono::high_resolution_clock::now();
+        const auto duration    = std::chrono::duration<float, std::micro>(end_time - start_time);
+        stats_.latency_us      = duration.count();
+        stats_.frames_processed++;
+        stats_.throughput_gbps = calculate_throughput(num_samples, stats_.latency_us);
+
+        frame_counter_++;
     }
-
-    const auto start_time = std::chrono::high_resolution_clock::now();
-
-    // --- Resource Selection ---
-    const int buffer_idx = static_cast<int>(frame_counter_ % config_.pinned_buffer_count);
-    auto& d_input        = d_input_buffers_[buffer_idx];
-    auto& d_output       = d_output_buffers_[buffer_idx];
-    auto& d_intermediate = d_intermediate_buffers_[buffer_idx];
-
-    const int h2d_stream_idx     = 0;
-    const int compute_stream_idx = (streams_.size() > 1) ? 1 : 0;
-    const int d2h_stream_idx     = (streams_.size() > 2) ? 2 : compute_stream_idx;
-
-    auto& e_h2d_done     = events_[buffer_idx * 2 + 0];
-    auto& e_compute_done = events_[buffer_idx * 2 + 1];
-
-    // --- Asynchronous Pipeline ---
-
-    // 1. Host-to-Device Transfer
-    d_input.copy_from_host(input, num_samples, streams_[h2d_stream_idx].get());
-    e_h2d_done.record(streams_[h2d_stream_idx].get());
-
-    // 2. Processing Pipeline (on compute stream)
-    IONO_CUDA_CHECK(cudaStreamWaitEvent(streams_[compute_stream_idx].get(), e_h2d_done.get(), 0));
-
-    // Stage 1: Window (In-Place)
-    // Applies Hann window directly onto the d_input buffer.
-    stages_[0]->process(d_input.get(), d_input.get(), num_samples, streams_[compute_stream_idx].get());
-
-    // Stage 2: FFT (Real-to-Complex, Out-of-Place)
-    // Reads windowed real data from d_input, writes complex spectrum to d_intermediate.
-    stages_[1]->process(d_input.get(), d_intermediate.get(), num_samples, streams_[compute_stream_idx].get());
-
-    // Stage 3: Magnitude (Complex-to-Real, Out-of-Place)
-    // Reads complex spectrum from d_intermediate, writes float magnitudes to d_output.
-    const size_t complex_elements = static_cast<size_t>(config_.num_output_bins()) * config_.batch;
-    stages_[2]->process(d_intermediate.get(), d_output.get(), complex_elements, streams_[compute_stream_idx].get());
-
-    e_compute_done.record(streams_[compute_stream_idx].get());
-
-    // 3. Device-to-Host Transfer
-    IONO_CUDA_CHECK(cudaStreamWaitEvent(streams_[d2h_stream_idx].get(), e_compute_done.get(), 0));
-    d_output.copy_to_host(output, complex_elements, streams_[d2h_stream_idx].get());
-    
-    // 4. Final Synchronization
-    IONO_CUDA_CHECK(cudaStreamSynchronize(streams_[d2h_stream_idx].get()));
-
-    // --- Statistics ---
-    const auto end_time    = std::chrono::high_resolution_clock::now();
-    const auto duration    = std::chrono::duration<float, std::micro>(end_time - start_time);
-    stats_.latency_us      = duration.count();
-    stats_.frames_processed++;
-    stats_.throughput_gbps = calculate_throughput(num_samples, stats_.latency_us);
-
-    frame_counter_++;
-}
 
     void process_async(const float* input, size_t num_samples, ResultCallback callback) {
         if (!initialized_) {
@@ -204,7 +204,7 @@ void process(const float* input, float* output, size_t num_samples) {
         std::ostringstream v;
         v << (cuda_runtime_version / 1000) << "." << (cuda_runtime_version % 1000) / 10;
         info.cuda_version  = v.str();
-        info.cufft_version = info.cuda_version; // approximate for v1.0
+        info.cufft_version = info.cuda_version;
         info.device_name   = device_props_.name;
         info.device_compute_capability_major = device_props_.major;
         info.device_compute_capability_minor = device_props_.minor;
@@ -271,9 +271,9 @@ private:
     // CUDA resources
     std::vector<CudaStream> streams_;
     std::vector<CudaEvent>  events_;
-    int h2d_stream_idx_ = 0;
-    int compute_stream_idx_ = 0;
-    int d2h_stream_idx_ = 0;
+    int h2d_stream_idx_      = 0;
+    int compute_stream_idx_  = 0;
+    int d2h_stream_idx_      = 0;
 
     // Per-slot device buffers
     std::vector<DeviceBuffer<float>> d_input_buffers_;        // time-domain floats

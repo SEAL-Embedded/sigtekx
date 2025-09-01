@@ -15,10 +15,10 @@ namespace ionosense {
 // Configuration for processing stages
 struct StageConfig {
     // FFT parameters
-    int nfft = 1024;
-    int batch = 2;  // Dual channels
-    float overlap = 0.5f;
-    int sample_rate_hz = 48000;
+    int    nfft            = 1024;
+    int    batch           = 2;
+    float  overlap         = 0.5f;
+    int    sample_rate_hz  = 48000;
     
     // Window parameters
     enum class WindowType { HANN };
@@ -47,10 +47,10 @@ struct StageConfig {
 
 // Processing statistics for monitoring
 struct ProcessingStats {
-    float latency_us = 0.0f;
-    float throughput_gbps = 0.0f;
-    size_t frames_processed = 0;
-    bool is_warmup = true;
+    float   latency_us        = 0.0f;
+    float   throughput_gbps   = 0.0f;
+    size_t  frames_processed  = 0;
+    bool    is_warmup         = true;
 };
 
 // Abstract base class for processing stages (Strategy pattern)

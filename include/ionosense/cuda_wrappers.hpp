@@ -65,7 +65,7 @@ private:
     }
 };
 
-// RAII wrapper for CUDA streams (move-only, following C++17 best practices)
+// RAII wrapper for CUDA streams (move-only)
 class CudaStream {
 public:
     CudaStream() : stream_(nullptr) {
@@ -81,7 +81,7 @@ public:
     }
     
     // Move-only semantics
-    CudaStream(const CudaStream&) = delete;
+    CudaStream(const CudaStream&)            = delete;
     CudaStream& operator=(const CudaStream&) = delete;
     
     CudaStream(CudaStream&& other) noexcept 
@@ -199,7 +199,7 @@ public:
     }
     
     // Move-only semantics
-    DeviceBuffer(const DeviceBuffer&) = delete;
+    DeviceBuffer(const DeviceBuffer&)            = delete;
     DeviceBuffer& operator=(const DeviceBuffer&) = delete;
     
     DeviceBuffer(DeviceBuffer&& other) noexcept
@@ -217,10 +217,10 @@ public:
         return *this;
     }
     
-    T* get() noexcept { return ptr_; }
-    const T* get() const noexcept { return ptr_; }
-    size_t size() const noexcept { return size_; }
-    size_t bytes() const noexcept { return size_ * sizeof(T); }
+    T*        get() noexcept          { return ptr_; }
+    const T*  get() const noexcept    { return ptr_; }
+    size_t    size() const noexcept   { return size_; }
+    size_t    bytes() const noexcept  { return size_ * sizeof(T); }
     
     void resize(size_t new_count) {
         if (new_count != size_) {
@@ -283,7 +283,7 @@ public:
     }
     
     // Move-only semantics
-    PinnedHostBuffer(const PinnedHostBuffer&) = delete;
+    PinnedHostBuffer(const PinnedHostBuffer&)            = delete;
     PinnedHostBuffer& operator=(const PinnedHostBuffer&) = delete;
     
     PinnedHostBuffer(PinnedHostBuffer&& other) noexcept
@@ -301,16 +301,16 @@ public:
         return *this;
     }
     
-    T* get() noexcept { return ptr_; }
-    const T* get() const noexcept { return ptr_; }
-    T* data() noexcept { return ptr_; }
-    const T* data() const noexcept { return ptr_; }
+    T*        get() noexcept          { return ptr_; }
+    const T*  get() const noexcept    { return ptr_; }
+    T*        data() noexcept         { return ptr_; }
+    const T*  data() const noexcept   { return ptr_; }
     
-    size_t size() const noexcept { return size_; }
-    size_t bytes() const noexcept { return size_ * sizeof(T); }
+    size_t    size() const noexcept   { return size_; }
+    size_t    bytes() const noexcept  { return size_ * sizeof(T); }
     
-    T& operator[](size_t idx) { return ptr_[idx]; }
-    const T& operator[](size_t idx) const { return ptr_[idx]; }
+    T&        operator[](size_t idx)       { return ptr_[idx]; }
+    const T&  operator[](size_t idx) const { return ptr_[idx]; }
     
     void resize(size_t new_count) {
         if (new_count != size_) {
@@ -350,7 +350,7 @@ public:
     }
     
     // Move-only semantics
-    CufftPlan(const CufftPlan&) = delete;
+    CufftPlan(const CufftPlan&)            = delete;
     CufftPlan& operator=(const CufftPlan&) = delete;
     
     CufftPlan(CufftPlan&& other) noexcept
@@ -363,15 +363,15 @@ public:
             if (plan_) {
                 cufftDestroy(plan_);
             }
-            plan_ = std::exchange(other.plan_, 0);
-            work_area_ = std::move(other.work_area_);
-            work_size_ = std::exchange(other.work_size_, 0);
+            plan_       = std::exchange(other.plan_, 0);
+            work_area_  = std::move(other.work_area_);
+            work_size_  = std::exchange(other.work_size_, 0);
         }
         return *this;
     }
     
-    cufftHandle get() const noexcept { return plan_; }
-    operator cufftHandle() const noexcept { return plan_; }
+    cufftHandle  get() const noexcept          { return plan_; }
+    operator     cufftHandle() const noexcept  { return plan_; }
     
     // Initialize plan with proper work area management
     void create_plan_many(int rank, int* n, int* inembed, int istride, int idist,

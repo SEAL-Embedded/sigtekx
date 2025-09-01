@@ -221,11 +221,11 @@ public:
             throw std::runtime_error("MagnitudeStage not initialized");
         }
 
-        const float2* complex_input = static_cast<const float2*>(input);
-        float*        mag_output    = static_cast<float*>(output);
+        const float2*  complex_input  = static_cast<const float2*>(input);
+        float*         mag_output     = static_cast<float*>(output);
 
-        const int bins_per_frame = num_output_bins_;           // nfft/2 + 1
-        const int frames         = static_cast<int>(config_.batch);
+        const int  bins_per_frame  = num_output_bins_;    // nfft/2 + 1
+        const int  frames          = static_cast<int>(config_.batch);
 
         // Accept either tight-packed [bins_per_frame] or full-FFT stride [nfft].
         // Compute stride directly from what we were given.
