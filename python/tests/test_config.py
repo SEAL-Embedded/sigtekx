@@ -25,11 +25,9 @@ def test_pipeline_config_valid(default_fft_config):
     """Tests creation of a valid PipelineConfig."""
     config = PipelineConfig(
         num_streams=4,
-        use_graphs=False,
         stage_config=default_fft_config
     )
     assert config.num_streams == 4
-    assert not config.use_graphs
     assert config.stage_config == default_fft_config
 
 def test_pipeline_config_invalid_streams():

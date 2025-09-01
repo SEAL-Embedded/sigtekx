@@ -2,7 +2,7 @@
 ionosense_hpc.core.pipelines: Direct wrapper for C++ PipelineEngine.
 
 Provides Python access to the high-performance pipeline with multi-stream
-execution, CUDA graphs, and profiling capabilities.
+execution and profiling capabilities. This version does not use CUDA graphs.
 """
 
 from __future__ import annotations
@@ -30,13 +30,7 @@ class Pipeline:
     High-performance asynchronous FFT pipeline with multi-stream execution.
     
     This class wraps the C++ PipelineEngine, providing zero-copy buffer access
-    and full control over async execution for research workflows requiring
-    precise timing control.
-    
-    Attributes:
-        num_streams: Number of CUDA streams for concurrent execution.
-        use_graphs: Whether CUDA graphs are enabled for lower latency.
-        is_prepared: Whether the pipeline has been prepared for execution.
+    and full control over async execution.
     """
     
     def __init__(self, config: Optional[PipelineConfig] = None):
@@ -52,7 +46,6 @@ class Pipeline:
         # Build the C++ engine
         builder = _engine.PipelineBuilder()
         builder.with_streams(config.num_streams)
-        builder.with_graphs(config.use_graphs)
         builder.with_profiling(config.enable_profiling)
         
         # Configure the stage (currently only FFT supported)
@@ -66,7 +59,7 @@ class Pipeline:
             self._config = config
         except Exception as e:
             raise translate_cpp_exception(e)
-        
+    
     def set_window(self, window_coeffs: NDArray[np.float32]) -> None:
         self._engine.set_window(np.ascontiguousarray(window_coeffs, dtype=np.float32))
 
@@ -75,8 +68,7 @@ class Pipeline:
         """
         Prepare the pipeline for execution.
         
-        This performs warm-up runs and captures CUDA graphs if enabled.
-        Must be called before any execute operations.
+        This performs warm-up runs. Must be called before any execute operations.
         
         Raises:
             StateError: If already prepared.
@@ -141,10 +133,6 @@ class Pipeline:
         
         Returns:
             A NumPy array view of shape (batch_size, nfft).
-        
-        Note:
-            This is a zero-copy view. Modifications directly affect the
-            buffer used by the GPU.
         """
         try:
             return self._engine.get_input_buffer(stream_idx)
@@ -160,9 +148,6 @@ class Pipeline:
         
         Returns:
             A NumPy array view of shape (batch_size, nfft/2+1).
-        
-        Note:
-            This is a zero-copy view into pinned memory.
         """
         try:
             return self._engine.get_output_buffer(stream_idx)
@@ -172,6 +157,7 @@ class Pipeline:
     @property
     def stats(self) -> PipelineStats:
         """Get performance statistics."""
+        from .profiling import PipelineStats
         return PipelineStats._from_cpp(self._engine.stats)
     
     def reset_stats(self) -> None:
@@ -187,24 +173,13 @@ class Pipeline:
     def num_streams(self) -> int:
         """Get the number of streams."""
         return self._config.num_streams
-    
-    @property
-    def use_graphs(self) -> bool:
-        """Check if CUDA graphs are enabled."""
-        return self._engine.use_graphs
-    
-    @use_graphs.setter
-    def use_graphs(self, enable: bool) -> None:
-        """Enable or disable CUDA graphs at runtime."""
-        self._engine.use_graphs = enable
 
 
 class PipelineBuilder:
     """
     Builder pattern for constructing Pipeline instances.
     
-    Provides a fluent interface for configuring pipelines, mirroring
-    the C++ PipelineBuilder API.
+    Provides a fluent interface for configuring pipelines.
     """
     
     def __init__(self):
@@ -216,11 +191,6 @@ class PipelineBuilder:
         if not 1 <= num_streams <= 16:
             raise ConfigurationError(f"Number of streams must be 1-16, got {num_streams}")
         self._config.num_streams = num_streams
-        return self
-    
-    def with_graphs(self, enable: bool) -> PipelineBuilder:
-        """Enable or disable CUDA graphs."""
-        self._config.use_graphs = bool(enable)
         return self
     
     def with_profiling(self, enable: bool) -> PipelineBuilder:

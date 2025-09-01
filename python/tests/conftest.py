@@ -88,7 +88,6 @@ def default_pipeline_config(default_fft_config):
     """Default PipelineConfig used across tests."""
     return PipelineConfig(
         num_streams=3,
-        use_graphs=True,
         enable_profiling=True,
         stage_config=default_fft_config,
     )
@@ -113,6 +112,5 @@ def fft_processor_instance():
         fft_size=2048,
         batch_size=2,
         window="hann",
-        use_graphs=True,
         num_streams=3,
     )

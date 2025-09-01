@@ -36,7 +36,6 @@ class FFTProcessor:
         fft_size: int = 4096,
         batch_size: int = 2,
         window: Optional[Union[str, FFTArray]] = None,
-        use_graphs: bool = True,
         num_streams: int = 3,
         enable_profiling: bool = True,
     ):
@@ -53,18 +52,18 @@ class FFTProcessor:
             PipelineBuilder()
             .with_fft(self.fft_size, self.batch_size)
             .with_streams(num_streams)
-            .with_graphs(use_graphs)
             .with_profiling(enable_profiling)
             .build()
         )
         
-        # Prepare window data first
+        if isinstance(window, str):
+            self._window_data = create_window(window, self.fft_size)
+            self._pipeline.set_window(self._window_data)
+        elif isinstance(window, np.ndarray):
+            self._window_data = window.astype(np.float32)
+            self._pipeline.set_window(self._window_data)
+        
         self._pipeline.prepare()
-        # then make one call to set it.
-        if window is not None:
-            # This just populates self._window_data
-            self.set_window(window)
-            # The line above now handles the C++ call internally
 
     def process(self, *inputs: FFTArray) -> FFTArray:
         """
@@ -73,15 +72,12 @@ class FFTProcessor:
         if len(inputs) != self.batch_size:
             raise ValueError(f"Expected {self.batch_size} inputs, got {len(inputs)}")
 
-        # Validate shapes *before* attempting to stack. This ensures the correct,
-        # specific error message is raised if the input shapes are inconsistent.
         for i, arr in enumerate(inputs):
             if arr.shape != (self.fft_size,):
                 raise ValueError(
                     f"Input {i} has shape {arr.shape}, expected ({self.fft_size},)"
                 )
 
-        # Consolidate the validated inputs into a single batch array.
         input_batch = np.stack(inputs)
         return self.process_batch(input_batch)
 
@@ -94,7 +90,6 @@ class FFTProcessor:
                 f"Expected shape ({self.batch_size}, {self.fft_size}), got {data.shape}"
             )
 
-        # The data is now passed RAW to the engine. No Python-side windowing.
         processed_data = np.ascontiguousarray(data, dtype=np.float32)
 
         with self._lock:
@@ -102,7 +97,14 @@ class FFTProcessor:
             self._current_stream = (self._current_stream + 1) % self._pipeline.num_streams
 
         input_buffer = self._pipeline.get_input_buffer(stream_idx)
-        input_buffer[...] = processed_data
+        
+        # --- THE FINAL, DEFINITIVE FIX ---
+        # The previous slice-based copy was causing memory corruption due to
+        # broadcasting issues with the pybind11 buffer view. A manual, row-by-row
+        # copy is safer and guarantees correctness.
+        for i in range(self.batch_size):
+            input_buffer[i, :self.fft_size] = processed_data[i]
+        # ---------------------------------
 
         self._pipeline.execute_async(stream_idx)
         self._pipeline.sync_stream(stream_idx)
@@ -110,7 +112,9 @@ class FFTProcessor:
         return self._pipeline.get_output_buffer(stream_idx).copy()
 
     def set_window(self, window: Union[str, FFTArray]) -> None:
-        """Set or change the window function used for processing."""
+        """
+        Set or change the window function used for processing.
+        """
         if isinstance(window, str):
             self._window_data = create_window(window, self.fft_size)
         else:
@@ -119,8 +123,7 @@ class FFTProcessor:
                 raise ValueError(f"Window shape {window_array.shape} != ({self.fft_size},)")
             self._window_data = np.ascontiguousarray(window_array)
         
-        # Set the window on the already-prepared pipeline
-        if self._pipeline.is_prepared and self._window_data is not None:
+        if self._window_data is not None:
             self._pipeline.set_window(self._window_data)
 
     @property
@@ -148,3 +151,4 @@ class FFTProcessor:
             f"batch_size={self.batch_size}, "
             f"num_streams={self.num_streams})"
         )
+

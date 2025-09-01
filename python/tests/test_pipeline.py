@@ -3,7 +3,7 @@ Unit tests for the low-level Pipeline and PipelineBuilder APIs.
 """
 import pytest
 import numpy as np
-import re  # Import the 're' module
+import re
 from ionosense_hpc.core.pipelines import Pipeline, PipelineBuilder
 from ionosense_hpc.core.config import PipelineConfig, FFTConfig
 from ionosense_hpc.core.exceptions import StateError
@@ -13,19 +13,16 @@ def test_pipeline_builder(default_fft_config):
     builder = PipelineBuilder()
     pipeline = (builder
         .with_streams(2)
-        .with_graphs(False)
         .with_profiling(True)
         .with_fft(default_fft_config.nfft, default_fft_config.batch_size)
         .build())
 
     assert pipeline is not None
     assert pipeline.num_streams == 2
-    assert not pipeline.use_graphs
 
 def test_pipeline_prepare(pipeline_instance: Pipeline):
     """Tests that the pipeline prepares correctly and handles double-prepare."""
     assert pipeline_instance.is_prepared
-    # No change needed here, this was correct
     with pytest.raises(StateError, match="State Error: Pipeline already prepared."):
         pipeline_instance.prepare()
 
@@ -33,7 +30,6 @@ def test_pipeline_execute_before_prepare():
     """Tests that calling execute before prepare raises a StateError."""
     pipeline = PipelineBuilder().with_fft(1024, 2).build() # Don't call prepare()
     
-    # FIX: Escape the special regex characters in the expected error message
     expected_error = "State Error: Pipeline not prepared. Call prepare() first."
     with pytest.raises(StateError, match=re.escape(expected_error)):
         pipeline.execute_async(0)
@@ -56,8 +52,6 @@ def test_pipeline_buffer_access(pipeline_instance: Pipeline):
 
 def test_pipeline_synchronize_all(pipeline_instance: Pipeline):
     """Tests that synchronize_all runs without errors."""
-    # Simple test to ensure the method call is wired up correctly.
-    # A more complex test would involve multiple streams and events.
     pipeline_instance.execute_async(0)
     pipeline_instance.synchronize_all()
     # No assert needed, if it doesn't hang or throw, it's working at a basic level.

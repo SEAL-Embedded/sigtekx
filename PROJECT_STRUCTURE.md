@@ -8,10 +8,30 @@ Complete layout of the ionosense-hpc-lib codebase with documentation links.
 ionosense-hpc-lib/
 │
 ├── .guide/                    # C++/CUDA code examples and documentation
-├── bindings/                  # C++ to Python bindings (pybind11)
-├── include/                   # C++ header files for the core library
-├── src/                       # C++/CUDA source code implementation
-├── tests/                     # C++ unit tests (GTest)
+│
+├── bindings/
+│   └── bindings.cpp              # pybind11 entrypoint, exposes C++ research engine to Python
+│
+├── include/ionosense/
+│   ├── cuda_wrappers.hpp         # RAII wrappers for cudaStream, cudaEvent, cufftHandle, buffers
+│   ├── research_engine.hpp       # ResearchEngine: public C++ API (IPipelineEngine + concrete impl via Pimpl)
+│   ├── processing_stage.hpp      # Abstract stage interface + v1.0 stages (Window, FFT, Magnitude)
+│   └── engines/                  # Engine-specific headers (ResearchEngine built now; others present but not built)
+│       ├── ion_engine.hpp        # IFE (Ionosense Fused) — present for future, **not built now**
+│       └── obe_engine.hpp        # OBE (Offline/Batch) — present for future, **not built now**
+│
+├── src/
+│   ├── ops_fft.cu                # CUDA kernels: apply_window, magnitude, helpers
+│   ├── research_engine.cpp       # ResearchEngine: stream mgmt, plan reuse, enqueue/execute
+│   ├── processing_stage.cpp      # v1.0 Strategy implementations (WindowStage, FFTStage, MagnitudeStage)
+│   └── engines/                  # Engine-specific implementations
+│       ├── ion_engine.cpp        # Ionosense Fused Engine skeleton for future work — **not built now**
+│       └── obe_engine.cpp        # Offline/Batch Engine skeleton for future work — **not built now**
+│
+├── tests/
+│   ├── test_cuda_wrappers.cpp    # GTest: RAII CUDA wrappers (streams, events, buffers, plans)
+│   ├── test_research_engine.cpp  # GTest: ResearchEngine orchestration (init, exec, teardown)
+│   └── test_processing_stage.cpp # GTest: stage correctness (window, FFT, magnitude)
 │
 ├── python/
 │    ├── src/

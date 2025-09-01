@@ -65,7 +65,7 @@ FetchContent_Declare(
 # ============================================================================
 add_library(ion_engine OBJECT
     src/ops_fft.cu
-    src/pipeline_engine.cpp
+    src/research_engine.cpp
     src/processing_stage.cpp
 )
 target_include_directories(ion_engine PUBLIC
@@ -143,7 +143,7 @@ if(IONO_WITH_TESTS)
     FetchContent_MakeAvailable(googletest)
 
     add_executable(test_engine
-        tests/test_pipeline_engine.cpp
+        tests/test_research_engine.cpp
         tests/test_processing_stage.cpp
         tests/test_cuda_wrappers.cpp
     )
