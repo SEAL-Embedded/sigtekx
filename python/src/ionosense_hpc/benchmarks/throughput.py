@@ -176,4 +176,3 @@ if __name__ == '__main__':
     print("\nRunning Batch Scaling Benchmark...")
     scaling_results = benchmark_batch_scaling()
     print(json.dumps(scaling_results, indent=2, default=str))
-

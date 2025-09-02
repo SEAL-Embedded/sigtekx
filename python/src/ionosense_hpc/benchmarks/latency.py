@@ -158,4 +158,3 @@ if __name__ == '__main__':
     print("\nRunning Jitter Benchmark...")
     jitter_results = benchmark_jitter()
     print(json.dumps(jitter_results, indent=2, default=str))
-

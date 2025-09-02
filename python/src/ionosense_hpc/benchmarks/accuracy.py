@@ -170,4 +170,3 @@ if __name__ == '__main__':
     print("\nRunning Numerical Stability Benchmark...")
     stab_results = benchmark_numerical_stability()
     print(json.dumps(stab_results, indent=2, default=str))
-

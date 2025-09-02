@@ -88,14 +88,8 @@ from .config import (
 )
 
 # Import utilities (may use pynvml)
-from .utils import (
-    gpu_count,
-    current_device,
-    device_info,
-    make_sine,
-    make_chirp,
-    make_noise
-)
+from .utils.device import gpu_count, current_device, device_info
+from .utils.signals import make_sine, make_chirp, make_noise, make_multitone
 
 # Import core engine classes (requires _engine module)
 try:
@@ -163,6 +157,7 @@ __all__ = [
     'make_sine',
     'make_chirp',
     'make_noise',
+    'make_multitone',
     # Helper functions
     'show_versions',
     'self_test'
