@@ -24,29 +24,32 @@ jobs:
         with:
           python-version: '3.11'
 
-      # 3. Install CUDA Toolkit using the correct action version
-      - name: Install CUDA Toolkit 13.0.0
-        uses: Jimver/cuda-toolkit@v0.2.27
+      # 3. Install CUDA Toolkit 13.0.0
+      - name: Install CUDA Toolkit
+        uses: Jimver/cuda-toolkit@v0.2.24
         id: cuda-toolkit
         with:
           cuda: '13.0.0'
 
-      # 4. Configure the build with CMake
-      - name: Configure CMake
-        run: cmake -S . -B build -DIONO_WITH_TESTS=OFF
+      # 4. Configure and Build with the run-cmake Action
+      - name: Configure and Build CMake Project
+        uses: lukka/run-cmake@v10
+        with:
+          # Tell CMake where to find your CMakeLists.txt (the root)
+          sourceDirectory: ${{ github.workspace }}
+          # Use a temporary directory for build files
+          buildDirectory: ${{ runner.temp }}/build
+          # Pass your custom options directly to CMake
+          cmakeOptions: "-DIONO_WITH_TESTS=OFF -DIONO_WITH_PYTHON=ON"
 
-      # 5. Build the C++/CUDA extension
-      - name: Build C++ Extension
-        run: cmake --build build --config Release
-
-      # 6. Install Python dependencies
+      # 5. Install Python dependencies
       - name: Install Python Dependencies
         run: pip install .[dev]
 
-      # 7. Run linter
+      # 6. Run linter
       - name: Run Ruff Linter
         run: ruff check python/src python/tests
 
-      # 8. Run Python unit tests (excluding GPU tests)
+      # 7. Run Python unit tests (excluding GPU tests)
       - name: Run Pytest (CPU-only)
         run: pytest -m "not gpu"
