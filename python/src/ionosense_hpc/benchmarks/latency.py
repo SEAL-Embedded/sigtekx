@@ -1,10 +1,8 @@
 """Latency benchmarking for the signal processing pipeline."""
 
 import time
-import json
-import argparse
 from typing import Dict, Any, Optional
-
+import json
 import numpy as np
 
 from ..core import Processor
@@ -19,7 +17,18 @@ def benchmark_latency(
     signal_type: str = 'sine',
     report_percentiles: bool = True
 ) -> Dict[str, Any]:
-    """Benchmark per-frame processing latency."""
+    """Benchmark per-frame processing latency.
+    
+    Args:
+        config: Engine configuration (None for realtime preset)
+        n_iterations: Number of benchmark iterations
+        warmup_iterations: Additional warmup iterations
+        signal_type: Type of test signal
+        report_percentiles: Include percentile statistics
+        
+    Returns:
+        Dictionary with latency statistics
+    """
     if config is None:
         config = Presets.realtime()
     
@@ -37,37 +46,39 @@ def benchmark_latency(
         for _ in range(warmup_iterations):
             proc.process(test_data)
         
-        # This direct access is for benchmarking only; avoid in production
-        if hasattr(proc, '_engine'):
-            proc._engine._frame_count = 0
-            proc._engine._total_latency_us = 0.0
-        
         latencies = []
         logger.info("Starting timed iterations...")
         
         for i in range(n_iterations):
-            _ = proc.process(test_data)
-            # In a real scenario, latency would be measured end-to-end
-            # Here we use the engine's internal stat for simplicity
-            stats = proc._engine.get_stats()
+            proc.process(test_data)
+            stats = proc.get_stats()
             latencies.append(stats['latency_us'])
+            
+            if (i + 1) % (n_iterations // 10 or 1) == 0:
+                logger.debug(f"  Iteration {i + 1}/{n_iterations}")
     
-    latencies = np.array(latencies)
+    latencies_np = np.array(latencies)
     results = {
-        'config': { 'nfft': config.nfft, 'batch': config.batch, 'overlap': config.overlap },
+        'config': config.model_dump(),
         'n_iterations': n_iterations,
-        'mean_us': float(np.mean(latencies)),
-        'std_us': float(np.std(latencies)),
-        'min_us': float(np.min(latencies)),
-        'max_us': float(np.max(latencies)),
+        'mean_us': float(np.mean(latencies_np)),
+        'std_us': float(np.std(latencies_np)),
+        'min_us': float(np.min(latencies_np)),
+        'max_us': float(np.max(latencies_np)),
     }
     
     if report_percentiles:
         results.update({
-            'p50_us': float(np.percentile(latencies, 50)),
-            'p90_us': float(np.percentile(latencies, 90)),
-            'p99_us': float(np.percentile(latencies, 99)),
+            'p50_us': float(np.percentile(latencies_np, 50)),
+            'p90_us': float(np.percentile(latencies_np, 90)),
+            'p95_us': float(np.percentile(latencies_np, 95)),
+            'p99_us': float(np.percentile(latencies_np, 99)),
         })
+    
+    deadline_us = 200
+    misses = np.sum(latencies_np > deadline_us)
+    results['deadline_misses'] = int(misses)
+    results['deadline_miss_rate'] = float(misses / n_iterations) if n_iterations > 0 else 0
     
     return results
 
@@ -78,16 +89,15 @@ def benchmark_jitter(
     target_fps: Optional[float] = None
 ) -> Dict[str, Any]:
     """Benchmark timing jitter for real-time processing."""
-    # (Implementation remains the same)
     if config is None:
         config = Presets.realtime()
     
     if target_fps is None:
         samples_per_second = config.sample_rate_hz
-        samples_per_frame = config.hop_size * config.batch
-        target_fps = samples_per_second / samples_per_frame if samples_per_frame > 0 else 0
+        samples_per_frame = config.hop_size
+        target_fps = samples_per_second / samples_per_frame
     
-    target_interval_ms = 1000.0 / target_fps if target_fps > 0 else 0
+    target_interval_ms = 1000.0 / target_fps
     
     logger.info(f"Starting jitter benchmark: {duration_seconds}s @ {target_fps:.1f} FPS")
     
@@ -114,48 +124,38 @@ def benchmark_jitter(
             
             last_frame_time = frame_start
             
-            if target_fps and target_interval_ms > 0:
-                elapsed = (frame_end - frame_start) * 1000
-                sleep_time = max(0, target_interval_ms - elapsed)
-                if sleep_time > 0:
-                    time.sleep(sleep_time / 1000)
-
-    frame_times = np.array(frame_times)
-    interval_times = np.array(interval_times) if interval_times else np.array([0])
+            elapsed = (frame_end - frame_start) * 1000
+            sleep_time = max(0, target_interval_ms - elapsed)
+            if sleep_time > 0:
+                time.sleep(sleep_time / 1000)
+    
+    frame_times_np = np.array(frame_times)
+    interval_times_np = np.array(interval_times) if interval_times else np.array([0])
     
     results = {
         'duration_s': duration_seconds,
         'target_fps': target_fps,
         'n_frames': len(frame_times),
+        'actual_fps': len(frame_times) / duration_seconds if duration_seconds > 0 else 0,
         'frame_time': {
-            'mean_ms': float(np.mean(frame_times)),
-            'std_ms': float(np.std(frame_times)),
+            'mean_ms': float(np.mean(frame_times_np)),
+            'std_ms': float(np.std(frame_times_np)),
+            'max_ms': float(np.max(frame_times_np))
         },
         'interval': {
-            'mean_ms': float(np.mean(interval_times)),
-            'jitter_ms': float(np.std(interval_times)),
+            'mean_ms': float(np.mean(interval_times_np)),
+            'std_ms': float(np.std(interval_times_np)),
+            'jitter_ms': float(np.std(interval_times_np))
         }
     }
     return results
 
-# --- SCRIPT ENTRY POINT ---
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run latency and jitter benchmarks.")
-    parser.add_argument("-n", "--iterations", type=int, default=1000, help="Number of iterations for latency test.")
-    parser.add_argument("-d", "--duration", type=float, default=5.0, help="Duration in seconds for jitter test.")
-    parser.add_argument("--preset", type=str, default="realtime", help="Configuration preset to use.")
-    args = parser.parse_args()
+if __name__ == '__main__':
+    print("Running Latency Benchmark...")
+    latency_results = benchmark_latency()
+    print(json.dumps(latency_results, indent=2, default=str))
 
-    try:
-        config = getattr(Presets, args.preset)()
-    except AttributeError:
-        print(f"Error: Preset '{args.preset}' not found.")
-        exit(1)
+    print("\nRunning Jitter Benchmark...")
+    jitter_results = benchmark_jitter()
+    print(json.dumps(jitter_results, indent=2, default=str))
 
-    print("--- Running Latency Benchmark ---")
-    latency_results = benchmark_latency(config, n_iterations=args.iterations)
-    print(json.dumps(latency_results, indent=2))
-
-    print("\n--- Running Jitter Benchmark ---")
-    jitter_results = benchmark_jitter(config, duration_seconds=args.duration)
-    print(json.dumps(jitter_results, indent=2))

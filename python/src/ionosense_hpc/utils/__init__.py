@@ -26,6 +26,17 @@ from .signals import (
     make_test_batch
 )
 
+from .profiling import (
+    nvtx_range
+)
+
+from .reporting import (
+    print_header,
+    print_latency_report,
+    print_throughput_report,
+    print_accuracy_report
+)
+
 __all__ = [
     # Device utilities
     'gpu_count',
@@ -46,5 +57,12 @@ __all__ = [
     'make_chirp',
     'make_noise',
     'make_multitone',
-    'make_test_batch'
+    'make_test_batch',
+    # Profiling
+    'nvtx_range',
+    # Reporting
+    'print_header',
+    'print_latency_report',
+    'print_throughput_report',
+    'print_accuracy_report'
 ]

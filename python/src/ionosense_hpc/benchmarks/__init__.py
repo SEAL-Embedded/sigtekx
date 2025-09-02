@@ -1,11 +1,11 @@
 """
-Ionosense-HPC Benchmarking Suite.
+Ionose H-Performance Computing (HPC) Benchmark Suite.
 
-This module provides a collection of scripts for performance, accuracy,
-and stability testing of the signal processing engine.
+This module provides a collection of standardized tests for evaluating the
+performance, accuracy, and stability of the signal processing engine.
 
-Each benchmark can be run as a standalone script or imported as a function.
-The main entry point for the full suite is the `suite` module.
+The benchmarks can be run individually or as a complete suite via the CLI:
+`python -m ionosense_hpc.benchmarks.suite`
 """
 
 from .accuracy import (
@@ -13,17 +13,11 @@ from .accuracy import (
     benchmark_window_accuracy,
     benchmark_numerical_stability,
 )
-from .latency import (
-    benchmark_latency,
-    benchmark_jitter,
-)
-from .throughput import (
-    benchmark_throughput,
-    benchmark_batch_scaling,
-)
+from .latency import benchmark_latency, benchmark_jitter
+from .throughput import benchmark_throughput, benchmark_batch_scaling
 from .suite import run_full_suite
 
-# __all__ defines the public API for the benchmarks module.
+# Define the public API for this module
 __all__ = [
     "benchmark_accuracy",
     "benchmark_window_accuracy",
@@ -34,3 +28,4 @@ __all__ = [
     "benchmark_batch_scaling",
     "run_full_suite",
 ]
+
