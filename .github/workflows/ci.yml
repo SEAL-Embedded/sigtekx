@@ -24,9 +24,9 @@ jobs:
         with:
           python-version: '3.11'
 
-      # 3. Install CUDA Toolkit using a dedicated Action
-      - name: Install CUDA Toolkit 13.0
-        uses: Jimver/cuda-toolkit@v0.2.11
+      # 3. Install CUDA Toolkit using the correct action version
+      - name: Install CUDA Toolkit 13.0.0
+        uses: Jimver/cuda-toolkit@v0.2.24
         id: cuda-toolkit
         with:
           cuda: '13.0.0'
