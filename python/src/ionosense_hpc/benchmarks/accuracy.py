@@ -137,10 +137,13 @@ def _generate_test_signal(spec: Dict[str, Any], config: EngineConfig) -> np.ndar
 
 def _compute_reference_fft(data: np.ndarray, config: EngineConfig) -> np.ndarray:
     data = data.reshape(config.batch, config.nfft)
+
     window = scipy_signal.windows.hann(config.nfft, sym=False)
     data_windowed = data * window
     fft_result = rfft(data_windowed, axis=1)
-    return np.abs(fft_result)
+    
+    fft_result_scaled = np.abs(fft_result) / config.nfft
+    return fft_result_scaled
 
 
 def _compare_spectra(gpu_output: np.ndarray, ref_output: np.ndarray, tolerance: float) -> Dict[str, Any]:
