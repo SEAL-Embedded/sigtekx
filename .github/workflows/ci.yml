@@ -31,16 +31,12 @@ jobs:
         with:
           cuda: '13.0.0'
 
-      # 4. Configure and Build with the run-cmake Action
-      - name: Configure and Build CMake Project
+      # 4. Configure and Build C++ using Presets
+      - name: Build C++ Tests
         uses: lukka/run-cmake@v10
         with:
-          # Tell CMake where to find your CMakeLists.txt (the root)
-          sourceDirectory: ${{ github.workspace }}
-          # Use a temporary directory for build files
-          buildDirectory: ${{ runner.temp }}/build
-          # Pass your custom options directly to CMake
-          cmakeOptions: "-DIONO_WITH_TESTS=OFF -DIONO_WITH_PYTHON=ON"
+          configurePreset: 'ci-linux'
+          buildPreset: 'ci-linux-build'
 
       # 5. Install Python dependencies
       - name: Install Python Dependencies

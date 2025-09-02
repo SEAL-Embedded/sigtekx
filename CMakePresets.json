@@ -68,12 +68,25 @@
     },
     {
       "name": "windows-vs",
+      "displayName": "Windows Visual Studio",
+      "description": "Windows release build with Visual Studio 2022",
       "generator": "Visual Studio 17 2022",
       "binaryDir": "${sourceDir}/build/windows-vs",
       "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
         "IONO_WITH_TESTS": "ON",
         "IONO_WITH_GRAPHS": "ON",
         "IONO_WITH_PYTHON": "ON"
+      }
+    },
+    {
+      "name": "ci-linux",
+      "inherits": "base",
+      "displayName": "CI Configure for Linux",
+      "description": "Builds the C++ tests, disables Python part for CI step.",
+      "cacheVariables": {
+        "IONO_WITH_TESTS": "ON",
+        "IONO_WITH_PYTHON": "OFF"
       }
     }
   ],
@@ -102,6 +115,11 @@
       "name": "windows-vs",
       "configurePreset": "windows-vs",
       "configuration": "Release"
+    },
+    {
+      "name": "ci-linux-build",
+      "configurePreset": "ci-linux",
+      "displayName": "Build for Linux CI"
     }
   ],
   "testPresets": [
@@ -124,17 +142,18 @@
     {
       "name": "linux-rel-workflow",
       "steps": [
-        { "type": "configure", "name": "linux-rel" },
-        { "type": "build",     "name": "linux-rel" },
-        { "type": "test",      "name": "linux-tests" }
-      ]
-    },
-    {
-      "name": "windows-rel-workflow",
-      "steps": [
-        { "type": "configure", "name": "windows-rel" },
-        { "type": "build",     "name": "windows-rel" },
-        { "type": "test",      "name": "windows-tests" }
+        {
+          "type": "configure",
+          "name": "linux-rel"
+        },
+        {
+          "type": "build",
+          "name": "linux-rel"
+        },
+        {
+          "type": "test",
+          "name": "linux-tests"
+        }
       ]
     }
   ]
