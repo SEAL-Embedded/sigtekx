@@ -16,7 +16,7 @@ dependencies:
   - cuda-compiler=13.0
   - cuda-libraries-dev=13.0
 
-  # Python stack
+  # Python stack - Core (existing)
   - numpy
   - pybind11
   - pytest
@@ -26,9 +26,21 @@ dependencies:
   - pandas
   - matplotlib
   - h5py
-  # Testing
+  
+  # Python stack - Added for API
+  - pydantic>=2.0
+  - pynvml
+  
+  # Testing (existing + additions)
   - pytest
   - pytest-xdist
-  # Dev Tools
+  - pytest-timeout
+  
+  # Dev Tools (existing + additions)
   - pre-commit
   - pip
+  - mypy
+  - ruff
+  - wheel
+  - build
+  - setuptools>=68

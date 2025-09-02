@@ -1,5 +1,7 @@
 ﻿# ============================================================================
 # ionosense-hpc-lib • Project CLI (Windows)
+# - Professional research-grade build & test orchestration
+# - Integrated Python API commands following RSE/RE standards
 # ============================================================================
 
 # --- Paths & Defaults --------------------------------------------------------
@@ -7,8 +9,10 @@ $ProjectRoot = (Get-Item -Path (Join-Path $PSScriptRoot "..")).FullName
 $BuildDir    = Join-Path $ProjectRoot "build"
 $PythonDir   = Join-Path $ProjectRoot "python"
 $BuildPreset = if ($env:BUILD_PRESET) { $env:BUILD_PRESET } else { "windows-rel" }
-$CondaEnvName = "ionosense-hpc" # Match environment.yml
-$CMakePresetsPath = Join-Path $ProjectRoot "CMakePresets.json"
+$CondaEnvName = "ionosense-hpc"
+$EnvironmentFile = Join-Path $ProjectRoot "environment.win.yml"
+$BenchResultsDir = Join-Path $BuildDir "benchmark_results"
+
 
 # --- Pretty logging ----------------------------------------------------------
 Function log     { param($Message) Write-Host "✅ [INFO] $Message" -ForegroundColor Cyan }
@@ -20,85 +24,93 @@ Function section { param($Message) Write-Host "`n💪 == $Message ==`n" -Foregro
 $ErrorActionPreference = 'Stop'
 
 # --- Helpers -----------------------------------------------------------------
-Function Get-WorkflowPresetFor {
-    param([string]$ConfigurePresetName)
+Function Ensure-EnvActivated {
+    if (-not $env:CONDA_PREFIX -or ($env:CONDA_DEFAULT_ENV -ne $CondaEnvName)) {
+        err "Conda environment '$CondaEnvName' is not activated."
+        log "Please run: conda activate $CondaEnvName"
+        exit 1
+    }
+}
+
+Function With-PythonPath {
+    param([scriptblock]$ScriptBlock)
+    $oldPath = $env:PYTHONPATH
+    # Ensure the src directory is on the path for local development imports
+    $env:PYTHONPATH = "$BuildDir\$BuildPreset;" + (Join-Path $PythonDir "src") + ";$env:PYTHONPATH"
     try {
-        if (-not (Test-Path $CMakePresetsPath)) { return $null }
-        $json = Get-Content -Raw $CMakePresetsPath | ConvertFrom-Json
-        if (-not $json.workflowPresets) { return $null }
-        foreach ($wf in $json.workflowPresets) {
-            foreach ($step in $wf.steps) {
-                if ($step.type -eq 'configure' -and $step.name -eq $ConfigurePresetName) {
-                    return $wf.name
-                }
-            }
-        }
-        return $null
-    } catch {
-        warn "Failed to parse workflow presets: $_"
-        return $null
+        & $ScriptBlock
+    } finally {
+        $env:PYTHONPATH = $oldPath
     }
 }
-
-Function Find-BenchmarkScript {
-    param([string]$Name)
-
-    $benchRoot = Join-Path $PythonDir "benchmarks"
-
-    # If caller passed a relative path like "fft/raw_throughput" or "fft\raw_throughput"
-    $norm = $Name -replace '/', '\'
-    if ($norm -match '\\') {
-        $candidate = Join-Path $benchRoot ($norm + ".py")
-        if (Test-Path $candidate -PathType Leaf) { return (Resolve-Path $candidate).Path }
-    }
-
-    # Otherwise search by filename only, recursively
-    $matches = Get-ChildItem -Path $benchRoot -Recurse -Filter "$Name.py" -File -ErrorAction SilentlyContinue
-    if (-not $matches) {
-        err "Benchmark script not found: ${Name}.py"
-        log "Use '.\scripts\cli.ps1 list benchmarks' to see available scripts."
-        exit 1
-    }
-    if ($matches.Count -gt 1) {
-        err "Ambiguous script name: '$Name'. Multiple matches found:"
-        $matches | ForEach-Object { Write-Host "  $($_.FullName)" }
-        exit 1
-    }
-    return $matches[0].FullName
-}
-
 
 # --- Core actions ------------------------------------------------------------
 Function cmd_setup {
-    section "Environment Setup (Mamba)"
+    section "Environment Setup (Windows/Mamba)"
+    Set-Location $ProjectRoot # Ensure we are in the correct directory
+
+    $solver = "mamba"
     if (-not (Get-Command mamba -ErrorAction SilentlyContinue)) {
-        err "Mamba not found. Please ensure Miniconda is installed and run 'conda install mamba -n base -c conda-forge'."
+        if (-not (Get-Command conda -ErrorAction SilentlyContinue)) {
+            err "Neither mamba nor conda found. Please install Miniforge3 or Miniconda."
+            exit 1
+        }
+        warn "mamba not found, using conda (slower). Install mamba: conda install mamba -n base -c conda-forge"
+        $solver = "conda"
+    }
+
+    $envExists = conda env list | Select-String -Quiet -Pattern "\b$CondaEnvName\b"
+    if ($envExists) {
+        log "Updating existing environment '$CondaEnvName' with $solver..."
+        & $solver env update --name $CondaEnvName --file $EnvironmentFile --prune
+    } else {
+        log "Creating new environment '$CondaEnvName' with $solver..."
+        log "This may take several minutes..."
+        & $solver env create --file $EnvironmentFile
+    }
+    if ($LASTEXITCODE -ne 0) {
+        err "Environment setup failed"
         exit 1
     }
-    log "Creating/Updating Conda environment '$CondaEnvName' with Mamba..."
-    log "This may take several minutes on the first run..."
-    # Use mamba for a faster, more robust solver
-    mamba env update --name $CondaEnvName --file (Join-Path $ProjectRoot "environment.win.yml") --prune
-    ok "Conda environment '$CondaEnvName' is ready."
-    log "Activate it with: conda activate $CondaEnvName"
+    
+    log "Installing ionosense-hpc Python package in development mode..."
+    conda run -n $CondaEnvName python -m pip install -e ".[dev,benchmark,export]"
+    if ($LASTEXITCODE -ne 0) {
+        err "Pip install failed. Ensure the conda environment is correct."
+        exit 1
+    }
+    
+    ok "Environment ready. Activate with: conda activate $CondaEnvName"
 }
 
 Function cmd_build {
     param([string]$Preset = $BuildPreset)
     section "Configuring & Building (preset: ${Preset})"
-
-    if (-not $env:CONDA_PREFIX -or ($env:CONDA_DEFAULT_ENV -ne $CondaEnvName)) {
-        err "Conda environment '$CondaEnvName' is not activated. Please run 'conda activate $CondaEnvName' first."
-        exit 1
-    }
-
-    # The VS Native Tools prompt guarantees cl.exe is on the PATH.
-    # The activated Conda env guarantees cmake and ninja are on the PATH.
-    # No special logic is needed.
+    Ensure-EnvActivated
+    
     cmake --preset $Preset
+    if ($LASTEXITCODE -ne 0) { 
+        err "Configuration failed"
+        exit 1 
+    }
+    
     cmake --build --preset $Preset --parallel --verbose
-
-    ok "Build finished -> $($BuildDir)\$($Preset)"
+    if ($LASTEXITCODE -ne 0) { 
+        err "Build failed"
+        exit 1 
+    }
+    
+    log "Verifying Python module..."
+    With-PythonPath {
+        python -c "import ionosense_hpc; print(f'Module loaded: v{ionosense_hpc.__version__}')"
+        if ($LASTEXITCODE -eq 0) {
+            ok "Python module verified"
+        } else {
+            warn "Python module import failed - check build output"
+        }
+    }
+    
+    ok "Build finished -> $BuildDir\$Preset"
 }
 
 Function cmd_rebuild {
@@ -109,58 +121,106 @@ Function cmd_rebuild {
         log "Removing $presetDir"
         Remove-Item -Path $presetDir -Recurse -Force
     }
-    # Call the updated build command without the venv-specific flag
     cmd_build -Preset $Preset
 }
 
 Function cmd_test {
     param([string]$Preset = $BuildPreset)
     section "Running All Tests"
-
+    Ensure-EnvActivated
+    
     log "Running C++ tests..."
-    # Correctly pass the preset name and the output flag as separate arguments
     $testPreset = $Preset.Replace('rel','tests').Replace('debug','tests')
     ctest --preset $testPreset --output-on-failure
-    ok "C++ tests (ctest) completed."
-
+    if ($LASTEXITCODE -ne 0) {
+        warn "Some C++ tests failed"
+    } else {
+        ok "C++ tests passed"
+    }
+    
     log "Running Python tests..."
-    pytest -v (Join-Path $ProjectRoot "python\tests") --tb=short
-    ok "Python tests completed."
+    With-PythonPath {
+        pytest -v (Join-Path $PythonDir "tests") --tb=short
+    }
+    if ($LASTEXITCODE -ne 0) {
+        warn "Some Python tests failed"
+    } else {
+        ok "Python tests passed"
+    }
+    
+    ok "All tests completed"
 }
 
 Function cmd_list {
     param([string[]]$ListArgs)
-    if ($ListArgs.Count -eq 0 -or $ListArgs[0] -ne "benchmarks") {
-        err "Usage: list benchmarks"
+    if ($ListArgs.Count -eq 0) {
+        err "Usage: list <benchmarks|presets|devices>"
         return
     }
-    section "Available Benchmarks"
-    $benchmarkDir = Join-Path $PythonDir "benchmarks"
-    Get-ChildItem -Path $benchmarkDir -Recurse -Filter "*.py" -File |
-        Where-Object { $_.Name -ne "__init__.py" } |
-        ForEach-Object {
-            ($_.FullName.Substring($benchmarkDir.Length + 1) -replace '\.py$','') -replace '\\','/'
-        } |
-        Sort-Object
+    
+    switch ($ListArgs[0]) {
+        "benchmarks" {
+            section "Available Benchmarks"
+            $benchmarkDir = Join-Path $PythonDir "src\ionosense_hpc\benchmarks"
+            Get-ChildItem -Path $benchmarkDir -Recurse -Filter "*.py" -File |
+                Where-Object { $_.Name -ne "__init__.py" } |
+                ForEach-Object {
+                    $_.Name -replace '\.py$',''
+                } |
+                Sort-Object
+        }
+        "presets" {
+            section "Available Configuration Presets"
+            With-PythonPath {
+                python -c "from ionosense_hpc import Presets; [print(f'  {n:12s}: nfft={c.nfft:5d}, batch={c.batch:3d}') for n, c in Presets.list_presets().items()]"
+            }
+        }
+        "devices" {
+            section "Available CUDA Devices"
+            With-PythonPath {
+                python -c "from ionosense_hpc import gpu_count, device_info; n=gpu_count(); print(f'Found {n} CUDA device(s)'); [print(f'  [{i}] {d['name']} - {d['memory_free_mb']}/{d['memory_total_mb']} MB free') for i in range(n) for d in [device_info(i)]]"
+            }
+        }
+        default {
+            err "Unknown list type: $($ListArgs[0])"
+        }
+    }
 }
-
 
 Function cmd_bench {
     param([string[]]$BenchArgs)
     if ($BenchArgs.Count -lt 1) {
-        err "Usage: bench <script_name|subpath> [args...]"
+        err "Usage: bench <script_name|suite> [args...]"
         return
     }
+    
+    Ensure-EnvActivated
+    New-Item -ItemType Directory -Force -Path $BenchResultsDir | Out-Null
+    
     $scriptName = $BenchArgs[0]
     $scriptArgs = if ($BenchArgs.Count -gt 1) { $BenchArgs[1..($BenchArgs.Length - 1)] } else { @() }
-
-    $scriptPath = Find-BenchmarkScript -Name $scriptName
-
-    section "Running Benchmark: $scriptName"
-    # Call 'python' directly, which will be resolved from the activated Conda env
-    & python $scriptPath $scriptArgs
+    
+    $moduleBase = "ionosense_hpc.benchmarks"
+    
+    if ($scriptName -eq "suite") {
+        section "Running Full Benchmark Suite"
+        $preset = if ($scriptArgs.Count -gt 0) { $scriptArgs[0] } else { "realtime" }
+        $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+        $outputDir = Join-Path $BenchResultsDir "${timestamp}_${preset}"
+        
+        With-PythonPath {
+            python -m $moduleBase.suite --preset $preset --output $outputDir --log-level INFO
+        }
+        
+        ok "Results saved to: $outputDir"
+    } else {
+        $moduleName = "$moduleBase.$scriptName"
+        section "Running Benchmark: $moduleName"
+        With-PythonPath {
+            & python -m $moduleName $scriptArgs
+        }
+    }
 }
-
 
 Function cmd_profile {
     param([string[]]$ProfileArgs)
@@ -168,81 +228,115 @@ Function cmd_profile {
         err "Usage: profile <nsys|ncu> <script_name|subpath> [args...]"
         return
     }
-    $tool       = $ProfileArgs[0]
+    
+    Ensure-EnvActivated
+    $tool = $ProfileArgs[0]
     $scriptName = $ProfileArgs[1]
     $scriptArgs = if ($ProfileArgs.Count -gt 2) { $ProfileArgs[2..($ProfileArgs.Length - 1)] } else { @() }
-
-    $scriptPath = Find-BenchmarkScript -Name $scriptName
-
-    $outDir  = Join-Path $BuildDir "profiles" $tool
-    New-Item -ItemType Directory -Force -Path $outDir | Out-Null
-    $outFile = Join-Path $outDir "$($scriptName -replace '[\\/]', '_')_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
-
-    section "Profiling ($tool): $scriptName"
-    switch ($tool) {
-        "nsys" {
-            # Call 'python' directly, which will be resolved from the activated Conda env
-            nsys profile -o "$outFile" --trace=cuda,nvtx -f true --wait=all python $scriptPath $scriptArgs
-            ok "Nsight Systems report saved to ${outFile}.nsys-rep"
-        }
-        "ncu" {
-            # Call 'python' directly, which will be resolved from the activated Conda env
-            ncu --set full --target-processes all -o "$outFile" python $scriptPath $scriptArgs
-            ok "Nsight Compute report saved to ${outFile}.ncu-rep"
-        }
-        default {
-            err "Unknown profiler: '$tool'. Use 'nsys' or 'ncu'."
+    
+    $moduleBase = "ionosense_hpc.benchmarks"
+    $moduleName = "$moduleBase.$scriptName"
+    
+    New-Item -ItemType Directory -Force -Path (Join-Path $BuildDir "nsight_reports/nsys_reports") -ErrorAction SilentlyContinue | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $BuildDir "nsight_reports/ncu_reports") -ErrorAction SilentlyContinue | Out-Null
+    
+    $timestamp = Get-Date -Format 'yyyyMMdd_HHmmss'
+    $outFile = "${scriptName}_${timestamp}" -replace '[\\/]', '_'
+    
+    section "Profiling ($tool): $moduleName"
+    
+    With-PythonPath {
+        switch ($tool) {
+            "nsys" {
+                $reportPath = Join-Path $BuildDir "nsight_reports/nsys_reports/$outFile"
+                nsys profile -o $reportPath --trace=cuda,nvtx,osrt -f true --wait=all python -m $moduleName $scriptArgs
+                ok "Nsight Systems report saved to ${reportPath}.nsys-rep"
+            }
+            "ncu" {
+                $reportPath = Join-Path $BuildDir "nsight_reports/ncu_reports/$outFile"
+                ncu --set full -o $reportPath python -m $moduleName $scriptArgs
+                ok "Nsight Compute report saved to ${reportPath}.ncu-rep"
+            }
+            default {
+                err "Unknown profiler: '$tool'. Use 'nsys' or 'ncu'."
+            }
         }
     }
 }
 
+Function cmd_validate {
+    section "Running Validation Suite"
+    Ensure-EnvActivated
+    
+    log "Running accuracy and stability validation..."
+    With-PythonPath {
+        python -c "from ionosense_hpc.benchmarks import benchmark_accuracy, benchmark_numerical_stability; import json; acc_results = benchmark_accuracy(); print(f""Accuracy: {acc_results['summary']['pass_rate']:.0%} tests passed""); stab_results = benchmark_numerical_stability(); print(f""Stability: {'PASS' if stab_results['all_stable'] else 'FAIL'}""); f_path = r'$BuildDir\validation_results.json'; [IO.File]::WriteAllText(f_path, (json.dumps({'accuracy': acc_results, 'stability': stab_results}, indent=2))); print(f""Results saved to: {f_path}"")"
+    }
+    ok "Validation complete"
+}
+
+Function cmd_monitor {
+    section "GPU Monitoring"
+    Ensure-EnvActivated
+    
+    log "Starting GPU monitor (Ctrl+C to stop)..."
+    With-PythonPath {
+        python -c "import time, os; from ionosense_hpc import monitor_device; try: [ (os.system('cls' if os.name == 'nt' else 'clear'), print('=== GPU Monitor ==='), print(monitor_device()), time.sleep(1)) for _ in iter(int, 1)]; except KeyboardInterrupt: print('\nDone.')"
+    }
+}
+
+Function cmd_info {
+    section "System Information"
+    Ensure-EnvActivated
+    
+    With-PythonPath {
+        python -c "from ionosense_hpc import show_versions; print('=== Environment ==='); show_versions(verbose=True)"
+    }
+}
 
 Function cmd_clean {
     section "Cleaning Workspace"
     
-    # Remove the main build directory
     if (Test-Path $BuildDir) {
         log "Removing build directory: $BuildDir"
         Remove-Item -Path $BuildDir -Recurse -Force -ErrorAction SilentlyContinue
     }
     
-    # Remove the old virtual environment directory
-    $OldVenvDir = Join-Path $ProjectRoot ".venv"
-    if (Test-Path $OldVenvDir) {
-        log "Removing old .venv directory: $OldVenvDir"
-        Remove-Item -Path $OldVenvDir -Recurse -Force -ErrorAction SilentlyContinue
-    }
-
-    # Remove Python cache files and directories
-    Get-ChildItem -Path $ProjectRoot -Include __pycache__,.pytest_cache -Directory -Recurse -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-    Get-ChildItem -Path $ProjectRoot -Include *.pyc -File -Recurse -Force | Remove-Item -Force -ErrorAction SilentlyContinue
+    log "Cleaning Python artifacts..."
+    Get-ChildItem -Path $ProjectRoot -Include __pycache__,.pytest_cache,*.egg-info -Directory -Recurse -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+    Get-ChildItem -Path $ProjectRoot -Include *.pyc,*.pyo -File -Recurse -Force | Remove-Item -Force -ErrorAction SilentlyContinue
     
-    ok "Workspace cleaned."
+    ok "Workspace cleaned"
 }
 
 Function Show-Usage {
     Write-Host @"
-IONOSENSE-HPC • Scalable Project CLI (Windows)
-Usage: ./scripts/cli.ps1 <command> [options]
+IONOSENSE-HPC • Research-Grade Signal Processing CLI (Windows)
+Usage: .\scripts\cli.ps1 <command> [options]
 
 CORE WORKFLOW
-  setup                    Initialize Python venv and install dependencies
-  build [preset]           Configure & build (default: $($BuildPreset))
-  rebuild [preset]         Clean and rebuild
-  test [preset]            Use workflow (configure+build+ctest) if available, then pytest
+  setup                      Create/update environment & install Python package
+  build [preset]             Configure & build (default: $BuildPreset)
+  rebuild [preset]           Clean & rebuild
+  test [preset]              Run C++ & Python tests
 
 BENCHMARKING & PROFILING
-  list benchmarks          Discover and list all available benchmark scripts
-  bench <name> [args...]   Run a benchmark by its name (without .py)
-  profile <tool> <name>    Profile a benchmark with 'nsys' or 'ncu'
+  list <type>                List available items (benchmarks, presets, devices)
+  bench suite [preset]       Run full benchmark suite with report
+  bench <name> [args...]     Run specific benchmark
+  profile <tool> <name>      Profile with Nsight Systems (nsys) or Compute (ncu)
+  validate                   Run numerical validation suite
 
 UTILITIES
-  clean                    Remove all build and cache files
+  monitor                    Real-time GPU monitoring
+  info                       Show system & build information
+  clean                      Remove all build outputs & caches
 
 EXAMPLES
+  .\scripts\cli.ps1 setup
+  .\scripts\cli.ps1 build
   .\scripts\cli.ps1 test
-  .\scripts\cli.ps1 build windows-rel
-  .\scripts\cli.ps1 bench raw_throughput -n 4096
+  .\scripts\cli.ps1 bench suite
 "@
 }
 
@@ -252,17 +346,32 @@ $CommandArgs = if ($Args.Count -gt 1) { $Args[1..($Args.Length - 1)] } else { @(
 
 Set-Location $ProjectRoot
 
+# REVISED: Corrected the logic for handling optional command-line arguments.
+# This replaces the invalid "-if" syntax with standard PowerShell conditionals.
 switch ($Command) {
     "help"      { Show-Usage }
     "-h"        { Show-Usage }
     "--help"    { Show-Usage }
     "setup"     { cmd_setup }
-    "build"     { if ($CommandArgs.Count -gt 0) { cmd_build   -Preset $CommandArgs[0] } else { cmd_build } }
-    "rebuild"   { if ($CommandArgs.Count -gt 0) { cmd_rebuild -Preset $CommandArgs[0] } else { cmd_rebuild } }
-    "test"      { if ($CommandArgs.Count -gt 0) { cmd_test    -Preset $CommandArgs[0] } else { cmd_test } }
+    "build"     { 
+        $preset = if ($CommandArgs.Count -gt 0) { $CommandArgs[0] } else { $BuildPreset }
+        cmd_build -Preset $preset
+    }
+    "rebuild"   { 
+        $preset = if ($CommandArgs.Count -gt 0) { $CommandArgs[0] } else { $BuildPreset }
+        cmd_rebuild -Preset $preset
+    }
+    "test"      { 
+        $preset = if ($CommandArgs.Count -gt 0) { $CommandArgs[0] } else { $BuildPreset }
+        cmd_test -Preset $preset
+    }
     "clean"     { cmd_clean }
-    "list"      { cmd_list    -ListArgs    $CommandArgs }
-    "bench"     { cmd_bench   -BenchArgs   $CommandArgs }
+    "list"      { cmd_list -ListArgs $CommandArgs }
+    "bench"     { cmd_bench -BenchArgs $CommandArgs }
     "profile"   { cmd_profile -ProfileArgs $CommandArgs }
+    "validate"  { cmd_validate }
+    "monitor"   { cmd_monitor }
+    "info"      { cmd_info }
     default     { err "Unknown command: $Command"; Show-Usage; exit 1 }
 }
+

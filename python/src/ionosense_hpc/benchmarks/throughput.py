@@ -1,80 +1,105 @@
-"""
-ionosense_hpc.benchmarks.throughput
------------------------------------
-Benchmark for measuring the maximum sustainable throughput of the engine.
-
-This test focuses on how many FFTs can be processed per second when the
-pipeline is kept fully saturated with work, leveraging asynchronous execution
-and multiple CUDA streams.
-"""
-from __future__ import annotations
+"""Throughput benchmarking for sustained processing performance."""
 
 import time
+import json
+import argparse
+from typing import Dict, Any, Optional
+
 import numpy as np
 
-from .base import BenchmarkBase
-from ..core.pipelines import Pipeline, PipelineBuilder
-from ..core.config import FFTConfig
-from ..utils.console import safe_print
+from ..core import Processor
+from ..config import EngineConfig, Presets
+from ..utils import make_test_batch, logger, get_memory_usage
 
-class ThroughputBenchmark(BenchmarkBase):
-    """
-    Measures maximum sustainable FFTs/second using an asynchronous pipeline.
-    """
 
-    def run_single(self, fft_size: int, batch_size: int) -> dict:
-        """
-        Runs a throughput test for a single configuration.
+def benchmark_throughput(
+    config: Optional[EngineConfig] = None,
+    duration_seconds: float = 10.0
+) -> Dict[str, Any]:
+    """Benchmark sustained throughput performance."""
+    if config is None:
+        config = Presets.throughput()
 
-        Args:
-            fft_size: The FFT length to test.
-            batch_size: The number of simultaneous signals to test.
+    samples_per_batch = config.nfft * config.batch
+    bytes_per_batch = samples_per_batch * 4  # float32
 
-        Returns:
-            A dictionary containing throughput metrics.
-        """
-        if self.config.verbose:
-            safe_print(f"  Measuring throughput: FFT Size={fft_size}, Batch Size={batch_size}")
-
-        # 1. Build a pipeline configured for maximum throughput
-        fft_config = FFTConfig(nfft=fft_size, batch_size=batch_size)
-        builder = PipelineBuilder()
-        builder.with_fft(fft_config.nfft, fft_config.batch_size)
-        builder.with_streams(self.config.num_streams)
-        builder.with_graphs(self.config.use_graphs)
-        pipeline = builder.build()
-        pipeline.prepare()
-
-        # 2. Prepare dummy data for all streams to keep the GPU busy
-        for i in range(self.config.num_streams):
-            input_buffer = pipeline.get_input_buffer(i)
-            input_buffer[:] = np.random.randn(*input_buffer.shape).astype(np.float32)
-
-        # 3. Warmup phase
-        for i in range(self.config.warmup_iterations):
-            pipeline.execute(stream_idx=i % self.config.num_streams)
-        pipeline.sync_all()
-
-        # 4. Measurement loop
+    logger.info(f"Starting throughput benchmark: {duration_seconds} seconds")
+    
+    test_batches = [make_test_batch(config.nfft, config.batch, signal_type='noise', seed=i) for i in range(10)]
+    
+    with Processor(config) as proc:
         start_time = time.perf_counter()
-        for i in range(self.config.num_iterations):
-            # This is a fire-and-forget loop, relying on the C++ engine's
-            # internal stream synchronization to manage the pipeline.
-            pipeline.execute(stream_idx=i % self.config.num_streams)
+        frames_processed = 0
+        while (time.perf_counter() - start_time) < duration_seconds:
+            _ = proc.process(test_batches[frames_processed % 10])
+            frames_processed += 1
+        elapsed_seconds = time.perf_counter() - start_time
 
-        # 5. Final synchronization to ensure all work is complete
-        pipeline.sync_all()
-        end_time = time.perf_counter()
-
-        # 6. Calculate and return metrics
-        elapsed_seconds = end_time - start_time
-        total_ffts = self.config.num_iterations * batch_size
-        ffts_per_second = total_ffts / elapsed_seconds if elapsed_seconds > 0 else 0
-        gbytes_per_second = (total_ffts * fft_size * 4 * 2) / elapsed_seconds / 1e9 # Input+Output
-
-        return {
-            "total_ffts": total_ffts,
-            "elapsed_seconds": elapsed_seconds,
-            "ffts_per_second": ffts_per_second,
-            "gbytes_per_second": gbytes_per_second,
+    gb_processed = (frames_processed * bytes_per_batch) / (1024 ** 3)
+    
+    results = {
+        'config': { 'nfft': config.nfft, 'batch': config.batch },
+        'runtime': { 'elapsed_seconds': elapsed_seconds, 'frames_processed': frames_processed },
+        'throughput': {
+            'frames_per_second': frames_processed / elapsed_seconds,
+            'gb_per_second': gb_processed / elapsed_seconds,
         }
+    }
+    return results
+
+def benchmark_batch_scaling(
+    nfft: int = 2048,
+    batch_sizes: Optional[list] = None,
+) -> Dict[str, Any]:
+    """Benchmark performance scaling with batch size."""
+    if batch_sizes is None:
+        batch_sizes = [1, 2, 4, 8, 16, 32]
+    
+    logger.info(f"Starting batch scaling benchmark: nfft={nfft}")
+    
+    results = { 'nfft': nfft, 'batch_sizes': batch_sizes, 'throughput': [], 'efficiency': [] }
+    baseline_throughput = None
+
+    for batch in batch_sizes:
+        config = EngineConfig(nfft=nfft, batch=batch)
+        test_data = make_test_batch(nfft, batch, seed=42)
+        with Processor(config) as proc:
+            start_time = time.perf_counter()
+            # A fixed number of iterations for a stable measurement
+            n_iter = max(10, 1000 // batch) 
+            for _ in range(n_iter):
+                _ = proc.process(test_data)
+            elapsed = time.perf_counter() - start_time
+        
+        throughput = (nfft * batch * n_iter) / elapsed
+        results['throughput'].append(throughput)
+        
+        if baseline_throughput is None:
+            baseline_throughput = throughput / batch
+            efficiency = 100.0
+        else:
+            efficiency = (throughput / (baseline_throughput * batch)) * 100
+        results['efficiency'].append(efficiency)
+
+    return results
+
+# --- SCRIPT ENTRY POINT ---
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run throughput benchmarks.")
+    parser.add_argument("-d", "--duration", type=float, default=10.0, help="Duration in seconds for throughput test.")
+    parser.add_argument("--preset", type=str, default="throughput", help="Configuration preset to use.")
+    args = parser.parse_args()
+
+    try:
+        config = getattr(Presets, args.preset)()
+    except AttributeError:
+        print(f"Error: Preset '{args.preset}' not found.")
+        exit(1)
+
+    print("--- Running Throughput Benchmark ---")
+    throughput_results = benchmark_throughput(config, duration_seconds=args.duration)
+    print(json.dumps(throughput_results, indent=2))
+
+    print("\n--- Running Batch Scaling Benchmark ---")
+    scaling_results = benchmark_batch_scaling(nfft=config.nfft)
+    print(json.dumps(scaling_results, indent=2))
