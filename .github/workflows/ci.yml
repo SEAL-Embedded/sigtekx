@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Check out your repository code
+      # 1. Check out repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -24,28 +24,31 @@ jobs:
         with:
           python-version: '3.11'
 
-      # 3. Install CUDA Toolkit 13.0.0
+      # 3. Install build-time Python dependencies
+      - name: Install Build Dependencies
+        run: pip install pybind11
+
+      # 4. Install CUDA Toolkit 13.0.0
       - name: Install CUDA Toolkit
         uses: Jimver/cuda-toolkit@v0.2.27 # need v0.2.27 or later for CUDA 13 support
-        id: cuda-toolkit
         with:
           cuda: '13.0.0'
 
-      # 4. Configure and Build C++ using Presets
+      # 5. Configure and Build C++ using Presets
       - name: Build C++ Tests
         uses: lukka/run-cmake@v10
         with:
           configurePreset: 'ci-linux'
           buildPreset: 'ci-linux-build'
 
-      # 5. Install Python dependencies
+      # 6. Install Python runtime dependencies
       - name: Install Python Dependencies
         run: pip install .[dev]
 
-      # 6. Run linter
+      # 7. Run linter
       - name: Run Ruff Linter
         run: ruff check python/src python/tests
 
-      # 7. Run Python unit tests (excluding GPU tests)
+      # 8. Run Python unit tests (excluding GPU tests)
       - name: Run Pytest (CPU-only)
         run: pytest -m "not gpu"
