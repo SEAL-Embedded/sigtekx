@@ -12,6 +12,11 @@ Testing Strategy: GPU-First
 
 import pytest
 
+# Make the fixtures from the testing module available to all tests
+pytest_plugins = [
+   "ionosense_hpc.testing.fixtures"
+]
+
 def pytest_addoption(parser):
     """Adds the --no-gpu command-line option to Pytest."""
     parser.addoption(

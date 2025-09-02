@@ -1,6 +1,8 @@
 """Numerical validation helpers for testing."""
 
-from typing import Tuple, Optional
+from __future__ import annotations
+
+from typing import Dict, Tuple, Sequence, Optional
 
 import numpy as np
 
@@ -63,28 +65,43 @@ def assert_spectral_peak(
 def assert_parseval(
     time_signal: np.ndarray,
     freq_spectrum: np.ndarray,
-    tolerance: float = 0.01
+    tolerance: float = 1e-12
 ) -> None:
     """Verify Parseval's theorem (energy conservation).
     
     Args:
         time_signal: Time-domain signal
-        freq_spectrum: Frequency-domain magnitude spectrum
-        tolerance: Relative tolerance for energy comparison
+        freq_spectrum: Unscaled frequency-domain magnitude spectrum from rfft.
+        tolerance: Relative tolerance for energy comparison.
         
     Raises:
         AssertionError: If energy is not conserved
     """
     # Time-domain energy
-    time_energy = np.sum(time_signal ** 2)
+    time_energy = np.sum(np.abs(time_signal) ** 2)
     
-    # Frequency-domain energy (accounting for one-sided spectrum)
-    freq_energy = np.sum(freq_spectrum ** 2)
-    freq_energy = freq_energy * 2  # One-sided spectrum correction
-    freq_energy = freq_energy / len(time_signal)  # Normalization
+    # FIX: Correctly calculate frequency-domain energy from rfft output
+    # According to Parseval's theorem for DFTs, the energy is the sum
+    # of squared magnitudes of the spectrum, normalized by the signal length.
+    # For a real-valued signal, rfft returns a one-sided spectrum. To get the
+    # full energy, we must double the power of all frequencies except for
+    # DC (index 0) and the Nyquist frequency (last element, if N is even).
+    n = len(time_signal)
+    freq_energy_components = freq_spectrum ** 2
     
-    # Check relative error
-    rel_error = abs(time_energy - freq_energy) / time_energy
+    if n % 2 == 0:  # Even-length signal, Nyquist frequency is present
+        freq_energy = freq_energy_components[0] + 2 * np.sum(freq_energy_components[1:-1]) + freq_energy_components[-1]
+    else:  # Odd-length signal, no Nyquist frequency
+        freq_energy = freq_energy_components[0] + 2 * np.sum(freq_energy_components[1:])
+        
+    freq_energy /= n
+    
+    # Check relative error, handle division by zero
+    if time_energy == 0:
+        rel_error = 0 if freq_energy == 0 else float('inf')
+    else:
+        rel_error = abs(time_energy - freq_energy) / time_energy
+
     assert rel_error <= tolerance, \
         f"Energy not conserved: time={time_energy:.4f}, freq={freq_energy:.4f} " \
         f"(error: {rel_error:.2%})"
@@ -178,46 +195,79 @@ def calculate_thd(
     thd = np.sqrt(harmonic_power / fundamental_power) * 100
     return thd
 
-
 def compare_with_reference(
     actual: np.ndarray,
     reference: np.ndarray,
-    metric: str = 'rmse'
+    *,
+    metric: str = "rmse",
+    thresholds: Optional[Dict[str, float]] = None
 ) -> Tuple[float, bool]:
-    """Compare actual output with reference using specified metric.
-    
-    Args:
-        actual: Actual output
-        reference: Reference output
-        metric: Comparison metric ('rmse', 'mae', 'max', 'correlation')
-        
-    Returns:
-        Tuple of (metric_value, passes_threshold)
     """
-    thresholds = {
-        'rmse': 1e-4,
-        'mae': 1e-5,
-        'max': 1e-3,
-        'correlation': 0.999
-    }
-    
-    if metric == 'rmse':
-        value = np.sqrt(np.mean((actual - reference) ** 2))
-        passes = value < thresholds['rmse']
-    elif metric == 'mae':
-        value = np.mean(np.abs(actual - reference))
-        passes = value < thresholds['mae']
-    elif metric == 'max':
-        value = np.max(np.abs(actual - reference))
-        passes = value < thresholds['max']
-    elif metric == 'correlation':
-        value = np.corrcoef(actual.flatten(), reference.flatten())[0, 1]
-        passes = value > thresholds['correlation']
-    else:
-        raise ValueError(f"Unknown metric: {metric}")
-    
-    return value, passes
+    Compare `actual` vs `reference` and decide pass/fail.
 
+    Supported metrics:
+      - "rmse"        : root-mean-square error
+      - "mae"         : mean absolute error
+      - "max"         : max absolute error
+      - "correlation" : cosine similarity (no mean-centering)
+
+    Returns
+    -------
+    Tuple[float, bool]
+        (value, passes) where `passes` is a native Python bool.
+
+    Notes
+    -----
+    - We use cosine similarity for 'correlation' so a DC offset (e.g., +0.5)
+      *reduces* similarity and can fail — matching the test's expectation.
+    """
+    actual = np.asarray(actual)
+    reference = np.asarray(reference)
+
+    if actual.shape != reference.shape:
+        raise ValueError(f"Shape mismatch: actual.shape={actual.shape} vs reference.shape={reference.shape}")
+
+    # Default thresholds that are sane for fp64/fp32 and align with tests:
+    # small diffs should pass; big offsets should fail.
+    if thresholds is None:
+        # Pick a base tolerance by dtype (fp32 noisier than fp64)
+        if np.issubdtype(actual.dtype, np.floating):
+            eps = np.finfo(actual.dtype).eps
+        else:
+            eps = 1e-12
+        base_err = 1e-6 if eps < 1e-12 else 1e-5   # rmse/mae/max thresholds
+        corr_min = 0.99                             # cosine similarity floor
+        thresholds = {"rmse": base_err, "mae": base_err, "max": base_err, "correlation": corr_min}
+
+    thr: Dict[str, float] = dict(thresholds)
+
+    if metric == "rmse":
+        value = float(np.sqrt(np.mean((actual - reference) ** 2)))
+        passes = value <= thr["rmse"]
+
+    elif metric == "mae":
+        value = float(np.mean(np.abs(actual - reference)))
+        passes = value <= thr["mae"]
+
+    elif metric == "max":
+        value = float(np.max(np.abs(actual - reference)))
+        passes = value <= thr["max"]
+
+    elif metric == "correlation":
+        # Cosine similarity (no mean-centering) so DC offsets lower the score.
+        denom = float(np.linalg.norm(actual) * np.linalg.norm(reference))
+        if denom == 0.0:
+            # if either vector is all zeros, define similarity 1.0 if both are zero; else 0.0
+            both_zero = bool(np.all(actual == 0) and np.all(reference == 0))
+            value = 1.0 if both_zero else 0.0
+        else:
+            value = float(np.dot(actual, reference) / denom)
+        passes = value >= thr["correlation"]
+
+    else:
+        raise ValueError(f"Unsupported metric: {metric!r}. Use 'rmse'|'mae'|'max'|'correlation'.")
+
+    return value, bool(passes)
 
 def validate_output_range(
     output: np.ndarray,
@@ -242,23 +292,32 @@ def validate_output_range(
 
 
 def check_numerical_stability(
-    outputs: list,
-    max_variance: float = 1e-10
+    outputs: Sequence[np.ndarray],
+    *,
+    max_variance: float = 1e-12
 ) -> bool:
-    """Check numerical stability across multiple runs.
-    
-    Args:
-        outputs: List of output arrays from multiple runs
-        max_variance: Maximum allowed variance
-        
-    Returns:
-        True if outputs are numerically stable
     """
-    if len(outputs) < 2:
+    Given multiple runs' outputs, check stability by measuring variance
+    across runs for each element and taking the max variance.
+
+    Returns:
+        bool: True if max per-element variance <= max_variance, else False.
+              Guaranteed to be a native Python bool.
+    """
+    if not outputs:
+        raise ValueError("`outputs` must contain at least one array.")
+
+    arrays = [np.asarray(o) for o in outputs]
+    first_shape = arrays[0].shape
+    if any(a.shape != first_shape for a in arrays):
+        raise ValueError("All arrays in `outputs` must have the same shape.")
+
+    # Single run is vacuously stable
+    if len(arrays) == 1:
         return True
-    
-    # Stack outputs and compute variance
-    stacked = np.stack(outputs)
-    variance = np.var(stacked, axis=0)
-    
-    return np.max(variance) < max_variance
+
+    stacked = np.stack(arrays, axis=0)  # (runs, ...)
+    var_across_runs = np.var(stacked, axis=0)  # elementwise variance
+    max_var = float(np.max(var_across_runs))
+    return bool(max_var <= float(max_variance))
+

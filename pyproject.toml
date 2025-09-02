@@ -196,7 +196,7 @@ omit = [
 ]
 
 [tool.coverage.report]
-fail_under = 55  # Enforce a minimum coverage of 55% for now
+fail_under = 85  # Enforce a minimum coverage of 85%
 show_missing = true
 skip_covered = true
 exclude_lines = [
