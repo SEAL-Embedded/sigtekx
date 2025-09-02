@@ -2,13 +2,10 @@ name: ionosense-hpc
 channels:
   - nvidia
   - conda-forge
-  - defaults
 channel_priority: strict
 dependencies:
-  # Core language
+  # Core
   - python=3.11
-
-  # Build tools
   - cmake>=3.26
   - ninja
   - gxx_linux-64=14.*
@@ -20,9 +17,31 @@ dependencies:
   # C++ testing
   - gtest
 
-  # Python stack
+  # Python stack - Core
   - numpy
   - pybind11
-  - pytest
   - tqdm
   - colorama
+  - scipy
+  - pandas
+  - matplotlib
+  - jupyterlab
+  - h5py
+  
+  # Python stack - API
+  - pydantic>=2.0
+  - pynvml
+  
+  # Testing
+  - pytest
+  - pytest-xdist
+  - pytest-timeout
+  
+  # Dev Tools
+  - pre-commit
+  - pip
+  - mypy
+  - ruff
+  - wheel
+  - build
+  - setuptools>=68
