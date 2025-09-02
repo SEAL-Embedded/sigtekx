@@ -5,6 +5,7 @@ signal processing engine optimized for real-time dual-channel FFT processing
 with <200μs latency targets.
 """
 
+import contextlib
 import os
 import platform
 import sys
@@ -20,7 +21,7 @@ from .__version__ import __version__, __version_info__
 
 def _bootstrap_windows_dlls():
     """Load required Windows DLLs before importing the extension module.
-    
+
     This function must run before any attempt to import _engine.
     It adds the DLL directory to the search path on Windows.
     """
@@ -55,10 +56,8 @@ def _bootstrap_windows_dlls():
 
     for cuda_path in cuda_paths:
         if Path(cuda_path).exists():
-            try:
+            with contextlib.suppress(AttributeError, OSError):
                 os.add_dll_directory(cuda_path)
-            except (AttributeError, OSError):
-                pass
             break
 
 
@@ -115,7 +114,8 @@ except (ImportError, DllLoadError) as e:
 
     warnings.warn(
         f"C++ engine module could not be loaded: {_ENGINE_ERROR}",
-        ImportWarning
+        ImportWarning,
+        stacklevel=2,
     )
 
 
@@ -162,10 +162,10 @@ __all__ = [
 
 def show_versions(verbose: bool = True) -> dict:
     """Show version information for ionosense-hpc and dependencies.
-    
+
     Args:
         verbose: If True, print to console
-        
+
     Returns:
         Dictionary with version information
     """
@@ -212,10 +212,10 @@ def show_versions(verbose: bool = True) -> dict:
 
 def self_test(verbose: bool = True) -> bool:
     """Run a quick self-test to verify installation.
-    
+
     Args:
         verbose: If True, print progress
-        
+
     Returns:
         True if all tests pass
     """
@@ -325,7 +325,8 @@ try:
     if _ENGINE_AVAILABLE and gpu_count() == 0:
         warnings.warn(
             "No CUDA-capable GPU detected. The engine may not function correctly.",
-            RuntimeWarning
+            RuntimeWarning,
+            stacklevel=2,
         )
 except Exception:
     pass  # Suppress errors during import

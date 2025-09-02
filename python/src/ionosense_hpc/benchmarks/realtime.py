@@ -13,22 +13,22 @@ from typing import Any
 import numpy as np
 from tqdm import tqdm
 
-from ..config import EngineConfig, Presets
-from ..core import Processor
-from ..utils.logging import logger, setup_logging
-from ..utils.profiling import nvtx_range
-from ..utils.reporting import print_latency_report
-from ..utils.signals import make_test_batch
+from ionosense_hpc.config import EngineConfig, Presets
+from ionosense_hpc.core import Processor
+from ionosense_hpc.utils.logging import logger, setup_logging
+from ionosense_hpc.utils.profiling import nvtx_range
+from ionosense_hpc.utils.reporting import print_latency_report
+from ionosense_hpc.utils.signals import make_test_batch
 
 
 def benchmark_realtime(config: EngineConfig, duration_seconds: float) -> dict[str, Any]:
     """
     Runs a real-time benchmark with pacing to simulate a real-world stream.
-    
+
     Args:
         config: The engine configuration.
         duration_seconds: The duration of the simulation in seconds.
-        
+
     Returns:
         A dictionary containing benchmark results.
     """

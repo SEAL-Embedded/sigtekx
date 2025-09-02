@@ -7,9 +7,9 @@ import numpy as np
 from scipy import signal as scipy_signal
 from scipy.fft import rfft
 
-from ..config import EngineConfig, Presets
-from ..core import Processor
-from ..utils import logger, make_multitone, make_sine
+from ionosense_hpc.config import EngineConfig, Presets
+from ionosense_hpc.core import Processor
+from ionosense_hpc.utils import logger, make_multitone, make_sine
 
 
 def benchmark_accuracy(

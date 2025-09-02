@@ -7,11 +7,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from ..config import Presets
-from ..utils import device_info, logger, setup_logging
-from .accuracy import benchmark_accuracy
-from .latency import benchmark_jitter, benchmark_latency
-from .throughput import benchmark_batch_scaling, benchmark_throughput
+from ionosense_hpc.benchmarks.accuracy import benchmark_accuracy
+from ionosense_hpc.benchmarks.latency import benchmark_jitter, benchmark_latency
+from ionosense_hpc.benchmarks.throughput import benchmark_batch_scaling, benchmark_throughput
+from ionosense_hpc.config import Presets
+from ionosense_hpc.utils import device_info, logger, setup_logging
 
 
 def run_full_suite(

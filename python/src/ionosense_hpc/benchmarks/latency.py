@@ -6,9 +6,9 @@ from typing import Any
 
 import numpy as np
 
-from ..config import EngineConfig, Presets
-from ..core import Processor
-from ..utils import logger, make_test_batch
+from ionosense_hpc.config import EngineConfig, Presets
+from ionosense_hpc.core import Processor
+from ionosense_hpc.utils import logger, make_test_batch
 
 
 def benchmark_latency(
@@ -19,14 +19,14 @@ def benchmark_latency(
     report_percentiles: bool = True
 ) -> dict[str, Any]:
     """Benchmark per-frame processing latency.
-    
+
     Args:
         config: Engine configuration (None for realtime preset)
         n_iterations: Number of benchmark iterations
         warmup_iterations: Additional warmup iterations
         signal_type: Type of test signal
         report_percentiles: Include percentile statistics
-        
+
     Returns:
         Dictionary with latency statistics
     """

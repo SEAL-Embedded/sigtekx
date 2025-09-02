@@ -6,9 +6,9 @@ from typing import Any
 
 import numpy as np
 
-from ..config import EngineConfig, Presets
-from ..core import Processor
-from ..utils import get_memory_usage, logger, make_test_batch
+from ionosense_hpc.config import EngineConfig, Presets
+from ionosense_hpc.core import Processor
+from ionosense_hpc.utils import get_memory_usage, logger, make_test_batch
 
 
 def benchmark_throughput(
@@ -18,13 +18,13 @@ def benchmark_throughput(
     report_memory: bool = True
 ) -> dict[str, Any]:
     """Benchmark sustained throughput performance.
-    
+
     Args:
         config: Engine configuration (None for throughput preset)
         duration_seconds: Test duration if data_size_mb not specified
         data_size_mb: Total data to process in MB (overrides duration)
         report_memory: Include memory usage statistics
-        
+
     Returns:
         Dictionary with throughput metrics
     """
@@ -109,12 +109,12 @@ def benchmark_batch_scaling(
     n_iterations: int = 100
 ) -> dict[str, Any]:
     """Benchmark performance scaling with batch size.
-    
+
     Args:
         nfft: FFT size to test
         batch_sizes: List of batch sizes to test
         n_iterations: Iterations per batch size
-        
+
     Returns:
         Dictionary with scaling analysis
     """
