@@ -1,298 +1,199 @@
-# Python Bindings Layer
+# Python Bindings for Ionosense HPC Library
 
-Pybind11 interface exposing the C++ FFT engine to Python with zero-copy buffer access.
+## Overview
 
-## Architecture Overview
+This directory contains the pybind11 bindings that expose the C++ CUDA FFT engine to Python, enabling seamless integration with scientific Python workflows including NumPy, pandas, and visualization libraries.
 
-```
-Python numpy.ndarray
-        ↓
-py::array_t (pybind11 wrapper)
-        ↓
-Pinned Memory (zero-copy view)
-        ↓
-CUDA Operations (async)
-```
+## Architecture
 
-## Key Design Decisions
+The Python bindings follow a dual-layer design:
 
-### Zero-Copy Buffer Strategy
+1. **Direct C++ Bindings**: Low-level pybind11 wrappers for core C++ classes
+2. **Python-Friendly Wrapper**: `PyResearchEngine` class that handles NumPy array conversions and provides Pythonic interfaces
 
-Traditional approach (SLOW):
-```cpp
-// Copies data - avoid this
-.def("get_output", [](Engine& self) {
-    std::vector<float> data = self.get_output();
-    return py::array_t<float>(data.size(), data.data());
-});
-```
+### Key Design Decisions
 
-Our approach (FAST):
-```cpp
-// Zero-copy view into pinned memory
-.def("pinned_output", [](RtFftEngine &self, int stream_idx) {
-    float* ptr = self.pinned_output(stream_idx);  // Direct pointer
-    return py::array_t<float>(make_buf(ptr, rows, cols));  // View, not copy
-})
-```
+- **Zero-Copy Data Transfer**: Where possible, NumPy arrays are accessed directly without copying
+- **Exception Safety**: C++ exceptions are properly translated to Python exceptions
+- **Memory Management**: RAII principles ensure proper cleanup of CUDA resources
+- **Type Safety**: Strong typing with automatic NumPy dtype validation
 
-### Buffer Info Helper
+## Files
 
-```cpp
-static inline py::buffer_info make_buf(float* ptr, int rows, int cols) {
-    return py::buffer_info(
-        ptr,                                     // Pointer to buffer
-        sizeof(float),                           // Size of one element
-        py::format_descriptor<float>::format(), // Python format code ('f')
-        2,                                       // Number of dimensions
-        { rows, cols },                          // Shape (batch, bins)
-        { sizeof(float) * cols,                 // Strides (row-major)
-          sizeof(float) }
-    );
-}
-```
+### `bindings.cpp`
+Main pybind11 module definition exposing:
 
-## Binding Structure
+- `ResearchEngine` - Main processing engine wrapper
+- `EngineConfig` - Engine configuration parameters  
+- `StageConfig` - Processing stage configuration
+- `ProcessingStats` - Performance metrics
+- `RuntimeInfo` - CUDA environment information
+- Utility functions for device management
 
-### Configuration Class
+## API Reference
 
-```cpp
-py::class_<ionosense::RtFftConfig>(m, "RtFftConfig")
-    .def(py::init<>())  // Default constructor
-    
-    // Keyword constructor for Python convenience
-    .def(py::init([](int nfft, int batch, bool use_graphs, bool verbose) {
-        ionosense::RtFftConfig cfg;
-        cfg.nfft = nfft;
-        cfg.batch = batch;
-        cfg.use_graphs = use_graphs;
-        cfg.verbose = verbose;
-        return cfg;
-    }),
-    py::arg("nfft"),
-    py::arg("batch"),
-    py::arg("use_graphs") = true,    // Default value
-    py::arg("verbose") = false)
-    
-    // Direct field access
-    .def_readwrite("nfft", &ionosense::RtFftConfig::nfft)
-    .def_readwrite("batch", &ionosense::RtFftConfig::batch);
-```
-
-### Engine Class
-
-```cpp
-py::class_<ionosense::RtFftEngine>(m, "RtFftEngine")
-    // Primary constructor with config
-    .def(py::init<const ionosense::RtFftConfig&>())
-    
-    // Convenience constructor bypassing config
-    .def(py::init([](int nfft, int batch, bool use_graphs, bool verbose) {
-        ionosense::RtFftConfig cfg;
-        cfg.nfft = nfft;
-        cfg.batch = batch;
-        cfg.use_graphs = use_graphs;
-        cfg.verbose = verbose;
-        return std::make_unique<ionosense::RtFftEngine>(cfg);
-    }))
-```
-
-## Memory Safety
-
-### Array Validation
-
-```cpp
-.def("set_window", [](ionosense::RtFftEngine &self,
-                      py::array_t<float, py::array::c_style | 
-                                  py::array::forcecast> arr) {
-    // Validate size
-    if (arr.size() != self.get_fft_size()) {
-        throw std::runtime_error("Window size must match FFT size.");
-    }
-    
-    // Pass raw pointer to C++
-    self.set_window(arr.data(0));
-})
-```
-
-### Lifetime Management
-
-**Problem**: Python might garbage collect while GPU is using buffer.
-
-**Solution**: Pinned memory owned by C++ engine, Python gets non-owning view.
-
-```cpp
-// Buffer lifetime tied to engine, not Python
-float* ptr = self.pinned_input(stream_idx);  // C++ owns
-return py::array_t<float>(buffer_info);      // Python views
-```
-
-## Properties vs Methods
-
-### Properties (Pythonic)
-
-```cpp
-.def_property("use_graphs",
-    &RtFftEngine::get_use_graphs,    // Getter
-    &RtFftEngine::set_use_graphs)    // Setter
-
-// Python usage: engine.use_graphs = True
-```
-
-### Read-Only Properties
-
-```cpp
-.def_property_readonly("fft_size", &RtFftEngine::get_fft_size)
-.def_property_readonly("graphs_ready", &RtFftEngine::graphs_ready)
-
-// Python usage: size = engine.fft_size  (no setter)
-```
-
-## Exception Translation
-
-C++ exceptions are automatically translated to Python:
-
-| C++ Exception | Python Exception |
-|---------------|------------------|
-| `std::runtime_error` | `RuntimeError` |
-| `std::out_of_range` | `IndexError` |
-| `std::invalid_argument` | `ValueError` |
-| CUDA errors (via throw) | `RuntimeError` |
-
-## Performance Critical Sections
-
-### No-Copy Operations
-
-```cpp
-// Direct buffer access - zero overhead
-.def("pinned_input", [](RtFftEngine &self, int idx) {
-    float* ptr = self.pinned_input(idx);
-    return py::array_t<float>(make_buf(...));
-}, py::return_value_policy::reference_internal)
-```
-
-### GIL Release
-
-For long-running operations (future):
-```cpp
-.def("execute_async", [](RtFftEngine &self, int idx) {
-    py::gil_scoped_release release;  // Release Python GIL
-    self.execute_async(idx);          // Can run parallel to Python
-})
-```
-
-## Build Configuration
-
-### CMake Integration
-
-```cmake
-pybind11_add_module(_engine bindings/bindings.cpp)
-target_link_libraries(_engine PRIVATE
-    "$<TARGET_OBJECTS:ion_engine>"   # Object files from static lib
-    pybind11::module
-    CUDA::cudart_static
-    CUDA::cufft
-)
-```
-
-### Output Location
-
-```cmake
-set(_ION_PY_OUT "${CMAKE_CURRENT_SOURCE_DIR}/python/ionosense_hpc/core")
-set_target_properties(_engine PROPERTIES
-    LIBRARY_OUTPUT_DIRECTORY "${_ION_PY_OUT}"   # .so on Linux
-    RUNTIME_OUTPUT_DIRECTORY "${_ION_PY_OUT}"   # .pyd on Windows
-)
-```
-
-## Testing Bindings
-
-### Python Test
+### PyResearchEngine Class
 
 ```python
-def test_buffer_shapes():
-    engine = RtFftEngine(1024, 4)
-    
-    # Input shape: (batch, nfft)
-    assert engine.pinned_input(0).shape == (4, 1024)
-    
-    # Output shape: (batch, nfft//2 + 1)  
-    assert engine.pinned_output(0).shape == (4, 513)
+from ionosense_hpc.core import ResearchEngine, EngineConfig
+
+engine = ResearchEngine()
+config = EngineConfig()
+config.nfft = 1024
+config.batch = 2
+engine.initialize(config)
+
+# Process NumPy array
+import numpy as np
+input_data = np.random.randn(2048).astype(np.float32)
+spectrum = engine.process(input_data)  # Returns shape (batch, num_bins)
 ```
 
-### Memory Test
+#### Methods
+
+- `initialize(config: EngineConfig)` - Initialize engine with configuration
+- `process(input: np.ndarray) -> np.ndarray` - Process input signal, return magnitude spectrum
+- `reset()` - Reset engine to uninitialized state
+- `synchronize()` - Synchronize all CUDA streams
+- `get_stats() -> ProcessingStats` - Get latest performance metrics
+- `get_runtime_info() -> RuntimeInfo` - Get CUDA environment info
+- `is_initialized -> bool` - Check initialization status
+
+#### Input Requirements
+
+- **Data Type**: `np.float32` (automatic casting applied)
+- **Shape**: 1D array with length `nfft * batch`
+- **Memory Layout**: C-contiguous (automatic conversion if needed)
+
+#### Output Format
+
+- **Data Type**: `np.float32`
+- **Shape**: `(batch, num_output_bins)` where `num_output_bins = nfft//2 + 1`
+- **Units**: Magnitude spectrum (linear scale)
+
+## Configuration Classes
+
+### EngineConfig
+
+Controls overall engine behavior:
 
 ```python
-def test_zero_copy():
-    engine = RtFftEngine(1024, 2)
-    
-    # Get buffer view
-    buf = engine.pinned_input(0)
-    
-    # Modify in place
-    buf[0, :] = np.arange(1024)
-    
-    # Changes visible to C++/CUDA
-    engine.execute_async(0)
+config = EngineConfig()
+config.nfft = 1024              # FFT size (power of 2)
+config.batch = 2                # Number of parallel channels
+config.overlap = 0.5            # Frame overlap [0.0, 1.0)
+config.sample_rate_hz = 48000   # Input sample rate
+config.stream_count = 3         # CUDA streams for parallelism
+config.warmup_iters = 1         # GPU warmup iterations
 ```
 
-## Debugging Bindings
+### StageConfig
 
-### Verbose Build
+Controls individual processing stages:
+
+```python
+from ionosense_hpc.core import StageConfig, WindowType, ScalePolicy
+
+stage_config = StageConfig()
+stage_config.nfft = 1024
+stage_config.window_type = WindowType.HANN
+stage_config.scale_policy = ScalePolicy.ONE_OVER_N
+```
+
+## Performance Considerations
+
+### Memory Management
+
+- **Pinned Memory**: Engine uses page-locked host memory for optimal transfer performance
+- **Buffer Reuse**: Internal buffers are reused across process() calls
+- **GPU Memory**: Device memory is pre-allocated during initialization
+
+### Threading
+
+- **GIL Release**: Processing calls release Python's GIL for parallel execution
+- **Stream Parallelism**: Multiple CUDA streams enable concurrent H2D, compute, and D2H operations
+- **Asynchronous Operations**: All CUDA operations are asynchronous when possible
+
+### Optimization Guidelines
+
+```python
+# Good: Reuse engine instance
+engine = ResearchEngine()
+engine.initialize(config)
+for data_batch in signal_stream:
+    spectrum = engine.process(data_batch)
+
+# Avoid: Recreating engine frequently
+for data_batch in signal_stream:
+    engine = ResearchEngine()  # Expensive!
+    engine.initialize(config)
+    spectrum = engine.process(data_batch)
+```
+
+## Error Handling
+
+All C++ exceptions are translated to appropriate Python exceptions:
+
+- `RuntimeError` - Engine initialization or processing errors
+- `ValueError` - Invalid input array dimensions or configuration
+- `CudaException` - CUDA runtime errors (custom exception type)
+- `CufftException` - cuFFT library errors (custom exception type)
+
+## Build Integration
+
+The bindings are compiled as part of the main CMake build:
 
 ```bash
-cmake --build . --verbose  # See actual compiler commands
+# Build with CMake presets
+cmake --preset linux-rel
+cmake --build build/linux-rel --target _engine
+
+# Python package installation
+pip install -e python/
 ```
 
-### Symbol Inspection
+## Testing
+
+Python bindings are tested via pytest:
 
 ```bash
-# Linux
-nm -D _engine.so | grep RtFftEngine
-
-# Windows  
-dumpbin /EXPORTS _engine.pyd
+pytest python/tests/test_bindings.py -v
 ```
 
-### Python Import Debug
+Test coverage includes:
+- NumPy array conversion accuracy
+- Error handling for invalid inputs  
+- Memory leak detection
+- Performance regression tests
+
+## Debugging
+
+### Memory Issues
 
 ```python
-import sys
-sys.path.insert(0, '/path/to/module')
-
-import _engine
-print(dir(_engine))  # List all exposed symbols
+# Enable CUDA synchronous mode for debugging
+import os
+os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 ```
 
-## Common Issues
+### Profiling
 
-| Problem | Cause | Solution |
-|---------|-------|----------|
-| `ImportError: undefined symbol` | ABI mismatch | Rebuild with same compiler |
-| Segfault on buffer access | Using after free | Check engine lifetime |
-| Wrong buffer values | Type mismatch | Ensure float32/numpy.float32 |
-| Can't find module | Wrong path | Check CMake output directory |
-
-## Future Enhancements
-
-1. **Async/Await Support**: Python async interface for streams
-2. **Buffer Protocol**: Custom buffer protocol for direct memoryview
-3. **Capsule API**: Share GPU pointers with other extensions
-4. **Docstrings**: Generate from C++ Doxygen comments
-
-## Module Naming
-
-```cpp
-PYBIND11_MODULE(_engine, m) {
-    m.doc() = "High-performance CUDA FFT engine";
-    
-    // Backward compatibility aliases
-    m.attr("CudaFftEngine") = m.attr("RtFftEngine");
-    m.attr("CudaFftConfig") = m.attr("RtFftConfig");
-}
-```
-
-Python imports as:
 ```python
-from ionosense_hpc.core._engine import RtFftEngine
+engine.set_profiling_enabled(True)
+stats = engine.get_stats()
+print(f"Latency: {stats.latency_us:.2f} μs")
+print(f"Throughput: {stats.throughput_gbps:.2f} GB/s")
 ```
+
+## Version Compatibility
+
+- **Python**: 3.11+ (managed via Conda)
+- **NumPy**: 1.24+ (specified in pyproject.toml)
+- **pybind11**: 2.11+ (build dependency)
+- **CUDA**: 12.0+ (runtime requirement)
+
+## References
+
+1. pybind11 documentation: https://pybind11.readthedocs.io/
+2. NumPy C API: https://numpy.org/doc/stable/reference/c-api/
+3. CUDA Python interoperability: https://docs.nvidia.com/cuda/cuda-runtime-api/
