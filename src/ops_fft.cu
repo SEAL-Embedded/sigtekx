@@ -360,7 +360,7 @@ void launch_scale_fft(float2* data, int num_elements, float scale, cudaStream_t 
 void generate_hann_window_cpu(float* window, int size, bool sqrt_norm) {
     const float pi = 3.14159265358979323846f;
     for (int i = 0; i < size; ++i) {
-        float val = 0.5f * (1.0f - cosf(2.0f * pi * i / (size - 1)));
+        float val = 0.5f * (1.0f - cosf(2.0f * pi * i / size));
         window[i] = sqrt_norm ? sqrtf(val) : val;
     }
 }
