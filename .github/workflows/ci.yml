@@ -1,0 +1,56 @@
+name: CI Checks
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push events but only for the "main" branch
+  push:
+    branches: [ "main" ]
+  # Triggers the workflow on pull requests to the "main" branch
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  # This job runs quick checks that do not require a GPU
+  cpu-checks:
+    name: CPU Checks (Lint, Build, Test)
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Check out your repository code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Set up Python 3.11
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # 3. Install the CUDA Toolkit (required for building the C++ code)
+      - name: Install CUDA Toolkit
+        run: |
+          wget https://developer.download.nvidia.com/compute/cuda/12.0.0/local_installers/cuda_12.0.0_525.60.13_linux.run
+          sudo sh cuda_12.0.0_525.60.13_linux.run --silent --driver --toolkit
+
+      # 4. Configure the build with CMake
+      - name: Configure CMake
+        run: |
+          export PATH="/usr/local/cuda/bin:$PATH"
+          export LD_LIBRARY_PATH="/usr/local/cuda/lib64:$LD_LIBRARY_PATH"
+          cmake -S . -B build -DIONO_WITH_TESTS=OFF
+
+      # 5. Build the C++/CUDA extension
+      - name: Build C++ Extension
+        run: cmake --build build --config Release
+
+      # 6. Install Python dependencies
+      - name: Install Python Dependencies
+        run: pip install .[dev]
+
+      # 7. Run linter
+      - name: Run Ruff Linter
+        run: ruff check python/src python/tests
+
+      # 8. Run Python unit tests (excluding GPU tests)
+      - name: Run Pytest (CPU-only)
+        run: pytest -m "not gpu"

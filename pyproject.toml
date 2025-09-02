@@ -14,7 +14,6 @@ version = "0.1.0"
 description = "High-performance CUDA FFT engine + Python bindings for real-time ULF/VLF signal processing."
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "MIT" }
 authors = [{ name = "Kevin Rahsaz", email = "rahsaz.kevin@gmail.com" }]
 keywords = ["fft", "cuda", "signal processing", "hpc", "real-time"]
 classifiers = [
