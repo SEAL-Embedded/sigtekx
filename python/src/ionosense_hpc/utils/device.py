@@ -1,7 +1,6 @@
 """CUDA device query and management utilities."""
 
 import warnings
-from typing import Dict, List, Optional, Tuple
 
 try:
     import pynvml
@@ -25,7 +24,7 @@ def gpu_count() -> int:
             return count
         except Exception:
             pass
-    
+
     # Fallback to C++ module
     try:
         from ..core.raw_engine import RawEngine
@@ -48,7 +47,7 @@ def current_device() -> int:
         return 0
 
 
-def device_info(device_id: Optional[int] = None) -> Dict[str, any]:
+def device_info(device_id: int | None = None) -> dict[str, any]:
     """Get detailed information about a CUDA device.
     
     Args:
@@ -59,7 +58,7 @@ def device_info(device_id: Optional[int] = None) -> Dict[str, any]:
     """
     if device_id is None:
         device_id = current_device()
-    
+
     info = {
         'id': device_id,
         'name': 'Unknown',
@@ -71,25 +70,25 @@ def device_info(device_id: Optional[int] = None) -> Dict[str, any]:
         'utilization_gpu': None,
         'utilization_memory': None
     }
-    
+
     if NVML_AVAILABLE:
         try:
             pynvml.nvmlInit()
             handle = pynvml.nvmlDeviceGetHandleByIndex(device_id)
-            
+
             # Basic info
             info['name'] = pynvml.nvmlDeviceGetName(handle)
-            
+
             # Memory info
             mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
             info['memory_total_mb'] = mem_info.total // (1024 * 1024)
             info['memory_free_mb'] = mem_info.free // (1024 * 1024)
-            
+
             # Compute capability
             major = pynvml.nvmlDeviceGetCudaComputeCapability(handle)[0]
             minor = pynvml.nvmlDeviceGetCudaComputeCapability(handle)[1]
             info['compute_capability'] = (major, minor)
-            
+
             # Optional monitoring (may fail on some GPUs)
             try:
                 info['temperature_c'] = pynvml.nvmlDeviceGetTemperature(
@@ -97,23 +96,23 @@ def device_info(device_id: Optional[int] = None) -> Dict[str, any]:
                 )
             except:
                 pass
-            
+
             try:
                 info['power_w'] = pynvml.nvmlDeviceGetPowerUsage(handle) / 1000.0
             except:
                 pass
-            
+
             try:
                 util = pynvml.nvmlDeviceGetUtilizationRates(handle)
                 info['utilization_gpu'] = util.gpu
                 info['utilization_memory'] = util.memory
             except:
                 pass
-            
+
             pynvml.nvmlShutdown()
         except Exception as e:
             warnings.warn(f"NVML query failed: {e}")
-    
+
     # Try to get basic info from C++ module as fallback
     if info['name'] == 'Unknown':
         try:
@@ -128,11 +127,11 @@ def device_info(device_id: Optional[int] = None) -> Dict[str, any]:
                         info['name'] = name_part.split(' (CC ')[0]
         except:
             pass
-    
+
     return info
 
 
-def get_memory_usage() -> Tuple[int, int]:
+def get_memory_usage() -> tuple[int, int]:
     """Get current GPU memory usage.
     
     Returns:
@@ -154,7 +153,7 @@ def check_cuda_available() -> bool:
     return gpu_count() > 0
 
 
-def get_compute_capability(device_id: Optional[int] = None) -> Tuple[int, int]:
+def get_compute_capability(device_id: int | None = None) -> tuple[int, int]:
     """Get compute capability of a device.
     
     Args:
@@ -167,7 +166,7 @@ def get_compute_capability(device_id: Optional[int] = None) -> Tuple[int, int]:
     return info.get('compute_capability', (0, 0))
 
 
-def monitor_device(device_id: Optional[int] = None) -> str:
+def monitor_device(device_id: int | None = None) -> str:
     """Get a formatted string with current device status.
     
     Args:
@@ -177,21 +176,21 @@ def monitor_device(device_id: Optional[int] = None) -> str:
         Formatted status string
     """
     info = device_info(device_id)
-    
+
     lines = [
         f"Device {info['id']}: {info['name']}",
         f"  Memory: {info['memory_total_mb'] - info['memory_free_mb']}/"
         f"{info['memory_total_mb']} MB used",
         f"  Compute Capability: {info['compute_capability'][0]}.{info['compute_capability'][1]}"
     ]
-    
+
     if info['temperature_c'] is not None:
         lines.append(f"  Temperature: {info['temperature_c']}°C")
-    
+
     if info['power_w'] is not None:
         lines.append(f"  Power: {info['power_w']:.1f}W")
-    
+
     if info['utilization_gpu'] is not None:
         lines.append(f"  GPU Utilization: {info['utilization_gpu']}%")
-    
+
     return '\n'.join(lines)

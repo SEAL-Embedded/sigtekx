@@ -1,16 +1,11 @@
 """Low-level wrapper for the C++ _engine extension module."""
 
 import warnings
-from typing import Optional, Dict, Any, Tuple
+from typing import Any
 
 import numpy as np
 
-from ..exceptions import (
-    IonosenseError, 
-    EngineRuntimeError, 
-    EngineStateError,
-    DllLoadError
-)
+from ..exceptions import DllLoadError, EngineRuntimeError, EngineStateError
 
 
 def import_engine():
@@ -47,15 +42,15 @@ class RawEngine:
     exceptions and checking module availability. For most use cases, use
     the higher-level Engine or Processor classes instead.
     """
-    
+
     def __init__(self):
         """Initialize the raw engine wrapper."""
         self._engine_module = import_engine()
         self._engine = self._engine_module.ResearchEngine()
         self._initialized = False
         self._config = None
-    
-    def initialize(self, config: Dict[str, Any]) -> None:
+
+    def initialize(self, config: dict[str, Any]) -> None:
         """Initialize the engine with a configuration dictionary.
         
         Args:
@@ -70,13 +65,13 @@ class RawEngine:
             for key, value in config.items():
                 if hasattr(cpp_config, key):
                     setattr(cpp_config, key, value)
-            
+
             self._engine.initialize(cpp_config)
             self._config = config
             self._initialized = True
         except RuntimeError as e:
             raise EngineRuntimeError(f"Failed to initialize engine: {e}", str(e))
-    
+
     def process(self, input_data: np.ndarray) -> np.ndarray:
         """Process a batch of input data.
         
@@ -92,14 +87,14 @@ class RawEngine:
         """
         if not self._initialized:
             raise EngineStateError("Engine not initialized", "uninitialized")
-        
+
         try:
             # Ensure float32 and contiguous
             if input_data.dtype != np.float32:
                 input_data = input_data.astype(np.float32)
             if not input_data.flags['C_CONTIGUOUS']:
                 input_data = np.ascontiguousarray(input_data)
-            
+
             return self._engine.process(input_data)
         except RuntimeError as e:
             error_str = str(e)
@@ -110,7 +105,7 @@ class RawEngine:
                 )
             else:
                 raise EngineRuntimeError(f"Processing failed: {e}", error_str)
-    
+
     def reset(self) -> None:
         """Reset the engine to uninitialized state."""
         try:
@@ -119,7 +114,7 @@ class RawEngine:
             self._config = None
         except RuntimeError as e:
             warnings.warn(f"Reset warning: {e}")
-    
+
     def synchronize(self) -> None:
         """Synchronize all CUDA streams."""
         if not self._initialized:
@@ -128,8 +123,8 @@ class RawEngine:
             self._engine.synchronize()
         except RuntimeError as e:
             raise EngineRuntimeError(f"Synchronization failed: {e}")
-    
-    def get_stats(self) -> Dict[str, Any]:
+
+    def get_stats(self) -> dict[str, Any]:
         """Get processing statistics.
         
         Returns:
@@ -141,15 +136,15 @@ class RawEngine:
                 'throughput_gbps': 0.0,
                 'frames_processed': 0
             }
-        
+
         stats = self._engine.get_stats()
         return {
             'latency_us': stats.latency_us,
             'throughput_gbps': stats.throughput_gbps,
             'frames_processed': stats.frames_processed
         }
-    
-    def get_runtime_info(self) -> Dict[str, Any]:
+
+    def get_runtime_info(self) -> dict[str, Any]:
         """Get CUDA runtime information.
         
         Returns:
@@ -162,17 +157,17 @@ class RawEngine:
             'device_memory_mb': getattr(info, 'device_memory_total_mb', 0),
             'device_memory_free_mb': getattr(info, 'device_memory_free_mb', 0)
         }
-    
+
     @property
     def is_initialized(self) -> bool:
         """Check if engine is initialized."""
         return self._initialized and self._engine.is_initialized
-    
+
     @property
-    def config(self) -> Optional[Dict[str, Any]]:
+    def config(self) -> dict[str, Any] | None:
         """Get current configuration."""
         return self._config.copy() if self._config else None
-    
+
     @classmethod
     def get_available_devices(cls) -> list:
         """Get list of available CUDA devices.
@@ -186,7 +181,7 @@ class RawEngine:
         except Exception as e:
             warnings.warn(f"Failed to query devices: {e}")
             return []
-    
+
     @classmethod
     def select_best_device(cls) -> int:
         """Select the best available CUDA device.
@@ -199,11 +194,11 @@ class RawEngine:
             return engine_module.select_best_device()
         except Exception:
             return 0  # Default to device 0
-    
+
     def __repr__(self) -> str:
         state = "initialized" if self._initialized else "uninitialized"
         return f"<RawEngine state={state}>"
-    
+
     def __del__(self):
         """Ensure cleanup on deletion."""
         try:

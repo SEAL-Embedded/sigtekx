@@ -1,7 +1,7 @@
 """Stage definitions and metadata for the pipeline."""
 
 from enum import Enum
-from typing import Dict, Any
+from typing import Any
 
 
 class StageType(Enum):
@@ -15,7 +15,7 @@ class StageType(Enum):
 
 
 # Stage metadata for documentation and future extensibility
-STAGE_METADATA: Dict[StageType, Dict[str, Any]] = {
+STAGE_METADATA: dict[StageType, dict[str, Any]] = {
     StageType.WINDOW: {
         "description": "Apply window function to reduce spectral leakage",
         "input": "Real-valued time-domain signal",
@@ -61,7 +61,7 @@ STAGE_METADATA: Dict[StageType, Dict[str, Any]] = {
 }
 
 
-def get_stage_info(stage_type: StageType) -> Dict[str, Any]:
+def get_stage_info(stage_type: StageType) -> dict[str, Any]:
     """Get information about a stage type.
     
     Args:

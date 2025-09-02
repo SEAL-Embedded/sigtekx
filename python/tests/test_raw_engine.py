@@ -3,9 +3,7 @@ Tests for the low-level RawEngine wrapper to improve test coverage.
 """
 
 import gc
-import sys
-import warnings
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest

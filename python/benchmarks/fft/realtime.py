@@ -7,30 +7,40 @@ measure and compare host-side latency between a CPU core and the
 concurrent 3-stream CUDA engine.
 """
 from __future__ import annotations
-import argparse
-import time
-import numpy as np
-import sys
-from typing import Dict
 
+import argparse
+import sys
+import time
+
+import numpy as np
 from utils import (
-    CudaFftEngine, nvtx_range, build_signal, compute_stats, fmt_t, 
-    print_header, print_separator, create_engine, tqdm, is_profiler_attached, safe_print
+    CudaFftEngine,
+    build_signal,
+    compute_stats,
+    create_engine,
+    fmt_t,
+    is_profiler_attached,
+    nvtx_range,
+    print_header,
+    print_separator,
+    safe_print,
+    tqdm,
 )
+
 
 # ───────────────────────── Core Benchmark Logic ───────────────────────────────
 def run_rt_benchmark(mode: str, nfft: int, hop: int, sr: int, duration: float,
-                     batch_size: int, use_graphs: bool, verbose: bool) -> Dict[str, float]:
+                     batch_size: int, use_graphs: bool, verbose: bool) -> dict[str, float]:
     """Runs a real-time benchmark with pacing to simulate a real-world stream."""
     assert mode in ("cpu", "gpu")
-    
+
     # The time budget for processing one pair of frames
     budget_s_per_pair = hop / sr
     deadline_ms = budget_s_per_pair * 1000 * 0.8 # Target 80% of time budget
-    
+
     # Quiet mode for profiler unless verbose is forced
     quiet = is_profiler_attached() and not verbose
-    
+
     window = np.hanning(nfft).astype(np.float32)
 
     with nvtx_range(f"run_rt::{mode}"):
@@ -39,20 +49,20 @@ def run_rt_benchmark(mode: str, nfft: int, hop: int, sr: int, duration: float,
             eng = create_engine(nfft, batch_size, use_graphs, verbose_override=verbose)
             eng.set_window(window) # Preload window to GPU
             eng.prepare_for_execution()
-        
+
         sig = build_signal(sr, duration + 2.0, nfft)
-        
+
         latencies_ms = []
         stream_idx = 0
         pairs_per_batch = batch_size // 2
-        
+
         # --- Real-Time Simulation Loop ---
-        pbar = tqdm(total=duration, desc=f"Simulating ({mode.upper()})", 
+        pbar = tqdm(total=duration, desc=f"Simulating ({mode.upper()})",
                     unit="s", disable=quiet)
-        
+
         t_global_start = time.perf_counter()
         total_pairs_processed = 0
-        
+
         with nvtx_range("rt_loop"):
             while (time.perf_counter() - t_global_start) < duration:
                 # Calculate when the next batch of data would be "available"
@@ -71,18 +81,18 @@ def run_rt_benchmark(mode: str, nfft: int, hop: int, sr: int, duration: float,
                 # --- Latency Measurement ---
                 with nvtx_range(f"iter_compute::{mode}"):
                     t_iter_start = time.perf_counter()
-                    
+
                     if mode == "gpu":
                         # Ensure the stream's previous work is done and get its output
                         eng.sync_stream(stream_idx)
                         _ = eng.pinned_output(stream_idx)[0]
-                        
+
                         # Prepare the next batch of input data
                         offset = total_pairs_processed * hop
                         ch1_frames = [sig["ch1"][offset + i*hop : offset + i*hop + nfft] for i in range(pairs_per_batch)]
                         ch2_frames = [sig["ch2"][offset + i*hop : offset + i*hop + nfft] for i in range(pairs_per_batch)]
                         input_batch = np.concatenate(ch1_frames + ch2_frames).astype(np.float32, copy=False)
-                        
+
                         # Asynchronously execute
                         dst = eng.pinned_input(stream_idx)      # (batch, nfft) view
                         dst.ravel()[:] = input_batch            # flatten dest so shapes match (B*N,)
@@ -102,10 +112,10 @@ def run_rt_benchmark(mode: str, nfft: int, hop: int, sr: int, duration: float,
                     total_pairs_processed += pairs_per_batch
                 else:
                     total_pairs_processed += 1
-                
+
                 pbar.n = min(time.perf_counter() - t_global_start, duration)
                 pbar.refresh()
-        
+
         if mode == "gpu":
             eng.synchronize_all_streams()
         pbar.close()

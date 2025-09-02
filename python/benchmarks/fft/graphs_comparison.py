@@ -9,27 +9,27 @@ for the FFT engine. Performs A/B testing to measure:
 3. Latency consistency (jitter reduction)
 """
 
-import numpy as np
-import time
 import argparse
-from typing import Dict
 import sys
+import time
+
+import numpy as np
 
 # Import shared components from the utils module
 from utils import (
     CudaFftEngine,
     compute_stats,
     fmt_t,
+    nvtx_range,
     print_header,
     print_separator,
-    nvtx_range,
-    safe_print
+    safe_print,
 )
 
 # ─────────────────────────── Benchmark Functions ────────────────────
 
 def benchmark_latency(engine: CudaFftEngine,
-                     num_iterations: int) -> Dict[str, float]:
+                     num_iterations: int) -> dict[str, float]:
     """
     Measure per-iteration host-side latency for the FFT pipeline.
     This is a good proxy for measuring CPU overhead per call.
@@ -63,7 +63,7 @@ def benchmark_latency(engine: CudaFftEngine,
     return compute_stats(latencies[10:])
 
 def benchmark_throughput(engine: CudaFftEngine,
-                        duration_sec: float) -> Dict[str, float]:
+                        duration_sec: float) -> dict[str, float]:
     """
     Measure maximum throughput (iterations/sec) over a fixed duration.
     """
@@ -102,7 +102,7 @@ def run_comparison(nfft: int, batch: int, iterations: int, duration: float):
     """Run complete comparison between graph and non-graph modes."""
     if CudaFftEngine is None: return
 
-    print_header(f"CUDA FFT Engine Graph Benchmark")
+    print_header("CUDA FFT Engine Graph Benchmark")
     safe_print(f"Configuration: NFFT={nfft}, Batch={batch}\n")
 
     # ──────────── Test with Graphs Disabled ────────────

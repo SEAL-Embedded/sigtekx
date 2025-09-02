@@ -7,31 +7,40 @@ by comparing a single-threaded CPU implementation against the
 concurrent 3-stream CUDA implementation.
 """
 from __future__ import annotations
+
 import argparse
-import time
-import numpy as np
 import sys
-from typing import Dict
+import time
+
+import numpy as np
 
 # Import all shared components from the utils file
 from utils import (
-    CudaFftEngine, nvtx_range, build_signal, print_header, 
-    print_separator, create_engine, tqdm, is_profiler_attached, safe_print
+    CudaFftEngine,
+    build_signal,
+    create_engine,
+    is_profiler_attached,
+    nvtx_range,
+    print_header,
+    print_separator,
+    safe_print,
+    tqdm,
 )
 
+
 # ───────────────────────── Core Benchmark Logic ───────────────────────────────
-def run_throughput_benchmark(mode: str, nfft: int, hop: int, sr: int, 
-                             duration: float, batch_size: int, use_graphs: bool, verbose: bool) -> Dict[str, float]:
+def run_throughput_benchmark(mode: str, nfft: int, hop: int, sr: int,
+                             duration: float, batch_size: int, use_graphs: bool, verbose: bool) -> dict[str, float]:
     """
     Runs a raw throughput benchmark.
     - 'gpu' mode uses the 3-stream asynchronous pipeline.
     - 'cpu' mode is a synchronous single-core loop.
     """
     assert mode in ("cpu", "gpu")
-    
+
     # Calculate total number of FFT pairs to process based on duration
     num_pairs_total = int((duration * sr) / hop)
-    
+
     # Determine the number of loop iterations
     if mode == "gpu":
         pairs_per_batch = batch_size // 2
@@ -41,7 +50,7 @@ def run_throughput_benchmark(mode: str, nfft: int, hop: int, sr: int,
 
     # Quiet mode for profiler unless verbose is forced
     quiet = is_profiler_attached() and not verbose
-    
+
     with nvtx_range(f"run_throughput::{mode}"):
         # --- Initialization ---
         if mode == "gpu":
@@ -49,37 +58,37 @@ def run_throughput_benchmark(mode: str, nfft: int, hop: int, sr: int,
             eng.prepare_for_execution()
         else:
             window = np.hanning(nfft).astype(np.float32)
-        
+
         sig = build_signal(sr, duration * 1.1, nfft) # Generate ample signal
-        
+
         # --- Main Processing Loop ---
         stream_idx = 0
         total_pairs_processed = 0
-        
+
         # Use tqdm for a progress bar
-        pbar = tqdm(range(num_iterations), desc=f"Processing ({mode.upper()})", 
+        pbar = tqdm(range(num_iterations), desc=f"Processing ({mode.upper()})",
                     unit="iter", disable=quiet)
-        
+
         t_start = time.perf_counter()
         with nvtx_range("throughput_loop"):
             for _ in pbar:
                 if mode == "gpu":
                     pairs_per_batch = batch_size // 2
-                    
+
                     # 1. Synchronize the current stream to ensure its resources are free
                     eng.sync_stream(stream_idx)
-                    
+
                     # 2. Prepare batch data on the host
                     offset = total_pairs_processed * hop
                     ch1_frames = [sig["ch1"][offset + i*hop : offset + i*hop + nfft] for i in range(pairs_per_batch)]
                     ch2_frames = [sig["ch2"][offset + i*hop : offset + i*hop + nfft] for i in range(pairs_per_batch)]
                     batch_data = np.concatenate(ch1_frames + ch2_frames).astype(np.float32, copy=False)
-                    
+
                     # 3. Copy data to pinned memory and execute asynchronously
                     dst = eng.pinned_input(stream_idx)      # (batch, nfft) view
                     dst.ravel()[:] = batch_data             # flatten dest so shapes match (B*N,)
                     eng.execute_async(stream_idx)
-                    
+
                     total_pairs_processed += pairs_per_batch
                     stream_idx = (stream_idx + 1) % eng.num_streams
                 else: # CPU mode
@@ -89,18 +98,18 @@ def run_throughput_benchmark(mode: str, nfft: int, hop: int, sr: int,
                     _ = np.fft.rfft(ch1_frame)
                     _ = np.fft.rfft(ch2_frame)
                     total_pairs_processed += 1
-        
+
         # --- Finalization ---
         if mode == "gpu":
             with nvtx_range("final_sync"):
                 eng.synchronize_all_streams()
-        
+
         t_end = time.perf_counter()
 
     total_time_s = t_end - t_start
     total_ffts = total_pairs_processed * 2
     throughput = total_ffts / total_time_s if total_time_s > 0 else 0
-    
+
     return {"throughput_fps": throughput, "total_ffts": total_ffts}
 
 # ───────────────────────────────── Main ───────────────────────────────────────

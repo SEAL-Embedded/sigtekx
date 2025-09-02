@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, Tuple, Sequence, Optional
+from collections.abc import Sequence
 
 import numpy as np
 
@@ -50,11 +50,11 @@ def assert_spectral_peak(
     """
     # Calculate frequency bins
     freqs = np.fft.rfftfreq(nfft, 1/sample_rate)
-    
+
     # Find peak
     peak_idx = np.argmax(spectrum)
     peak_freq = freqs[peak_idx]
-    
+
     # Check if within tolerance
     error_hz = abs(peak_freq - expected_frequency)
     assert error_hz <= tolerance_hz, \
@@ -79,7 +79,7 @@ def assert_parseval(
     """
     # Time-domain energy
     time_energy = np.sum(np.abs(time_signal) ** 2)
-    
+
     # FIX: Correctly calculate frequency-domain energy from rfft output
     # According to Parseval's theorem for DFTs, the energy is the sum
     # of squared magnitudes of the spectrum, normalized by the signal length.
@@ -88,14 +88,14 @@ def assert_parseval(
     # DC (index 0) and the Nyquist frequency (last element, if N is even).
     n = len(time_signal)
     freq_energy_components = freq_spectrum ** 2
-    
+
     if n % 2 == 0:  # Even-length signal, Nyquist frequency is present
         freq_energy = freq_energy_components[0] + 2 * np.sum(freq_energy_components[1:-1]) + freq_energy_components[-1]
     else:  # Odd-length signal, no Nyquist frequency
         freq_energy = freq_energy_components[0] + 2 * np.sum(freq_energy_components[1:])
-        
+
     freq_energy /= n
-    
+
     # Check relative error, handle division by zero
     if time_energy == 0:
         rel_error = 0 if freq_energy == 0 else float('inf')
@@ -127,14 +127,14 @@ def assert_snr(
     """
     signal_power = np.mean(signal ** 2)
     noise_power = np.mean(noise ** 2)
-    
+
     if noise_power == 0:
         return float('inf')
-    
+
     snr_db = 10 * np.log10(signal_power / noise_power)
     assert snr_db >= min_snr_db, \
         f"SNR {snr_db:.1f} dB is below minimum {min_snr_db:.1f} dB"
-    
+
     return snr_db
 
 
@@ -153,16 +153,16 @@ def validate_fft_symmetry(
     """
     # For real input, FFT should have Hermitian symmetry
     # This is automatically satisfied for rfft, but can check DC/Nyquist
-    
+
     # DC component should be real
     if abs(complex_spectrum[0].imag) > tolerance:
         return False
-    
+
     # Nyquist component (if present) should be real
     if len(complex_spectrum) % 2 == 0:
         if abs(complex_spectrum[-1].imag) > tolerance:
             return False
-    
+
     return True
 
 
@@ -182,16 +182,16 @@ def calculate_thd(
         THD as a percentage
     """
     fundamental_power = spectrum[fundamental_idx] ** 2
-    
+
     harmonic_power = 0
     for n in range(2, num_harmonics + 1):
         harmonic_idx = fundamental_idx * n
         if harmonic_idx < len(spectrum):
             harmonic_power += spectrum[harmonic_idx] ** 2
-    
+
     if fundamental_power == 0:
         return 0.0
-    
+
     thd = np.sqrt(harmonic_power / fundamental_power) * 100
     return thd
 
@@ -200,8 +200,8 @@ def compare_with_reference(
     reference: np.ndarray,
     *,
     metric: str = "rmse",
-    thresholds: Optional[Dict[str, float]] = None
-) -> Tuple[float, bool]:
+    thresholds: dict[str, float] | None = None
+) -> tuple[float, bool]:
     """
     Compare `actual` vs `reference` and decide pass/fail.
 
@@ -239,7 +239,7 @@ def compare_with_reference(
         corr_min = 0.99                             # cosine similarity floor
         thresholds = {"rmse": base_err, "mae": base_err, "max": base_err, "correlation": corr_min}
 
-    thr: Dict[str, float] = dict(thresholds)
+    thr: dict[str, float] = dict(thresholds)
 
     if metric == "rmse":
         value = float(np.sqrt(np.mean((actual - reference) ** 2)))
@@ -271,8 +271,8 @@ def compare_with_reference(
 
 def validate_output_range(
     output: np.ndarray,
-    min_val: Optional[float] = None,
-    max_val: Optional[float] = None
+    min_val: float | None = None,
+    max_val: float | None = None
 ) -> bool:
     """Validate that output values are within expected range.
     

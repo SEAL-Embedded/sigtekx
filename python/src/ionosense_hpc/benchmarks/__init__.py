@@ -10,19 +10,19 @@ The main entry point for the full suite is the `suite` module.
 
 from .accuracy import (
     benchmark_accuracy,
-    benchmark_window_accuracy,
     benchmark_numerical_stability,
+    benchmark_window_accuracy,
 )
 from .latency import (
-    benchmark_latency,
     benchmark_jitter,
-)
-from .throughput import (
-    benchmark_throughput,
-    benchmark_batch_scaling,
+    benchmark_latency,
 )
 from .realtime import benchmark_realtime
 from .suite import run_full_suite
+from .throughput import (
+    benchmark_batch_scaling,
+    benchmark_throughput,
+)
 
 # __all__ defines the public API for the benchmarks module.
 __all__ = [

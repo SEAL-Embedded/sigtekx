@@ -1,11 +1,11 @@
 """Tests for the processing stages and registry."""
 
+
 import pytest
-import abc
 
 # Import the global registry instance that the application uses
-from ionosense_hpc.stages.registry import _global_registry, StageRegistry
-from ionosense_hpc.exceptions import IonosenseError
+from ionosense_hpc.stages.registry import _global_registry
+
 
 # Mock some stages for testing, since the tests depend on them being registered.
 # In a real scenario, you might import the modules where they are defined.
@@ -67,7 +67,7 @@ class TestStageRegistry:
         """Test retrieving registered stages."""
         # Check that stages registered at the start of the file are retrievable
         assert len(stage_registry.list_stages()) >= 3
-        
+
         fft_stage = stage_registry.get("fft")
         assert fft_stage.key == "fft"
 
@@ -79,7 +79,7 @@ class TestStageRegistry:
     def test_list_available_stages(self, stage_registry):
         """Test that listing available stages returns a list of keys."""
         available_stages = stage_registry.list_stages()
-        
+
         assert isinstance(available_stages, list)
         assert "fft" in available_stages
         assert "magnitude" in available_stages

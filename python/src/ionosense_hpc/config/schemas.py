@@ -1,8 +1,8 @@
 """Pydantic v2 configuration schemas for the engine."""
 
-from typing import Optional, Literal
-from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
-from typing_extensions import Self
+from typing import Self
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class EngineConfig(BaseModel):
@@ -11,7 +11,7 @@ class EngineConfig(BaseModel):
     This class validates all parameters and provides sensible defaults
     for real-time dual-channel ULF/VLF signal processing.
     """
-    
+
     # Signal parameters
     nfft: int = Field(
         default=1024,
@@ -34,7 +34,7 @@ class EngineConfig(BaseModel):
         gt=0,
         description="Input sample rate in Hz"
     )
-    
+
     # Execution parameters
     stream_count: int = Field(
         default=3,
@@ -58,7 +58,7 @@ class EngineConfig(BaseModel):
         gt=0,
         description="Timeout for async operations in milliseconds"
     )
-    
+
     # Performance tuning
     use_cuda_graphs: bool = Field(
         default=False,
@@ -74,7 +74,7 @@ class EngineConfig(BaseModel):
         validate_assignment=True,
         use_enum_values=True
     )
-    
+
     @field_validator('nfft')
     @classmethod
     def validate_power_of_two(cls, v: int) -> int:
@@ -82,13 +82,13 @@ class EngineConfig(BaseModel):
         if v & (v - 1) != 0:
             raise ValueError(f"nfft must be a power of 2, got {v}")
         return v
-    
+
     @model_validator(mode='after')
     def validate_memory_requirements(self) -> Self:
         """Check that configuration won't exceed reasonable memory limits."""
         bytes_per_buffer = self.nfft * self.batch * 4  # float32
         total_bytes = bytes_per_buffer * self.pinned_buffer_count * 3  # input, output, intermediate
-        
+
         # Lowered threshold to align with test case expectations
         if total_bytes > 256 * 1024**2:  # 256MB warning threshold
             import warnings
@@ -97,27 +97,27 @@ class EngineConfig(BaseModel):
                 ResourceWarning
             )
         return self
-    
+
     @property
     def hop_size(self) -> int:
         """Calculate hop size between frames."""
         return int(self.nfft * (1.0 - self.overlap))
-    
+
     @property
     def num_output_bins(self) -> int:
         """Number of frequency bins in R2C FFT output."""
         return self.nfft // 2 + 1
-    
+
     @property
     def frame_duration_ms(self) -> float:
         """Duration of one FFT frame in milliseconds."""
         return (self.nfft / self.sample_rate_hz) * 1000
-    
+
     @property
     def hop_duration_ms(self) -> float:
         """Duration between frame starts in milliseconds."""
         return (self.hop_size / self.sample_rate_hz) * 1000
-    
+
     def __repr__(self) -> str:
         return (
             f"<EngineConfig nfft={self.nfft} batch={self.batch} "

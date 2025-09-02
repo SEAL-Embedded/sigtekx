@@ -1,21 +1,22 @@
 """Throughput benchmarking for sustained processing performance."""
 
-import time
-from typing import Dict, Any, Optional
 import json
+import time
+from typing import Any
+
 import numpy as np
 
-from ..core import Processor
 from ..config import EngineConfig, Presets
-from ..utils import make_test_batch, logger, get_memory_usage
+from ..core import Processor
+from ..utils import get_memory_usage, logger, make_test_batch
 
 
 def benchmark_throughput(
-    config: Optional[EngineConfig] = None,
+    config: EngineConfig | None = None,
     duration_seconds: float = 10.0,
-    data_size_mb: Optional[float] = None,
+    data_size_mb: float | None = None,
     report_memory: bool = True
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Benchmark sustained throughput performance.
     
     Args:
@@ -29,34 +30,34 @@ def benchmark_throughput(
     """
     if config is None:
         config = Presets.throughput()
-    
+
     bytes_per_sample = 4  # float32
     samples_per_batch = config.nfft * config.batch
     bytes_per_batch = samples_per_batch * bytes_per_sample
     mb_per_batch = bytes_per_batch / (1024 * 1024)
-    
+
     if data_size_mb is not None:
         n_batches = int(data_size_mb / mb_per_batch)
         test_mode = f"{data_size_mb:.1f} MB data"
     else:
         # A rough estimate for progress, the loop condition is time-based
-        est_fps = 1000 
+        est_fps = 1000
         n_batches = int(duration_seconds * est_fps)
         test_mode = f"{duration_seconds:.1f} seconds"
-    
+
     logger.info(f"Starting throughput benchmark: {test_mode}")
     logger.info(f"  Batch size: {samples_per_batch} samples ({mb_per_batch:.2f} MB)")
-    
+
     test_data = make_test_batch(config.nfft, config.batch, signal_type='noise', seed=42)
-    
+
     if report_memory:
         initial_mem_mb, total_mem_mb = get_memory_usage()
-    
+
     with Processor(config) as proc:
         start_time = time.perf_counter()
         bytes_processed = 0
         frames_processed = 0
-        
+
         if data_size_mb is not None:
             for _ in range(n_batches):
                 _ = proc.process(test_data)
@@ -67,16 +68,16 @@ def benchmark_throughput(
                 _ = proc.process(test_data)
                 bytes_processed += bytes_per_batch
                 frames_processed += 1
-        
+
         end_time = time.perf_counter()
         elapsed_seconds = end_time - start_time
-        
+
         if report_memory:
             final_mem_mb, _ = get_memory_usage()
 
     mb_processed = bytes_processed / (1024 * 1024)
     gb_processed = bytes_processed / (1024 ** 3)
-    
+
     results = {
         'config': config.model_dump(),
         'runtime': {
@@ -90,7 +91,7 @@ def benchmark_throughput(
             'samples_per_second': (frames_processed * samples_per_batch) / elapsed_seconds
         }
     }
-    
+
     if report_memory:
         results['memory'] = {
             'initial_mb': initial_mem_mb,
@@ -98,15 +99,15 @@ def benchmark_throughput(
             'delta_mb': final_mem_mb - initial_mem_mb,
             'total_available_mb': total_mem_mb
         }
-    
+
     return results
 
 
 def benchmark_batch_scaling(
     nfft: int = 2048,
-    batch_sizes: Optional[list] = None,
+    batch_sizes: list | None = None,
     n_iterations: int = 100
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Benchmark performance scaling with batch size.
     
     Args:
@@ -119,9 +120,9 @@ def benchmark_batch_scaling(
     """
     if batch_sizes is None:
         batch_sizes = [1, 2, 4, 8, 16, 32, 64]
-    
+
     logger.info(f"Starting batch scaling benchmark: nfft={nfft}")
-    
+
     results = {
         'nfft': nfft,
         'batch_sizes': batch_sizes,
@@ -129,15 +130,15 @@ def benchmark_batch_scaling(
         'latency_us': [],
         'efficiency_percent': []
     }
-    
+
     base_throughput_per_channel = None
-    
+
     for batch in batch_sizes:
         logger.info(f"  Testing batch={batch}...")
-        
+
         config = EngineConfig(nfft=nfft, batch=batch, warmup_iters=10)
         test_data = make_test_batch(nfft, batch, seed=42)
-        
+
         with Processor(config) as proc:
             latencies = []
             # Warmup is handled by Processor, run benchmark iterations
@@ -149,10 +150,10 @@ def benchmark_batch_scaling(
         total_samples = nfft * batch * n_iterations
         total_time_s = sum(latencies) / 1e6
         throughput_sps = total_samples / total_time_s if total_time_s > 0 else 0
-        
+
         results['throughput_msps'].append(throughput_sps / 1e6)
         results['latency_us'].append(avg_latency_us)
-        
+
         if base_throughput_per_channel is None and batch > 0:
             base_throughput_per_channel = throughput_sps / batch
             efficiency = 100.0
@@ -163,9 +164,9 @@ def benchmark_batch_scaling(
             efficiency = 0.0
 
         results['efficiency_percent'].append(efficiency)
-        
+
         logger.info(f"    Throughput: {throughput_sps/1e6:.2f} MS/s, Latency: {avg_latency_us:.1f} us, Efficiency: {efficiency:.1f}%")
-    
+
     return results
 
 if __name__ == '__main__':

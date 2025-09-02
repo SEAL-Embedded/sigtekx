@@ -11,19 +11,14 @@ gains with numerical precision.
 """
 
 from __future__ import annotations
-import argparse
-import time
-import numpy as np
-import sys
 
-from utils import (
-    CudaFftEngine,
-    nvtx_range,
-    build_signal,
-    print_header,
-    print_separator,
-    safe_print
-)
+import argparse
+import sys
+import time
+
+import numpy as np
+from utils import CudaFftEngine, build_signal, nvtx_range, print_header, print_separator, safe_print
+
 
 def mean_squared_error(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     """Calculates the Mean Squared Error."""
@@ -50,7 +45,7 @@ def run_verification(nfft: int, batch_size: int, sr: int, duration: float) -> No
     # --- 1. CPU Reference Implementation ---
     safe_print("Running CPU reference...")
     cpu_results = []
-    
+
     with nvtx_range("cpu_run"):
         t_start_cpu = time.perf_counter()
         loop_iterations = range(0, total_frames, num_pairs_in_batch)
@@ -60,7 +55,7 @@ def run_verification(nfft: int, batch_size: int, sr: int, duration: float) -> No
 
             ref_ch1_fft = [np.abs(np.fft.rfft(frame * window)) for frame in ch1_frames]
             ref_ch2_fft = [np.abs(np.fft.rfft(frame * window)) for frame in ch2_frames]
-            
+
             if (i + num_pairs_in_batch) >= total_frames:
                 cpu_results = np.concatenate(ref_ch1_fft + ref_ch2_fft)
         t_end_cpu = time.perf_counter()
@@ -82,19 +77,19 @@ def run_verification(nfft: int, batch_size: int, sr: int, duration: float) -> No
         t_start_gpu = time.perf_counter()
         for i in loop_iterations:
             eng.sync_stream(stream_idx)
-            
+
             ch1_frames = [sig["ch1"][ (i + j) * nfft : (i + j) * nfft + nfft] for j in range(num_pairs_in_batch)]
             ch2_frames = [sig["ch2"][ (i + j) * nfft : (i + j) * nfft + nfft] for j in range(num_pairs_in_batch)]
             input_batch = np.concatenate(ch1_frames + ch2_frames)
-            
+
             eng.pinned_input(stream_idx)[:] = input_batch
             eng.execute_async(stream_idx)
-            
+
             stream_idx = (stream_idx + 1) % eng.num_streams
 
         for i in range(eng.num_streams):
             eng.sync_stream(i)
-        
+
         t_end_gpu = time.perf_counter()
 
         last_stream_idx = (stream_idx - 1 + eng.num_streams) % eng.num_streams
@@ -107,7 +102,7 @@ def run_verification(nfft: int, batch_size: int, sr: int, duration: float) -> No
     # --- 3. Verification and Reporting ---
     safe_print("")
     print_header("Verification & Performance Report")
-    
+
     # Throughput Calculation
     total_ffts_processed = len(loop_iterations) * batch_size
     cpu_ffts_per_sec = total_ffts_processed / (cpu_time_ms / 1000.0) if cpu_time_ms > 0 else 0
@@ -118,16 +113,16 @@ def run_verification(nfft: int, batch_size: int, sr: int, duration: float) -> No
     print_separator()
     safe_print(f"{'Total Processing Time':<25} {f'{cpu_time_ms:.2f} ms':>20} {f'{gpu_time_ms:.2f} ms':>20}")
     safe_print(f"{'Throughput (FFTs/sec)':<25} {f'{cpu_ffts_per_sec:,.0f}':>20} {f'{gpu_ffts_per_sec:,.0f}':>20}")
-    
+
     safe_print("")
-    
+
     # --- Accuracy Report ---
     if cpu_results.size == 0 or gpu_results.size == 0:
          safe_print("Could not perform accuracy check: one of the results was empty.")
     else:
         max_abs_error = np.max(np.abs(cpu_results - gpu_results))
         mse = mean_squared_error(cpu_results, gpu_results)
-        
+
         safe_print(f"{'Accuracy Metric':<25} {'Value'}")
         print_separator()
         safe_print(f"{'Max Absolute Error':<25} {f'{max_abs_error:.9f}':>20}")

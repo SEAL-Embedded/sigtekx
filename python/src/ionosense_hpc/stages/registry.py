@@ -1,7 +1,8 @@
 """Stage registry for pipeline extensibility."""
 
-from typing import Dict, Callable, Any, Optional
 import warnings
+from collections.abc import Callable
+from typing import Any
 
 
 class StageRegistry:
@@ -10,16 +11,16 @@ class StageRegistry:
     This is a placeholder for v2.0 extensibility. Currently,
     the pipeline stages are hardcoded in C++.
     """
-    
+
     def __init__(self):
-        self._stages: Dict[str, Callable] = {}
-        self._metadata: Dict[str, Dict[str, Any]] = {}
-    
+        self._stages: dict[str, Callable] = {}
+        self._metadata: dict[str, dict[str, Any]] = {}
+
     def register(
         self,
         name: str,
         stage_fn: Callable,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: dict[str, Any] | None = None
     ) -> None:
         """Register a custom stage.
         
@@ -30,11 +31,11 @@ class StageRegistry:
         """
         if name in self._stages:
             warnings.warn(f"Overwriting existing stage: {name}")
-        
+
         self._stages[name] = stage_fn
         self._metadata[name] = metadata or {}
-    
-    def get(self, name: str) -> Optional[Callable]:
+
+    def get(self, name: str) -> Callable | None:
         """Get a registered stage.
         
         Args:
@@ -44,7 +45,7 @@ class StageRegistry:
             Stage function or None
         """
         return self._stages.get(name)
-    
+
     def list_stages(self) -> list:
         """List all registered stages.
         
@@ -52,8 +53,8 @@ class StageRegistry:
             List of stage names
         """
         return list(self._stages.keys())
-    
-    def get_metadata(self, name: str) -> Dict[str, Any]:
+
+    def get_metadata(self, name: str) -> dict[str, Any]:
         """Get stage metadata.
         
         Args:
@@ -63,7 +64,7 @@ class StageRegistry:
             Stage metadata dictionary
         """
         return self._metadata.get(name, {})
-    
+
     def clear(self) -> None:
         """Clear all registered stages."""
         self._stages.clear()
@@ -74,7 +75,7 @@ class StageRegistry:
 _global_registry = StageRegistry()
 
 
-def register_stage(name: str, metadata: Optional[Dict[str, Any]] = None):
+def register_stage(name: str, metadata: dict[str, Any] | None = None):
     """Decorator for registering stages.
     
     Example:
@@ -88,7 +89,7 @@ def register_stage(name: str, metadata: Optional[Dict[str, Any]] = None):
     return decorator
 
 
-def get_stage(name: str) -> Optional[Callable]:
+def get_stage(name: str) -> Callable | None:
     """Get a registered stage by name."""
     return _global_registry.get(name)
 

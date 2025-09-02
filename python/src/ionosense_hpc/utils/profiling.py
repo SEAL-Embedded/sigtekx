@@ -1,6 +1,6 @@
 """Profiling utilities, including NVTX shims for NVIDIA Nsight."""
-from contextlib import contextmanager
 import warnings
+from contextlib import contextmanager
 
 try:
     import nvtx

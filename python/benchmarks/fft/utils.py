@@ -7,10 +7,11 @@ FFT benchmark scripts. This includes engine imports, NVTX shims,
 signal generation, statistical calculations, and console output.
 """
 from __future__ import annotations
-import numpy as np
-import sys
+
 import os
-from typing import Dict, List
+import sys
+
+import numpy as np
 
 # ─── Dependency Checks and Imports ────────────────────────────────────────────
 
@@ -66,7 +67,7 @@ def safe_print(text: str, file=None):
     """
     if file is None:
         file = sys.stdout
-    
+
     try:
         print(text, file=file)
     except UnicodeEncodeError:
@@ -115,25 +116,25 @@ def print_rocket(text: str):
 
 # ─── Data Generation & Stats ──────────────────────────────────────────────────
 
-def build_signal(sr: int, length_s: float, nfft: int) -> Dict[str, np.ndarray]:
+def build_signal(sr: int, length_s: float, nfft: int) -> dict[str, np.ndarray]:
     """Generates a synthetic two-channel signal."""
     num_samples = int(sr * length_s) + nfft * 2  # Add buffer
     t = np.arange(num_samples, dtype=np.float32) / sr
-    
+
     # Simple sine waves with a bit of noise
     ch1 = np.sin(2 * np.pi * 7_000 * t, dtype=np.float32)
     ch1 += 0.01 * np.random.randn(num_samples).astype(np.float32)
-    
+
     ch2 = np.sin(2 * np.pi * 1_000 * t, dtype=np.float32)
     ch2 += 0.01 * np.random.randn(num_samples).astype(np.float32)
-          
+
     return {"ch1": ch1, "ch2": ch2}
 
-def compute_stats(data: List[float]) -> Dict[str, float]:
+def compute_stats(data: list[float]) -> dict[str, float]:
     """Computes descriptive statistics for a list of numbers."""
     if not data:
-        return {key: 0.0 for key in ['mean', 'median', 'min', 'max', 'stdev', 'p95', 'p99']}
-    
+        return dict.fromkeys(['mean', 'median', 'min', 'max', 'stdev', 'p95', 'p99'], 0.0)
+
     arr = np.array(data, dtype=np.float64)
     return {
         'mean': arr.mean(), 'median': np.median(arr),
@@ -144,18 +145,18 @@ def compute_stats(data: List[float]) -> Dict[str, float]:
 
 # ─── Engine Initialization Helper ─────────────────────────────────────────────
 
-def create_engine(nfft: int, 
-                  batch_size: int, 
-                  use_graphs: bool = True, 
-                  verbose_override: bool = False) -> 'CudaFftEngine':
+def create_engine(nfft: int,
+                  batch_size: int,
+                  use_graphs: bool = True,
+                  verbose_override: bool = False) -> CudaFftEngine:
     """
     Helper to create a CudaFftEngine with smart defaults.
     Verbose output is automatically disabled under a profiler unless overridden.
     """
     if CudaFftEngine is None:
         raise RuntimeError("CudaFftEngine not available - module failed to import.")
-    
+
     # Make the engine verbose only when verbose_override is True.
     is_verbose = verbose_override
-    
+
     return CudaFftEngine(nfft, batch_size, use_graphs=use_graphs, verbose=is_verbose)

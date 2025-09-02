@@ -1,41 +1,23 @@
 """Utility functions for ionosense-hpc."""
 
 from .device import (
-    gpu_count,
+    check_cuda_available,
     current_device,
     device_info,
-    get_memory_usage,
-    check_cuda_available,
     get_compute_capability,
-    monitor_device
+    get_memory_usage,
+    gpu_count,
+    monitor_device,
 )
-
-from .logging import (
-    logger,
-    setup_logging,
-    log_config,
-    log_performance,
-    log_device_info
-)
-
-from .signals import (
-    make_sine,
-    make_chirp,
-    make_noise,
-    make_multitone,
-    make_test_batch
-)
-
-from .profiling import (
-    nvtx_range
-)
-
+from .logging import log_config, log_device_info, log_performance, logger, setup_logging
+from .profiling import nvtx_range
 from .reporting import (
+    print_accuracy_report,
     print_header,
     print_latency_report,
     print_throughput_report,
-    print_accuracy_report
 )
+from .signals import make_chirp, make_multitone, make_noise, make_sine, make_test_batch
 
 __all__ = [
     # Device utilities

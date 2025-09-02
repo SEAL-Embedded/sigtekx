@@ -1,7 +1,6 @@
 """Configuration validation utilities."""
 
 import warnings
-from typing import Optional, Tuple
 
 import numpy as np
 
@@ -11,7 +10,7 @@ from ..exceptions import ConfigError, ValidationError
 def validate_config_device_compatibility(
     config: 'EngineConfig',
     device_memory_mb: int,
-    compute_capability: Tuple[int, int]
+    compute_capability: tuple[int, int]
 ) -> None:
     """Validate configuration against device capabilities.
     
@@ -30,7 +29,7 @@ def validate_config_device_compatibility(
             f"Configuration requires ~{estimated_mb}MB but device has {device_memory_mb}MB",
             hint="Reduce batch size or nfft"
         )
-    
+
     # Compute capability check
     major, minor = compute_capability
     if major < 6:
@@ -38,7 +37,7 @@ def validate_config_device_compatibility(
             f"GPU compute capability {major}.{minor} is below recommended 6.0",
             PerformanceWarning
         )
-    
+
     # Large FFT warning
     if config.nfft > 16384:
         warnings.warn(
@@ -60,25 +59,25 @@ def estimate_memory_usage_mb(config: 'EngineConfig') -> int:
     input_size = config.nfft * config.batch * 4  # float32
     output_size = config.num_output_bins * config.batch * 4
     complex_size = output_size * 2  # complex float
-    
+
     # Account for all buffers
     per_buffer = input_size + output_size + complex_size
     total_bytes = per_buffer * config.pinned_buffer_count
-    
+
     # Add workspace estimates
     cufft_workspace = config.nfft * config.batch * 8  # Rough estimate
     total_bytes += cufft_workspace
-    
+
     # Window coefficients
     total_bytes += config.nfft * 4
-    
+
     return total_bytes // (1024 * 1024)
 
 
 def validate_input_array(
     data: np.ndarray,
-    expected_shape: Optional[Tuple[int, ...]] = None,
-    expected_dtype: Optional[np.dtype] = None,
+    expected_shape: tuple[int, ...] | None = None,
+    expected_dtype: np.dtype | None = None,
     name: str = "input"
 ) -> np.ndarray:
     """Validate and prepare a NumPy array for processing.
@@ -101,7 +100,7 @@ def validate_input_array(
             expected="numpy.ndarray",
             got=type(data).__name__
         )
-    
+
     # Shape validation
     if expected_shape is not None:
         if data.shape != expected_shape:
@@ -110,7 +109,7 @@ def validate_input_array(
                 expected=str(expected_shape),
                 got=str(data.shape)
             )
-    
+
     # Dtype validation/conversion
     if expected_dtype is not None:
         if data.dtype != expected_dtype:
@@ -122,16 +121,16 @@ def validate_input_array(
                     expected=str(expected_dtype),
                     got=str(data.dtype)
                 ) from e
-    
+
     # Check for contiguous memory
     if not data.flags['C_CONTIGUOUS']:
         data = np.ascontiguousarray(data)
-    
+
     # Check for NaN/Inf
     if np.issubdtype(data.dtype, np.floating):
         if not np.isfinite(data).all():
             warnings.warn(f"{name} contains NaN or Inf values", RuntimeWarning)
-    
+
     return data
 
 
@@ -148,7 +147,7 @@ def validate_batch_size(data: np.ndarray, config: 'EngineConfig') -> None:
     expected_samples = config.nfft * config.batch
     if data.size != expected_samples:
         raise ValidationError(
-            f"Data size mismatch for batch processing",
+            "Data size mismatch for batch processing",
             expected=f"{expected_samples} samples ({config.batch} x {config.nfft})",
             got=f"{data.size} samples"
         )

@@ -6,8 +6,8 @@ with <200μs latency targets.
 """
 
 import os
-import sys
 import platform
+import sys
 import warnings
 from pathlib import Path
 
@@ -26,16 +26,16 @@ def _bootstrap_windows_dlls():
     """
     if platform.system() != 'Windows':
         return
-    
+
     # Get the package directory
     package_dir = Path(__file__).parent
-    
+
     # Check for DLL directory
     dll_dir = package_dir / '.libs' / 'windows'
     if not dll_dir.exists():
         # Try alternative location
         dll_dir = package_dir / 'core'
-    
+
     if dll_dir.exists():
         # Add to DLL search path
         try:
@@ -45,14 +45,14 @@ def _bootstrap_windows_dlls():
             # Fallback for older Python
             if str(dll_dir) not in os.environ.get('PATH', ''):
                 os.environ['PATH'] = str(dll_dir) + os.pathsep + os.environ.get('PATH', '')
-    
+
     # Also check for CUDA toolkit in PATH
     cuda_paths = [
         r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.0\bin',
         r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.8\bin',
         r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.7\bin',
     ]
-    
+
     for cuda_path in cuda_paths:
         if Path(cuda_path).exists():
             try:
@@ -71,38 +71,30 @@ _bootstrap_windows_dlls()
 # ============================================================================
 
 # Import exceptions first (no dependencies)
+# Import configuration (minimal dependencies)
+from .config import EngineConfig, Presets
 from .exceptions import (
-    IonosenseError,
     ConfigError,
     DeviceNotFoundError,
     DllLoadError,
-    EngineStateError,
     EngineRuntimeError,
-    ValidationError
-)
-
-# Import configuration (minimal dependencies)
-from .config import (
-    EngineConfig,
-    Presets
+    EngineStateError,
+    IonosenseError,
+    ValidationError,
 )
 
 # Import utilities (may use pynvml)
-from .utils.device import gpu_count, current_device, device_info
-from .utils.signals import make_sine, make_chirp, make_noise, make_multitone
+from .utils.device import current_device, device_info, gpu_count
+from .utils.signals import make_chirp, make_multitone, make_noise, make_sine
 
 # Import core engine classes (requires _engine module)
 try:
-    from .core import (
-        RawEngine,
-        Engine,
-        Processor
-    )
+    from .core import Engine, Processor, RawEngine
     _ENGINE_AVAILABLE = True
 except (ImportError, DllLoadError) as e:
     _ENGINE_AVAILABLE = False
     _ENGINE_ERROR = str(e)
-    
+
     # Provide dummy classes for better error messages
     class Processor:
         def __init__(self, *args, **kwargs):
@@ -112,15 +104,15 @@ except (ImportError, DllLoadError) as e:
                 f"  Linux/WSL: ./scripts/cli.sh build\n"
                 f"  Windows: .\\scripts\\cli.ps1 build"
             )
-    
+
     class Engine:
         def __init__(self, *args, **kwargs):
             raise RuntimeError(f"Engine not available: {_ENGINE_ERROR}")
-    
+
     class RawEngine:
         def __init__(self, *args, **kwargs):
             raise RuntimeError(f"Engine not available: {_ENGINE_ERROR}")
-    
+
     warnings.warn(
         f"C++ engine module could not be loaded: {_ENGINE_ERROR}",
         ImportWarning
@@ -178,7 +170,7 @@ def show_versions(verbose: bool = True) -> dict:
         Dictionary with version information
     """
     import numpy as np
-    
+
     versions = {
         'ionosense_hpc': __version__,
         'python': f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
@@ -186,7 +178,7 @@ def show_versions(verbose: bool = True) -> dict:
         'platform': platform.platform(),
         'engine_available': _ENGINE_AVAILABLE
     }
-    
+
     # Try to get CUDA version
     if _ENGINE_AVAILABLE:
         try:
@@ -201,20 +193,20 @@ def show_versions(verbose: bool = True) -> dict:
     else:
         versions['cuda'] = 'N/A (engine not loaded)'
         versions['device'] = 'N/A'
-    
+
     # Try to get pynvml version
     try:
         import pynvml
         versions['pynvml'] = pynvml.__version__ if hasattr(pynvml, '__version__') else 'installed'
     except ImportError:
         versions['pynvml'] = 'not installed'
-    
+
     if verbose:
         print("Ionosense-HPC Environment")
         print("=" * 40)
         for key, value in versions.items():
             print(f"{key:20s}: {value}")
-    
+
     return versions
 
 
@@ -230,9 +222,9 @@ def self_test(verbose: bool = True) -> bool:
     if verbose:
         print("Running ionosense-hpc self-test...")
         print("-" * 40)
-    
+
     all_passed = True
-    
+
     # Test 1: Check engine availability
     if verbose:
         print("1. Checking engine availability...")
@@ -243,7 +235,7 @@ def self_test(verbose: bool = True) -> bool:
     else:
         if verbose:
             print("   OK: Engine module loaded")
-    
+
     # Test 2: Check GPU availability
     if verbose:
         print("2. Checking GPU availability...")
@@ -260,7 +252,7 @@ def self_test(verbose: bool = True) -> bool:
         if verbose:
             print(f"   FAIL: {e}")
         all_passed = False
-    
+
     # Test 3: Try to create and initialize processor
     if verbose:
         print("3. Testing processor initialization...")
@@ -274,7 +266,7 @@ def self_test(verbose: bool = True) -> bool:
             print(f"   FAIL: {e}")
         all_passed = False
         return False
-    
+
     # Test 4: Run a simple processing test
     if verbose:
         print("4. Testing signal processing...")
@@ -282,7 +274,7 @@ def self_test(verbose: bool = True) -> bool:
         import numpy as np
         test_data = np.zeros(256, dtype=np.float32)  # Validation preset uses nfft=256, batch=1
         output = proc.process(test_data)
-        
+
         if output.shape != (1, 129):  # batch=1, bins=nfft/2+1
             if verbose:
                 print(f"   FAIL: Unexpected output shape {output.shape}")
@@ -296,7 +288,7 @@ def self_test(verbose: bool = True) -> bool:
         all_passed = False
     finally:
         proc.reset()
-    
+
     # Test 5: Check for NaN/Inf in output
     if verbose:
         print("5. Checking numerical stability...")
@@ -308,14 +300,14 @@ def self_test(verbose: bool = True) -> bool:
         else:
             if verbose:
                 print("   OK: Output is numerically stable")
-    
+
     if verbose:
         print("-" * 40)
         if all_passed:
             print("Self-test PASSED ✓")
         else:
             print("Self-test completed with warnings")
-    
+
     return all_passed
 
 
@@ -325,6 +317,7 @@ def self_test(verbose: bool = True) -> bool:
 
 # Set up logging on import
 from .utils.logging import setup_logging
+
 setup_logging()
 
 # Warn if running in an environment without GPU

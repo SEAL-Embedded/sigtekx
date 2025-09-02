@@ -1,12 +1,13 @@
 """Pre-configured engine settings for common use cases."""
 
-from typing import Dict, Any
+from typing import Any
+
 from .schemas import EngineConfig
 
 
 class Presets:
     """Collection of pre-configured engine settings."""
-    
+
     @staticmethod
     def realtime() -> EngineConfig:
         """Configuration for real-time processing with minimal latency.
@@ -25,7 +26,7 @@ class Presets:
             use_cuda_graphs=False,  # Future optimization
             enable_profiling=False  # Minimize overhead
         )
-    
+
     @staticmethod
     def throughput() -> EngineConfig:
         """Configuration for maximum throughput batch processing.
@@ -44,7 +45,7 @@ class Presets:
             use_cuda_graphs=False,
             enable_profiling=False
         )
-    
+
     @staticmethod
     def validation() -> EngineConfig:
         """Configuration for accuracy validation and testing.
@@ -63,7 +64,7 @@ class Presets:
             use_cuda_graphs=False,
             enable_profiling=True  # Enable for debugging
         )
-    
+
     @staticmethod
     def profiling() -> EngineConfig:
         """Configuration optimized for profiling and benchmarking.
@@ -82,7 +83,7 @@ class Presets:
             use_cuda_graphs=False,
             enable_profiling=True
         )
-    
+
     @staticmethod
     def custom(**kwargs: Any) -> EngineConfig:
         """Create a custom configuration starting from realtime preset.
@@ -103,9 +104,9 @@ class Presets:
             else:
                 raise ValueError(f"Unknown parameter: {key}")
         return base
-    
+
     @classmethod
-    def list_presets(cls) -> Dict[str, EngineConfig]:
+    def list_presets(cls) -> dict[str, EngineConfig]:
         """Get all available presets.
         
         Returns:

@@ -5,23 +5,23 @@ Simulates a real-time, dual-channel FFT processing scenario to
 measure latency and deadline adherence, following RSE/RE standards.
 """
 import argparse
-import time
 import json
 import sys
-from typing import Dict, Any
+import time
+from typing import Any
 
 import numpy as np
 from tqdm import tqdm
 
-from ..core import Processor
 from ..config import EngineConfig, Presets
-from ..utils.signals import make_test_batch
+from ..core import Processor
+from ..utils.logging import logger, setup_logging
 from ..utils.profiling import nvtx_range
 from ..utils.reporting import print_latency_report
-from ..utils.logging import logger, setup_logging
+from ..utils.signals import make_test_batch
 
 
-def benchmark_realtime(config: EngineConfig, duration_seconds: float) -> Dict[str, Any]:
+def benchmark_realtime(config: EngineConfig, duration_seconds: float) -> dict[str, Any]:
     """
     Runs a real-time benchmark with pacing to simulate a real-world stream.
     
@@ -37,7 +37,7 @@ def benchmark_realtime(config: EngineConfig, duration_seconds: float) -> Dict[st
     deadline_s = deadline_ms / 1000.0
     if deadline_s <= 0:
         raise ValueError("Hop duration must be positive for real-time benchmark.")
-        
+
     num_frames = int(duration_seconds / deadline_s)
 
     logger.info(f"Simulating real-time stream for {duration_seconds}s...")
@@ -46,36 +46,36 @@ def benchmark_realtime(config: EngineConfig, duration_seconds: float) -> Dict[st
 
     latencies_ms = []
     missed_deadlines = 0
-    
+
     # Use consistent test data for each frame
     test_data = make_test_batch(config.nfft, config.batch, signal_type='noise', seed=42)
 
     with Processor(config) as proc:
         # Warmup is handled by the Processor's initialization
-        
+
         t_global_start = time.perf_counter()
-        
+
         with nvtx_range("realtime_simulation_loop"):
             for i in tqdm(range(num_frames), desc="Real-time Simulation", unit="frame"):
                 # Calculate when the next frame of data would be "available"
                 target_time = t_global_start + (i + 1) * deadline_s
-                
+
                 # Pacing: Wait until the target time is reached
                 # A busy-wait is used for higher timing precision than time.sleep()
                 while time.perf_counter() < target_time:
                     pass
-                
+
                 # --- Latency Measurement ---
                 with nvtx_range(f"frame_{i}"):
                     t_iter_start = time.perf_counter()
-                    
+
                     proc.process(test_data)
-                    
+
                     t_iter_end = time.perf_counter()
-                
+
                 latency_ms = (t_iter_end - t_iter_start) * 1000.0
                 latencies_ms.append(latency_ms)
-                
+
                 if latency_ms > deadline_ms:
                     missed_deadlines += 1
 
@@ -102,7 +102,7 @@ if __name__ == "__main__":
     parser.add_argument("--preset", type=str, default="realtime", help="Configuration preset to use (e.g., 'realtime', 'profiling').")
     parser.add_argument("-d", "--duration", type=float, default=10.0, help="Benchmark duration in seconds.")
     parser.add_argument("-o", "--output", type=str, help="Optional JSON output file path.")
-    
+
     args = parser.parse_args()
 
     setup_logging(level="INFO")
@@ -117,10 +117,10 @@ if __name__ == "__main__":
     except Exception as e:
         logger.error(f"Failed to load preset '{args.preset}': {e}")
         sys.exit(1)
-        
+
     # Run the benchmark
     results = benchmark_realtime(config, args.duration)
-    
+
     # Print the formatted report
     print_latency_report(results, title="Real-time Performance Report")
 
@@ -129,5 +129,5 @@ if __name__ == "__main__":
             with open(args.output, 'w') as f:
                 json.dump(results, f, indent=2, default=str)
             logger.info(f"Results saved to {args.output}")
-        except IOError as e:
+        except OSError as e:
             logger.error(f"Failed to write output file: {e}")

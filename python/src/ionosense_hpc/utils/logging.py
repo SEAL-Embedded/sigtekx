@@ -3,17 +3,15 @@
 import logging
 import os
 import sys
-from typing import Optional
-
 
 # Module logger
 logger = logging.getLogger('ionosense_hpc')
 
 
 def setup_logging(
-    level: Optional[str] = None,
-    format_string: Optional[str] = None,
-    log_file: Optional[str] = None
+    level: str | None = None,
+    format_string: str | None = None,
+    log_file: str | None = None
 ) -> logging.Logger:
     """Configure logging for the ionosense_hpc package.
     
@@ -28,31 +26,31 @@ def setup_logging(
     # Check environment variable for log level
     if level is None:
         level = os.environ.get('IONO_LOG_LEVEL', 'INFO')
-    
+
     # Default format
     if format_string is None:
         format_string = '[%(asctime)s] %(name)s %(levelname)s: %(message)s'
-    
+
     # Configure logger
     logger.setLevel(getattr(logging, level.upper()))
-    
+
     # Remove existing handlers
     logger.handlers.clear()
-    
+
     # Console handler
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(logging.Formatter(format_string))
     logger.addHandler(console_handler)
-    
+
     # File handler if requested
     if log_file:
         file_handler = logging.FileHandler(log_file)
         file_handler.setFormatter(logging.Formatter(format_string))
         logger.addHandler(file_handler)
-    
+
     # Prevent propagation to root logger
     logger.propagate = False
-    
+
     return logger
 
 
@@ -63,7 +61,7 @@ def log_config(config: 'EngineConfig', level: int = logging.INFO) -> None:
         config: Engine configuration to log
         level: Logging level to use
     """
-    logger.log(level, f"Engine Configuration:")
+    logger.log(level, "Engine Configuration:")
     logger.log(level, f"  FFT Size: {config.nfft}")
     logger.log(level, f"  Batch Size: {config.batch}")
     logger.log(level, f"  Sample Rate: {config.sample_rate_hz} Hz")

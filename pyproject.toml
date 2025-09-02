@@ -97,6 +97,7 @@ target-version = "py311"
 line-length = 100
 src = ["python/src", "python/tests"]
 
+[tool.ruff.lint]
 select = [
   "E",   # pycodestyle errors
   "W",   # pycodestyle warnings
@@ -113,17 +114,15 @@ ignore = [
   "E501",  # line too long (handled by formatter)
   "B008",  # do not perform function calls in argument defaults
 ]
+isort.known-first-party = ["ionosense_hpc"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401", "E402", "ARG002"]
+"python/tests/*" = ["B", "SIM", "ARG001", "ARG002"]
 
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
-
-[tool.ruff.isort]
-known-first-party = ["ionosense_hpc"]
-
-[tool.ruff.per-file-ignores]
-"__init__.py" = ["F401", "E402"]
-"python/tests/*" = ["B", "SIM", "ARG001", "ARG002"]
 
 # --- Static Type Checking (Mypy) ---
 [tool.mypy]

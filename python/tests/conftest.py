@@ -34,7 +34,7 @@ def pytest_collection_modifyitems(config, items):
     if not config.getoption("--no-gpu"):
         # --no-gpu flag is NOT set, so run all tests.
         return
-    
+
     # --no-gpu flag IS set, so skip all tests marked with 'gpu'.
     skip_gpu = pytest.mark.skip(reason="--no-gpu option used to skip GPU-dependent tests")
     for item in items:

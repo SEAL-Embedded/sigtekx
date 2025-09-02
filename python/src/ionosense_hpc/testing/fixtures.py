@@ -1,9 +1,10 @@
 """Shared pytest fixtures for testing."""
 
-import pytest
-import numpy as np
+from collections.abc import Generator
 from pathlib import Path
-from typing import Generator, Any
+
+import numpy as np
+import pytest
 
 from ..config import EngineConfig, Presets
 from ..core import Processor

@@ -1,15 +1,15 @@
 # python/tests/test_exceptions.py
 
-import pytest
 from ionosense_hpc.exceptions import (
-    IonosenseError,
     ConfigError,
     DeviceNotFoundError,
     DllLoadError,
-    EngineStateError,
     EngineRuntimeError,
-    ValidationError
+    EngineStateError,
+    IonosenseError,
+    ValidationError,
 )
+
 
 def test_ionosense_error_str():
     """Test the base __str__ method for IonosenseError."""
@@ -70,7 +70,7 @@ def test_engine_runtime_error():
     # Out of memory error
     err_mem = EngineRuntimeError("CUDA Error", cuda_error="out of memory")
     assert "Reduce batch size or nfft" in str(err_mem)
-    
+
     # Invalid configuration error
     err_config = EngineRuntimeError("CUDA Error", cuda_error="invalid configuration")
     assert "Check that nfft is a power of 2" in str(err_config)

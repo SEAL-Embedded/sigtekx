@@ -1,7 +1,7 @@
 """Utilities for printing clean, formatted benchmark reports to the console."""
 
 import json
-from typing import Dict, Any
+from typing import Any
 
 try:
     from tabulate import tabulate
@@ -16,7 +16,7 @@ def print_header(title: str):
     print(f" {title.upper()}")
     print(f"{bar}")
 
-def print_dict_as_json(data: Dict[str, Any]):
+def print_dict_as_json(data: dict[str, Any]):
     """Prints a dictionary as a nicely formatted JSON string."""
     print(json.dumps(data, indent=2, default=str))
 
@@ -26,10 +26,10 @@ def fmt_ms_to_us(val_ms: float) -> str:
         return f"{val_ms * 1000:.2f} µs"
     return f"{val_ms:.2f} ms"
 
-def print_latency_report(results: Dict[str, Any], title: str = "Latency Report"):
+def print_latency_report(results: dict[str, Any], title: str = "Latency Report"):
     """Prints a formatted latency report using tabulate if available."""
     print_header(title)
-    
+
     headers = ["Metric", "Value"]
     table = [
         ["Mean", fmt_ms_to_us(results.get('mean_us', 0) / 1000)],
@@ -40,7 +40,7 @@ def print_latency_report(results: Dict[str, Any], title: str = "Latency Report")
         ["Min", fmt_ms_to_us(results.get('min_us', 0) / 1000)],
         ["Max", fmt_ms_to_us(results.get('max_us', 0) / 1000)],
     ]
-    
+
     # Add real-time specific metrics if they exist
     if 'deadline_ms' in results:
         table.append(["-" * 15, "-" * 15]) # Separator
@@ -53,12 +53,12 @@ def print_latency_report(results: Dict[str, Any], title: str = "Latency Report")
         print("\n".join([f"  {row[0]:<20}: {row[1]}" for row in table]))
 
 
-def print_throughput_report(results: Dict[str, Any], title: str = "Throughput Report"):
+def print_throughput_report(results: dict[str, Any], title: str = "Throughput Report"):
     """Prints a formatted throughput report."""
     print_header(title)
     tp = results.get('throughput', {})
     rt = results.get('runtime', {})
-    
+
     headers = ["Metric", "Value"]
     table = [
         ["Duration", f"{rt.get('elapsed_seconds', 0):.2f} s"],
@@ -71,13 +71,13 @@ def print_throughput_report(results: Dict[str, Any], title: str = "Throughput Re
     else:
         print("\n".join([f"  {row[0]:<20}: {row[1]}" for row in table]))
 
-def print_accuracy_report(results: Dict[str, Any], title: str = "Accuracy Report"):
+def print_accuracy_report(results: dict[str, Any], title: str = "Accuracy Report"):
     """Prints a formatted accuracy report."""
     print_header(title)
     summary = results['summary']
     pass_rate = summary.get('pass_rate', 0)
     status = "✅ PASSED" if pass_rate == 1.0 else "⚠️  WARNING" if pass_rate > 0 else "❌ FAILED"
-    
+
     print(f"Overall Result: {status} ({summary['passed']}/{summary['total_tests']} tests passed, {pass_rate:.1%})")
     print(f"Tolerance: {results['tolerance']:.1e}\n")
 
@@ -89,7 +89,7 @@ def print_accuracy_report(results: Dict[str, Any], title: str = "Accuracy Report
             "✅" if test['passed'] else "❌",
             f"{test['max_error']:.3e}"
         ])
-        
+
     if TABULATE_AVAILABLE:
         print(tabulate(table, headers=headers, tablefmt="heavy_outline", stralign="center"))
     else:

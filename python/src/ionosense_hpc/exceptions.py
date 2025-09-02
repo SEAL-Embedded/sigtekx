@@ -1,15 +1,15 @@
 """Custom exception hierarchy for ionosense-hpc."""
 
-from typing import Optional, Any
+from typing import Any
 
 
 class IonosenseError(Exception):
     """Base exception for all ionosense-hpc errors."""
-    
-    def __init__(self, message: str, hint: Optional[str] = None):
+
+    def __init__(self, message: str, hint: str | None = None):
         super().__init__(message)
         self.hint = hint
-    
+
     def __str__(self) -> str:
         msg = super().__str__()
         if self.hint:
@@ -19,8 +19,8 @@ class IonosenseError(Exception):
 
 class ConfigError(IonosenseError):
     """Configuration validation or compatibility error."""
-    
-    def __init__(self, message: str, field: Optional[str] = None, value: Any = None):
+
+    def __init__(self, message: str, field: str | None = None, value: Any = None):
         hint = None
         if field:
             hint = f"Check the '{field}' field"
@@ -33,7 +33,7 @@ class ConfigError(IonosenseError):
 
 class DeviceNotFoundError(IonosenseError):
     """No CUDA-capable devices found."""
-    
+
     def __init__(self, message: str = "No CUDA-capable devices found"):
         hint = "Ensure NVIDIA drivers are installed and a GPU is present"
         super().__init__(message, hint)
@@ -41,8 +41,8 @@ class DeviceNotFoundError(IonosenseError):
 
 class DllLoadError(IonosenseError):
     """Failed to load required DLL/shared library."""
-    
-    def __init__(self, dll_name: str, original_error: Optional[Exception] = None):
+
+    def __init__(self, dll_name: str, original_error: Exception | None = None):
         message = f"Failed to load {dll_name}"
         if original_error:
             message += f": {original_error}"
@@ -54,8 +54,8 @@ class DllLoadError(IonosenseError):
 
 class EngineStateError(IonosenseError):
     """Engine is in an invalid state for the requested operation."""
-    
-    def __init__(self, message: str, current_state: Optional[str] = None):
+
+    def __init__(self, message: str, current_state: str | None = None):
         hint = None
         if current_state == "uninitialized":
             hint = "Call initialize() or use the Processor context manager"
@@ -67,8 +67,8 @@ class EngineStateError(IonosenseError):
 
 class EngineRuntimeError(IonosenseError):
     """Runtime error during engine processing."""
-    
-    def __init__(self, message: str, cuda_error: Optional[str] = None):
+
+    def __init__(self, message: str, cuda_error: str | None = None):
         hint = None
         if cuda_error:
             if "out of memory" in cuda_error.lower():
@@ -81,8 +81,8 @@ class EngineRuntimeError(IonosenseError):
 
 class ValidationError(IonosenseError):
     """Input data validation error."""
-    
-    def __init__(self, message: str, expected: Optional[str] = None, got: Optional[str] = None):
+
+    def __init__(self, message: str, expected: str | None = None, got: str | None = None):
         hint = None
         if expected and got:
             hint = f"Expected {expected}, got {got}"

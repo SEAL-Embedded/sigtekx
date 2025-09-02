@@ -1,6 +1,5 @@
 """Signal generation utilities for testing and validation."""
 
-from typing import Optional, Union
 
 import numpy as np
 
@@ -55,7 +54,7 @@ def make_chirp(
         1D array containing the chirp signal
     """
     t = np.arange(0, duration, 1.0 / sample_rate, dtype=np.float64)
-    
+
     if method == 'linear':
         # Linear frequency sweep
         phase = 2 * np.pi * (f_start * t + (f_end - f_start) * t**2 / (2 * duration))
@@ -67,7 +66,7 @@ def make_chirp(
         phase = 2 * np.pi * beta * f_start * (np.exp(t / beta) - 1)
     else:
         raise ValueError(f"Unknown method: {method}")
-    
+
     signal = amplitude * np.sin(phase)
     return signal.astype(dtype)
 
@@ -77,7 +76,7 @@ def make_noise(
     sample_rate: int = 48000,
     noise_type: str = 'white',
     amplitude: float = 1.0,
-    seed: Optional[int] = None,
+    seed: int | None = None,
     dtype: np.dtype = np.float32
 ) -> np.ndarray:
     """Generate noise signal.
@@ -95,13 +94,13 @@ def make_noise(
     """
     if seed is not None:
         np.random.seed(seed)
-    
+
     n_samples = int(duration * sample_rate)
-    
+
     if noise_type == 'white':
         # White noise: flat spectrum
         signal = np.random.randn(n_samples)
-        
+
     elif noise_type == 'pink':
         # Pink noise: 1/f spectrum
         # Simple approximation using filtering
@@ -114,26 +113,26 @@ def make_noise(
             signal[i] = sum(b[j] * white[i-j] for j in range(len(b)))
             if i >= len(a):
                 signal[i] -= sum(a[j] * signal[i-j] for j in range(1, len(a)))
-                
+
     elif noise_type == 'brown':
         # Brown noise: 1/f² spectrum (integrated white noise)
         white = np.random.randn(n_samples)
         signal = np.cumsum(white) / np.sqrt(n_samples)
-        
+
     else:
         raise ValueError(f"Unknown noise type: {noise_type}")
-    
+
     # Normalize to desired amplitude
     signal = amplitude * signal / np.std(signal)
     return signal.astype(dtype)
 
 
 def make_multitone(
-    frequencies: Union[list, np.ndarray],
+    frequencies: list | np.ndarray,
     duration: float,
     sample_rate: int = 48000,
-    amplitudes: Optional[Union[list, np.ndarray]] = None,
-    phases: Optional[Union[list, np.ndarray]] = None,
+    amplitudes: list | np.ndarray | None = None,
+    phases: list | np.ndarray | None = None,
     dtype: np.dtype = np.float32
 ) -> np.ndarray:
     """Generate a multi-tone signal.
@@ -151,23 +150,23 @@ def make_multitone(
     """
     frequencies = np.asarray(frequencies)
     n_tones = len(frequencies)
-    
+
     if amplitudes is None:
         amplitudes = np.ones(n_tones) / n_tones
     else:
         amplitudes = np.asarray(amplitudes)
-    
+
     if phases is None:
         phases = np.zeros(n_tones)
     else:
         phases = np.asarray(phases)
-    
+
     t = np.arange(0, duration, 1.0 / sample_rate, dtype=np.float64)
     signal = np.zeros_like(t)
-    
-    for freq, amp, phase in zip(frequencies, amplitudes, phases):
+
+    for freq, amp, phase in zip(frequencies, amplitudes, phases, strict=False):
         signal += amp * np.sin(2 * np.pi * freq * t + phase)
-    
+
     return signal.astype(dtype)
 
 
@@ -175,7 +174,7 @@ def make_test_batch(
     nfft: int,
     batch: int,
     signal_type: str = 'sine',
-    seed: Optional[int] = None,
+    seed: int | None = None,
     **kwargs
 ) -> np.ndarray:
     """Generate a batch of test signals for engine processing.
@@ -192,19 +191,19 @@ def make_test_batch(
     """
     if seed is not None:
         np.random.seed(seed)
-    
+
     # Generate base signal
     duration = nfft / kwargs.get('sample_rate', 48000)
-    
+
     if signal_type == 'sine':
         frequency = kwargs.get('frequency', 1000.0)
-        base_signal = make_sine(frequency, duration, **{k: v for k, v in kwargs.items() 
+        base_signal = make_sine(frequency, duration, **{k: v for k, v in kwargs.items()
                                                         if k not in ['frequency']})
     elif signal_type == 'chirp':
         f_start = kwargs.get('f_start', 100.0)
         f_end = kwargs.get('f_end', 5000.0)
-        base_signal = make_chirp(f_start, f_end, duration, 
-                                 **{k: v for k, v in kwargs.items() 
+        base_signal = make_chirp(f_start, f_end, duration,
+                                 **{k: v for k, v in kwargs.items()
                                     if k not in ['f_start', 'f_end']})
     elif signal_type == 'noise':
         base_signal = make_noise(duration, **kwargs)
@@ -212,13 +211,13 @@ def make_test_batch(
         base_signal = np.zeros(nfft, dtype=np.float32)
     else:
         raise ValueError(f"Unknown signal type: {signal_type}")
-    
+
     # Ensure correct length
     if len(base_signal) > nfft:
         base_signal = base_signal[:nfft]
     elif len(base_signal) < nfft:
         base_signal = np.pad(base_signal, (0, nfft - len(base_signal)))
-    
+
     # Create batch
     if batch == 1:
         return base_signal
@@ -237,7 +236,7 @@ def make_test_batch(
                 # Add small frequency/phase variation
                 noise = make_noise(duration, amplitude=0.01, seed=(seed + i) if seed else None)
                 channel_signal = base_signal + noise[:len(base_signal)]
-            
+
             batch_data[i * nfft:(i + 1) * nfft] = channel_signal
-        
+
         return batch_data

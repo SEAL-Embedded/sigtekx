@@ -1,10 +1,12 @@
 # python/tests/test_fixtures.py
 
-import pytest
-import numpy as np
 from pathlib import Path
+
+import numpy as np
+
 from ionosense_hpc.config import EngineConfig
 from ionosense_hpc.core import Processor
+
 
 def test_temp_data_dir(temp_data_dir):
     """Test the temp_data_dir fixture."""
@@ -19,7 +21,7 @@ def test_config_fixtures(validation_config, realtime_config, benchmark_config):
 
     assert isinstance(realtime_config, EngineConfig)
     assert realtime_config.nfft == 1024
-    
+
     assert isinstance(benchmark_config, EngineConfig)
     assert benchmark_config.enable_profiling is True
 
@@ -42,7 +44,7 @@ def test_data_generation_fixtures(test_sine_data, test_batch_data, test_noise_da
     assert test_batch_data.shape == (2048,)
 
     assert isinstance(test_noise_data, np.ndarray)
-    
+
     assert isinstance(reference_fft_output, np.ndarray)
     assert len(reference_fft_output) == 256 // 2 + 1
 
