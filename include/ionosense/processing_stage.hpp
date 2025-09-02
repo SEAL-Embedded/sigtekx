@@ -1,89 +1,144 @@
-// include/ionosense/processing_stage.hpp
+/**
+ * @file processing_stage.hpp
+ * @version 1.0
+ * @date 2025-09-01
+ * @author [Kevin Rahsaz]
+ *
+ * @brief Defines the abstract interface and concrete implementations for stages
+ * in the signal processing pipeline.
+ *
+ * This file specifies the IProcessingStage interface using the Strategy design
+ * pattern, allowing for a flexible and extensible pipeline architecture. It also
+ * provides the concrete stages for the v1.0 pipeline: Window, FFT, and Magnitude.
+ * The design promotes modularity and testability, key tenets of RSE/RE.
+ */
+
 #pragma once
 
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <vector>
+#include <string>
 #include <cuda_runtime_api.h>
 
-// IMPORTANT: pull the real template BEFORE anyone uses DeviceBuffer<T>.
 #include "ionosense/cuda_wrappers.hpp"
 
 namespace ionosense {
 
-// Configuration for processing stages
+/**
+ * @struct StageConfig
+ * @brief Configuration parameters for all processing stages.
+ *
+ * Consolidates settings for FFT, windowing, scaling, and execution logic
+ * to ensure consistent configuration across the entire pipeline.
+ */
 struct StageConfig {
-    // FFT parameters
-    int    nfft            = 1024;
-    int    batch           = 2;
-    float  overlap         = 0.5f;
-    int    sample_rate_hz  = 48000;
+    // --- FFT Parameters ---
+    int    nfft            = 1024;  ///< FFT size (number of points). Must be a power of 2.
+    int    batch           = 2;     ///< Number of signals to process in parallel.
+    float  overlap         = 0.5f;  ///< Overlap factor between consecutive frames [0.0, 1.0).
+    int    sample_rate_hz  = 48000; ///< Sample rate of the input signal in Hz.
     
-    // Window parameters
-    enum class WindowType { HANN };
-    WindowType window_type = WindowType::HANN;
-    enum class WindowNorm { UNITY, SQRT };
-    WindowNorm window_norm = WindowNorm::UNITY;
-    bool preload_window = true;
+    // --- Windowing Parameters ---
+    enum class WindowType { HANN }; ///< Enumeration of supported window types.
+    WindowType window_type = WindowType::HANN; ///< The window function to apply.
+
+    enum class WindowNorm { UNITY, SQRT }; ///< Normalization type for the window.
+    WindowNorm window_norm = WindowNorm::UNITY; ///< The normalization scheme.
     
-    // Scaling parameters
-    enum class ScalePolicy { NONE, ONE_OVER_N, ONE_OVER_SQRT_N };
-    ScalePolicy scale_policy = ScalePolicy::NONE;
+    bool preload_window = true; ///< If true, window coefficients are uploaded to GPU once at initialization.
+
+    // --- Scaling Parameters ---
+    enum class ScalePolicy { NONE, ONE_OVER_N, ONE_OVER_SQRT_N }; ///< FFT output scaling policies.
+    ScalePolicy scale_policy = ScalePolicy::NONE; ///< Scaling policy for the FFT output.
     
-    // Output parameters
-    enum class OutputMode { MAGNITUDE, COMPLEX_PASSTHROUGH };
-    OutputMode output_mode = OutputMode::MAGNITUDE;
+    // --- Output Parameters ---
+    enum class OutputMode { MAGNITUDE, COMPLEX_PASSTHROUGH }; ///< Desired output format.
+    OutputMode output_mode = OutputMode::MAGNITUDE; ///< Output format.
+
+    // --- Execution Parameters ---
+    bool inplace = true;        ///< Hint for whether stages can operate in-place.
+    int warmup_iters = 1;       ///< Number of warmup iterations during initialization.
     
-    // Execution parameters
-    bool inplace = true;
-    int warmup_iters = 1;
-    
-    // Derived parameters (computed)
+    /**
+     * @brief Calculates the hop size (number of samples between frames).
+     * @return The hop size in samples.
+     */
     int hop_size() const {
         return static_cast<int>(nfft * (1.0f - overlap));
     }
 };
 
-// Processing statistics for monitoring
+/**
+ * @struct ProcessingStats
+ * @brief Holds performance metrics for a processing operation.
+ */
 struct ProcessingStats {
-    float   latency_us        = 0.0f;
-    float   throughput_gbps   = 0.0f;
-    size_t  frames_processed  = 0;
-    bool    is_warmup         = true;
+    float   latency_us        = 0.0f; ///< Total latency for the operation in microseconds.
+    float   throughput_gbps   = 0.0f; ///< Achieved throughput in GB/s.
+    size_t  frames_processed  = 0;    ///< Cumulative count of processed frames.
+    bool    is_warmup         = true; ///< Flag indicating if the metric is from a warmup run.
 };
 
-// Abstract base class for processing stages (Strategy pattern)
+/**
+ * @class IProcessingStage
+ * @brief Abstract base class for a stage in the processing pipeline (Strategy Pattern).
+ *
+ * Defines the common interface that all processing stages must implement,
+ * ensuring interchangeability and a consistent pipeline structure.
+ */
 class IProcessingStage {
 public:
     virtual ~IProcessingStage() = default;
     
-    // Initialize the stage with configuration
+    /**
+     * @brief Initializes the stage with a given configuration and CUDA stream.
+     * @param config The configuration settings for the stage.
+     * @param stream The CUDA stream to be used for initialization tasks.
+     */
     virtual void initialize(const StageConfig& config, cudaStream_t stream) = 0;
     
-    // Process data through this stage
-    virtual void process(void* input, void* output, size_t num_samples,
+    /**
+     * @brief Processes data through this stage.
+     * @param input Pointer to the input data on the device. Type is stage-dependent.
+     * @param output Pointer to the output data on the device.
+     * @param num_elements The number of elements to process.
+     * @param stream The CUDA stream to execute the processing on.
+     */
+    virtual void process(void* input, void* output, size_t num_elements,
                         cudaStream_t stream) = 0;
     
-    // Get stage name for debugging/profiling
+    /**
+     * @brief Gets the name of the stage for identification.
+     * @return A string containing the stage's name.
+     */
     virtual std::string name() const = 0;
     
-    // Check if stage can work in-place
+    /**
+     * @brief Reports whether the stage supports in-place processing.
+     * @return True if the stage can use the same buffer for input and output, false otherwise.
+     */
     virtual bool supports_inplace() const = 0;
     
-    // Get memory requirements
+    /**
+     * @brief Gets the device memory size required by the stage for its workspace.
+     * @return The required workspace size in bytes.
+     */
     virtual size_t get_workspace_size() const = 0;
 };
 
-// Window stage - applies window function to input signal
+/**
+ * @class WindowStage
+ * @brief Applies a window function to the input signal.
+ */
 class WindowStage : public IProcessingStage {
 public:
     WindowStage();
     ~WindowStage();
     
     void initialize(const StageConfig& config, cudaStream_t stream) override;
-    void process(void* input, void* output, size_t num_samples,
-                cudaStream_t stream) override;
+    void process(void* input, void* output, size_t num_samples, cudaStream_t stream) override;
     std::string name() const override { return "WindowStage"; }
     bool supports_inplace() const override { return true; }
     size_t get_workspace_size() const override;
@@ -93,15 +148,17 @@ private:
     std::unique_ptr<Impl> pImpl;
 };
 
-// FFT stage - performs cuFFT transform
+/**
+ * @class FFTStage
+ * @brief Performs the Fast Fourier Transform using cuFFT.
+ */
 class FFTStage : public IProcessingStage {
 public:
     FFTStage();
     ~FFTStage();
     
     void initialize(const StageConfig& config, cudaStream_t stream) override;
-    void process(void* input, void* output, size_t num_samples,
-                cudaStream_t stream) override;
+    void process(void* input, void* output, size_t num_samples, cudaStream_t stream) override;
     std::string name() const override { return "FFTStage"; }
     bool supports_inplace() const override { return true; }
     size_t get_workspace_size() const override;
@@ -111,15 +168,17 @@ private:
     std::unique_ptr<Impl> pImpl;
 };
 
-// Magnitude stage - computes magnitude from complex FFT output
+/**
+ * @class MagnitudeStage
+ * @brief Computes the magnitude from the complex FFT output.
+ */
 class MagnitudeStage : public IProcessingStage {
 public:
     MagnitudeStage();
     ~MagnitudeStage();
     
     void initialize(const StageConfig& config, cudaStream_t stream) override;
-    void process(void* input, void* output, size_t num_samples,
-                cudaStream_t stream) override;
+    void process(void* input, void* output, size_t num_samples, cudaStream_t stream) override;
     std::string name() const override { return "MagnitudeStage"; }
     bool supports_inplace() const override { return false; }
     size_t get_workspace_size() const override;
@@ -129,28 +188,56 @@ private:
     std::unique_ptr<Impl> pImpl;
 };
 
-// Stage factory for creating processing stages
+/**
+ * @class StageFactory
+ * @brief Factory for creating processing stage objects.
+ *
+ * Encapsulates the creation logic for different pipeline stages, promoting
+ * loose coupling and simplifying pipeline construction.
+ */
 class StageFactory {
 public:
+    /** @enum StageType Enumeration of available stage types. */
     enum class StageType {
         WINDOW,
         FFT,
         MAGNITUDE
     };
     
+    /**
+     * @brief Creates a single processing stage of a specified type.
+     * @param type The type of stage to create.
+     * @return A unique_ptr to the created IProcessingStage.
+     */
     static std::unique_ptr<IProcessingStage> create(StageType type);
     
-    // Create the default v1.0 pipeline stages
+    /**
+     * @brief Creates the default sequence of stages for the v1.0 pipeline.
+     * @return A vector of unique_ptrs to the pipeline stages in order.
+     */
     static std::vector<std::unique_ptr<IProcessingStage>> create_default_pipeline();
 };
 
-// Utility functions for window generation
+/**
+ * @namespace window_utils
+ * @brief Provides utility functions for generating window coefficients.
+ */
 namespace window_utils {
-    // Generate Hann window coefficients
+    /**
+     * @brief Generates Hann window coefficients on the CPU.
+     * @param[out] window Pointer to the host array to store coefficients.
+     * @param size The size of the window (number of coefficients).
+     * @param sqrt_norm If true, applies a square root normalization.
+     */
     void generate_hann_window(float* window, int size, bool sqrt_norm = false);
     
-    // Apply normalization to window
+    /**
+     * @brief Normalizes a window to have a specific property (e.g., unity gain).
+     * @param[in,out] window Pointer to the window coefficients to normalize.
+     * @param size The size of the window.
+     * @param norm The normalization policy to apply.
+     */
     void normalize_window(float* window, int size, StageConfig::WindowNorm norm);
 }
 
-}  // namespace ionosense
+} // namespace ionosense
