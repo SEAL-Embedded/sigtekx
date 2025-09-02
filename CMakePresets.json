@@ -2,7 +2,7 @@
   "version": 6,
   "cmakeMinimumRequired": {
     "major": 3,
-    "minor": 25,
+    "minor": 26,
     "patch": 0
   },
   "configurePresets": [
@@ -83,10 +83,11 @@
       "name": "ci-linux",
       "inherits": "base",
       "displayName": "CI Configure for Linux",
-      "description": "Builds the C++ tests, disables Python part for CI step.",
+      "description": "Builds without C++ tests for CPU-only CI runner.",
+      "binaryDir": "${sourceDir}/build/ci",
       "cacheVariables": {
-        "IONO_WITH_TESTS": "ON",
-        "IONO_WITH_PYTHON": "OFF"
+        "IONO_WITH_TESTS": "OFF",
+        "IONO_WITH_PYTHON": "ON"
       }
     }
   ],
