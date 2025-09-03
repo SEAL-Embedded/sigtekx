@@ -9,8 +9,8 @@ on:
     branches: ["main"]
 
 jobs:
-  docker-checks:
-    name: Docker Checks (Lint, Build, Test, Scan)
+  main-ci-checks:
+    name: Lint, Test, Scan, and Build
     runs-on: ubuntu-latest
 
     steps:
@@ -26,29 +26,41 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and cache Docker image
+      # Step 1: Build the 'builder' stage as our CI image and scan it
+      - name: Build and Scan CI Image
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile
-          push: true
+          target: builder
           tags: kevinrhz/ionosense-hpc:ci
-          cache-from: type=registry,ref=kevinrhz/ionosense-hpc:cache
-          cache-to: type=registry,ref=kevinrhz/ionosense-hpc:cache,mode=max
+          # Load the image into the runner's docker daemon
+          load: true
+          # Use a specific cache for the CI build
+          cache-from: type=registry,ref=kevinrhz/ionosense-hpc:ci-cache
+          cache-to: type=registry,ref=kevinrhz/ionosense-hpc:ci-cache,mode=max
+          # Integrate Trivy scan directly into the build
+          scan-with: trivy
+          scan-args: |
+            --severity CRITICAL,HIGH
+            --vuln-type os,library
+            --ignore-unfixed
 
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: 'kevinrhz/ionosense-hpc:ci'
-          format: 'table'
-          exit-code: '1'
-          ignore-unfixed: true
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
-
-      # Add your linter and test steps here, running them against the built image
+      # Step 2: Use the CI image to run the linter
       - name: Run Ruff Linter
         run: docker run --rm kevinrhz/ionosense-hpc:ci ruff check python/
 
-      - name: Run Pytest
+      # Step 3: Use the same CI image to run CPU-only tests
+      - name: Run Pytest (CPU-Only)
         run: docker run --rm kevinrhz/ionosense-hpc:ci pytest -m "not gpu" --cov-fail-under=70
+
+      # Step 4 (Optional): Build and push the final, small production image
+      - name: Build and Push Production Image
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          # No 'target' specified, so it builds the final stage by default
+          push: true
+          tags: kevinrhz/ionosense-hpc:latest
+          cache-from: type=registry,ref=kevinrhz/ionosense-hpc:prod-cache
+          cache-to: type=registry,ref=kevinrhz/ionosense-hpc:prod-cache,mode=max
