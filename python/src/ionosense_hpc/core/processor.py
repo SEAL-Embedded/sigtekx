@@ -4,20 +4,20 @@ from typing import Any
 
 import numpy as np
 
-from ..config import EngineConfig, Presets
-from ..exceptions import EngineStateError
-from ..utils.device import device_info, monitor_device
-from ..utils.logging import logger
-from .engine import Engine
+from ionosense_hpc.config import EngineConfig, Presets
+from ionosense_hpc.core.engine import Engine
+from ionosense_hpc.exceptions import EngineStateError
+from ionosense_hpc.utils.device import device_info, monitor_device
+from ionosense_hpc.utils.logging import logger
 
 
 class Processor:
     """High-level interface with context manager support.
-    
+
     This class provides the most Pythonic interface to the engine,
     with automatic resource management, presets, and convenience methods.
     It's designed to be used as a context manager for proper cleanup.
-    
+
     Examples:
         >>> from ionosense_hpc import Processor, Presets
         >>> with Processor(Presets.realtime()) as proc:
@@ -30,7 +30,7 @@ class Processor:
         auto_init: bool = True
     ):
         """Initialize the processor.
-        
+
         Args:
             config: Configuration object, preset name, or None for default
             auto_init: Whether to initialize immediately
@@ -62,7 +62,7 @@ class Processor:
 
     def initialize(self, config: EngineConfig | None = None) -> None:
         """Initialize the processor and engine.
-        
+
         Args:
             config: Optional new configuration
         """
@@ -90,14 +90,14 @@ class Processor:
         return_complex: bool = False
     ) -> np.ndarray:
         """Process input data through the FFT pipeline.
-        
+
         Args:
             input_data: Input signal data
             return_complex: If True, return complex spectrum (future feature)
-            
+
         Returns:
             Magnitude spectrum [batch, bins]
-            
+
         Raises:
             EngineStateError: If not initialized
         """
@@ -129,11 +129,11 @@ class Processor:
         max_frames: int | None = None
     ) -> list[np.ndarray]:
         """Process a stream of data frames.
-        
+
         Args:
             data_generator: Iterator yielding input frames
             max_frames: Maximum frames to process
-            
+
         Returns:
             List of output spectra
         """
@@ -160,11 +160,11 @@ class Processor:
         input_data: np.ndarray | None = None
     ) -> dict[str, Any]:
         """Run a quick benchmark.
-        
+
         Args:
             n_iterations: Number of iterations
             input_data: Optional test data (None for zeros)
-            
+
         Returns:
             Benchmark results dictionary
         """
@@ -214,7 +214,7 @@ class Processor:
 
     def get_stats(self) -> dict[str, Any]:
         """Get current statistics.
-        
+
         Returns:
             Combined statistics dictionary
         """

@@ -7,7 +7,7 @@ from typing import Any
 
 class StageRegistry:
     """Registry for custom processing stages.
-    
+
     This is a placeholder for v2.0 extensibility. Currently,
     the pipeline stages are hardcoded in C++.
     """
@@ -23,7 +23,7 @@ class StageRegistry:
         metadata: dict[str, Any] | None = None
     ) -> None:
         """Register a custom stage.
-        
+
         Args:
             name: Unique stage identifier
             stage_fn: Stage processing function
@@ -37,10 +37,10 @@ class StageRegistry:
 
     def get(self, name: str) -> Callable | None:
         """Get a registered stage.
-        
+
         Args:
             name: Stage identifier
-            
+
         Returns:
             Stage function or None
         """
@@ -48,7 +48,7 @@ class StageRegistry:
 
     def list_stages(self) -> list:
         """List all registered stages.
-        
+
         Returns:
             List of stage names
         """
@@ -56,10 +56,10 @@ class StageRegistry:
 
     def get_metadata(self, name: str) -> dict[str, Any]:
         """Get stage metadata.
-        
+
         Args:
             name: Stage identifier
-            
+
         Returns:
             Stage metadata dictionary
         """
@@ -77,7 +77,7 @@ _global_registry = StageRegistry()
 
 def register_stage(name: str, metadata: dict[str, Any] | None = None):
     """Decorator for registering stages.
-    
+
     Example:
         >>> @register_stage("custom_filter")
         ... def my_filter(data, config):

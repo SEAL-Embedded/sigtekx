@@ -63,10 +63,10 @@ STAGE_METADATA: dict[StageType, dict[str, Any]] = {
 
 def get_stage_info(stage_type: StageType) -> dict[str, Any]:
     """Get information about a stage type.
-    
+
     Args:
         stage_type: Type of stage
-        
+
     Returns:
         Stage metadata dictionary
     """
@@ -75,7 +75,7 @@ def get_stage_info(stage_type: StageType) -> dict[str, Any]:
 
 def list_implemented_stages() -> list:
     """List stages that are currently implemented.
-    
+
     Returns:
         List of implemented stage types
     """
@@ -88,7 +88,7 @@ def list_implemented_stages() -> list:
 
 def list_future_stages() -> list:
     """List planned but not yet implemented stages.
-    
+
     Returns:
         List of future stage types
     """

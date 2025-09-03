@@ -5,15 +5,15 @@ from typing import Any
 
 import numpy as np
 
-from ..exceptions import DllLoadError, EngineRuntimeError, EngineStateError
+from ionosense_hpc.exceptions import DllLoadError, EngineRuntimeError, EngineStateError
 
 
 def import_engine():
     """Import the native extension with proper error handling.
-    
+
     Returns:
         The loaded _engine module
-        
+
     Raises:
         DllLoadError: If the extension cannot be loaded
     """
@@ -37,7 +37,7 @@ def import_engine():
 
 class RawEngine:
     """Thin wrapper around the C++ ResearchEngine.
-    
+
     This class provides minimal Python-level processing, mostly translating
     exceptions and checking module availability. For most use cases, use
     the higher-level Engine or Processor classes instead.
@@ -52,10 +52,10 @@ class RawEngine:
 
     def initialize(self, config: dict[str, Any]) -> None:
         """Initialize the engine with a configuration dictionary.
-        
+
         Args:
             config: Configuration parameters as a dict
-            
+
         Raises:
             EngineRuntimeError: If initialization fails
         """
@@ -74,13 +74,13 @@ class RawEngine:
 
     def process(self, input_data: np.ndarray) -> np.ndarray:
         """Process a batch of input data.
-        
+
         Args:
             input_data: 1D array of float32 samples
-            
+
         Returns:
             2D array of magnitude spectra [batch, bins]
-            
+
         Raises:
             EngineStateError: If engine is not initialized
             EngineRuntimeError: If processing fails
@@ -126,7 +126,7 @@ class RawEngine:
 
     def get_stats(self) -> dict[str, Any]:
         """Get processing statistics.
-        
+
         Returns:
             Dictionary with latency_us, throughput_gbps, frames_processed
         """
@@ -146,7 +146,7 @@ class RawEngine:
 
     def get_runtime_info(self) -> dict[str, Any]:
         """Get CUDA runtime information.
-        
+
         Returns:
             Dictionary with device and CUDA version info
         """
@@ -171,7 +171,7 @@ class RawEngine:
     @classmethod
     def get_available_devices(cls) -> list:
         """Get list of available CUDA devices.
-        
+
         Returns:
             List of device description strings
         """
@@ -185,7 +185,7 @@ class RawEngine:
     @classmethod
     def select_best_device(cls) -> int:
         """Select the best available CUDA device.
-        
+
         Returns:
             Device ID of the best device
         """

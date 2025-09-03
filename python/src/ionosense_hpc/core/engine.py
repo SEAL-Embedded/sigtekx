@@ -4,15 +4,15 @@ from typing import Any
 
 import numpy as np
 
-from ..config import EngineConfig, validate_batch_size, validate_input_array
-from ..exceptions import EngineStateError, ValidationError
-from ..utils.logging import log_config, log_performance, logger
-from .raw_engine import RawEngine
+from ionosense_hpc.config import EngineConfig, validate_batch_size, validate_input_array
+from ionosense_hpc.core.raw_engine import RawEngine
+from ionosense_hpc.exceptions import EngineStateError, ValidationError
+from ionosense_hpc.utils.logging import log_config, log_performance, logger
 
 
 class Engine:
     """Mid-level wrapper providing validation and buffer management.
-    
+
     This class adds input validation, automatic buffer sizing, and
     performance tracking on top of the raw C++ engine. It handles
     the details of preparing data for the GPU while exposing a
@@ -21,7 +21,7 @@ class Engine:
 
     def __init__(self, config: EngineConfig | None = None):
         """Initialize the engine.
-        
+
         Args:
             config: Engine configuration (can be set later)
         """
@@ -38,10 +38,10 @@ class Engine:
 
     def initialize(self, config: EngineConfig) -> None:
         """Initialize the engine with configuration.
-        
+
         Args:
             config: Validated engine configuration
-            
+
         Raises:
             EngineRuntimeError: If initialization fails
         """
@@ -78,14 +78,14 @@ class Engine:
         output: np.ndarray | None = None
     ) -> np.ndarray:
         """Process a batch of input data.
-        
+
         Args:
             input_data: Input samples as array or list
             output: Optional pre-allocated output buffer
-            
+
         Returns:
             2D array of magnitude spectra [batch, bins]
-            
+
         Raises:
             EngineStateError: If not initialized
             ValidationError: If input is invalid
@@ -140,11 +140,11 @@ class Engine:
         hop_size: int | None = None
     ) -> np.ndarray:
         """Process multiple overlapping frames.
-        
+
         Args:
             input_data: Long input signal
             hop_size: Samples between frames (None for config default)
-            
+
         Returns:
             3D array of spectra [frames, batch, bins]
         """
@@ -200,7 +200,7 @@ class Engine:
 
     def get_stats(self) -> dict[str, Any]:
         """Get accumulated performance statistics.
-        
+
         Returns:
             Dictionary with performance metrics
         """
@@ -235,7 +235,7 @@ class Engine:
 
     def _run_warmup(self, iterations: int) -> None:
         """Run warmup iterations to stabilize GPU clocks.
-        
+
         Args:
             iterations: Number of warmup iterations
         """

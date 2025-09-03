@@ -11,7 +11,7 @@ class Presets:
     @staticmethod
     def realtime() -> EngineConfig:
         """Configuration for real-time processing with minimal latency.
-        
+
         Optimized for <200μs latency with dual-channel ULF/VLF signals.
         """
         return EngineConfig(
@@ -30,7 +30,7 @@ class Presets:
     @staticmethod
     def throughput() -> EngineConfig:
         """Configuration for maximum throughput batch processing.
-        
+
         Optimized for processing large datasets offline.
         """
         return EngineConfig(
@@ -49,7 +49,7 @@ class Presets:
     @staticmethod
     def validation() -> EngineConfig:
         """Configuration for accuracy validation and testing.
-        
+
         Small sizes for debugging and numerical validation.
         """
         return EngineConfig(
@@ -68,7 +68,7 @@ class Presets:
     @staticmethod
     def profiling() -> EngineConfig:
         """Configuration optimized for profiling and benchmarking.
-        
+
         Balanced settings to expose both compute and memory patterns.
         """
         return EngineConfig(
@@ -87,13 +87,13 @@ class Presets:
     @staticmethod
     def custom(**kwargs: Any) -> EngineConfig:
         """Create a custom configuration starting from realtime preset.
-        
+
         Args:
             **kwargs: Parameters to override
-            
+
         Returns:
             Custom EngineConfig
-            
+
         Example:
             >>> config = Presets.custom(nfft=2048, batch=4)
         """
@@ -108,7 +108,7 @@ class Presets:
     @classmethod
     def list_presets(cls) -> dict[str, EngineConfig]:
         """Get all available presets.
-        
+
         Returns:
             Dictionary mapping preset names to configurations
         """

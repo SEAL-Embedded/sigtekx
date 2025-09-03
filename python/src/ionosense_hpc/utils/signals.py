@@ -13,7 +13,7 @@ def make_sine(
     dtype: np.dtype = np.float32
 ) -> np.ndarray:
     """Generate a sine wave signal.
-    
+
     Args:
         frequency: Frequency in Hz
         duration: Duration in seconds
@@ -21,7 +21,7 @@ def make_sine(
         amplitude: Peak amplitude
         phase: Initial phase in radians
         dtype: Output data type
-        
+
     Returns:
         1D array containing the sine wave
     """
@@ -40,7 +40,7 @@ def make_chirp(
     dtype: np.dtype = np.float32
 ) -> np.ndarray:
     """Generate a chirp (frequency sweep) signal.
-    
+
     Args:
         f_start: Starting frequency in Hz
         f_end: Ending frequency in Hz
@@ -49,7 +49,7 @@ def make_chirp(
         method: Sweep method ('linear' or 'logarithmic')
         amplitude: Peak amplitude
         dtype: Output data type
-        
+
     Returns:
         1D array containing the chirp signal
     """
@@ -80,7 +80,7 @@ def make_noise(
     dtype: np.dtype = np.float32
 ) -> np.ndarray:
     """Generate noise signal.
-    
+
     Args:
         duration: Duration in seconds
         sample_rate: Sample rate in Hz
@@ -88,7 +88,7 @@ def make_noise(
         amplitude: RMS amplitude
         seed: Random seed for reproducibility
         dtype: Output data type
-        
+
     Returns:
         1D array containing the noise signal
     """
@@ -136,7 +136,7 @@ def make_multitone(
     dtype: np.dtype = np.float32
 ) -> np.ndarray:
     """Generate a multi-tone signal.
-    
+
     Args:
         frequencies: List of frequencies in Hz
         duration: Duration in seconds
@@ -144,7 +144,7 @@ def make_multitone(
         amplitudes: Amplitude for each frequency (None for equal)
         phases: Phase for each frequency in radians (None for zero)
         dtype: Output data type
-        
+
     Returns:
         1D array containing the multi-tone signal
     """
@@ -178,14 +178,14 @@ def make_test_batch(
     **kwargs
 ) -> np.ndarray:
     """Generate a batch of test signals for engine processing.
-    
+
     Args:
         nfft: FFT size (number of samples per channel)
         batch: Number of channels
         signal_type: Type of signal ('sine', 'chirp', 'noise', 'zeros')
         seed: Random seed for reproducibility
         **kwargs: Additional arguments for signal generators
-        
+
     Returns:
         1D array of size nfft * batch
     """

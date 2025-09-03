@@ -75,7 +75,6 @@ def benchmark_throughput(
         if report_memory:
             final_mem_mb, _ = get_memory_usage()
 
-    mb_processed = bytes_processed / (1024 * 1024)
     gb_processed = bytes_processed / (1024 ** 3)
 
     results = {
@@ -165,7 +164,7 @@ def benchmark_batch_scaling(
 
         results['efficiency_percent'].append(efficiency)
 
-        logger.info(f"    Throughput: {throughput_sps/1e6:.2f} MS/s, Latency: {avg_latency_us:.1f} us, Efficiency: {efficiency:.1f}%")
+        logger.info(f"    Throughput: {throughput_sps/1e6:.2f} MS/a, Latency: {avg_latency_us:.1f} us, Efficiency: {efficiency:.1f}%")
 
     return results
 

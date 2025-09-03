@@ -122,9 +122,12 @@ def main():
         run_full_suite(output_dir=args.output, config_preset=args.preset)
     else:
         config = Presets.realtime()
-        if args.preset == 'throughput': config = Presets.throughput()
-        elif args.preset == 'validation': config = Presets.validation()
-        elif args.preset == 'profiling': config = Presets.profiling()
+        if args.preset == 'throughput':
+            config = Presets.throughput()
+        elif args.preset == 'validation':
+            config = Presets.validation()
+        elif args.preset == 'profiling':
+            config = Presets.profiling()
 
         results = {}
         if args.test == 'latency':

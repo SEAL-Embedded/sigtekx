@@ -14,12 +14,12 @@ def setup_logging(
     log_file: str | None = None
 ) -> logging.Logger:
     """Configure logging for the ionosense_hpc package.
-    
+
     Args:
         level: Log level (DEBUG, INFO, WARNING, ERROR)
         format_string: Custom format string
         log_file: Optional file to write logs to
-        
+
     Returns:
         Configured logger instance
     """
@@ -56,7 +56,7 @@ def setup_logging(
 
 def log_config(config: 'EngineConfig', level: int = logging.INFO) -> None:
     """Log engine configuration details.
-    
+
     Args:
         config: Engine configuration to log
         level: Logging level to use
@@ -73,7 +73,7 @@ def log_config(config: 'EngineConfig', level: int = logging.INFO) -> None:
 
 def log_performance(stats: dict, level: int = logging.INFO) -> None:
     """Log performance statistics.
-    
+
     Args:
         stats: Performance statistics dictionary
         level: Logging level to use
@@ -86,7 +86,7 @@ def log_performance(stats: dict, level: int = logging.INFO) -> None:
 
 def log_device_info(info: dict, level: int = logging.INFO) -> None:
     """Log CUDA device information.
-    
+
     Args:
         info: Device info dictionary
         level: Logging level to use

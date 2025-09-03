@@ -1,5 +1,5 @@
 """Pydantic v2 configuration schemas for the engine."""
-
+import warnings
 from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 class EngineConfig(BaseModel):
     """Configuration for the signal processing engine.
-    
+
     This class validates all parameters and provides sensible defaults
     for real-time dual-channel ULF/VLF signal processing.
     """
@@ -91,10 +91,10 @@ class EngineConfig(BaseModel):
 
         # Lowered threshold to align with test case expectations
         if total_bytes > 256 * 1024**2:  # 256MB warning threshold
-            import warnings
             warnings.warn(
                 f"Configuration requires ~{total_bytes/(1024**2):.1f}MB device memory",
-                ResourceWarning
+                ResourceWarning,
+                stacklevel=2
             )
         return self
 

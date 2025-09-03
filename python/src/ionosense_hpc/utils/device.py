@@ -12,7 +12,7 @@ except ImportError:
 
 def gpu_count() -> int:
     """Get the number of available CUDA devices.
-    
+
     Returns:
         Number of CUDA-capable GPUs
     """
@@ -36,7 +36,7 @@ def gpu_count() -> int:
 
 def current_device() -> int:
     """Get the currently selected CUDA device ID.
-    
+
     Returns:
         Current device ID (0-based)
     """
@@ -49,10 +49,10 @@ def current_device() -> int:
 
 def device_info(device_id: int | None = None) -> dict[str, any]:
     """Get detailed information about a CUDA device.
-    
+
     Args:
         device_id: Device to query (None for current device)
-        
+
     Returns:
         Dictionary with device properties
     """
@@ -133,7 +133,7 @@ def device_info(device_id: int | None = None) -> dict[str, any]:
 
 def get_memory_usage() -> tuple[int, int]:
     """Get current GPU memory usage.
-    
+
     Returns:
         Tuple of (used_mb, total_mb)
     """
@@ -146,7 +146,7 @@ def get_memory_usage() -> tuple[int, int]:
 
 def check_cuda_available() -> bool:
     """Check if CUDA is available and functional.
-    
+
     Returns:
         True if CUDA can be used
     """
@@ -155,10 +155,10 @@ def check_cuda_available() -> bool:
 
 def get_compute_capability(device_id: int | None = None) -> tuple[int, int]:
     """Get compute capability of a device.
-    
+
     Args:
         device_id: Device to query (None for current)
-        
+
     Returns:
         Tuple of (major, minor) compute capability
     """
@@ -168,10 +168,10 @@ def get_compute_capability(device_id: int | None = None) -> tuple[int, int]:
 
 def monitor_device(device_id: int | None = None) -> str:
     """Get a formatted string with current device status.
-    
+
     Args:
         device_id: Device to monitor (None for current)
-        
+
     Returns:
         Formatted status string
     """

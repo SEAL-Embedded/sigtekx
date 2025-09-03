@@ -4,21 +4,22 @@ import warnings
 
 import numpy as np
 
-from ..exceptions import ConfigError, ValidationError
+from ionosense_hpc.config.schemas import EngineConfig
+from ionosense_hpc.exceptions import ConfigError, ValidationError
 
 
 def validate_config_device_compatibility(
-    config: 'EngineConfig',
+    config: EngineConfig,
     device_memory_mb: int,
     compute_capability: tuple[int, int]
 ) -> None:
     """Validate configuration against device capabilities.
-    
+
     Args:
         config: Engine configuration to validate
         device_memory_mb: Available device memory in MB
         compute_capability: Device compute capability (major, minor)
-        
+
     Raises:
         ConfigError: If configuration exceeds device capabilities
     """
@@ -35,23 +36,25 @@ def validate_config_device_compatibility(
     if major < 6:
         warnings.warn(
             f"GPU compute capability {major}.{minor} is below recommended 6.0",
-            PerformanceWarning
+            RuntimeWarning,
+            stacklevel=2
         )
 
     # Large FFT warning
     if config.nfft > 16384:
         warnings.warn(
             f"Large FFT size ({config.nfft}) may impact real-time performance",
-            PerformanceWarning
+            RuntimeWarning,
+            stacklevel=2
         )
 
 
-def estimate_memory_usage_mb(config: 'EngineConfig') -> int:
+def estimate_memory_usage_mb(config: EngineConfig) -> int:
     """Estimate GPU memory usage for a configuration.
-    
+
     Args:
         config: Engine configuration
-        
+
     Returns:
         Estimated memory usage in megabytes
     """
@@ -81,16 +84,16 @@ def validate_input_array(
     name: str = "input"
 ) -> np.ndarray:
     """Validate and prepare a NumPy array for processing.
-    
+
     Args:
         data: Input array to validate
         expected_shape: Expected shape (None to skip)
         expected_dtype: Expected dtype (None to skip)
         name: Name for error messages
-        
+
     Returns:
         Validated array (possibly with dtype conversion)
-        
+
     Raises:
         ValidationError: If validation fails
     """
@@ -102,45 +105,44 @@ def validate_input_array(
         )
 
     # Shape validation
-    if expected_shape is not None:
-        if data.shape != expected_shape:
-            raise ValidationError(
-                f"{name} shape mismatch",
-                expected=str(expected_shape),
-                got=str(data.shape)
-            )
+    if expected_shape is not None and data.shape != expected_shape:
+        raise ValidationError(
+            f"{name} shape mismatch",
+            expected=str(expected_shape),
+            got=str(data.shape)
+        )
 
     # Dtype validation/conversion
-    if expected_dtype is not None:
-        if data.dtype != expected_dtype:
-            try:
-                data = data.astype(expected_dtype, copy=False)
-            except (ValueError, TypeError) as e:
-                raise ValidationError(
-                    f"Cannot convert {name} to {expected_dtype}",
-                    expected=str(expected_dtype),
-                    got=str(data.dtype)
-                ) from e
+    if expected_dtype is not None and data.dtype != expected_dtype:
+        try:
+            data = data.astype(expected_dtype, copy=False)
+        except (ValueError, TypeError) as e:
+            raise ValidationError(
+                f"Cannot convert {name} to {expected_dtype}",
+                expected=str(expected_dtype),
+                got=str(data.dtype)
+            ) from e
 
     # Check for contiguous memory
     if not data.flags['C_CONTIGUOUS']:
         data = np.ascontiguousarray(data)
 
     # Check for NaN/Inf
-    if np.issubdtype(data.dtype, np.floating):
-        if not np.isfinite(data).all():
-            warnings.warn(f"{name} contains NaN or Inf values", RuntimeWarning)
+    if np.issubdtype(data.dtype, np.floating) and not np.isfinite(data).all():
+        warnings.warn(
+            f"{name} contains NaN or Inf values", RuntimeWarning, stacklevel=2
+        )
 
     return data
 
 
-def validate_batch_size(data: np.ndarray, config: 'EngineConfig') -> None:
+def validate_batch_size(data: np.ndarray, config: EngineConfig) -> None:
     """Validate that data matches the configured batch size.
-    
+
     Args:
         data: Input data array
         config: Engine configuration
-        
+
     Raises:
         ValidationError: If batch size doesn't match
     """
