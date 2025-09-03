@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from ionosense_hpc.config import EngineConfig
 from ionosense_hpc.core import Processor
@@ -25,10 +26,10 @@ def test_config_fixtures(validation_config, realtime_config, benchmark_config):
     assert isinstance(benchmark_config, EngineConfig)
     assert benchmark_config.enable_profiling is True
 
+@pytest.mark.gpu
 def test_test_processor(test_processor):
     """Test the test_processor fixture."""
     assert isinstance(test_processor, Processor)
-    # FIX: The correct property is 'is_initialized'
     assert test_processor.is_initialized is True
 
 def test_seeded_rng(seeded_rng):
