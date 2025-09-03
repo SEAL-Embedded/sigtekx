@@ -40,6 +40,9 @@ RUN cmake --preset ci-linux && cmake --build --preset ci-linux-build
 # into a single .whl file in the 'dist' directory.
 RUN pip wheel . --wheel-dir dist/
 
+# This ensures commands run against the CI image execute inside the conda env
+ENTRYPOINT ["conda", "run", "-n", "ionosense-hpc", "--no-capture-output"]
+
 # -----------------------------------------------------------------------------
 
 # Stage 2: The "final" stage for the production image
