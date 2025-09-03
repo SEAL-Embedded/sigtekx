@@ -23,7 +23,7 @@ Function section { param($Message) Write-Host "`n💪 == $Message ==`n" -Foregro
 
 $ErrorActionPreference = 'Stop'
 
-# --- Helpers -----------------------------------------------------------------
+# --- Helpers ------------------------------------------------------------------
 Function Ensure-EnvActivated {
     if (-not $env:CONDA_PREFIX -or ($env:CONDA_DEFAULT_ENV -ne $CondaEnvName)) {
         err "Conda environment '$CondaEnvName' is not activated."
