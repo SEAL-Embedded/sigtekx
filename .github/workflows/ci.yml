@@ -51,4 +51,4 @@ jobs:
 
       # 8. Run Python unit tests (excluding GPU tests)
       - name: Run Pytest (CPU-only)
-        run: pytest -m "not gpu"
+        run: pytest -m "not gpu" --cov-fail-under=70
