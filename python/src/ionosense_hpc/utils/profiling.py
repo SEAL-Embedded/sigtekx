@@ -8,7 +8,7 @@ try:
 except ImportError:
     NVTX_AVAILABLE = False
     warnings.warn("`nvtx` not installed. NVTX markers will be disabled. "
-                  "Install with: pip install nvtx", ImportWarning)
+                  "Install with: pip install nvtx", ImportWarning, stacklevel=2)
 
 
 @contextmanager

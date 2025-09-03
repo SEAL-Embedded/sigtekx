@@ -248,7 +248,7 @@ class Engine:
             dtype=np.float32
         )
 
-        for i in range(iterations):
+        for _ in range(iterations):
             self.process(dummy_input)
 
         self._is_warming_up = False
@@ -269,5 +269,5 @@ class Engine:
         try:
             if hasattr(self, '_raw_engine') and self.is_initialized:
                 self.reset()
-        except:
+        except Exception:
             pass

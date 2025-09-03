@@ -151,15 +151,8 @@ def make_multitone(
     frequencies = np.asarray(frequencies)
     n_tones = len(frequencies)
 
-    if amplitudes is None:
-        amplitudes = np.ones(n_tones) / n_tones
-    else:
-        amplitudes = np.asarray(amplitudes)
-
-    if phases is None:
-        phases = np.zeros(n_tones)
-    else:
-        phases = np.asarray(phases)
+    amplitudes = np.ones(n_tones) / n_tones if amplitudes is None else np.asarray(amplitudes)
+    phases = np.zeros(n_tones) if phases is None else np.asarray(phases)
 
     t = np.arange(0, duration, 1.0 / sample_rate, dtype=np.float64)
     signal = np.zeros_like(t)

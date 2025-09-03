@@ -15,14 +15,14 @@ def assert_allclose(
     err_msg: str = ""
 ) -> None:
     """Assert that two arrays are element-wise equal within tolerance.
-    
+
     Args:
         actual: Actual output array
         expected: Expected output array
         rtol: Relative tolerance
         atol: Absolute tolerance
         err_msg: Optional error message
-        
+
     Raises:
         AssertionError: If arrays are not close
     """
@@ -37,14 +37,14 @@ def assert_spectral_peak(
     tolerance_hz: float = 10.0
 ) -> None:
     """Assert that spectrum has peak at expected frequency.
-    
+
     Args:
         spectrum: Magnitude spectrum array
         expected_frequency: Expected peak frequency in Hz
         sample_rate: Sample rate in Hz
         nfft: FFT size
         tolerance_hz: Frequency tolerance in Hz
-        
+
     Raises:
         AssertionError: If peak is not at expected frequency
     """
@@ -68,12 +68,12 @@ def assert_parseval(
     tolerance: float = 1e-12
 ) -> None:
     """Verify Parseval's theorem (energy conservation).
-    
+
     Args:
         time_signal: Time-domain signal
         freq_spectrum: Unscaled frequency-domain magnitude spectrum from rfft.
         tolerance: Relative tolerance for energy comparison.
-        
+
     Raises:
         AssertionError: If energy is not conserved
     """
@@ -113,15 +113,15 @@ def assert_snr(
     min_snr_db: float
 ) -> float:
     """Assert that signal-to-noise ratio meets minimum requirement.
-    
+
     Args:
         signal: Clean signal
         noise: Noise or error signal
         min_snr_db: Minimum required SNR in dB
-        
+
     Returns:
         Actual SNR in dB
-        
+
     Raises:
         AssertionError: If SNR is below minimum
     """
@@ -143,27 +143,23 @@ def validate_fft_symmetry(
     tolerance: float = 1e-10
 ) -> bool:
     """Check if FFT output has expected symmetry properties.
-    
+
     Args:
         complex_spectrum: Complex FFT output
         tolerance: Tolerance for symmetry check
-        
+
     Returns:
         True if symmetry is valid
     """
-    # For real input, FFT should have Hermitian symmetry
-    # This is automatically satisfied for rfft, but can check DC/Nyquist
+    # For real input, FFT should have Hermitian symmetry.
+    # Check that DC and Nyquist (if present) components are real.
+    is_dc_real = abs(complex_spectrum[0].imag) <= tolerance
 
-    # DC component should be real
-    if abs(complex_spectrum[0].imag) > tolerance:
-        return False
+    # Nyquist is real only if it exists (even length) and its imag part is small.
+    is_nyquist_real = (len(complex_spectrum) % 2 != 0) or \
+                      (abs(complex_spectrum[-1].imag) <= tolerance)
 
-    # Nyquist component (if present) should be real
-    if len(complex_spectrum) % 2 == 0:
-        if abs(complex_spectrum[-1].imag) > tolerance:
-            return False
-
-    return True
+    return is_dc_real and is_nyquist_real
 
 
 def calculate_thd(
@@ -172,12 +168,12 @@ def calculate_thd(
     num_harmonics: int = 5
 ) -> float:
     """Calculate Total Harmonic Distortion.
-    
+
     Args:
         spectrum: Magnitude spectrum
         fundamental_idx: Index of fundamental frequency
         num_harmonics: Number of harmonics to include
-        
+
     Returns:
         THD as a percentage
     """
@@ -231,10 +227,7 @@ def compare_with_reference(
     # small diffs should pass; big offsets should fail.
     if thresholds is None:
         # Pick a base tolerance by dtype (fp32 noisier than fp64)
-        if np.issubdtype(actual.dtype, np.floating):
-            eps = np.finfo(actual.dtype).eps
-        else:
-            eps = 1e-12
+        eps = np.finfo(actual.dtype).eps if np.issubdtype(actual.dtype, np.floating) else 1e-12
         base_err = 1e-6 if eps < 1e-12 else 1e-5   # rmse/mae/max thresholds
         corr_min = 0.99                             # cosine similarity floor
         thresholds = {"rmse": base_err, "mae": base_err, "max": base_err, "correlation": corr_min}
@@ -275,20 +268,18 @@ def validate_output_range(
     max_val: float | None = None
 ) -> bool:
     """Validate that output values are within expected range.
-    
+
     Args:
         output: Output array to validate
         min_val: Minimum expected value
         max_val: Maximum expected value
-        
+
     Returns:
         True if all values are within range
     """
-    if min_val is not None and np.min(output) < min_val:
-        return False
-    if max_val is not None and np.max(output) > max_val:
-        return False
-    return True
+    is_min_ok = min_val is None or np.min(output) >= min_val
+    is_max_ok = max_val is None or np.max(output) <= max_val
+    return is_min_ok and is_max_ok
 
 
 def check_numerical_stability(
@@ -320,4 +311,3 @@ def check_numerical_stability(
     var_across_runs = np.var(stacked, axis=0)  # elementwise variance
     max_var = float(np.max(var_across_runs))
     return bool(max_var <= float(max_variance))
-

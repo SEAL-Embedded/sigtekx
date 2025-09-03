@@ -4,6 +4,8 @@ import logging
 import os
 import sys
 
+from ionosense_hpc.config import EngineConfig
+
 # Module logger
 logger = logging.getLogger('ionosense_hpc')
 
@@ -54,7 +56,7 @@ def setup_logging(
     return logger
 
 
-def log_config(config: 'EngineConfig', level: int = logging.INFO) -> None:
+def log_config(config: EngineConfig, level: int = logging.INFO) -> None:
     """Log engine configuration details.
 
     Args:

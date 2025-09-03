@@ -6,15 +6,15 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from ..config import EngineConfig, Presets
-from ..core import Processor
-from ..utils import make_test_batch
+from ionosense_hpc.config import EngineConfig, Presets
+from ionosense_hpc.core import Processor
+from ionosense_hpc.utils import make_test_batch
 
 
 @pytest.fixture
 def temp_data_dir(tmp_path: Path) -> Path:
     """Create a temporary directory for test data.
-    
+
     Returns:
         Path to temporary directory
     """
@@ -26,7 +26,7 @@ def temp_data_dir(tmp_path: Path) -> Path:
 @pytest.fixture
 def validation_config() -> EngineConfig:
     """Provide a small configuration for validation tests.
-    
+
     Returns:
         EngineConfig for validation
     """
@@ -36,7 +36,7 @@ def validation_config() -> EngineConfig:
 @pytest.fixture
 def realtime_config() -> EngineConfig:
     """Provide realtime configuration for tests.
-    
+
     Returns:
         EngineConfig for realtime processing
     """
@@ -46,7 +46,7 @@ def realtime_config() -> EngineConfig:
 @pytest.fixture
 def test_processor(validation_config: EngineConfig) -> Generator[Processor, None, None]:
     """Create a test processor with cleanup.
-    
+
     Yields:
         Initialized Processor instance
     """
@@ -58,7 +58,7 @@ def test_processor(validation_config: EngineConfig) -> Generator[Processor, None
 @pytest.fixture
 def seeded_rng() -> np.random.Generator:
     """Create a seeded random number generator.
-    
+
     Returns:
         Seeded numpy RNG
     """
@@ -68,11 +68,11 @@ def seeded_rng() -> np.random.Generator:
 @pytest.fixture
 def test_sine_data() -> np.ndarray:
     """Generate test sine wave data.
-    
+
     Returns:
         1D array with 1kHz sine wave
     """
-    from ..utils import make_sine
+    from ionosense_hpc.utils import make_sine
     return make_sine(
         frequency=1000,
         duration=0.1,
@@ -85,7 +85,7 @@ def test_sine_data() -> np.ndarray:
 @pytest.fixture
 def test_batch_data() -> np.ndarray:
     """Generate test batch data for dual-channel processing.
-    
+
     Returns:
         Batch data array
     """
@@ -101,11 +101,11 @@ def test_batch_data() -> np.ndarray:
 @pytest.fixture
 def test_noise_data() -> np.ndarray:
     """Generate test noise data.
-    
+
     Returns:
         White noise array
     """
-    from ..utils import make_noise
+    from ionosense_hpc.utils import make_noise
     return make_noise(
         duration=0.1,
         sample_rate=48000,
@@ -117,7 +117,7 @@ def test_noise_data() -> np.ndarray:
 @pytest.fixture
 def mock_device_info() -> dict:
     """Mock device information for testing without GPU.
-    
+
     Returns:
         Mock device info dictionary
     """
@@ -137,7 +137,7 @@ def mock_device_info() -> dict:
 @pytest.fixture(params=['sine', 'chirp', 'noise', 'multitone'])
 def test_signal_type(request) -> str:
     """Parametrized fixture for different signal types.
-    
+
     Returns:
         Signal type string
     """
@@ -147,7 +147,7 @@ def test_signal_type(request) -> str:
 @pytest.fixture(params=[256, 512, 1024, 2048])
 def test_nfft_size(request) -> int:
     """Parametrized fixture for different FFT sizes.
-    
+
     Returns:
         FFT size
     """
@@ -157,7 +157,7 @@ def test_nfft_size(request) -> int:
 @pytest.fixture(params=[1, 2, 4, 8])
 def test_batch_size(request) -> int:
     """Parametrized fixture for different batch sizes.
-    
+
     Returns:
         Batch size
     """
@@ -167,12 +167,12 @@ def test_batch_size(request) -> int:
 @pytest.fixture
 def gpu_available() -> bool:
     """Check if GPU is available for testing.
-    
+
     Returns:
         True if CUDA GPU is available
     """
     try:
-        from ..utils import gpu_count
+        from ionosense_hpc.utils import gpu_count
         return gpu_count() > 0
     except Exception:
         return False
@@ -188,7 +188,7 @@ def skip_without_gpu(gpu_available: bool) -> None:
 @pytest.fixture
 def benchmark_config() -> EngineConfig:
     """Configuration optimized for benchmarking.
-    
+
     Returns:
         Benchmark-optimized config
     """
@@ -205,7 +205,7 @@ def benchmark_config() -> EngineConfig:
 @pytest.fixture
 def reference_fft_output() -> np.ndarray:
     """Pre-computed reference FFT output for validation.
-    
+
     Returns:
         Reference magnitude spectrum
     """

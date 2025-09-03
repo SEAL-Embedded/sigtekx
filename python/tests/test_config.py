@@ -60,7 +60,7 @@ class TestEngineConfig:
         """Test memory usage warning for large configs."""
         with pytest.warns(ResourceWarning):
             # This should trigger a warning for >4GB
-            config = EngineConfig(nfft=65536, batch=256)
+            EngineConfig(nfft=65536, batch=256)
 
 
 class TestPresets:

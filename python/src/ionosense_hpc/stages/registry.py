@@ -30,7 +30,7 @@ class StageRegistry:
             metadata: Optional stage metadata
         """
         if name in self._stages:
-            warnings.warn(f"Overwriting existing stage: {name}")
+            warnings.warn(f"Overwriting existing stage: {name}", stacklevel=2)
 
         self._stages[name] = stage_fn
         self._metadata[name] = metadata or {}

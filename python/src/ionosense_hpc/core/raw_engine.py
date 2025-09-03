@@ -25,12 +25,12 @@ def import_engine():
         # Check for common error patterns
         error_str = str(e)
         if "DLL load failed" in error_str or "cannot open shared object" in error_str:
-            raise DllLoadError("_engine", e)
+            raise DllLoadError("_engine", e) from e
         elif "No module named" in error_str:
             raise DllLoadError(
                 "_engine",
                 RuntimeError("Extension module not found. Run build first: ./scripts/cli.sh build")
-            )
+            ) from e
         else:
             raise
 
@@ -70,7 +70,7 @@ class RawEngine:
             self._config = config
             self._initialized = True
         except RuntimeError as e:
-            raise EngineRuntimeError(f"Failed to initialize engine: {e}", str(e))
+            raise EngineRuntimeError(f"Failed to initialize engine: {e}", str(e)) from e
 
     def process(self, input_data: np.ndarray) -> np.ndarray:
         """Process a batch of input data.
@@ -102,9 +102,9 @@ class RawEngine:
                 raise EngineRuntimeError(
                     f"Input size error: {e}",
                     "Check that input size matches nfft * batch"
-                )
+                ) from e
             else:
-                raise EngineRuntimeError(f"Processing failed: {e}", error_str)
+                raise EngineRuntimeError(f"Processing failed: {e}", error_str) from e
 
     def reset(self) -> None:
         """Reset the engine to uninitialized state."""
@@ -113,7 +113,7 @@ class RawEngine:
             self._initialized = False
             self._config = None
         except RuntimeError as e:
-            warnings.warn(f"Reset warning: {e}")
+            warnings.warn(f"Reset warning: {e}", stacklevel=2)
 
     def synchronize(self) -> None:
         """Synchronize all CUDA streams."""
@@ -122,7 +122,7 @@ class RawEngine:
         try:
             self._engine.synchronize()
         except RuntimeError as e:
-            raise EngineRuntimeError(f"Synchronization failed: {e}")
+            raise EngineRuntimeError(f"Synchronization failed: {e}") from e
 
     def get_stats(self) -> dict[str, Any]:
         """Get processing statistics.
@@ -179,7 +179,7 @@ class RawEngine:
             engine_module = import_engine()
             return engine_module.get_available_devices()
         except Exception as e:
-            warnings.warn(f"Failed to query devices: {e}")
+            warnings.warn(f"Failed to query devices: {e}", stacklevel=2)
             return []
 
     @classmethod
@@ -204,5 +204,5 @@ class RawEngine:
         try:
             if hasattr(self, '_engine') and self._initialized:
                 self.reset()
-        except:
+        except Exception:
             pass  # Suppress errors during cleanup

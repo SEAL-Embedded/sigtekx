@@ -182,7 +182,7 @@ class Processor:
         latencies = []
         logger.info(f"Running benchmark with {n_iterations} iterations...")
 
-        for i in range(n_iterations):
+        for _ in range(n_iterations):
             self.process(input_data)
             stats = self._engine.get_stats()
             latencies.append(stats['latency_us'])

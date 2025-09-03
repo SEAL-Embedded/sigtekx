@@ -73,7 +73,7 @@ class TestEngineLifecycle:
 
     def test_init_with_config(self, engine_config):
         """Test that __init__ with a config calls initialize."""
-        with patch('ionosense_hpc.core.engine.RawEngine') as mock_raw_cls:
+        with patch('ionosense_hpc.core.engine.RawEngine'):
             e = Engine(config=engine_config)
             e._raw_engine.initialize.assert_called_once_with(engine_config.model_dump())
 
@@ -207,7 +207,7 @@ class TestEngineStats:
     def test_get_stats_averaging(self, initialized_engine):
         """Test that get_stats correctly calculates average latency."""
         latencies = [100.0, 150.0, 200.0, 200.0]
-        stats_list = [{'latency_us': l} for l in latencies]
+        stats_list = [{'latency_us': lat} for lat in latencies]
 
         initialized_engine._raw_engine.get_stats.side_effect = stats_list
 

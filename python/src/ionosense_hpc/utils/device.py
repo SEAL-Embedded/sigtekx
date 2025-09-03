@@ -1,5 +1,6 @@
 """CUDA device query and management utilities."""
 
+import contextlib
 import warnings
 
 try:
@@ -7,7 +8,7 @@ try:
     NVML_AVAILABLE = True
 except ImportError:
     NVML_AVAILABLE = False
-    warnings.warn("pynvml not available; GPU monitoring limited", ImportWarning)
+    warnings.warn("pynvml not available; GPU monitoring limited", ImportWarning, stacklevel=2)
 
 
 def gpu_count() -> int:
@@ -27,7 +28,7 @@ def gpu_count() -> int:
 
     # Fallback to C++ module
     try:
-        from ..core.raw_engine import RawEngine
+        from ionosense_hpc.core.raw_engine import RawEngine
         devices = RawEngine.get_available_devices()
         return len(devices)
     except Exception:
@@ -41,7 +42,7 @@ def current_device() -> int:
         Current device ID (0-based)
     """
     try:
-        from ..core.raw_engine import RawEngine
+        from ionosense_hpc.core.raw_engine import RawEngine
         return RawEngine.select_best_device()
     except Exception:
         return 0
@@ -90,33 +91,27 @@ def device_info(device_id: int | None = None) -> dict[str, any]:
             info['compute_capability'] = (major, minor)
 
             # Optional monitoring (may fail on some GPUs)
-            try:
+            with contextlib.suppress(pynvml.NVMLError):
                 info['temperature_c'] = pynvml.nvmlDeviceGetTemperature(
                     handle, pynvml.NVML_TEMPERATURE_GPU
                 )
-            except:
-                pass
 
-            try:
+            with contextlib.suppress(pynvml.NVMLError):
                 info['power_w'] = pynvml.nvmlDeviceGetPowerUsage(handle) / 1000.0
-            except:
-                pass
 
-            try:
+            with contextlib.suppress(pynvml.NVMLError):
                 util = pynvml.nvmlDeviceGetUtilizationRates(handle)
                 info['utilization_gpu'] = util.gpu
                 info['utilization_memory'] = util.memory
-            except:
-                pass
 
             pynvml.nvmlShutdown()
         except Exception as e:
-            warnings.warn(f"NVML query failed: {e}")
+            warnings.warn(f"NVML query failed: {e}", stacklevel=2)
 
     # Try to get basic info from C++ module as fallback
     if info['name'] == 'Unknown':
         try:
-            from ..core.raw_engine import RawEngine
+            from ionosense_hpc.core.raw_engine import RawEngine
             devices = RawEngine.get_available_devices()
             if device_id < len(devices):
                 # Parse device string like "[0] NVIDIA RTX 4000 Ada (CC 8.9)"
@@ -125,7 +120,7 @@ def device_info(device_id: int | None = None) -> dict[str, any]:
                     name_part = device_str.split('] ', 1)[1]
                     if ' (CC ' in name_part:
                         info['name'] = name_part.split(' (CC ')[0]
-        except:
+        except Exception:
             pass
 
     return info
