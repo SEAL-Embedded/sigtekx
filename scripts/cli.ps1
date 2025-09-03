@@ -10,7 +10,7 @@ $BuildDir    = Join-Path $ProjectRoot "build"
 $PythonDir   = Join-Path $ProjectRoot "python"
 $BuildPreset = if ($env:BUILD_PRESET) { $env:BUILD_PRESET } else { "windows-rel" }
 $CondaEnvName = "ionosense-hpc"
-$EnvironmentFile = Join-Path $ProjectRoot "environment.win.yml"
+$EnvironmentFile = Join-Path $ProjectRoot "environments/environment.win.yml"
 $BenchResultsDir = Join-Path $BuildDir "benchmark_results"
 
 

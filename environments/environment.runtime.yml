@@ -1,0 +1,20 @@
+name: ionosense-hpc
+channels:
+  - nvidia
+  - conda-forge
+dependencies:
+  # Core runtime
+  - python=3.11
+
+  # Python stack
+  - numpy
+  - pybind11
+  - tqdm
+  - colorama
+  - scipy
+  - pandas
+  - matplotlib
+  - jupyterlab
+  - h5py
+  - pydantic>=2.0
+  - pynvml

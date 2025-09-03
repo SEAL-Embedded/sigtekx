@@ -33,40 +33,58 @@ ionosense-hpc-lib/
 │   ├── test_research_engine.cpp  # GTest: ResearchEngine orchestration (init, exec, teardown)
 │   └── test_processing_stage.cpp # GTest: stage correctness (window, FFT, magnitude)
 │
+│
+│
 ├── python/
 │    ├── src/
-│    │   └── ionosense_hpc/
-│    │       ├── __init__.py
-│    │       │
-│    │       ├── benchmarks/
-│    │       │   ├── __init__.py
-│    │       │   ├── accuracy.py
-│    │       │   ├── base.py
-│    │       │   ├── latency.py
-│    │       │   └── throughput.py
-│    │       │
-│    │       ├── core/
-│    │       │   ├── __init__.py
-│    │       │   ├── config.py
-│    │       │   ├── exceptions.py
-│    │       │   ├── fft_processor.py
-│    │       │   ├── pipelines.py
-│    │       │   └── profiling.py
-│    │       │
-│    │       └── utils/
-│    │           ├── __init__.py
-│    │           ├── console.py
-│    │           ├── data_export.py
-│    │           ├── device.py
-│    │           ├── signals.py
-│    │           └── validation.py
+│    │    ionosense_hpc/
+│    │    ├── __init__.py              # The magic happens here: ALL public exports are defined.
+│    │    ├── __version__.py           # Defines __version__ = "1.0.0".
+│    │    │
+│    │    ├── core/                    # Implementation details (users NEVER import from here).
+│    │    │   ├── __init__.py
+│    │    │   ├── _engine.*.so         # (Assume this is pre-built and present).
+│    │    │   ├── processor.py         # Defines the high-level `Processor` class (with context manager).
+│    │    │   ├── engine.py            # Defines the mid-level `Engine` class.
+│    │    │   └── raw_engine.py        # Defines the low-level `RawEngine` wrapper.
+│    │    │
+│    │    ├── config/
+│    │    │   ├── __init__.py
+│    │    │   ├── schemas.py           # Pydantic models for EngineConfig, with __repr__.
+│    │    │   ├── validation.py        # Functions to validate configurations against device capabilities.
+│    │    │   └── presets.py           # Pre-configured instances for common use cases (e.g., REALTIME).
+│    │    │
+│    │    ├── stages/                  # (Placeholder for future scalability, not fully implemented in v1.0)
+│    │    │   ├── __init__.py
+│    │    │   ├── registry.py
+│    │    │   └── definitions.py
+│    │    │
+│    │    ├── benchmarks/              # The benchmark suite, structured as a submodule.
+│    │    │   ├── __init__.py
+│    │    │   ├── suite.py             # Main runner for executing benchmarks, with a CLI entry point.
+│    │    │   ├── latency.py           # Specific benchmarks for p50/p99 latency.
+│    │    │   ├── throughput.py        # Specific benchmarks for sustained GB/s.
+│    │    │   └── accuracy.py          # Benchmarks for comparing against NumPy/SciPy.
+│    │    │
+│    │    ├── utils/                   # Low-level utilities.
+│    │    │   ├── __init__.py
+│    │    │   ├── device.py            # GPU management and querying functions.
+│    │    │   ├── logging.py           # Configures structured logging for the library.
+│    │    │   └── signals.py           # Signal generation functions for testing and examples.
+│    │    │
+│    │    ├── testing/                 # Internal helpers for the pytest suite.
+│    │    │   ├── __init__.py
+│    │    │   ├── fixtures.py          # Shared pytest fixtures.
+│    │    │   └── validators.py        # Functions to validate numerical outputs.
+│    │    │
+│    │    └── exceptions.py            # Custom exception classes (IonosenseError, etc.).
 │    │
 │    └── tests/
 │        ├── conftest.py
-│        ├── test_config.py
-│        ├── test_fft_processor.py
-│        ├── test_integration.py
-│        └── test_pipelines.py
+│        ├── ...
+│        └── test_*.py
+│
+│
 │
 ├── research/                  # Experiments, analysis, and reports
 │   ├── notebooks/             # Exploratory notebooks and visualizations
