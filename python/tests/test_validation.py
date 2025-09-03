@@ -75,17 +75,17 @@ def test_validate_fft_symmetry():
     """Test the validate_fft_symmetry validator."""
     # Passing case: DC and Nyquist are real
     good_spectrum = np.array([1.0, 1+2j, -1+3j, 2.0], dtype=np.complex64)
-    assert validate_fft_symmetry(good_spectrum) is True
+    assert validate_fft_symmetry(good_spectrum)
 
     # Failing case: DC has imaginary part
     bad_dc = good_spectrum.copy()
     bad_dc[0] = 1.0 + 1e-9j
-    assert validate_fft_symmetry(bad_dc) is False
+    assert not validate_fft_symmetry(bad_dc)
 
     # Failing case: Nyquist has imaginary part
     bad_nyquist = good_spectrum.copy()
     bad_nyquist[-1] = 2.0 - 1e-9j
-    assert validate_fft_symmetry(bad_nyquist) is False
+    assert not validate_fft_symmetry(bad_nyquist)
 
 
 def test_calculate_thd():
@@ -143,9 +143,9 @@ def test_compare_with_reference():
 def test_validate_output_range():
     """Test the validate_output_range validator."""
     data = np.array([-0.5, 0.0, 0.5])
-    assert validate_output_range(data, min_val=-1.0, max_val=1.0) is True
-    assert validate_output_range(data, min_val=0.0) is False
-    assert validate_output_range(data, max_val=0.4) is False
+    assert validate_output_range(data, min_val=-1.0, max_val=1.0)
+    assert not validate_output_range(data, min_val=0.0)
+    assert not validate_output_range(data, max_val=0.4)
 
 def test_check_numerical_stability():
     """Test the check_numerical_stability validator."""
