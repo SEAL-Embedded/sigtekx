@@ -14,15 +14,25 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Check out repository
+      # 1. Free up disk space by removing large, unused toolchains
+      - name: Free Disk Space
+        run: |
+          echo "Initial free space:"
+          df -h
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          echo "Free space after cleanup:"
+          df -h
+
+      # 2. Check out repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Set up Docker Buildx
+      # 3. Set up Docker Buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 3. Cache Docker layers
+      # 4. Cache Docker layers
       - name: Cache Docker layers
         uses: actions/cache@v4
         with:
@@ -31,7 +41,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-buildx-
 
-      # 4. Build the Docker image
+      # 5. Build the Docker image
       - name: Build Docker image
         uses: docker/build-push-action@v5
         with:
@@ -49,16 +59,16 @@ jobs:
           rm -rf /tmp/.buildx-cache
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
-      # 5. Run linter
+      # 6. Run linter
       - name: Run Ruff Linter
         run: docker run --rm kevinrhz/ionosense-hpc:ci ruff check python/
 
-      # 6. Configure and Build C++
+      # 7. Configure and Build C++
       - name: Configure and Build C++
         run: |
           docker run --rm -v ${{ github.workspace }}:/app kevinrhz/ionosense-hpc:ci cmake --preset ci-linux
           docker run --rm -v ${{ github.workspace }}:/app kevinrhz/ionosense-hpc:ci cmake --build --preset ci-linux-build
 
-      # 7. Run Python unit tests
+      # 8. Run Python unit tests
       - name: Run Pytest
         run: docker run --rm kevinrhz/ionosense-hpc:ci pytest -m "not gpu" --cov-fail-under=70
