@@ -1,3 +1,5 @@
+# .github/workflows/ci.yml
+
 name: CI Checks
 
 on:
@@ -22,31 +24,40 @@ jobs:
         with:
           python-version: '3.11'
 
-      # 3. Install build-time Python dependencies
+      # 3. Cache the CUDA Toolkit installation itself
+      - name: Cache CUDA Toolkit
+        id: cache-cuda
+        uses: actions/cache@v4
+        with:
+          path: /usr/local/cuda-13.0
+          key: ${{ runner.os }}-cuda-13.0
+
+      # 4. Install CUDA Toolkit ONLY if the cache was not found
+      - name: Install CUDA Toolkit
+        if: steps.cache-cuda.outputs.cache-hit != 'true'
+        uses: Jimver/cuda-toolkit@v0.2.27 # needs 0.2.27 or higher for cuda 13
+        with:
+          cuda: '13.0.0'
+      
+      # 5. Install build-time Python dependencies
       - name: Install Build Dependencies
         run: pip install pybind11
 
-      # 4. Install CUDA Toolkit 13.0.0
-      - name: Install CUDA Toolkit
-        uses: Jimver/cuda-toolkit@v0.2.27 # need v0.2.27 or later for CUDA 13 support
-        with:
-          cuda: '13.0.0'
-
-      # 5. Configure and Build C++ using Presets
-      - name: Build C++ Tests
+      # 6. Configure and Build C++ using Presets
+      - name: Build C++
         uses: lukka/run-cmake@v10
         with:
           configurePreset: 'ci-linux'
           buildPreset: 'ci-linux-build'
 
-      # 6. Install Python runtime dependencies
+      # 7. Install Python runtime dependencies
       - name: Install Python Dependencies
         run: pip install .[dev]
 
-      # 7. Run linter
+      # 8. Run linter
       - name: Run Ruff Linter
-        run: ruff check python/src python/tests
+        run: ruff check python/
 
-      # 8. Run Python unit tests (excluding GPU tests)
+      # 9. Run Python unit tests with adjusted coverage
       - name: Run Pytest (CPU-only)
         run: pytest -m "not gpu" --cov-fail-under=70
