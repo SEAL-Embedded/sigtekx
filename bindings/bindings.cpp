@@ -1,6 +1,6 @@
 /**
  * @file bindings.cpp
- * @version 1.0
+ * @version 0.1.0
  * @date 2025-09-01
  * @author [Kevin Rahsaz]
  *
