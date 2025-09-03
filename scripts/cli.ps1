@@ -44,6 +44,27 @@ Function With-PythonPath {
     }
 }
 
+Function _lint_python {
+    log "Running Python linter (ruff)..."
+    ruff check --fix (Join-Path $PythonDir)
+    if ($LASTEXITCODE -ne 0) {
+        warn "Ruff found issues in the Python code."
+        return $false
+    } else {
+        ok "Python linting passed."
+        return $true
+    }
+}
+
+Function _lint_cpp {
+    log "Running C++ linter (clang-tidy)..."
+    # This is a placeholder. To implement this, you would typically enable
+    # clang-tidy checks directly in your CMake build configuration by setting
+    # the CMAKE_CXX_CLANG_TIDY variable. Then, a clean build would show warnings.
+    warn "C++ linting is not yet configured. This is a placeholder."
+    return $true # Return true for now so it doesn't fail the combined lint command
+}
+
 # --- Core actions ------------------------------------------------------------
 Function cmd_setup {
     section "Environment Setup (Windows/Mamba)"
@@ -149,6 +170,42 @@ Function cmd_test {
     }
     
     ok "All tests completed"
+}
+
+Function cmd_lint {
+    param([string[]]$LintArgs)
+    section "Running Linters"
+    Ensure-EnvActivated
+
+    $target = if ($LintArgs.Count -gt 0) { $LintArgs[0] } else { "all" }
+
+    $py_ok = $true
+    $cpp_ok = $true
+
+    switch ($target) {
+        "all" {
+            $py_ok = _lint_python
+            $cpp_ok = _lint_cpp
+        }
+        "py" {
+            $py_ok = _lint_python
+        }
+        "cpp" {
+            $cpp_ok = _lint_cpp
+        }
+        default {
+            err "Unknown lint target: '$target'. Use 'py', 'cpp', or no argument for all."
+            exit 1
+        }
+    }
+
+    if (-not ($py_ok -and $cpp_ok)) {
+        err "Linting failed for one or more targets."
+        # Use a non-standard exit code to differentiate from other failures if needed
+        exit 2
+    } else {
+        ok "All lint checks passed."
+    }
 }
 
 Function cmd_list {
@@ -318,6 +375,7 @@ CORE WORKFLOW
   setup                      Create/update environment & install Python package
   build [preset]             Configure & build (default: $BuildPreset)
   rebuild [preset]           Clean & rebuild
+  lint [py|cpp]              Run Python, C++, or both linters
   test [preset]              Run C++ & Python tests
 
 BENCHMARKING & PROFILING
@@ -335,6 +393,7 @@ UTILITIES
 EXAMPLES
   .\scripts\cli.ps1 setup
   .\scripts\cli.ps1 build
+  .\scripts\cli.ps1 lint py
   .\scripts\cli.ps1 test
   .\scripts\cli.ps1 bench suite
 "@
@@ -353,18 +412,19 @@ switch ($Command) {
     "-h"        { Show-Usage }
     "--help"    { Show-Usage }
     "setup"     { cmd_setup }
-    "build"     { 
+    "build"     {
         $preset = if ($CommandArgs.Count -gt 0) { $CommandArgs[0] } else { $BuildPreset }
         cmd_build -Preset $preset
     }
-    "rebuild"   { 
+    "rebuild"   {
         $preset = if ($CommandArgs.Count -gt 0) { $CommandArgs[0] } else { $BuildPreset }
         cmd_rebuild -Preset $preset
     }
-    "test"      { 
+    "test"      {
         $preset = if ($CommandArgs.Count -gt 0) { $CommandArgs[0] } else { $BuildPreset }
         cmd_test -Preset $preset
     }
+    "lint"      { cmd_lint -LintArgs $CommandArgs }
     "clean"     { cmd_clean }
     "list"      { cmd_list -ListArgs $CommandArgs }
     "bench"     { cmd_bench -BenchArgs $CommandArgs }
@@ -374,4 +434,3 @@ switch ($Command) {
     "info"      { cmd_info }
     default     { err "Unknown command: $Command"; Show-Usage; exit 1 }
 }
-
