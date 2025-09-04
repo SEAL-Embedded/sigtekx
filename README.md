@@ -15,7 +15,7 @@ Professional-grade, research-oriented HPC library optimized for real-time signal
 - **Real-time Performance**: <200μs latency per dual-channel FFT pair (targeting <100μs)
 - **CUDA Optimization**: Multi-stream concurrency with CUDA Graphs support
 - **Research-Grade Accuracy**: IEEE 754 float32 compliance, validated against FFTW/MKL (not yet)
-- **Cross-Platform**: Linux-first development (native + WSL2), Windows deployment support
+- **Cross-Platform**: Linux (native + WSL2), Windows 11
 - **Python Integration**: Zero-copy NumPy interface via pybind11
 - **Production Ready**: Designed for 24/7 continuous field operation
 
@@ -556,4 +556,5 @@ If you use this software in your research, please cite:
 }
 
 ```
+
 
