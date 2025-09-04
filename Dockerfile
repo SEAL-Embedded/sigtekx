@@ -36,8 +36,19 @@ SHELL ["conda", "run", "-n", "ionosense-hpc", "/bin/bash", "-c"]
 ENV PYTHONPATH="/app/python/src"
 
 # Copy the source code and build the C++/CUDA components
-COPY . .
+COPY src/ ./src/
+COPY include/ ./include/
+COPY bindings/ ./bindings/
+COPY CMakeLists.txt .
+COPY CMakePresets.json .
+
+# Configure and build the C++/CUDA extension using CMake presets
 RUN cmake --preset ci-linux && cmake --build --preset ci-linux-build
+
+# Copy the Python source code and tests
+ENV PYTHONPATH="/app/python/src"
+COPY python/src/ ./python/src/
+COPY python/tests/ ./python/tests/
 
 # Build the Python wheel
 # This packages the Python code and the compiled C++ extension (.so file)
@@ -47,7 +58,7 @@ RUN pip wheel . --wheel-dir dist/
 # This ensures commands run against the CI image execute inside the conda env
 ENTRYPOINT ["conda", "run", "-n", "ionosense-hpc", "--no-capture-output"]
 
-# -----------------------------------------------------------------------------
+# ==================================================================================
 
 # Stage 2: The "final" stage for the production image
 FROM nvidia/cuda:13.0.0-runtime-ubuntu22.04
