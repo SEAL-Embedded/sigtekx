@@ -53,6 +53,7 @@ jobs:
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
+          timeout: '15m'
 
       # Step 3: PULL the CI image and run the linter.
       - name: Run Ruff Linter
