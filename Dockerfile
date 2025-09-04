@@ -31,23 +31,24 @@ RUN conda env create -f environment.build.yml && conda clean -afy
 # Activate the Conda environment for subsequent commands
 SHELL ["conda", "run", "-n", "ionosense-hpc", "/bin/bash", "-c"]
 
-# Add the source directory to the PYTHONPATH
-# This makes the package importable for pytest
-ENV PYTHONPATH="/app/python/src"
-
-# Copy the source code and build the C++/CUDA components
+# Copy build configuration and all source code required for the C++ build.
+# This includes the python source directory, which cmake needs as a destination for shared libraries.
+COPY pyproject.toml .
+COPY CMakeLists.txt CMakePresets.json ./
 COPY src/ ./src/
 COPY include/ ./include/
 COPY bindings/ ./bindings/
-COPY CMakeLists.txt .
-COPY CMakePresets.json .
+COPY python/src/ ./python/src/
 
-# Configure and build the C++/CUDA extension using CMake presets
+# Build the C++/CUDA components.
+# This layer is cached as long as C++ or Python source doesn't change.
+# The compiled .so file will be placed inside the python/src directory.
+ENV PYTHONPATH="/app/python/src"
 RUN cmake --preset ci-linux && cmake --build --preset ci-linux-build
 
-# Copy the Python source code and tests
-ENV PYTHONPATH="/app/python/src"
-COPY python/src/ ./python/src/
+# Copy the test files.
+# We copy this last because tests might change frequently, and we don't want
+# that to invalidate the C++ build cache.
 COPY python/tests/ ./python/tests/
 
 # Build the Python wheel
