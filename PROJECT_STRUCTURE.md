@@ -7,82 +7,74 @@ Complete layout of the ionosense-hpc-lib codebase with documentation links.
 ```
 ionosense-hpc-lib/
 │
-├── .guide/                    # C++/CUDA code examples and documentation
-│
-├── bindings/
+├── bindings/                   # C++/Python binding configurations
 │   └── bindings.cpp              # pybind11 entrypoint, exposes C++ research engine to Python
 │
-├── include/ionosense/
-│   ├── cuda_wrappers.hpp         # RAII wrappers for cudaStream, cudaEvent, cufftHandle, buffers
-│   ├── research_engine.hpp       # ResearchEngine: public C++ API (IPipelineEngine + concrete impl via Pimpl)
-│   ├── processing_stage.hpp      # Abstract stage interface + v1.0 stages (Window, FFT, Magnitude)
-│   └── engines/                  # Engine-specific headers (ResearchEngine built now; others present but not built)
-│       ├── ion_engine.hpp        # IFE (Ionosense Fused) — present for future, **not built now**
-│       └── obe_engine.hpp        # OBE (Offline/Batch) — present for future, **not built now**
+├── include/                    # C++ public headers
+│   └── ionosense/                # Main library header directory
+│       ├── cuda_wrappers.hpp     # RAII wrappers for CUDA/cuFFT resources (streams, events, handles)
+│       ├── processing_stage.hpp  # Abstract interface for processing stages
+│       └── research_engine.hpp   # Public C++ API for the research engine
 │
-├── src/
-│   ├── ops_fft.cu                # CUDA kernels: apply_window, magnitude, helpers
-│   ├── research_engine.cpp       # ResearchEngine: stream mgmt, plan reuse, enqueue/execute
-│   ├── processing_stage.cpp      # v1.0 Strategy implementations (WindowStage, FFTStage, MagnitudeStage)
-│   └── engines/                  # Engine-specific implementations
-│       ├── ion_engine.cpp        # Ionosense Fused Engine skeleton for future work — **not built now**
-│       └── obe_engine.cpp        # Offline/Batch Engine skeleton for future work — **not built now**
+├── src/                        # C++ source code implementations
+│   ├── ops_fft.cu                # CUDA kernels for windowing and magnitude calculations
+│   ├── processing_stage.cpp      # Implementations for concrete processing stages
+│   └── research_engine.cpp       # ResearchEngine implementation details
 │
-├── tests/
-│   ├── test_cuda_wrappers.cpp    # GTest: RAII CUDA wrappers (streams, events, buffers, plans)
-│   ├── test_research_engine.cpp  # GTest: ResearchEngine orchestration (init, exec, teardown)
-│   └── test_processing_stage.cpp # GTest: stage correctness (window, FFT, magnitude)
+├── tests/                        # C++ unit tests
 │
 │
 │
-├── python/
-│    ├── src/
-│    │    ionosense_hpc/
-│    │    ├── __init__.py              # The magic happens here: ALL public exports are defined.
-│    │    ├── __version__.py           # Defines __version__ = "1.0.0".
-│    │    │
-│    │    ├── core/                    # Implementation details (users NEVER import from here).
-│    │    │   ├── __init__.py
-│    │    │   ├── _engine.*.so         # (Assume this is pre-built and present).
-│    │    │   ├── processor.py         # Defines the high-level `Processor` class (with context manager).
-│    │    │   ├── engine.py            # Defines the mid-level `Engine` class.
-│    │    │   └── raw_engine.py        # Defines the low-level `RawEngine` wrapper.
-│    │    │
-│    │    ├── config/
-│    │    │   ├── __init__.py
-│    │    │   ├── schemas.py           # Pydantic models for EngineConfig, with __repr__.
-│    │    │   ├── validation.py        # Functions to validate configurations against device capabilities.
-│    │    │   └── presets.py           # Pre-configured instances for common use cases (e.g., REALTIME).
-│    │    │
-│    │    ├── stages/                  # (Placeholder for future scalability, not fully implemented in v1.0)
-│    │    │   ├── __init__.py
-│    │    │   ├── registry.py
-│    │    │   └── definitions.py
-│    │    │
-│    │    ├── benchmarks/              # The benchmark suite, structured as a submodule.
-│    │    │   ├── __init__.py
-│    │    │   ├── suite.py             # Main runner for executing benchmarks, with a CLI entry point.
-│    │    │   ├── latency.py           # Specific benchmarks for p50/p99 latency.
-│    │    │   ├── throughput.py        # Specific benchmarks for sustained GB/s.
-│    │    │   └── accuracy.py          # Benchmarks for comparing against NumPy/SciPy.
-│    │    │
-│    │    ├── utils/                   # Low-level utilities.
-│    │    │   ├── __init__.py
-│    │    │   ├── device.py            # GPU management and querying functions.
-│    │    │   ├── logging.py           # Configures structured logging for the library.
-│    │    │   └── signals.py           # Signal generation functions for testing and examples.
-│    │    │
-│    │    ├── testing/                 # Internal helpers for the pytest suite.
-│    │    │   ├── __init__.py
-│    │    │   ├── fixtures.py          # Shared pytest fixtures.
-│    │    │   └── validators.py        # Functions to validate numerical outputs.
-│    │    │
-│    │    └── exceptions.py            # Custom exception classes (IonosenseError, etc.).
-│    │
-│    └── tests/
-│        ├── conftest.py
-│        ├── ...
-│        └── test_*.py
+├── python/                   # Python package source and tests
+│   ├── src/                    # Source code for the Python package
+│   │   └── ionosense_hpc/        # The main Python package
+│   │       ├── __init__.py       # Initializes the Python package
+│   │       ├── __version__.py    # Defines the package version
+│   │       ├── exceptions.py     # Custom exception types for the library
+│   │       │
+│   │       ├── benchmarks/       # Performance benchmarking tools
+│   │       │   ├── __init__.py     # Makes benchmarks a sub-package
+│   │       │   ├── accuracy.py     # Accuracy benchmark scripts
+│   │       │   ├── latency.py      # Latency measurement scripts
+│   │       │   ├── realtime.py     # Real-time performance tests
+│   │       │   ├── suite.py        # Main benchmarking suite runner
+│   │       │   └── throughput.py   # Throughput measurement scripts
+│   │       │
+│   │       ├── config/           # Configuration management
+│   │       │   ├── __init__.py     # Makes config a sub-package
+│   │       │   ├── presets.py      # Pre-defined configuration presets
+│   │       │   ├── schemas.py      # Validation schemas for configurations
+│   │       │   └── validation.py   # Configuration validation logic
+│   │       │
+│   │       ├── core/             # Core Python logic wrapping the C++ library
+│   │       │   ├── __init__.py     # Makes core a sub-package
+│   │       │   ├── engine.py       # High-level Python engine interface
+│   │       │   ├── processor.py    # Main processor class for data handling
+│   │       │   └── raw_engine.py   # Low-level wrapper around the C++ engine
+│   │       │
+│   │       ├── stages/           # Python representations of processing stages
+│   │       │   ├── __init__.py     # Makes stages a sub-package
+│   │       │   ├── definitions.py  # Definitions of available stages
+│   │       │   └── registry.py     # Registry for managing stages
+│   │       │
+│   │       ├── testing/          # Utilities for testing the Python code
+│   │       │   ├── __init__.py     # Makes testing a sub-package
+│   │       │   ├── fixtures.py     # Pytest fixtures for tests
+│   │       │   └── validators.py   # Data validation helpers for tests
+│   │       │
+│   │       └── utils/            # Utility functions
+│   │           ├── __init__.py     # Makes utils a sub-package
+│   │           ├── device.py       # GPU device management utilities
+│   │           ├── logging.py      # Logging configuration
+│   │           ├── profiling.py    # Performance profiling tools
+│   │           ├── reporting.py    # Result reporting utilities
+│   │           └── signals.py      # Signal generation and processing tools
+│   │       
+│   │
+│   └── tests/                      # Python unit and integration tests
+│       ├── conftest.py             # Pytest configuration and shared fixtures
+│       ├── ...
+│       └── test_*.py               # Tests for python
 │
 │
 │
@@ -101,14 +93,32 @@ ionosense-hpc-lib/
 │   ├── reports/               # Project reports, papers, and presentations
 │   └── configs/               # Configuration files for experiments & benchmarks
 │
-├── scripts/                   # Helper scripts for development and environment setup
 │
-├── .gitignore                 # Specifies intentionally untracked files to ignore
-├── CMakeLists.txt             # Top-level build script for CMake
-├── CMakePresets.json          # Default build configurations for CMake
-├── environment.linux.yml      # Conda environment for Linux
-├── environment.win.yml        # Conda environment for Windows
-└── README.md                  # Main project documentation
+│
+├── scripts/                      # Command-line interface and utility scripts
+│   ├── cli.ps1                   # PowerShell CLI script for Windows
+│   ├── cli.sh                    # Bash CLI script for Linux/macOS
+│   └── start-devshell-x64.ps1    # Script to initialize the development environment on Windows
+│
+├── .github/                      # GitHub-specific files
+│   └── workflows/                # Continuous integration workflows
+│       └── ci.yml                # CI pipeline for building and testing
+│
+├── docs/                         # Project documentation
+│   ├── BENCHMARKS.md             # Documentation on performance benchmarks
+│   └── DEVELOPMENT.md            # Guide for developers contributing to the project
+│
+├── environments/                 # Conda environment configuration files
+│   └── environment.*.yml
+│
+├── .dockerignore                 # Specifies files to ignore in Docker builds
+├── .gitignore                    # Specifies files for Git to ignore
+├── CMakeLists.txt                # Root CMake build script
+├── CMakePresets.json             # Presets for CMake configuration
+├── Dockerfile                    # Docker configuration for containerization
+├── PROJECT_STRUCTURE.md          # This file, the project structure overview
+├── README.md                     # Main project README with overview and setup instructions
+└── pyproject.toml                # Python project configuration (PEP 518)
 ```
 
 ## Component Map
