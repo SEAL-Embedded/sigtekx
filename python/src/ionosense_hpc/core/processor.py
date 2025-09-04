@@ -1,4 +1,9 @@
-"""High-level context manager for the signal processing engine."""
+"""High-level context manager for the signal processing engine.
+
+This module provides the `Processor`, a user-friendly interface to the CUDA
+FFT engine. It uses a context manager for automatic resource management and
+offers presets for common use cases like real-time and batch processing.
+"""
 
 from typing import Any
 
@@ -12,16 +17,19 @@ from ionosense_hpc.utils.logging import logger
 
 
 class Processor:
-    """High-level interface with context manager support.
+    """High-level, context-aware interface for CUDA FFT processing.
 
-    This class provides the most Pythonic interface to the engine,
-    with automatic resource management, presets, and convenience methods.
-    It's designed to be used as a context manager for proper cleanup.
+    This class simplifies interaction with the engine by managing GPU resources
+    automatically via Python's `with` statement. It is the recommended entry
+    point for most applications.
 
-    Examples:
-        >>> from ionosense_hpc import Processor, Presets
-        >>> with Processor(Presets.realtime()) as proc:
-        ...     output = proc.process(input_data)
+    The class is NOT thread-safe; each thread should use its own instance.
+
+    Attributes:
+        _config: The current engine configuration.
+        _engine: The underlying mid-level Engine instance.
+        _is_initialized: A flag indicating if GPU resources are allocated.
+        _processing_history: A list of performance metrics from each `process` call.
     """
 
     def __init__(
@@ -29,17 +37,20 @@ class Processor:
         config: EngineConfig | str | None = None,
         auto_init: bool = True
     ):
-        """Initialize the processor.
+        """Initializes the processor.
 
         Args:
-            config: Configuration object, preset name, or None for default
-            auto_init: Whether to initialize immediately
+            config: An `EngineConfig` object, a preset name as a string
+                (e.g., 'realtime'), or None to use the default 'realtime' preset.
+            auto_init: If True and a config is provided, `initialize()` is
+                called automatically.
+
+        Raises:
+            ValueError: If the provided preset name is not recognized.
         """
-        # Handle config input
         if config is None:
             config = Presets.realtime()
         elif isinstance(config, str):
-            # Try to get preset by name
             presets_map = {
                 'realtime': Presets.realtime,
                 'throughput': Presets.throughput,
@@ -61,10 +72,17 @@ class Processor:
             self.initialize()
 
     def initialize(self, config: EngineConfig | None = None) -> None:
-        """Initialize the processor and engine.
+        """Allocates GPU resources and prepares the engine for processing.
+
+        This method must be called before any processing if `auto_init` was
+        False or if the processor was instantiated without a configuration.
 
         Args:
-            config: Optional new configuration
+            config: If provided, this configuration will replace the existing one.
+
+        Raises:
+            ValueError: If no configuration is available.
+            EngineRuntimeError: If GPU initialization fails.
         """
         if config is not None:
             self._config = config
@@ -72,16 +90,12 @@ class Processor:
         if self._config is None:
             raise ValueError("No configuration provided")
 
-        # Log device info
         info = device_info()
         logger.info(f"Initializing on device: {info['name']}")
         logger.info(f"  Memory: {info['memory_free_mb']}/{info['memory_total_mb']} MB free")
-        logger.info(f"  Compute Capability: {info['compute_capability']}")
 
-        # Initialize engine
         self._engine.initialize(self._config)
         self._is_initialized = True
-
         logger.info("Processor initialized successfully")
 
     def process(
@@ -89,32 +103,28 @@ class Processor:
         input_data: np.ndarray | list,
         return_complex: bool = False
     ) -> np.ndarray:
-        """Process input data through the FFT pipeline.
+        """Processes a single frame of input data.
 
         Args:
-            input_data: Input signal data
-            return_complex: If True, return complex spectrum (future feature)
+            input_data: The input signal data, typically a 1D NumPy array.
+            return_complex: If True, returns complex FFT output. (Not implemented)
 
         Returns:
-            Magnitude spectrum [batch, bins]
+            A NumPy array containing the magnitude spectrum.
 
         Raises:
-            EngineStateError: If not initialized
+            EngineStateError: If the processor is not initialized.
+            NotImplementedError: If `return_complex` is True.
         """
         if not self._is_initialized:
-            raise EngineStateError(
-                "Processor not initialized",
-                "Use as context manager or call initialize()"
-            )
+            raise EngineStateError("Processor not initialized", "Call initialize() or use as context manager")
 
         if return_complex:
             raise NotImplementedError("Complex output not yet supported")
 
-        # Process through engine
         output = self._engine.process(input_data)
-
-        # Track in history
         stats = self._engine.get_stats()
+
         self._processing_history.append({
             'frame': len(self._processing_history),
             'latency_us': stats.get('latency_us', 0),
@@ -128,14 +138,16 @@ class Processor:
         data_generator,
         max_frames: int | None = None
     ) -> list[np.ndarray]:
-        """Process a stream of data frames.
+        """Processes a stream of data from a generator.
 
         Args:
-            data_generator: Iterator yielding input frames
-            max_frames: Maximum frames to process
+            data_generator: An iterator or generator yielding data frames.
+            max_frames: The maximum number of frames to process. If None, processes
+                until the generator is exhausted.
 
         Returns:
-            List of output spectra
+            A list of NumPy arrays, each containing the magnitude spectrum
+            for a processed frame.
         """
         if not self._is_initialized:
             raise EngineStateError("Processor not initialized")
@@ -159,26 +171,22 @@ class Processor:
         n_iterations: int = 100,
         input_data: np.ndarray | None = None
     ) -> dict[str, Any]:
-        """Run a quick benchmark.
+        """Runs a performance benchmark and returns statistical results.
 
         Args:
-            n_iterations: Number of iterations
-            input_data: Optional test data (None for zeros)
+            n_iterations: The number of processing iterations to run.
+            input_data: Optional test data. If None, zero-filled data matching
+                the configuration is used.
 
         Returns:
-            Benchmark results dictionary
+            A dictionary containing performance statistics (mean, std, p99 latency, etc.).
         """
         if not self._is_initialized:
             raise EngineStateError("Processor not initialized")
 
-        # Prepare test data
         if input_data is None:
-            input_data = np.zeros(
-                self._config.nfft * self._config.batch,
-                dtype=np.float32
-            )
+            input_data = np.zeros(self._config.nfft * self._config.batch, dtype=np.float32)
 
-        # Run benchmark
         latencies = []
         logger.info(f"Running benchmark with {n_iterations} iterations...")
 
@@ -187,51 +195,47 @@ class Processor:
             stats = self._engine.get_stats()
             latencies.append(stats['latency_us'])
 
-        # Calculate statistics
         latencies = np.array(latencies)
         results = {
             'n_iterations': n_iterations,
             'mean_latency_us': float(np.mean(latencies)),
+            'p50_latency_us': float(np.percentile(latencies, 50)),
             'std_latency_us': float(np.std(latencies)),
             'min_latency_us': float(np.min(latencies)),
             'max_latency_us': float(np.max(latencies)),
-            'p50_latency_us': float(np.percentile(latencies, 50)),
             'p95_latency_us': float(np.percentile(latencies, 95)),
             'p99_latency_us': float(np.percentile(latencies, 99))
         }
 
         logger.info(f"Benchmark complete: mean={results['mean_latency_us']:.1f} μs, "
                    f"p99={results['p99_latency_us']:.1f} μs")
-
         return results
 
     def reset(self) -> None:
-        """Reset the processor and engine."""
+        """Resets the engine, freeing all GPU resources."""
         self._engine.reset()
         self._is_initialized = False
         self._processing_history.clear()
         logger.info("Processor reset")
 
     def get_stats(self) -> dict[str, Any]:
-        """Get current statistics.
+        """Gets current performance statistics from the engine and processor.
 
         Returns:
-            Combined statistics dictionary
+            A dictionary of performance metrics.
         """
         stats = self._engine.get_stats() if self._is_initialized else {}
-
-        # Add processor-level stats
         stats['total_processed'] = len(self._processing_history)
 
         if self._processing_history:
-            recent = self._processing_history[-10:]  # Last 10 frames
+            recent = self._processing_history[-10:]
             recent_latencies = [h['latency_us'] for h in recent]
             stats['recent_avg_latency_us'] = np.mean(recent_latencies)
 
         return stats
 
     def print_status(self) -> None:
-        """Print current processor status."""
+        """Prints a human-readable status report to the console."""
         print("Processor Status:")
         print(f"  Initialized: {self._is_initialized}")
 
@@ -241,27 +245,25 @@ class Processor:
             print(f"  Frames Processed: {stats.get('total_processed', 0)}")
             if 'recent_avg_latency_us' in stats:
                 print(f"  Recent Latency: {stats['recent_avg_latency_us']:.1f} μs")
-
-            # Device status
             print("\n" + monitor_device())
 
     @property
     def is_initialized(self) -> bool:
-        """Check if processor is initialized."""
+        """Returns True if the processor is initialized."""
         return self._is_initialized
 
     @property
     def config(self) -> EngineConfig | None:
-        """Get current configuration."""
+        """Returns the current processor configuration."""
         return self._config
 
     @property
     def history(self) -> list[dict[str, Any]]:
-        """Get processing history."""
+        """Returns a copy of the processing history."""
         return self._processing_history.copy()
 
     def __enter__(self):
-        """Enter context manager."""
+        """Enters the context manager, initializing if necessary."""
         if not self._is_initialized:
             self.initialize()
         self._context_active = True
@@ -269,23 +271,20 @@ class Processor:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Exit context manager with cleanup."""
+        """Exits the context manager, ensuring GPU synchronization."""
         self._context_active = False
-
-        # Log any exception
         if exc_type is not None:
             logger.error(f"Exception in processor context: {exc_type.__name__}: {exc_val}")
 
-        # Always cleanup
         try:
             self._engine.synchronize()
             logger.debug("Processor synchronized on context exit")
         except Exception as e:
             logger.warning(f"Failed to synchronize on exit: {e}")
 
-        # Don't suppress exceptions
         return False
 
     def __repr__(self) -> str:
+        """Returns a string representation of the processor."""
         state = "initialized" if self._is_initialized else "uninitialized"
         return f"<Processor state={state} config={self._config}>"

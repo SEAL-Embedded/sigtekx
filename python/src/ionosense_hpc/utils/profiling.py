@@ -1,4 +1,10 @@
-"""Profiling utilities, including NVTX shims for NVIDIA Nsight."""
+"""Profiling utilities with NVIDIA Nsight (NVTX) integration.
+
+This module provides NVTX markers for detailed performance analysis with
+NVIDIA's profiling tools. When the `nvtx` package is not installed, these
+utilities become no-ops with zero overhead.
+"""
+
 import warnings
 from contextlib import contextmanager
 
@@ -7,28 +13,26 @@ try:
     NVTX_AVAILABLE = True
 except ImportError:
     NVTX_AVAILABLE = False
-    warnings.warn("`nvtx` not installed. NVTX markers will be disabled. "
-                  "Install with: pip install nvtx", ImportWarning, stacklevel=2)
+    warnings.warn(
+        "`nvtx` not installed. NVTX markers will be disabled. "
+        "Install with: pip install nvtx",
+        ImportWarning, stacklevel=2
+    )
 
 
 @contextmanager
 def nvtx_range(name: str, color: str = "blue"):
-    """
-    A context manager for NVIDIA Tools Extension (NVTX) ranges.
-    These ranges are visible in NVIDIA Nsight Systems, making it easy
-    to identify specific sections of code in the profiler timeline.
+    """Creates a context-managed NVTX range for profiling.
 
-    If the `nvtx-plugins` package is not installed, this context manager
-    acts as a no-op, allowing the code to run without modification.
+    This range will appear in the NVIDIA Nsight Systems timeline viewer,
+    allowing for easy identification of code sections.
 
     Args:
-        name (str): The name of the range to be displayed in the profiler.
-        color (str): The color of the range. Can be a color name like "blue",
-                     "green", "red", or a hex code like "#FF0000".
+        name: A descriptive name for the profiling range.
+        color: A color for the range in the profiler (e.g., 'blue', 'red').
     """
     if NVTX_AVAILABLE:
         with nvtx.annotate(message=name, color=color):
             yield
     else:
         yield
-

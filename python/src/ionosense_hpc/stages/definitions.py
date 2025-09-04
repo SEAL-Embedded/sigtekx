@@ -1,83 +1,93 @@
-"""Stage definitions and metadata for the pipeline."""
+"""Stage definitions and metadata for the processing pipeline.
+
+This module defines the architectural framework for the extensible processing
+pipeline, providing structured metadata and type definitions for all current
+and planned processing stages.
+"""
 
 from enum import Enum
 from typing import Any
 
 
 class StageType(Enum):
-    """Types of processing stages in the pipeline."""
+    """Enumeration of processing stages in the ionosense-hpc pipeline."""
+
+    # Core processing stages (Implemented in v1.0)
     WINDOW = "window"
+    """Applies a window function to reduce spectral leakage."""
+
     FFT = "fft"
+    """Performs a Fast Fourier Transform using an optimized cuFFT implementation."""
+
     MAGNITUDE = "magnitude"
-    PHASE = "phase"  # Future
-    FILTER = "filter"  # Future
-    RESAMPLE = "resample"  # Future
+    """Calculates the magnitude spectrum from complex FFT results."""
+
+    # Analysis extensions (Planned for v2.0)
+    PHASE = "phase"
+    """Extracts and unwraps the phase spectrum."""
+
+    FILTER = "filter"
+    """Applies frequency-domain filtering operations."""
+
+    RESAMPLE = "resample"
+    """Performs multi-rate signal processing and resampling."""
 
 
-# Stage metadata for documentation and future extensibility
+# Stage metadata dictionary containing comprehensive information about each processing stage
 STAGE_METADATA: dict[StageType, dict[str, Any]] = {
     StageType.WINDOW: {
-        "description": "Apply window function to reduce spectral leakage",
-        "input": "Real-valued time-domain signal",
-        "output": "Windowed time-domain signal",
+        "description": "Apply window function to reduce spectral leakage.",
+        "implemented": True,
         "parameters": ["window_type", "window_norm"],
-        "implemented": True
     },
     StageType.FFT: {
-        "description": "Fast Fourier Transform using cuFFT",
-        "input": "Real or complex time-domain signal",
-        "output": "Complex frequency-domain spectrum",
+        "description": "Fast Fourier Transform using cuFFT.",
+        "implemented": True,
         "parameters": ["nfft", "batch"],
-        "implemented": True
     },
     StageType.MAGNITUDE: {
-        "description": "Compute magnitude from complex spectrum",
-        "input": "Complex frequency-domain spectrum",
-        "output": "Magnitude spectrum",
+        "description": "Compute magnitude from complex spectrum.",
+        "implemented": True,
         "parameters": ["scale_policy"],
-        "implemented": True
     },
     StageType.PHASE: {
-        "description": "Compute phase from complex spectrum",
-        "input": "Complex frequency-domain spectrum",
-        "output": "Phase spectrum in radians",
+        "description": "Compute phase from complex spectrum.",
+        "implemented": False,
+        "planned_version": "2.0",
         "parameters": ["unwrap"],
-        "implemented": False
     },
     StageType.FILTER: {
-        "description": "Apply frequency-domain filtering",
-        "input": "Complex frequency-domain spectrum",
-        "output": "Filtered complex spectrum",
+        "description": "Apply frequency-domain filtering.",
+        "implemented": False,
+        "planned_version": "2.0",
         "parameters": ["filter_type", "cutoff_frequencies"],
-        "implemented": False
     },
     StageType.RESAMPLE: {
-        "description": "Resample signal to different rate",
-        "input": "Time or frequency domain signal",
-        "output": "Resampled signal",
+        "description": "Resample signal to a different rate.",
+        "implemented": False,
+        "planned_version": "2.0",
         "parameters": ["target_rate", "method"],
-        "implemented": False
     }
 }
 
 
 def get_stage_info(stage_type: StageType) -> dict[str, Any]:
-    """Get information about a stage type.
+    """Get comprehensive information about a specific processing stage.
 
     Args:
-        stage_type: Type of stage
+        stage_type: The processing stage to query.
 
     Returns:
-        Stage metadata dictionary
+        A dictionary of metadata for the specified stage.
     """
     return STAGE_METADATA.get(stage_type, {})
 
 
-def list_implemented_stages() -> list:
-    """List stages that are currently implemented.
+def list_implemented_stages() -> list[StageType]:
+    """List all processing stages that are currently implemented.
 
     Returns:
-        List of implemented stage types
+        A list of StageType enums for all implemented stages.
     """
     return [
         stage_type
@@ -86,11 +96,11 @@ def list_implemented_stages() -> list:
     ]
 
 
-def list_future_stages() -> list:
-    """List planned but not yet implemented stages.
+def list_future_stages() -> list[StageType]:
+    """List all processing stages planned for future implementation.
 
     Returns:
-        List of future stage types
+        A list of StageType enums for all planned stages.
     """
     return [
         stage_type

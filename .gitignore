@@ -49,6 +49,8 @@ __pycache__/
 .eggs/
 build/                  # Python packaging builds inside subdirs
 pip-wheel-metadata/
+.whl
+dist/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
