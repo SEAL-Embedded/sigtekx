@@ -29,6 +29,7 @@ dependencies:
   - pydantic>=2.0
   - pynvml
   - pytest
+  - pytest-cov
   - pytest-xdist
   - pytest-timeout
   - pre-commit
