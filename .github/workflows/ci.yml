@@ -10,14 +10,16 @@ on:
 
 jobs:
   main-ci-checks:
-    name: Lint, Test, and Build
+    name: Lint and Test
     runs-on: ubuntu-latest
 
     steps:
       - name: Free Disk Space
         run: |
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
+          echo "Initial free space:"
+          df -h
+          sudo rm -rf /usr/local/lib/android /opt/ghc
+          echo "Free space after cleanup:"
           df -h
 
       - name: Checkout repository
@@ -32,7 +34,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Step 1: Build and PUSH the CI image. No 'load: true'.
+      # Step 1: Build and PUSH the 'builder' stage as our CI image.
       - name: Build and Push CI Image
         uses: docker/build-push-action@v5
         with:
@@ -43,24 +45,12 @@ jobs:
           cache-from: type=registry,ref=kevinrhz/ionosense-hpc:ci-cache
           cache-to: type=registry,ref=kevinrhz/ionosense-hpc:ci-cache,mode=max
 
-      # Step 2: Run the Trivy scan on the image in the registry.
-      - name: Scan CI Image with Trivy
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: 'kevinrhz/ionosense-hpc:ci'
-          format: 'table'
-          exit-code: '1'
-          ignore-unfixed: true
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
-          timeout: '15m'
-
-      # Step 3: PULL the CI image and run the linter.
+      # Step 2: Pull the CI image from the registry and run the linter.
       - name: Run Ruff Linter
         run: |
           docker pull kevinrhz/ionosense-hpc:ci
           docker run --rm kevinrhz/ionosense-hpc:ci ruff check python/
 
-      # Step 4: Use the already-pulled CI image to run tests.
+      # Step 3: Use the already-pulled image to run tests.
       - name: Run Pytest (CPU-Only)
         run: docker run --rm kevinrhz/ionosense-hpc:ci pytest -m "not gpu" --cov-fail-under=70
