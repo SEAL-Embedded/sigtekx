@@ -71,40 +71,40 @@ ionosense-hpc-lib/
 │   │           └── signals.py      # Signal generation and processing tools
 │   │       
 │   │
-│   └── tests/                      # Python unit and integration tests
+│   └── tests/                    # Python unit and integration tests
 │       ├── conftest.py             # Pytest configuration and shared fixtures
 │       ├── ...
 │       └── test_*.py               # Tests for python
 │
 │
 │
-├── research/                  # Experiments, analysis, and reports
-│   ├── notebooks/             # Exploratory notebooks and visualizations
-│   ├── data/                  # Datasets for experiments
+├── research/              # Experiments, analysis, and reports
+│   ├── notebooks/           # Exploratory notebooks and visualizations
+│   ├── data/                # Datasets for experiments
 │   │   ├── raw/               # Original, immutable data sources
 │   │   └── processed/         # Cleaned, transformed, or feature-engineered data
 │   │
-│   ├── experiments/           # Reproducible experiment scripts
-│   ├── results/               # Output from experiments (plots, tables, models)
+│   ├── experiments/         # Reproducible experiment scripts
+│   ├── results/             # Output from experiments (plots, tables, models)
 │   │   ├── figures/           # Generated plots and visualizations
 │   │   ├── tables/            # Tabular data and summary statistics
 │   │   └── models/            # Saved, trained model artifacts
 │   │
-│   ├── reports/               # Project reports, papers, and presentations
-│   └── configs/               # Configuration files for experiments & benchmarks
+│   ├── reports/             # Project reports, papers, and presentations
+│   └── configs/             # Configuration files for experiments & benchmarks
 │
 │
 │
-├── scripts/                      # Command-line interface and utility scripts
+├── scripts/                    # Command-line interface and utility scripts
 │   ├── cli.ps1                   # PowerShell CLI script for Windows
 │   ├── cli.sh                    # Bash CLI script for Linux/macOS
 │   └── start-devshell-x64.ps1    # Script to initialize the development environment on Windows
 │
-├── .github/                      # GitHub-specific files
-│   └── workflows/                # Continuous integration workflows
+├── .github/                  # GitHub-specific files
+│   └── workflows/              # Continuous integration workflows
 │       └── ci.yml                # CI pipeline for building and testing
 │
-├── docs/                         # Project documentation
+├── docs/                       # Project documentation
 │   ├── BENCHMARKS.md             # Documentation on performance benchmarks
 │   └── DEVELOPMENT.md            # Guide for developers contributing to the project
 │
