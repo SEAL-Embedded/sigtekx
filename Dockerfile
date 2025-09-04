@@ -31,6 +31,10 @@ RUN conda env create -f environment.build.yml && conda clean -afy
 # Activate the Conda environment for subsequent commands
 SHELL ["conda", "run", "-n", "ionosense-hpc", "/bin/bash", "-c"]
 
+# Add the source directory to the PYTHONPATH
+# This makes the package importable for pytest
+ENV PYTHONPATH="/app/python/src"
+
 # Copy the source code and build the C++/CUDA components
 COPY . .
 RUN cmake --preset ci-linux && cmake --build --preset ci-linux-build
@@ -64,6 +68,7 @@ RUN apt-get update && apt-get install -y wget && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
+# Add Conda to the PATH
 ENV PATH="/opt/conda/bin:${PATH}"
 
 # Accept Conda's Terms of Service non-interactively.
