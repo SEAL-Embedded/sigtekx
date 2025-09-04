@@ -25,7 +25,10 @@ dependencies:
   - scipy
   - pandas
   - matplotlib
+  - seaborn
   - jupyterlab
+  - ipykernel
+  - ipywidgets
   - h5py
   
   # Python stack - Added for API
