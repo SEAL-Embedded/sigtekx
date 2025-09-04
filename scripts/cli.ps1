@@ -115,7 +115,8 @@ Function cmd_build {
         exit 1 
     }
     
-    cmake --build --preset $Preset --parallel --verbose
+    $verboseFlag = if ($Preset -like "*debug*") { "--verbose" } else { $null }
+    cmake --build --preset $Preset --parallel $verboseFlag
     if ($LASTEXITCODE -ne 0) { 
         err "Build failed"
         exit 1 
@@ -401,7 +402,7 @@ EXAMPLES
 
 # --- Main Dispatcher ---
 $Command = if ($Args.Count -gt 0) { $Args[0] } else { "help" }
-$CommandArgs = if ($Args.Count -gt 1) { $Args[1..($Args.Length - 1)] } else { @() }
+$CommandArgs = @($Args | Select-Object -Skip 1)
 
 Set-Location $ProjectRoot
 

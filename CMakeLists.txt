@@ -22,6 +22,26 @@ option(IONO_WITH_PYTHON  "Build Python bindings"  ON)
 
 
 # ============================================================================
+# Compiler Flags for Release and Debug Builds
+# ============================================================================
+# --- CUDA Flags (apply to all platforms) ---
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -diag-suppress 177") # Suppress "variable was set but never used" warnings from nvcc
+set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -g -G -O0")
+set(CMAKE_CUDA_FLAGS_RELEASE "${CMAKE_CUDA_FLAGS_RELEASE} -O3 -DNDEBUG")
+
+# --- C++ Platform-Specific Flags ---
+if(MSVC)
+  # Flags for Microsoft Visual C++ Compiler (cl.exe)
+  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Zi /Od")
+  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2 /DNDEBUG")
+else()
+  # Flags for GCC/Clang
+  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0")
+  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -o3 -DNDEBUG")
+endif()
+
+
+# ============================================================================
 # Deps (Python, CUDA, Pybind11, GTest)
 # ============================================================================
 set(Python3_FIND_VIRTUALENV FIRST)      # Prefer venv/conda over system Python;
@@ -93,7 +113,7 @@ if(IONO_WITH_PYTHON)
     )
 
     target_include_directories(_engine PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include) # Add include dirs - Important!
-# Link against the object files from ion_engine directly + pybind11 + CUDA
+    # Link against the object files from ion_engine directly + pybind11 + CUDA
     target_link_libraries(_engine PRIVATE
         "$<TARGET_OBJECTS:ion_engine>"
         pybind11::module
