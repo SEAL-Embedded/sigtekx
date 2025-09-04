@@ -15,7 +15,7 @@ def gpu_count() -> int:
     """Get the number of available CUDA devices.
 
     Returns:
-        Number of CUDA-capable GPUs
+        Number of CUDA-capable GPU's
     """
     if NVML_AVAILABLE:
         try:
