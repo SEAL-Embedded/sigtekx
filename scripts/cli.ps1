@@ -44,6 +44,24 @@ Function With-PythonPath {
     }
 }
 
+Function Install-ProfileHelper {
+    $helperPath = Join-Path $PythonDir "src\ionosense_hpc\tools\profile_helper.py"
+    $helperDir = Split-Path $helperPath -Parent
+    
+    if (-not (Test-Path $helperDir)) {
+        New-Item -ItemType Directory -Path $helperDir -Force | Out-Null
+    }
+    
+    # The Python script content would be written here
+    # For now, assume it's already saved
+    
+    if (Test-Path $helperPath) {
+        return $helperPath
+    } else {
+        return $null
+    }
+}
+
 Function _lint_python {
     log "Running Python linter (ruff)..."
     ruff check --fix (Join-Path $PythonDir)
@@ -296,44 +314,199 @@ Function cmd_bench {
 
 Function cmd_profile {
     param([string[]]$ProfileArgs)
+    
     if ($ProfileArgs.Count -lt 2) {
-        err "Usage: profile <nsys|ncu> <script_name|subpath> [args...]"
+        err "Usage: profile <nsys|ncu> <script_name> [--full] [args...]"
         return
     }
     
     Ensure-EnvActivated
+    
     $tool = $ProfileArgs[0]
     $scriptName = $ProfileArgs[1]
     $scriptArgs = if ($ProfileArgs.Count -gt 2) { $ProfileArgs[2..($ProfileArgs.Length - 1)] } else { @() }
     
+    # Check for full mode
+    $fullMode = $scriptArgs -contains "--full"
+    if ($fullMode) {
+        $scriptArgs = $scriptArgs | Where-Object { $_ -ne "--full" }
+    }
+    
     $moduleBase = "ionosense_hpc.benchmarks"
     $moduleName = "$moduleBase.$scriptName"
     
-    New-Item -ItemType Directory -Force -Path (Join-Path $BuildDir "nsight_reports/nsys_reports") -ErrorAction SilentlyContinue | Out-Null
-    New-Item -ItemType Directory -Force -Path (Join-Path $BuildDir "nsight_reports/ncu_reports") -ErrorAction SilentlyContinue | Out-Null
+    $nsysDir = Join-Path $BuildDir "nsight_reports\nsys_reports"
+    $ncuDir = Join-Path $BuildDir "nsight_reports\ncu_reports"
+    New-Item -ItemType Directory -Force -Path $nsysDir | Out-Null
+    New-Item -ItemType Directory -Force -Path $ncuDir | Out-Null
     
     $timestamp = Get-Date -Format 'yyyyMMdd_HHmmss'
-    $outFile = "${scriptName}_${timestamp}" -replace '[\\/]', '_'
+    $mode = if ($fullMode) { "full" } else { "quick" }
+    $outFile = "${scriptName}_${mode}_${timestamp}"
     
-    section "Profiling ($tool): $moduleName"
+    section "Profiling ($tool $mode): $moduleName"
     
     With-PythonPath {
         switch ($tool) {
             "nsys" {
-                $reportPath = Join-Path $BuildDir "nsight_reports/nsys_reports/$outFile"
-                nsys profile -o $reportPath --trace=cuda,nvtx,osrt -f true --wait=all python -m $moduleName $scriptArgs
-                ok "Nsight Systems report saved to ${reportPath}.nsys-rep"
+                $reportPath = Join-Path $nsysDir $outFile
+                
+                # Build command as array
+                $cmd = @("nsys", "profile", "-o", $reportPath, "-f", "true", "--wait=all")
+                
+                if ($fullMode) {
+                    log "Full mode: All available GPU traces"
+                    # Use only Windows-compatible traces
+                    $cmd += "--trace=cuda,cublas,cusparse,nvtx,opengl,wddm"
+                    $cmd += "--cuda-memory-usage=true"
+                    $cmd += "--gpu-metrics-device=all"
+                } else {
+                    log "Quick mode: CUDA + NVTX only"
+                    $cmd += "--trace=cuda,nvtx"
+                }
+                
+                $cmd += "python", "-m", $moduleName
+                $cmd += $scriptArgs
+                
+                # Execute
+                & $cmd[0] $cmd[1..($cmd.Length-1)]
+                
+                if (Test-Path "${reportPath}.nsys-rep") {
+                    $size = [math]::Round((Get-Item "${reportPath}.nsys-rep").Length / 1MB, 2)
+                    ok "Report saved: ${reportPath}.nsys-rep (${size}MB)"
+                } else {
+                    err "Report not found"
+                }
             }
             "ncu" {
-                $reportPath = Join-Path $BuildDir "nsight_reports/ncu_reports/$outFile"
-                ncu --set full -o $reportPath python -m $moduleName $scriptArgs
-                ok "Nsight Compute report saved to ${reportPath}.ncu-rep"
+                $reportPath = Join-Path $ncuDir $outFile
+                
+                # Build command as array
+                $cmd = @("ncu", "-o", $reportPath)
+                
+                if ($fullMode) {
+                    warn "Full mode: ~43 passes per kernel (slow)"
+                    $cmd += "--set", "full"
+                } else {
+                    log "Quick mode: Basic metrics only"
+                    # Use the simplest metric set that works
+                    $cmd += "--set", "basic"
+                }
+                
+                $cmd += "python", "-m", $moduleName
+                $cmd += $scriptArgs
+                
+                # Execute
+                & $cmd[0] $cmd[1..($cmd.Length-1)]
+                
+                if (Test-Path "${reportPath}.ncu-rep") {
+                    $size = [math]::Round((Get-Item "${reportPath}.ncu-rep").Length / 1MB, 2)
+                    ok "Report saved: ${reportPath}.ncu-rep (${size}MB)"
+                } else {
+                    err "Report not found"
+                }
             }
             default {
-                err "Unknown profiler: '$tool'. Use 'nsys' or 'ncu'."
+                err "Unknown profiler: '$tool'"
             }
         }
     }
+}
+
+# Command to check profiling reports status
+Function cmd_profile_status {
+    section "Profiling Reports Status"
+    
+    $reportsDir = Join-Path $BuildDir "nsight_reports"
+    if (-not (Test-Path $reportsDir)) {
+        warn "No reports directory found. Run a profiling session first."
+        return
+    }
+    
+    # Function to format age
+    function Format-Age($lastWriteTime) {
+        $age = (Get-Date) - $lastWriteTime
+        if ($age.TotalMinutes -lt 60) { 
+            return "$([int]$age.TotalMinutes)m ago" 
+        } elseif ($age.TotalHours -lt 24) { 
+            return "$([int]$age.TotalHours)h ago" 
+        } else { 
+            return "$([int]$age.TotalDays)d ago" 
+        }
+    }
+    
+    Write-Host "`n📊 NSIGHT SYSTEMS REPORTS:" -ForegroundColor Cyan
+    Write-Host "─────────────────────────────────────────" -ForegroundColor DarkGray
+    
+    $nsysReports = Get-ChildItem -Path "$reportsDir\nsys_reports" -Filter "*.nsys-rep" -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending | Select-Object -First 10
+    
+    if ($nsysReports) {
+        foreach ($report in $nsysReports) {
+            $size = [math]::Round($report.Length / 1MB, 2)
+            $age = Format-Age $report.LastWriteTime
+            $name = $report.Name
+            
+            # Parse mode from filename if present
+            $modeTag = if ($name -match "_full_") { "[FULL]" } 
+                       elseif ($name -match "_quick_") { "[QUICK]" }
+                       else { "" }
+            
+            Write-Host ("  {0,-45} {1,6}MB  {2,10}  {3}" -f $name.Substring(.0, [Math]::Min($name.Length, 45)), $size, $age, $modeTag)
+        }
+    } else {
+        Write-Host "  No reports found" -ForegroundColor DarkGray
+    }
+    
+    Write-Host "`n🔬 NSIGHT COMPUTE REPORTS:" -ForegroundColor Cyan
+    Write-Host "─────────────────────────────────────────" -ForegroundColor DarkGray
+    
+    $ncuReports = Get-ChildItem -Path "$reportsDir\ncu_reports" -Filter "*.ncu-rep" -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending | Select-Object -First 10
+        
+    if ($ncuReports) {
+        foreach ($report in $ncuReports) {
+            $size = [math]::Round($report.Length / 1MB, 2)
+            $age = Format-Age $report.LastWriteTime
+            $name = $report.Name
+            
+            $modeTag = if ($name -match "_full_") { "[FULL]" }
+                       elseif ($name -match "_quick_") { "[QUICK]" }
+                       else { "" }
+            
+            Write-Host ("  {0,-45} {1,6}MB  {2,10}  {3}" -f $name.Substring(0, [Math]::Min($name.Length, 45)), $size, $age, $modeTag)
+        }
+    } else {
+        Write-Host "  No reports found" -ForegroundColor DarkGray
+    }
+    
+    # Summary stats
+    Write-Host "`n📈 SUMMARY:" -ForegroundColor Yellow
+    Write-Host "─────────────────────────────────────────" -ForegroundColor DarkGray
+    
+    $allReports = @()
+    if ($nsysReports) { $allReports += $nsysReports }
+    if ($ncuReports) { $allReports += $ncuReports }
+    
+    if ($allReports.Count -gt 0) {
+        $totalSize = ($allReports | Measure-Object -Property Length -Sum).Sum / 1MB
+        $oldestReport = ($allReports | Sort-Object LastWriteTime | Select-Object -First 1)
+        $newestReport = ($allReports | Sort-Object LastWriteTime -Descending | Select-Object -First 1)
+        
+        Write-Host ("  Total reports:  {0}" -f $allReports.Count)
+        Write-Host ("  Total size:     {0:N2} MB" -f $totalSize)
+        Write-Host ("  Newest:         {0} ({1})" -f $newestReport.Name, (Format-Age $newestReport.LastWriteTime))
+        Write-Host ("  Oldest:         {0} ({1})" -f $oldestReport.Name, (Format-Age $oldestReport.LastWriteTime))
+    }
+    
+    Write-Host ""
+    Write-Host "💡 TIP: Set IONO_USE_PY_PROFILER=1 to use the advanced Python profiler with progress tracking" -ForegroundColor DarkCyan
+}
+
+# Quick alias for common profiling tasks
+Function cmd_qprof {
+    param([string]$script = "latency")
+    cmd_profile @("nsys", $script, "--quick")
 }
 
 Function cmd_validate {
@@ -440,14 +613,16 @@ switch ($Command) {
         $preset = if ($CommandArgs.Count -gt 0) { $CommandArgs[0] } else { $BuildPreset }
         cmd_test -Preset $preset
     }
-    "lint"      { cmd_lint -LintArgs $CommandArgs }
-    "format"    { cmd_format }
-    "clean"     { cmd_clean }
-    "list"      { cmd_list -ListArgs $CommandArgs }
-    "bench"     { cmd_bench -BenchArgs $CommandArgs }
-    "profile"   { cmd_profile -ProfileArgs $CommandArgs }
-    "validate"  { cmd_validate }
-    "monitor"   { cmd_monitor }
-    "info"      { cmd_info }
-    default     { err "Unknown command: $Command"; Show-Usage; exit 1 }
+    "lint"            { cmd_lint -LintArgs $CommandArgs }
+    "format"          { cmd_format }
+    "clean"           { cmd_clean }
+    "list"            { cmd_list -ListArgs $CommandArgs }
+    "bench"           { cmd_bench -BenchArgs $CommandArgs }
+    "profile"         { cmd_profile -ProfileArgs $CommandArgs }
+    "profile-status"  { cmd_profile_status }
+    "qprof"           { cmd_qprof -script $(if ($CommandArgs.Count -gt 0) { $CommandArgs[0] } else { "latency" }) }
+    "validate"        { cmd_validate }
+    "monitor"         { cmd_monitor }
+    "info"            { cmd_info }
+    default           { err "Unknown command: $Command"; Show-Usage; exit 1 }
 }
