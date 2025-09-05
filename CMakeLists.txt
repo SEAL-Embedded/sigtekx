@@ -42,6 +42,32 @@ endif()
 
 
 # ============================================================================
+# C++ Quality-of-Life Tools (Linter, Formatter)
+# ============================================================================
+find_program(CLANG_FORMAT clang-format)
+if(CLANG_FORMAT)
+    file(GLOB_RECURSE ALL_CXX_FILES
+        "src/*.cpp" "src/*.cu"
+        "include/ionosense/*.hpp"
+        "tests/*.cpp"
+        "bindings/*.cpp"
+    )
+    add_custom_target(format COMMAND ${CLANG_FORMAT} -i ${ALL_CXX_FILES})
+endif()
+
+find_program(CLANG_TIDY clang-tidy)
+if(CLANG_TIDY)
+    set(CMAKE_CXX_CLANG_TIDY
+        ${CLANG_TIDY}
+        -checks=-*,readability-*,performance-*,portability-*,modernize-*
+        -header-filter=${CMAKE_CURRENT_SOURCE_DIR}/.*
+        --extra-arg-before=--driver-mode=cl
+        --extra-arg=/EHsc
+    )
+endif()
+
+
+# ============================================================================
 # Deps (Python, CUDA, Pybind11, GTest)
 # ============================================================================
 set(Python3_FIND_VIRTUALENV FIRST)      # Prefer venv/conda over system Python;

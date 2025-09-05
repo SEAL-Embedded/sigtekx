@@ -58,13 +58,15 @@ Function _lint_python {
 
 Function _lint_cpp {
     log "Running C++ linter (clang-tidy)..."
-    # This is a placeholder. To implement this, you would typically enable
-    # clang-tidy checks directly in your CMake build configuration by setting
-    # the CMAKE_CXX_CLANG_TIDY variable. Then, a clean build would show warnings.
-    warn "C++ linting is not yet configured. This is a placeholder."
-    return $true # Return true for now so it doesn't fail the combined lint command
+    warn "Clang-tidy runs as part of the build. Check the output below for warnings."
+    # We call the build but check the exit code here to determine success
+    cmd_build -Preset "windows-debug"
+    if ($LASTEXITCODE -eq 0) {
+        return $true
+    } else {
+        return $false
+    }
 }
-
 # --- Core actions ------------------------------------------------------------
 Function cmd_setup {
     section "Environment Setup (Windows/Mamba)"
@@ -207,6 +209,18 @@ Function cmd_lint {
     } else {
         ok "All lint checks passed."
     }
+}
+
+Function cmd_format {
+    section "Formatting C++ Code"
+    # A preset must be configured for the build directory to exist.
+    $presetDir = Join-Path $BuildDir "windows-debug"
+    if (-not (Test-Path "$presetDir/build.ninja")) {
+        warn "Build directory not configured. Running configure step for 'windows-debug' preset..."
+        cmake --preset "windows-debug"
+    }
+    cmake --build $presetDir --target format
+    ok "C++ formatting complete."
 }
 
 Function cmd_list {
@@ -377,6 +391,7 @@ CORE WORKFLOW
   build [preset]             Configure & build (default: $BuildPreset)
   rebuild [preset]           Clean & rebuild
   lint [py|cpp]              Run Python, C++, or both linters
+  format                     Auto-format C++ code (clang-format)
   test [preset]              Run C++ & Python tests
 
 BENCHMARKING & PROFILING
@@ -426,6 +441,7 @@ switch ($Command) {
         cmd_test -Preset $preset
     }
     "lint"      { cmd_lint -LintArgs $CommandArgs }
+    "format"    { cmd_format }
     "clean"     { cmd_clean }
     "list"      { cmd_list -ListArgs $CommandArgs }
     "bench"     { cmd_bench -BenchArgs $CommandArgs }
