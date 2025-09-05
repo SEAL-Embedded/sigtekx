@@ -85,6 +85,225 @@ Function _lint_cpp {
         return $false
     }
 }
+
+# =========================
+# Clickable links + openers
+# =========================
+
+function Write-Hyperlink {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$Text,
+        [Parameter(Mandatory)][string]$Uri
+    )
+    $esc = [char]27
+    $st_bel = [char]7
+    $oscStart = "$esc]8;;$Uri$st_bel"
+    $oscEnd   = "$esc]8;;$st_bel"
+
+    # Terminals that usually support OSC 8
+    $supportsOsc8 = $false
+    if ($env:WT_SESSION) { $supportsOsc8 = $true }               # Windows Terminal
+    elseif ($env:TERM_PROGRAM -eq 'vscode') { $supportsOsc8 = $true }  # VS Code
+    elseif ($env:TERM -match 'xterm|wezterm|alacritty|kitty|tmux') { $supportsOsc8 = $true }
+
+    if ($supportsOsc8) {
+        Write-Host "$oscStart$Text$oscEnd"
+    }
+    # Always print a fallback URI that’s usually clickable
+    Write-Host $Uri
+}
+
+function Write-ClickablePath {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [string]$Label = "Open"
+    )
+    $resolved = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).Path
+    $uri = ([System.Uri]::new($resolved)).AbsoluteUri   # file:///C:/...
+    Write-Hyperlink -Text $Label -Uri $uri
+}
+
+function Open-In-Files {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [switch]$Select
+    )
+    $resolved = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).Path
+    $dir  = Split-Path -Parent $resolved
+
+    if ($IsWindows) {
+        if ($Select) {
+            Start-Process explorer.exe "/select,`"$resolved`""
+        } else {
+            Start-Process explorer.exe "`"$dir`""
+        }
+    } elseif ($IsMacOS) {
+        if ($Select) {
+            # macOS doesn’t have “select” semantic in Finder CLI; open the dir.
+            Start-Process open $dir
+        } else {
+            Start-Process open $dir
+        }
+    } else {
+        Start-Process xdg-open $dir
+    }
+}
+
+# =========================
+# Nsight GUI resolvers/launchers
+# =========================
+
+function Resolve-Executable {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string[]]$CandidateNames,
+        [string[]]$ExtraSearchDirs = @()
+    )
+    # 1) PATH
+    foreach ($name in $CandidateNames) {
+        $cmd = Get-Command $name -ErrorAction SilentlyContinue
+        if ($cmd) { return $cmd.Source }
+    }
+
+    # 2) Well-known install locations
+    $search = @()
+    if ($IsWindows) {
+        $search += @(
+            Join-Path $env:ProgramFiles 'NVIDIA Corporation'
+            Join-Path $env:ProgramFiles 'NVIDIA GPU Computing Toolkit'
+        )
+    } else {
+        $search += @('/opt/nvidia', '/usr/local', '/usr')
+    }
+    if ($ExtraSearchDirs) { $search += $ExtraSearchDirs }
+
+    $results = foreach ($root in $search | Where-Object { Test-Path $_ }) {
+        Get-ChildItem -Path $root -Recurse -File -ErrorAction SilentlyContinue |
+            Where-Object { $CandidateNames -contains $_.Name }
+    }
+
+    if ($results) {
+        # Prefer newest modified binary
+        $pick = $results | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+        return $pick.FullName
+    }
+    return $null
+}
+
+function Open-In-NsightSystems {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$ReportPath
+    )
+    $exe = Resolve-Executable -CandidateNames @(
+        'nsys-ui.exe','nsys-ui','nsight-systems.exe','nsight-systems'
+    ) -ExtraSearchDirs @(
+        # Windows typical:
+        (Join-Path $env:ProgramFiles 'NVIDIA Corporation'),
+        # Linux typical:
+        '/opt/nvidia/nsight-systems','/opt/nvidia/nsight-systems/bin'
+    )
+
+    if (-not $exe) {
+        Write-Warning "Nsight Systems GUI not found. Try launching manually and opening: $ReportPath"
+        return
+    }
+    Start-Process $exe --% "$ReportPath"
+}
+
+function Open-In-NsightCompute {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$ReportPath
+    )
+    $exe = Resolve-Executable -CandidateNames @(
+        'nsight-compute.exe','nsight-compute','nv-nsight-cu.exe','nv-nsight-cu','ncu-ui.exe','ncu-ui'
+    ) -ExtraSearchDirs @(
+        # Windows typical:
+        (Join-Path $env:ProgramFiles 'NVIDIA Corporation'),
+        # Linux typical:
+        '/opt/nvidia/nsight-compute','/opt/nvidia/nsight-compute/bin'
+    )
+
+    if (-not $exe) {
+        Write-Warning "Nsight Compute GUI not found. Try launching manually and opening: $ReportPath"
+        return
+    }
+    Start-Process $exe --% "$ReportPath"
+}
+
+# =========================
+# Report discovery + pretty output
+# =========================
+
+function Find-LatestProfileReport {
+    [CmdletBinding(DefaultParameterSetName='ByDir')]
+    param(
+        [Parameter(ParameterSetName='ByDir',Mandatory=$true)][string]$Directory,
+        [Parameter(ParameterSetName='ByBase',Mandatory=$true)][string]$BaseWithoutExt,
+        [Parameter(Mandatory=$true)][ValidateSet('nsys','ncu')]$Kind
+    )
+    $candidates = @()
+    if ($PSCmdlet.ParameterSetName -eq 'ByBase') {
+        if ($Kind -eq 'nsys') {
+            $candidates += @("$BaseWithoutExt.qdrep", "$BaseWithoutExt.nsys-rep", "$BaseWithoutExt.sqlite")
+        } else {
+            $candidates += @("$BaseWithoutExt.ncu-rep")
+        }
+    } else {
+        if ($Kind -eq 'nsys') {
+            $candidates += Get-ChildItem -Path $Directory -Filter '*.qdrep' -File -ErrorAction SilentlyContinue
+            $candidates += Get-ChildItem -Path $Directory -Filter '*.nsys-rep' -File -ErrorAction SilentlyContinue
+            $candidates += Get-ChildItem -Path $Directory -Filter '*.sqlite' -File -ErrorAction SilentlyContinue
+        } else {
+            $candidates += Get-ChildItem -Path $Directory -Filter '*.ncu-rep' -File -ErrorAction SilentlyContinue
+        }
+        $candidates = $candidates | Sort-Object LastWriteTime -Descending | Select-Object -ExpandProperty FullName -First 1
+        return $candidates
+    }
+
+    foreach ($p in $candidates) {
+        if (Test-Path -LiteralPath $p) { return (Resolve-Path -LiteralPath $p).Path }
+    }
+    return $null
+}
+
+function Show-ProfileArtifacts {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$true)][ValidateSet('nsys','ncu')]$Kind,
+        [string]$ReportPath,
+        [string]$OutputDir,          # used if ReportPath is not provided
+        [switch]$OpenFolder,
+        [switch]$SelectFile,
+        [switch]$OpenGui
+    )
+
+    if (-not $ReportPath) {
+        if (-not $OutputDir) { throw "Provide -ReportPath or -OutputDir." }
+        $ReportPath = Find-LatestProfileReport -Directory $OutputDir -Kind $Kind
+    }
+    if (-not $ReportPath) {
+        Write-Warning "No report found."
+        return
+    }
+
+    Write-Host ""
+    Write-Host "📦 Saved profile:"
+    Write-ClickablePath -Path $ReportPath -Label "📄 Open report"
+    Write-ClickablePath -Path (Split-Path -Parent $ReportPath) -Label "📂 Open folder"
+
+    if ($OpenFolder) { Open-In-Files -Path $ReportPath -Select:$SelectFile }
+
+    if ($OpenGui) {
+        if ($Kind -eq 'nsys') { Open-In-NsightSystems -ReportPath $ReportPath }
+        else { Open-In-NsightCompute -ReportPath $ReportPath }
+    }
+}
+
 # --- Core actions ------------------------------------------------------------
 Function cmd_setup {
     section "Environment Setup (Windows/Mamba)"
@@ -314,94 +533,221 @@ Function cmd_bench {
 
 Function cmd_profile {
     param([string[]]$ProfileArgs)
-    
+
     if ($ProfileArgs.Count -lt 2) {
-        err "Usage: profile <nsys|ncu> <script_name> [--full] [args...]"
+        err "Usage: profile <nsys|ncu> <script_name> [--full] [--open] [--ui] [args...]"
         return
     }
-    
+
     Ensure-EnvActivated
-    
-    $tool = $ProfileArgs[0]
+
+    $tool       = $ProfileArgs[0]
     $scriptName = $ProfileArgs[1]
     $scriptArgs = if ($ProfileArgs.Count -gt 2) { $ProfileArgs[2..($ProfileArgs.Length - 1)] } else { @() }
-    
-    # Check for full mode
-    $fullMode = $scriptArgs -contains "--full"
-    if ($fullMode) {
-        $scriptArgs = $scriptArgs | Where-Object { $_ -ne "--full" }
-    }
-    
+
+    # extract our flags; pass the rest to python
+    $fullMode = $false; $openFlag = $false; $uiFlag = $false
+    if ($scriptArgs -contains "--full") { $fullMode = $true;  $scriptArgs = $scriptArgs | Where-Object { $_ -ne "--full" } }
+    if ($scriptArgs -contains "--open") { $openFlag = $true;  $scriptArgs = $scriptArgs | Where-Object { $_ -ne "--open" } }
+    if ($scriptArgs -contains "--ui")   { $uiFlag   = $true;  $scriptArgs = $scriptArgs | Where-Object { $_ -ne "--ui" } }
+
     $moduleBase = "ionosense_hpc.benchmarks"
     $moduleName = "$moduleBase.$scriptName"
-    
+
     $nsysDir = Join-Path $BuildDir "nsight_reports\nsys_reports"
-    $ncuDir = Join-Path $BuildDir "nsight_reports\ncu_reports"
+    $ncuDir  = Join-Path $BuildDir "nsight_reports\ncu_reports"
     New-Item -ItemType Directory -Force -Path $nsysDir | Out-Null
-    New-Item -ItemType Directory -Force -Path $ncuDir | Out-Null
-    
+    New-Item -ItemType Directory -Force -Path $ncuDir  | Out-Null
+
     $timestamp = Get-Date -Format 'yyyyMMdd_HHmmss'
-    $mode = if ($fullMode) { "full" } else { "quick" }
-    $outFile = "${scriptName}_${mode}_${timestamp}"
-    
+    $mode      = if ($fullMode) { "full" } else { "quick" }
+    $outFile   = "${scriptName}_${mode}_${timestamp}"
+
+    # robust Windows check
+    $onWindows = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform(
+        [System.Runtime.InteropServices.OSPlatform]::Windows
+    )
+
+    # ===== Pretty link rendering (clean, labeled) =====
+    function _PrintLinks([string]$reportPath, [string]$kind) {
+        # Styles (safe on PS >=7; no-ops on older)
+        $hasPSStyle = $PSStyle -ne $null
+        $B   = if ($hasPSStyle) { $PSStyle.Bold } else { "" }
+        $Dim = if ($hasPSStyle) { $PSStyle.Foreground.BrightBlack } else { "" }
+        $Hi  = if ($hasPSStyle) { $PSStyle.Foreground.BrightGreen } else { "" }
+        $R   = if ($hasPSStyle) { $PSStyle.Reset } else { "" }
+
+        # Terminal OSC8 hyperlink support
+        $supportsOsc8 = $false
+        if ($env:WT_SESSION) { $supportsOsc8 = $true }
+        elseif ($env:TERM_PROGRAM -eq 'vscode') { $supportsOsc8 = $true }
+        elseif ($env:TERM -match 'xterm|wezterm|alacritty|kitty|tmux') { $supportsOsc8 = $true }
+
+        # Paths + labels
+        $resolved     = (Resolve-Path -LiteralPath $reportPath).Path
+        $dir          = Split-Path -Parent $resolved
+        $fileName     = [System.IO.Path]::GetFileName($resolved)
+        $folderName   = Split-Path -Leaf $dir
+        $uriFile      = ([System.Uri]$resolved).AbsoluteUri
+        $uriFolder    = ([System.Uri](Resolve-Path -LiteralPath $dir).Path).AbsoluteUri
+        $sizeStr      = try { "{0:N1} MB" -f ((Get-Item -LiteralPath $resolved).Length / 1MB) } catch { "" }
+
+        # Hyperlink builder
+        $esc = [char]27; $bel = [char]7
+        function _HL($text, $uri) {
+            if ($supportsOsc8) { return "$esc]8;;$uri$bel$text$esc]8;;$bel" }
+            else { return "$text -> $uri" }
+        }
+
+        Write-Host ""
+        Write-Host ("{0}📦 Saved profile{1}" -f ($Hi+$B), $R)
+        Write-Host ("{0}────────────────────────────────────────────{1}" -f $Dim, $R)
+
+        # Report line
+        $openReport = _HL "Open report" $uriFile
+        $kindLabel  = if ($kind -eq 'nsys') { "Nsight Systems" } elseif ($kind -eq 'ncu') { "Nsight Compute" } else { "Report" }
+        Write-Host ("  📄 {0}: {1}  {2}({3}{4}{2})" -f $kindLabel, $openReport, $R, $Dim, "$fileName" + ($(if ($sizeStr) { " — $sizeStr" })))
+
+        # Folder line
+        $openFolder = _HL "Open folder" $uriFolder
+        Write-Host ("  📂 Folder: {0}  {1}({2}{3}{1})" -f $openFolder, $R, $Dim, $dir)
+
+        # Show raw URIs in dim text (copy-paste friendly) when OSC8 is supported
+        if ($supportsOsc8) {
+            Write-Host ("{0}     {1}{2}" -f $Dim, $uriFile, $R)
+            Write-Host ("{0}     {1}{2}" -f $Dim, $uriFolder, $R)
+        }
+
+        Write-Host ("{0}────────────────────────────────────────────{1}" -f $Dim, $R)
+    }
+
+    # local: open file’s folder (and select file on Windows)
+    function _OpenFolder([string]$reportPath) {
+        try {
+            $resolved = (Resolve-Path -LiteralPath $reportPath -ErrorAction Stop).Path
+            $dir = Split-Path -Parent $resolved
+            if ($onWindows) {
+                Start-Process -FilePath explorer.exe -ArgumentList @("/select,`"$resolved`"")
+            } elseif ($IsMacOS) {
+                Start-Process -FilePath open -ArgumentList @($dir)
+            } else {
+                Start-Process -FilePath xdg-open -ArgumentList @($dir)
+            }
+        } catch {
+            Write-Warning "Could not open folder: $($_.Exception.Message)"
+        }
+    }
+
+    # local: find a GUI exe on PATH or common dirs
+    function _ResolveExe([string[]]$names, [string[]]$extraDirs) {
+        foreach ($n in $names) {
+            $cmd = Get-Command $n -ErrorAction SilentlyContinue
+            if ($cmd) { return $cmd.Source }
+        }
+        $roots = @()
+        if ($onWindows) {
+            $roots += @(
+                $env:ProgramFiles, $env:ProgramFilesX86,
+                "$env:ProgramFiles\NVIDIA Corporation",
+                "$env:ProgramFilesX86\NVIDIA Corporation"
+            )
+        } else {
+            $roots += @('/opt/nvidia','/usr/local','/usr')
+        }
+        if ($extraDirs) { $roots += $extraDirs }
+        foreach ($root in $roots | Where-Object { $_ -and (Test-Path $_) }) {
+            foreach ($n in $names) {
+                $hit = Get-ChildItem -Path $root -Recurse -File -Filter $n -ErrorAction SilentlyContinue |
+                       Sort-Object LastWriteTime -Descending | Select-Object -First 1
+                if ($hit) { return $hit.FullName }
+            }
+        }
+        return $null
+    }
+
+    # local: launch Nsight UIs
+    function _OpenNsightSystems([string]$reportPath) {
+        $exe = _ResolveExe @('nsys-ui.exe','nsys-ui','nsight-systems.exe','nsight-systems') @()
+        if (-not $exe) { Write-Warning "Nsight Systems GUI not found. Open manually and load: $reportPath"; return }
+        $wd = Split-Path -Parent $reportPath
+        Start-Process -FilePath $exe -WorkingDirectory $wd -ArgumentList @("$reportPath")
+    }
+    function _OpenNsightCompute([string]$reportPath) {
+        $exe = _ResolveExe @('nsight-compute.exe','nsight-compute','nv-nsight-cu.exe','nv-nsight-cu','ncu-ui.exe','ncu-ui') @()
+        if (-not $exe) { Write-Warning "Nsight Compute GUI not found. Open manually and load: $reportPath"; return }
+        $wd = Split-Path -Parent $reportPath
+        Start-Process -FilePath $exe -WorkingDirectory $wd -ArgumentList @("$reportPath")
+    }
+
     section "Profiling ($tool $mode): $moduleName"
-    
+
     With-PythonPath {
         switch ($tool) {
-            "nsys" {
-                $reportPath = Join-Path $nsysDir $outFile
-                
-                # Build command as array
-                $cmd = @("nsys", "profile", "-o", $reportPath, "-f", "true", "--wait=all")
-                
+            'nsys' {
+                $outBase = Join-Path $nsysDir $outFile
+                $cmd = @('nsys','profile','-o',$outBase,'-f','true','--wait=all')
+
                 if ($fullMode) {
-                    log "Full mode: All available GPU traces"
-                    # Use only Windows-compatible traces
-                    $cmd += "--trace=cuda,cublas,cusparse,nvtx,opengl,wddm"
-                    $cmd += "--cuda-memory-usage=true"
-                    $cmd += "--gpu-metrics-device=all"
+                    log "Full mode: All available GPU traces (Windows-safe)"
+                    $cmd += '--trace=cuda,cublas,cusolver,cusparse,nvtx,opengl,wddm'
+                    $cmd += '--cuda-memory-usage=true'
+                    $cmd += '--gpu-metrics-device=all'
                 } else {
                     log "Quick mode: CUDA + NVTX only"
-                    $cmd += "--trace=cuda,nvtx"
+                    $cmd += '--trace=cuda,nvtx'
                 }
-                
-                $cmd += "python", "-m", $moduleName
-                $cmd += $scriptArgs
-                
-                # Execute
+
+                $cmd += 'python','-m',$moduleName
+                if ($scriptArgs.Count -gt 0) { $cmd += $scriptArgs }
+
                 & $cmd[0] $cmd[1..($cmd.Length-1)]
-                
-                if (Test-Path "${reportPath}.nsys-rep") {
-                    $size = [math]::Round((Get-Item "${reportPath}.nsys-rep").Length / 1MB, 2)
-                    ok "Report saved: ${reportPath}.nsys-rep (${size}MB)"
+                if ($LASTEXITCODE -ne 0) { err "nsys exited with code $LASTEXITCODE"; return }
+
+                $candidates = @("$outBase.qdrep","$outBase.nsys-rep","$outBase.sqlite")
+                $reportPath = $null
+                foreach ($p in $candidates) { if (Test-Path -LiteralPath $p) { $reportPath = (Resolve-Path -LiteralPath $p).Path; break } }
+
+                if ($reportPath) {
+                    try {
+                        $sizeMB = [math]::Round((Get-Item -LiteralPath $reportPath).Length / 1MB, 2)
+                        ok "Report saved: $([System.IO.Path]::GetFileName($reportPath)) ($sizeMB MB)"
+                    } catch { ok "Report saved: $([System.IO.Path]::GetFileName($reportPath))" }
+
+                    _PrintLinks $reportPath 'nsys'
+                    if ($openFlag) { _OpenFolder $reportPath }
+                    if ($uiFlag)   { _OpenNsightSystems $reportPath }
                 } else {
                     err "Report not found"
                 }
             }
-            "ncu" {
-                $reportPath = Join-Path $ncuDir $outFile
-                
-                # Build command as array
-                $cmd = @("ncu", "-o", $reportPath)
-                
+            'ncu' {
+                $outBase = Join-Path $ncuDir $outFile
+                $cmd = @('ncu','-o',$outBase)
+
                 if ($fullMode) {
-                    warn "Full mode: ~43 passes per kernel (slow)"
-                    $cmd += "--set", "full"
+                    warn "Full mode: heavy metric set (slow)"
+                    $cmd += '--set','full'
                 } else {
-                    log "Quick mode: Basic metrics only"
-                    # Use the simplest metric set that works
-                    $cmd += "--set", "basic"
+                    log "Quick mode: basic metric set"
+                    $cmd += '--set','basic'
                 }
-                
-                $cmd += "python", "-m", $moduleName
-                $cmd += $scriptArgs
-                
-                # Execute
+
+                $cmd += 'python','-m',$moduleName
+                if ($scriptArgs.Count -gt 0) { $cmd += $scriptArgs }
+
                 & $cmd[0] $cmd[1..($cmd.Length-1)]
-                
-                if (Test-Path "${reportPath}.ncu-rep") {
-                    $size = [math]::Round((Get-Item "${reportPath}.ncu-rep").Length / 1MB, 2)
-                    ok "Report saved: ${reportPath}.ncu-rep (${size}MB)"
+                if ($LASTEXITCODE -ne 0) { err "ncu exited with code $LASTEXITCODE"; return }
+
+                $reportPath = "$outBase.ncu-rep"
+                if (Test-Path -LiteralPath $reportPath) {
+                    try {
+                        $sizeMB = [math]::Round((Get-Item -LiteralPath $reportPath).Length / 1MB, 2)
+                        ok "Report saved: $([System.IO.Path]::GetFileName($reportPath)) ($sizeMB MB)"
+                    } catch { ok "Report saved: $([System.IO.Path]::GetFileName($reportPath))" }
+
+                    _PrintLinks $reportPath 'ncu'
+                    if ($openFlag) { _OpenFolder $reportPath }
+                    if ($uiFlag)   { _OpenNsightCompute $reportPath }
                 } else {
                     err "Report not found"
                 }
@@ -412,6 +758,9 @@ Function cmd_profile {
         }
     }
 }
+
+
+
 
 # Command to check profiling reports status
 Function cmd_profile_status {
