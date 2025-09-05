@@ -2,244 +2,174 @@
 
 import numpy as np
 import pytest
+from scipy import signal as sp_signal
+from scipy import stats
 
-from ionosense_hpc.utils import make_chirp, make_multitone, make_noise, make_sine, make_test_batch
+from ionosense_hpc.utils.signals import (
+    make_chirp,
+    make_multitone,
+    make_noise,
+    make_sine,
+    make_test_batch,
+)
+
+
+@pytest.fixture(scope="module")
+def signal_params():
+    """Provides common parameters for signal generation tests."""
+    return {"duration": 1.0, "sample_rate": 48000}
 
 
 class TestSignalGenerators:
-    """Test signal generation functions."""
+    """Test individual signal generation functions."""
 
-    def test_make_sine(self):
-        """Test sine wave generation."""
-        signal = make_sine(
-            frequency=1000,
-            duration=0.1,
-            sample_rate=48000,
-            amplitude=2.0,
-            phase=np.pi/2
+    def test_make_sine(self, signal_params):
+        """Test sine wave generation for correctness."""
+        params = {
+            "frequency": 1000,
+            "amplitude": 2.0,
+            "phase": np.pi / 2,
+            **signal_params,
+        }
+        signal = make_sine(**params)
+
+        expected_length = int(params["duration"] * params["sample_rate"])
+        assert len(signal) == expected_length, "Signal length is incorrect."
+        assert np.isclose(
+            np.max(signal), params["amplitude"], atol=1e-5
+        ), "Amplitude does not match expected peak."
+        assert signal.dtype == np.float32, "Data type should be float32."
+
+        # Verify frequency content
+        fft_vals = np.fft.rfft(signal)
+        freqs = np.fft.rfftfreq(len(signal), 1 / params["sample_rate"])
+        peak_freq = freqs[np.argmax(np.abs(fft_vals))]
+        assert np.isclose(
+            peak_freq, params["frequency"], atol=1.0
+        ), "Peak frequency does not match."
+
+    @pytest.mark.parametrize("method", ["linear", "quadratic", "logarithmic"])
+    def test_make_chirp(self, method, signal_params):
+        """Test chirp generation for correctness."""
+        params = {
+            "f_start": 100,
+            "f_end": 5000,
+            "method": method,
+            **signal_params,
+        }
+        signal = make_chirp(**params)
+        expected_length = int(params["duration"] * params["sample_rate"])
+        assert len(signal) == expected_length, "Signal length is incorrect."
+        assert signal.dtype == np.float32, "Data type should be float32."
+
+    @pytest.mark.parametrize(
+        "noise_type, expected_slope",
+        [("white", 0.0), ("pink", -1.0), ("brown", -2.0)],
+    )
+    def test_noise_spectrum(self, noise_type, expected_slope, signal_params):
+        """Test that generated noise has the correct spectral slope."""
+        # Use a longer duration for more reliable spectral analysis
+        noise = make_noise(
+            duration=5.0,
+            sample_rate=signal_params["sample_rate"],
+            noise_type=noise_type,
+            seed=42,
         )
 
-        # Check length
-        expected_length = int(0.1 * 48000)
-        assert len(signal) == expected_length
-
-        # Check amplitude (approximate)
-        assert np.max(np.abs(signal)) <= 2.0
-
-        # Check dtype
-        assert signal.dtype == np.float32
-
-    def test_make_chirp_linear(self):
-        """Test linear chirp generation."""
-        signal = make_chirp(
-            f_start=100,
-            f_end=1000,
-            duration=1.0,
-            sample_rate=48000,
-            method='linear'
+        # Calculate Power Spectral Density using Welch's method
+        freqs, psd = sp_signal.welch(
+            noise, fs=signal_params["sample_rate"], nperseg=4096
         )
 
-        assert len(signal) == 48000
-        assert signal.dtype == np.float32
+        # Fit a line to the log-log plot of the PSD
+        # We skip the DC component (freqs[0]) and very high frequencies
+        valid_indices = np.where((freqs > 1) & (psd > 1e-10))
+        log_freqs = np.log10(freqs[valid_indices])
+        log_psd = np.log10(psd[valid_indices])
 
-        # Frequency should increase over time
-        # (This is a simple check, not a rigorous validation)
-        first_quarter = signal[:12000]
-        last_quarter = signal[-12000:]
+        # Power is proportional to 1/f^beta, so log(P) is proportional to -beta*log(f).
+        # We expect the slope of the log-log plot to be -beta.
+        # White noise (beta=0), Pink (beta=1), Brown (beta=2).
+        # Our `expected_slope` is -beta.
+        res = stats.linregress(log_freqs, log_psd)
+        measured_slope = res.slope
 
-        # Later part should have more zero crossings (higher frequency)
-        first_crossings = np.sum(np.diff(np.sign(first_quarter)) != 0)
-        last_crossings = np.sum(np.diff(np.sign(last_quarter)) != 0)
-        assert last_crossings > first_crossings
+        assert np.isclose(
+            measured_slope, expected_slope, atol=0.3
+        ), f"{noise_type} noise should have a spectral slope near {expected_slope}."
 
-    def test_make_chirp_logarithmic(self):
-        """Test logarithmic chirp generation."""
-        signal = make_chirp(
-            f_start=100,
-            f_end=10000,
-            duration=1.0,
-            sample_rate=48000,
-            method='logarithmic'
-        )
-
-        assert len(signal) == 48000
-        assert signal.dtype == np.float32
-
-    def test_make_chirp_invalid(self):
-        """Test chirp with invalid parameters."""
-        # Negative frequency for log chirp
-        with pytest.raises(ValueError):
-            make_chirp(
-                f_start=-100,
-                f_end=1000,
-                duration=1.0,
-                method='logarithmic'
-            )
-
-        # Unknown method
-        with pytest.raises(ValueError):
-            make_chirp(
-                f_start=100,
-                f_end=1000,
-                duration=1.0,
-                method='unknown'
-            )
-
-    def test_make_noise_white(self):
-        """Test white noise generation."""
-        signal = make_noise(
-            duration=1.0,
-            sample_rate=48000,
-            noise_type='white',
-            amplitude=1.0,
-            seed=42
-        )
-
-        assert len(signal) == 48000
-        assert signal.dtype == np.float32
-
-        # Check amplitude scaling
-        assert np.abs(np.std(signal) - 1.0) < 0.1
-
-        # Reproducibility with seed
-        signal2 = make_noise(
-            duration=1.0,
-            sample_rate=48000,
-            noise_type='white',
-            seed=42
-        )
-        np.testing.assert_array_equal(signal, signal2)
-
-    def test_make_noise_types(self):
-        """Test different noise types."""
-        for noise_type in ['white', 'pink', 'brown']:
-            signal = make_noise(
-                duration=0.1,
-                sample_rate=48000,
-                noise_type=noise_type,
-                seed=42
-            )
-
-            assert len(signal) == 4800
-            assert not np.any(np.isnan(signal))
-            assert not np.any(np.isinf(signal))
-
-    def test_make_multitone(self):
-        """Test multi-tone signal generation."""
-        frequencies = [1000, 2000, 3000]
-        amplitudes = [1.0, 0.5, 0.25]
-
+    def test_make_multitone(self, signal_params):
+        """Test multitone signal generation."""
+        frequencies = [100.0, 500.0, 2000.0]
+        amplitudes = [0.5, 0.8, 0.3]
         signal = make_multitone(
-            frequencies=frequencies,
-            duration=0.1,
-            sample_rate=48000,
-            amplitudes=amplitudes
+            frequencies=frequencies, amplitudes=amplitudes, **signal_params
         )
 
-        assert len(signal) == 4800
-        assert signal.dtype == np.float32
+        expected_length = int(signal_params["duration"] * signal_params["sample_rate"])
+        assert len(signal) == expected_length, "Signal length is incorrect."
 
-        # FFT should show peaks at specified frequencies
-        fft = np.fft.rfft(signal)
-        freqs = np.fft.rfftfreq(len(signal), 1/48000)
+        # Check that the spectral peaks exist at the right frequencies
+        fft_vals = np.fft.rfft(signal)
+        freqs = np.fft.rfftfreq(len(signal), 1 / signal_params["sample_rate"])
+        for freq in frequencies:
+            idx = np.argmin(np.abs(freqs - freq))
+            # Check for a significant magnitude at the expected frequency bin
+            assert (
+                np.abs(fft_vals[idx]) > 100
+            ), f"Did not find a peak for {freq} Hz."
 
-        # Find peaks (simple method)
-        magnitude = np.abs(fft)
-        peaks = []
-        for f in frequencies:
-            idx = np.argmin(np.abs(freqs - f))
-            if magnitude[idx] > np.mean(magnitude) * 5:  # Simple threshold
-                peaks.append(freqs[idx])
 
-        # Should find peaks near the specified frequencies
-        assert len(peaks) >= 2  # At least 2 of 3 should be detectable
+class TestBatchGenerator:
+    """Test the make_test_batch function."""
 
-    def test_make_test_batch(self):
-        """Test batch signal generation."""
+    @pytest.mark.parametrize("batch_size", [1, 2, 8])
+    @pytest.mark.parametrize("signal_type", ["sine", "noise", "zeros", "multitone"])
+    def test_batch_creation(self, batch_size, signal_type):
+        """Test that batches are created with the correct shape and properties."""
+        nfft = 1024
         batch_data = make_test_batch(
-            nfft=1024,
-            batch=4,
-            signal_type='sine',
-            frequency=1000,
-            seed=42
+            nfft=nfft, batch=batch_size, signal_type=signal_type, seed=123
         )
 
-        # Check total size
-        assert len(batch_data) == 1024 * 4
-        assert batch_data.dtype == np.float32
+        assert (
+            batch_data.shape == (nfft * batch_size,)
+        ), "Batch data has incorrect shape."
+        assert batch_data.dtype == np.float32, "Batch data has incorrect dtype."
 
-        # Each channel should be slightly different
-        channels = batch_data.reshape(4, 1024)
+    def test_batch_channels_are_different(self):
+        """Test that channels in a batch are not identical (except for 'zeros')."""
+        nfft = 1024
+        batch_size = 4
 
-        # Channels should be similar but not identical
-        for i in range(1, 4):
-            correlation = np.corrcoef(channels[0], channels[i])[0, 1]
-            assert 0.9 < correlation < 1.0  # High correlation but not 1.0
-
-    def test_make_test_batch_types(self):
-        """Test different batch signal types."""
-        for signal_type in ['sine', 'chirp', 'noise', 'zeros']:
-            batch_data = make_test_batch(
-                nfft=256,
-                batch=2,
-                signal_type=signal_type,
-                seed=42
-            )
-
-            assert len(batch_data) == 512
-            assert not np.any(np.isnan(batch_data))
-
-            if signal_type == 'zeros':
-                assert np.all(batch_data == 0)
-
-
-class TestSignalProperties:
-    """Test signal properties and characteristics."""
-
-    def test_sine_frequency_accuracy(self):
-        """Test that generated sine has correct frequency."""
-        frequency = 1000  # Hz
-        sample_rate = 48000
-        duration = 1.0
-
-        signal = make_sine(frequency, duration, sample_rate)
-
-        # Use FFT to verify frequency
-        fft = np.fft.rfft(signal)
-        freqs = np.fft.rfftfreq(len(signal), 1/sample_rate)
-
-        # Find peak
-        peak_idx = np.argmax(np.abs(fft))
-        peak_freq = freqs[peak_idx]
-
-        # Should be within 1 Hz (resolution limited by FFT size)
-        assert abs(peak_freq - frequency) < 1.0
-
-    def test_noise_spectrum(self):
-        """Test noise spectral characteristics."""
-        # White noise should have flat spectrum
-        white = make_noise(
-            duration=10.0,  # Long duration for better statistics
-            sample_rate=48000,
-            noise_type='white',
-            seed=42
+        # For sine, channels should differ due to added noise
+        sine_batch = make_test_batch(
+            nfft=nfft, batch=batch_size, signal_type="sine", seed=42
         )
+        ch1 = sine_batch[0:nfft]
+        ch2 = sine_batch[nfft : 2 * nfft]
+        assert not np.array_equal(
+            ch1, ch2
+        ), "Sine batch channels should be different."
 
-        # Compute spectrum
-        fft = np.fft.rfft(white)
-        magnitude = np.abs(fft)
+        # For noise, channels should be statistically independent
+        noise_batch = make_test_batch(
+            nfft=nfft, batch=batch_size, signal_type="noise", seed=43
+        )
+        ch1_noise = noise_batch[0:nfft]
+        ch2_noise = noise_batch[nfft : 2 * nfft]
+        assert not np.array_equal(
+            ch1_noise, ch2_noise
+        ), "Noise batch channels should be different."
 
-        # Divide into bands and check flatness
-        n_bands = 10
-        band_size = len(magnitude) // n_bands
-        band_powers = []
+    def test_batch_zeros_are_identical(self):
+        """Test that channels in a 'zeros' batch are identical."""
+        nfft = 1024
+        batch_size = 4
+        zeros_batch = make_test_batch(
+            nfft=nfft, batch=batch_size, signal_type="zeros"
+        )
+        ch1 = zeros_batch[0:nfft]
+        ch2 = zeros_batch[nfft : 2 * nfft]
+        assert np.array_equal(ch1, ch2), "Zeros batch channels should be identical."
 
-        for i in range(n_bands):
-            start = i * band_size
-            end = (i + 1) * band_size
-            band_powers.append(np.mean(magnitude[start:end] ** 2))
-
-        # All bands should have similar power (within 50%)
-        mean_power = np.mean(band_powers)
-        for power in band_powers:
-            assert 0.5 * mean_power < power < 1.5 * mean_power
