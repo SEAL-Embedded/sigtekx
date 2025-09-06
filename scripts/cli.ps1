@@ -211,19 +211,26 @@ Function Invoke-Setup {
         throw "Environment setup failed"
     }
     
-    # Install package in development mode
+    # Install package in development mode (use current shell Python to preserve VS/CUDA env)
     Write-ResearchLog -Level Info -Message "Installing ionosense-hpc in development mode" -Component "Setup"
     Push-Location $script:ProjectRoot
-    conda run -n $script:CondaEnvName python -m pip install -e ".[dev,benchmark,export]"
+    # Ensure a clean scikit-build cache so updated CMake args take effect
+    $skbuildDir = Join-Path $script:ProjectRoot 'build/skbuild'
+    if (Test-Path $skbuildDir) {
+        Remove-Item -Recurse -Force $skbuildDir -ErrorAction SilentlyContinue
+        Write-ResearchLog -Level Info -Message "Cleared scikit-build cache: $skbuildDir" -Component "Setup"
+    }
+    $pythonExe = if ($env:CONDA_PREFIX) { Join-Path $env:CONDA_PREFIX 'python.exe' } else { 'python' }
+    # Default to CUDA OFF for editable installs to avoid toolset requirement
+    $env:SKBUILD_CMAKE_ARGS = "-DIONO_WITH_CUDA=OFF"
+    & $pythonExe -m pip install -e ".[dev,benchmark,export]"
+    Remove-Item Env:SKBUILD_CMAKE_ARGS -ErrorAction SilentlyContinue
     $installCode = $LASTEXITCODE
     Pop-Location
 
     if ($installCode -ne 0) {
-        Write-ResearchLog -Level Critical -Message "Editable install failed (pip exit $installCode)" -Component "Setup"
-        throw "Pip install failed"
-    }
-    
-    if ($LASTEXITCODE -eq 0) {
+        Write-ResearchLog -Level Warning -Message "Editable install failed (pip exit $installCode). Continuing without package install; use 'build' to compile extension and set PYTHONPATH via CLI commands." -Component "Setup"
+    } else {
         Write-ResearchLog -Level Info -Message "Setup completed successfully" -Component "Setup"
     }
 }
@@ -863,8 +870,8 @@ Function Open-NsightCompute {
 Function Show-Help {
     Write-Host @"
 ╔════════════════════════════════════════════════════════════════════════╗
-║  IONOSENSE-HPC RESEARCH PLATFORM CLI v$script:ResearchVersion                        ║
-║  Professional Signal Processing Research Environment                    ║
+║  IONOSENSE-HPC RESEARCH PLATFORM CLI v$script:ResearchVersion                            ║
+║  Professional Signal Processing Research Environment                   ║
 ╚════════════════════════════════════════════════════════════════════════╝
 
 USAGE: .\scripts\cli.ps1 <command> [options]

@@ -342,7 +342,7 @@ class BenchmarkSuite:
         print(f"Output: {self.output_dir}")
 
 
-def run_default_suite(preset: str = 'realtime', output_dir: str = None) -> dict[str, Any]:
+def run_default_suite(preset: str = 'realtime', output_dir: str | None = None) -> dict[str, Any]:
     """
     Convenience function to run the default benchmark suite.
     
@@ -367,8 +367,10 @@ import time
 
 import numpy as np
 
-if __name__ == '__main__':
+def main(argv: list[str] | None = None) -> int:
+    """Console entrypoint for `ionosense-bench` script."""
     import argparse
+    import sys as _sys
 
     parser = argparse.ArgumentParser(description='Run benchmark suite')
     parser.add_argument('--config', help='Suite configuration YAML file')
@@ -378,7 +380,7 @@ if __name__ == '__main__':
     parser.add_argument('--exclude', nargs='+', help='Benchmarks to exclude')
     parser.add_argument('--no-report', action='store_true', help='Skip report generation')
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     if args.config:
         suite = BenchmarkSuite(args.config)
@@ -391,4 +393,9 @@ if __name__ == '__main__':
         )
         suite = BenchmarkSuite(config)
 
-    results = suite.run()
+    _ = suite.run()
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

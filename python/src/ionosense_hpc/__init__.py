@@ -128,64 +128,14 @@ except (ImportError, DllLoadError) as e:
     )
 
 
-# ============================================================================
-# Benchmarking Suite Imports
-# ============================================================================
+"""
+Benchmark and report modules live under the `ionosense_hpc.benchmarks` package.
+To keep imports light and avoid optional heavy dependencies at import time,
+they are not re-exported at the top level. Import from submodules instead, e.g.:
 
-# Note: Assuming benchmark modules are in a 'benchmarks' sub-package.
-# Adjust paths if your structure is different.
-
-# Base infrastructure
-# Benchmark implementations
-# Legacy functions for backward compatibility
-from .benchmarks.accuracy import (
-    AccuracyBenchmark,
-    AccuracyBenchmarkConfig,
-    benchmark_accuracy,
-    benchmark_numerical_stability,
-    benchmark_window_accuracy,
-)
-from .benchmarks.base import (
-    BaseBenchmark,
-    BenchmarkConfig,
-    BenchmarkContext,
-    BenchmarkResult,
-    calculate_statistics,
-    load_benchmark_config,
-    save_benchmark_results,
-)
-from .benchmarks.latency import (
-    LatencyBenchmark,
-    LatencyBenchmarkConfig,
-    StreamingLatencyBenchmark,
-    benchmark_jitter,
-    benchmark_latency,
-    run_latency_benchmark_suite,
-)
-from .benchmarks.realtime import RealtimeBenchmark, RealtimeBenchmarkConfig, benchmark_realtime
-
-# Reporting and analysis
-from .benchmarks.reporting import BenchmarkReport, ReportConfig, generate_comparative_report
-from .benchmarks.suite import BenchmarkSuite, SuiteConfig, run_default_suite
-from .benchmarks.sweep import ExperimentConfig, ExperimentRun, ParameterSpec, ParameterSweep
-from .benchmarks.throughput import (
-    MemoryStressBenchmark,
-    ScalingBenchmark,
-    ThroughputBenchmark,
-    ThroughputBenchmarkConfig,
-    benchmark_batch_scaling,
-    benchmark_throughput,
-)
-
-# Benchmark-specific utilities
-from .utils.benchmark_utils import (
-    DataArchiver,
-    DeterministicGenerator,
-    SignalGenerator,
-    ValidationHelper,
-    create_test_signals,
-    validate_benchmark_results,
-)
+  from ionosense_hpc.benchmarks import BenchmarkSuite
+  from ionosense_hpc.benchmarks.throughput import ThroughputBenchmark
+"""
 
 # ============================================================================
 # Public API
@@ -193,92 +143,41 @@ from .utils.benchmark_utils import (
 
 __all__ = [
     # -- Metadata --
-    '__version__',
-    '__version_info__',
-    '__author__',
-    '__standards__',
+    "__version__",
+    "__version_info__",
+    "__author__",
+    "__standards__",
 
     # -- Core Engine --
-    'Processor',
-    'Engine',
-    'RawEngine',
-    'EngineConfig',
-    'Presets',
+    "Processor",
+    "Engine",
+    "RawEngine",
+
+    # -- Config --
+    "EngineConfig",
+    "Presets",
 
     # -- Core Exceptions --
-    'IonosenseError',
-    'ConfigError',
-    'DeviceNotFoundError',
-    'DllLoadError',
-    'EngineStateError',
-    'EngineRuntimeError',
-    'ValidationError',
+    "IonosenseError",
+    "ConfigError",
+    "DeviceNotFoundError",
+    "DllLoadError",
+    "EngineStateError",
+    "EngineRuntimeError",
+    "ValidationError",
 
-    # -- Core Utilities --
-    'gpu_count',
-    'current_device',
-    'device_info',
-    'make_sine',
-    'make_chirp',
-    'make_noise',
-    'make_multitone',
-    'show_versions',
-    'self_test',
+    # -- Utilities (lightweight) --
+    "gpu_count",
+    "current_device",
+    "device_info",
+    "make_sine",
+    "make_chirp",
+    "make_noise",
+    "make_multitone",
 
-    # -- Benchmarking Infrastructure --
-    "BaseBenchmark",
-    "BenchmarkConfig",
-    "BenchmarkContext",
-    "BenchmarkResult",
-    "calculate_statistics",
-    "load_benchmark_config",
-    "save_benchmark_results",
-
-    # -- Benchmark Classes --
-    "AccuracyBenchmark",
-    "AccuracyBenchmarkConfig",
-    "LatencyBenchmark",
-    "LatencyBenchmarkConfig",
-    "StreamingLatencyBenchmark",
-    "RealtimeBenchmark",
-    "RealtimeBenchmarkConfig",
-    "ThroughputBenchmark",
-    "ThroughputBenchmarkConfig",
-    "ScalingBenchmark",
-    "MemoryStressBenchmark",
-
-    # -- Benchmarking Orchestration --
-    "BenchmarkSuite",
-    "SuiteConfig",
-    "ParameterSweep",
-    "ExperimentConfig",
-    "ExperimentRun",
-    "ParameterSpec",
-
-    # -- Benchmarking Reporting --
-    "BenchmarkReport",
-    "ReportConfig",
-    "generate_comparative_report",
-
-    # -- Benchmarking Utilities --
-    "DeterministicGenerator",
-    "SignalGenerator",
-    "ValidationHelper",
-    "DataArchiver",
-    "create_test_signals",
-    "validate_benchmark_results",
-
-    # -- Legacy Benchmark Functions --
-    "benchmark_accuracy",
-    "benchmark_latency",
-    "benchmark_jitter",
-    "benchmark_throughput",
-    "benchmark_batch_scaling",
-    "benchmark_realtime",
-    "benchmark_numerical_stability",
-    "benchmark_window_accuracy",
-    "run_latency_benchmark_suite",
-    "run_default_suite",
+    # -- Diagnostics --
+    "show_versions",
+    "self_test",
 ]
 
 

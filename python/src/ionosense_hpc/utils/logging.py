@@ -82,4 +82,4 @@ def log_device_info(info: dict, level: int = logging.INFO) -> None:
         logger.log(level, f"  Temperature: {info['temperature_c']}°C")
 
 
-setup_logging()
+# Default configuration is set by the package __init__ on import.

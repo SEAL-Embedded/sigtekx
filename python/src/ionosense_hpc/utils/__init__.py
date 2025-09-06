@@ -11,12 +11,6 @@ from .device import (
 )
 from .logging import log_config, log_device_info, log_performance, logger, setup_logging
 from .profiling import nvtx_range
-from .reporting import (
-    print_accuracy_report,
-    print_header,
-    print_latency_report,
-    print_throughput_report,
-)
 from .signals import make_chirp, make_multitone, make_noise, make_sine, make_test_batch
 
 __all__ = [
@@ -42,9 +36,5 @@ __all__ = [
     'make_test_batch',
     # Profiling
     'nvtx_range',
-    # Reporting
-    'print_header',
-    'print_latency_report',
-    'print_throughput_report',
-    'print_accuracy_report'
+    # Reporting (import from ionosense_hpc.benchmarks.reporting when needed)
 ]

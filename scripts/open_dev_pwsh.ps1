@@ -93,6 +93,51 @@ function Activate-CondaEnv {
     else { Warn "Tried to activate '$Name' via $runner, but it didn’t stick." }
 }
 
+# ----- Ensure conda is available on PATH (robust for non-profile sessions) -----
+function Ensure-CondaOnPath {
+    if (Get-Command conda -ErrorAction SilentlyContinue) { return }
+
+    $candidates = @()
+
+    if ($env:CONDA_EXE) {
+        $candidates += (Split-Path -Parent $env:CONDA_EXE)
+        $candidates += (Split-Path -Parent (Split-Path -Parent $env:CONDA_EXE))
+    }
+    if ($env:CONDA_PREFIX) { $candidates += $env:CONDA_PREFIX }
+
+    $user = [Environment]::GetFolderPath('UserProfile')
+    $programData = [Environment]::GetFolderPath('CommonApplicationData')
+
+    $candidates += @(
+        (Join-Path $user 'miniconda3'),
+        (Join-Path $user 'mambaforge'),
+        (Join-Path $user 'anaconda3'),
+        (Join-Path $programData 'miniconda3'),
+        (Join-Path $programData 'Anaconda3')
+    )
+
+    foreach ($root in $candidates | Where-Object { $_ -and (Test-Path $_) }) {
+        $condabin = Join-Path $root 'condabin'
+        $scripts  = Join-Path $root 'Scripts'
+        $tryPaths = @(
+            (Join-Path $condabin 'conda.bat'),
+            (Join-Path $condabin 'conda.exe'),
+            (Join-Path $scripts  'conda.exe')
+        )
+        foreach ($p in $tryPaths) {
+            if (Test-Path $p) {
+                $binDir = Split-Path -Parent $p
+                if ($env:PATH -notlike "*${binDir}*") {
+                    $env:PATH = "$binDir;" + $env:PATH
+                }
+                Info "Added conda to PATH: $binDir"
+                return
+            }
+        }
+    }
+    Warn "conda not found on PATH and no standard install detected."
+}
+
 # ----- Optional: detect duplicate prompt decorators (inform only) -----
 function Check-PromptDupes {
     try {
@@ -104,6 +149,7 @@ function Check-PromptDupes {
 
 # ----- Run -----
 Enter-VSDev
+Ensure-CondaOnPath
 Activate-CondaEnv -Name $EnvName
 Check-PromptDupes
 

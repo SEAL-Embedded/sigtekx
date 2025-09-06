@@ -1,13 +1,37 @@
 """
-Ionosense-HPC Benchmarking Suite.
+Ionosense-HPC Benchmarking Suite package.
 
-This module provides a collection of scripts for performance, accuracy,
-and stability testing of the signal processing engine.
-
-Each benchmark can be run as a standalone script or imported as a function.
-The main entry point for the full suite is the `suite` module.
+Public API re-exports the core benchmarking primitives and convenience
+functions while keeping submodules importable directly.
 """
 
+# Core primitives and utilities
+from .base import (
+    BaseBenchmark,
+    BenchmarkConfig,
+    BenchmarkContext,
+    BenchmarkResult,
+    calculate_statistics,
+    load_benchmark_config,
+    save_benchmark_results,
+)
+
+# Suite orchestration
+from .suite import (
+    BenchmarkSuite,
+    SuiteConfig,
+    run_default_suite,
+)
+
+# Parameter sweeps
+from .sweep import (
+    ExperimentConfig,
+    ExperimentRun,
+    ParameterSpec,
+    ParameterSweep,
+)
+
+# Convenience functional benchmarks
 from .accuracy import (
     benchmark_accuracy,
     benchmark_numerical_stability,
@@ -18,14 +42,30 @@ from .latency import (
     benchmark_latency,
 )
 from .realtime import benchmark_realtime
-from .suite import run_full_suite
 from .throughput import (
     benchmark_batch_scaling,
     benchmark_throughput,
 )
 
-# __all__ defines the public API for the benchmarks module.
 __all__ = [
+    # Core primitives
+    "BaseBenchmark",
+    "BenchmarkConfig",
+    "BenchmarkContext",
+    "BenchmarkResult",
+    "calculate_statistics",
+    "load_benchmark_config",
+    "save_benchmark_results",
+    # Suite
+    "BenchmarkSuite",
+    "SuiteConfig",
+    "run_default_suite",
+    # Sweep
+    "ExperimentConfig",
+    "ExperimentRun",
+    "ParameterSpec",
+    "ParameterSweep",
+    # Functional benchmarks
     "benchmark_accuracy",
     "benchmark_window_accuracy",
     "benchmark_numerical_stability",
@@ -34,5 +74,4 @@ __all__ = [
     "benchmark_throughput",
     "benchmark_batch_scaling",
     "benchmark_realtime",
-    "run_full_suite",
 ]

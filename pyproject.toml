@@ -4,8 +4,11 @@
 # and tool configurations.
 
 [build-system]
-requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = [
+  "scikit-build-core>=0.9",
+  "pybind11>=2.11"
+]
+build-backend = "scikit_build_core.build"
 
 # --- Project Metadata (PEP 621) ---
 [project]
@@ -71,25 +74,33 @@ Documentation = "https://github.com/SEAL-Embedded/ionosense-hpc-lib/tree/main/do
 ionosense-bench = "ionosense_hpc.benchmarks.suite:main"
 
 # --- Build System & Packaging Configuration (setuptools) ---
-[tool.setuptools]
-package-dir = { "" = "python/src" }
-zip-safe = false
+# Note: Packaging is managed by scikit-build-core
 
-[tool.setuptools.packages.find]
-where = ["python/src"]
-include = ["ionosense_hpc*"]
-exclude = ["ionosense_hpc.tests*"]
+[tool.scikit-build]
+cmake.version = ">=3.26"
+build-dir = "build/skbuild"
+cmake.args = [
+  "-DIONO_WITH_PYTHON=ON",
+  "-DIONO_WITH_TESTS=OFF",
+  "-DIONO_WITH_CUDA=OFF"
+]
 
-[tool.setuptools.package-data]
-"ionosense_hpc" = [
-  "py.typed",
-  ".libs/windows/*.dll",
-  ".libs/linux/*.so",
+[tool.scikit-build.wheel]
+packages = ["python/src/ionosense_hpc"]
+
+[tool.scikit-build.sdist]
+include = [
+  "CMakeLists.txt",
+  "CMakePresets.json",
+  "src/**",
+  "include/**",
+  "bindings/**",
+  "python/**",
+  "README.md",
+  "LICENSE*",
+  "docs/**"
 ]
-"ionosense_hpc.core" = [
-  "_engine*.pyd",
-  "_engine*.so",
-]
+
 
 # --- Code Quality & Linting (Ruff) ---
 [tool.ruff]
