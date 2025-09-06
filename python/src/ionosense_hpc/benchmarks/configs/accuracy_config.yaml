@@ -1,0 +1,50 @@
+name: accuracy_validation
+iterations: 10
+warmup_iterations: 0
+
+# Test signals
+test_signals:
+  - type: sine
+    frequency: 1000
+    amplitude: 1.0
+  - type: sine
+    frequency: 5000
+    amplitude: 0.5
+  - type: dc
+    value: 1.0
+  - type: nyquist
+    amplitude: 1.0
+  - type: impulse
+    position: 0
+  - type: multitone
+    frequencies: [1000, 2000, 3000, 4000, 5000]
+  - type: chirp
+    f_start: 100
+    f_end: 20000
+  - type: noise
+    noise_type: white
+    amplitude: 0.1
+
+# Tolerance settings
+absolute_tolerance: 1.0e-6
+relative_tolerance: 1.0e-5
+phase_tolerance_deg: 1.0
+snr_threshold_db: 60.0
+
+# Validation types
+validate_parseval: true
+validate_linearity: true
+validate_time_invariance: true
+validate_numerical_stability: true
+
+# Reference settings
+reference_implementation: scipy
+use_double_precision_reference: true
+
+# Engine configuration
+engine_config:
+  nfft: 1024
+  batch: 1
+  overlap: 0.0
+  sample_rate_hz: 48000
+  warmup_iters: 0

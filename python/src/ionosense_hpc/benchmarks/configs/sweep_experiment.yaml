@@ -1,0 +1,43 @@
+name: optimal_config_search
+description: Search for optimal FFT and batch size configuration
+benchmark_class: ionosense_hpc.benchmarks.latency_enhanced.EnhancedLatencyBenchmark
+
+# Parameters to sweep
+parameters:
+  - name: engine_config.nfft
+    type: int
+    values: [256, 512, 1024, 2048, 4096]
+  
+  - name: engine_config.batch
+    type: int
+    range:
+      start: 1
+      stop: 64
+      step: 1
+  
+  - name: engine_config.overlap
+    type: float
+    values: [0.0, 0.25, 0.5, 0.75]
+
+# Sweep configuration
+sweep_type: grid  # grid, random, or latin_hypercube
+n_samples: 1000  # For random/LHS sampling
+
+# Base configuration for all runs
+base_config:
+  iterations: 500
+  warmup_iterations: 50
+  deadline_us: 200
+  test_signal_type: sine
+  measure_gpu_time: false
+  analyze_jitter: false
+
+# Execution settings
+parallel: true
+max_workers: 4
+continue_on_error: true
+
+# Output settings
+output_dir: ./experiments/optimal_config
+save_interval: 10
+aggregate_results: true
