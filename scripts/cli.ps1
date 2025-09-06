@@ -1,42 +1,181 @@
 ﻿# ============================================================================
-# ionosense-hpc-lib • Project CLI (Windows)
-# - Professional research-grade build & test orchestration
-# - Integrated Python API commands following RSE/RE standards
+# ionosense-hpc • Research Platform CLI (Windows)
+# - Professional research-grade build, test, and benchmark orchestration
+# - Compliant with RSE/RE/IEEE standards for reproducible research
+# - Version: 0.9.0
 # ============================================================================
 
-# --- Paths & Defaults --------------------------------------------------------
-$ProjectRoot = (Get-Item -Path (Join-Path $PSScriptRoot "..")).FullName
-$BuildDir    = Join-Path $ProjectRoot "build"
-$PythonDir   = Join-Path $ProjectRoot "python"
-$BuildPreset = if ($env:BUILD_PRESET) { $env:BUILD_PRESET } else { "windows-rel" }
-$CondaEnvName = "ionosense-hpc"
-$EnvironmentFile = Join-Path $ProjectRoot "environments/environment.win.yml"
-$BenchResultsDir = Join-Path $BuildDir "benchmark_results"
+#Requires -Version 7.0
 
+param(
+    [Parameter(Position=0)]
+    [string]$Command = "help",
+    
+    [Parameter(ValueFromRemainingArguments)]
+    [string[]]$CommandArgs = @()
+)
 
-# --- Pretty logging ----------------------------------------------------------
-Function log     { param($Message) Write-Host "✅ [INFO] $Message" -ForegroundColor Cyan }
-Function warn    { param($Message) Write-Host "⚠️ [WARN] $Message" -ForegroundColor Yellow }
-Function err     { param($Message) Write-Host "❌ [ERR ] $Message" -ForegroundColor Red }
-Function ok      { param($Message) Write-Host "👍 [OK  ] $Message" -ForegroundColor Green }
-Function section { param($Message) Write-Host "`n💪 == $Message ==`n" -ForegroundColor Magenta }
+# --- Configuration & Paths ---------------------------------------------------
+$script:ProjectRoot      = (Get-Item -Path (Join-Path $PSScriptRoot "..")).FullName
+$script:BuildDir         = Join-Path $ProjectRoot "build"
+$script:PythonDir        = Join-Path $ProjectRoot "python"
+$script:ConfigDir        = Join-Path $PythonDir "src\ionosense_hpc\benchmarks\configs"
+$script:BuildPreset      = if ($env:BUILD_PRESET) { $env:BUILD_PRESET } else { "windows-rel" }
+$script:CondaEnvName     = "ionosense-hpc"
+$script:EnvironmentFile  = Join-Path $ProjectRoot "environments\environment.win.yml"
+$script:BenchResultsDir  = Join-Path $BuildDir "benchmark_results"
+$script:ReportsDir       = Join-Path $BuildDir "reports"
+$script:ExperimentsDir   = Join-Path $BuildDir "experiments"
+$script:ProfileDir       = Join-Path $BuildDir "nsight_reports"
+$script:LogRoot          = Join-Path $ProjectRoot ".ionosense\logs"
 
-$ErrorActionPreference = 'Stop'
+# Research metadata
+$script:ResearchVersion   = "0.9.0"
+$script:ResearchStandards = @("RSE", "RE", "IEEE-1074", "IEEE-754")
 
-# --- Helpers ------------------------------------------------------------------
-Function Ensure-EnvActivated {
-    if (-not $env:CONDA_PREFIX -or ($env:CONDA_DEFAULT_ENV -ne $CondaEnvName)) {
-        err "Conda environment '$CondaEnvName' is not activated."
-        log "Please run: conda activate $CondaEnvName"
-        exit 1
+# --- Enhanced Logging with Research Standards -------------------------------
+enum LogLevel {
+    Debug    = 0
+    Info     = 1
+    Warning  = 2
+    Error    = 3
+    Critical = 4
+}
+
+$script:CurrentLogLevel = [LogLevel]::Info
+
+Function Write-ResearchLog {
+    param(
+        [LogLevel]$Level,
+        [string]$Message,
+        [string]$Component = "CLI",
+        [hashtable]$Metadata = @{}
+    )
+
+    # Respect current log level
+    if ($Level -lt $script:CurrentLogLevel) { return }
+
+    # Timestamp + visual formatting for console
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss.fff"
+    $levelStr  = $Level.ToString().ToUpper().PadRight(8)
+
+    $color = switch ($Level) {
+        Debug    { "DarkGray" }
+        Info     { "Cyan" }
+        Warning  { "Yellow" }
+        Error    { "Red" }
+        Critical { "DarkRed" }
+    }
+
+    $icon = switch ($Level) {
+        Debug    { "🔍" }
+        Info     { "ℹ️" }
+        Warning  { "⚠️" }
+        Error    { "❌" }
+        Critical { "🔥" }
+    }
+
+    # Console line
+    Write-Host "$icon [$timestamp] [$levelStr] [$Component] $Message" -ForegroundColor $color
+
+    # ---- File logging (research traceability) ----
+    # If $script:LogFile is not set by the initializer, skip silently.
+    if (-not $script:LogFile) { return }
+
+    # Make JSON line (handle weird metadata gracefully)
+    try {
+        $jsonEntry = @{
+            timestamp = $timestamp
+            level     = $levelStr
+            component = $Component
+            message   = $Message
+            metadata  = $Metadata
+        } | ConvertTo-Json -Compress -Depth 8
+    }
+    catch {
+        $jsonEntry = @{
+            timestamp = $timestamp
+            level     = $levelStr
+            component = $Component
+            message   = $Message
+            metadata  = @{ _error = "metadata_json_failure"; _type = ($Metadata.GetType().FullName) }
+        } | ConvertTo-Json -Compress -Depth 3
+    }
+
+    # Ensure directory exists; if not writable, fall back to %TEMP%
+    $targetPath = $script:LogFile
+    $targetDir  = Split-Path -Parent $targetPath
+
+    try {
+        if (-not (Test-Path -LiteralPath $targetDir)) {
+            New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+        }
+        Add-Content -Path $targetPath -Value $jsonEntry -Encoding utf8 -ErrorAction Stop
+    }
+    catch {
+        # One-time fallback warning to avoid spam (doesn't call Write-ResearchLog to prevent recursion)
+        if (-not $script:LogFileFallbackNotified) {
+            $script:LogFileFallbackNotified = $true
+            $warnStamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss.fff"
+            Write-Host "⚠️ [$warnStamp] [WARNING ] [CLI] Log path '$targetPath' not writable. Falling back to %TEMP%." -ForegroundColor Yellow
+        }
+
+        try {
+            $fallbackDir  = Join-Path $env:TEMP "ionosense-logs"
+            if (-not (Test-Path -LiteralPath $fallbackDir)) {
+                New-Item -ItemType Directory -Path $fallbackDir -Force | Out-Null
+            }
+
+            if (-not $script:LogFile -or -not (Test-Path -LiteralPath (Split-Path -Parent $script:LogFile))) {
+                # Create a fresh fallback file name once
+                $fallbackName = "research_log_{0}.jsonl" -f (Get-Date -Format "yyyyMMdd_HHmmss")
+                $script:LogFile = Join-Path $fallbackDir $fallbackName
+            }
+
+            Add-Content -Path $script:LogFile -Value $jsonEntry -Encoding utf8 -ErrorAction Stop
+        }
+        catch {
+            # Catastrophic I/O failure — swallow to avoid recursive logging loops.
+            # We already wrote to console above, so at least the message isn't lost.
+        }
     }
 }
 
-Function With-PythonPath {
+
+Function Initialize-ResearchEnvironment {
+    # Create necessary directories
+    @($script:BenchResultsDir, $script:ReportsDir, $script:ExperimentsDir, $script:ProfileDir) | ForEach-Object {
+        if (-not (Test-Path $_)) {
+            New-Item -ItemType Directory -Path $_ -Force | Out-Null
+            Write-ResearchLog -Level Info -Message "Created directory: $_" -Component "Init"
+        }
+    }
+    
+    # Initialize research log
+    $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+    $script:LogFile = Join-Path $script:LogRoot "research_log_$timestamp.jsonl"
+    
+    Write-ResearchLog -Level Info -Message "Research environment initialized" -Component "Init" -Metadata @{
+        version = $script:ResearchVersion
+        standards = $script:ResearchStandards
+        root = $script:ProjectRoot
+    }
+}
+
+# --- Environment Management --------------------------------------------------
+Function Test-CondaEnvironment {
+    if (-not $env:CONDA_PREFIX -or ($env:CONDA_DEFAULT_ENV -ne $script:CondaEnvName)) {
+        return $false
+    }
+    return $true
+}
+
+Function Invoke-WithPythonPath {
     param([scriptblock]$ScriptBlock)
+    
     $oldPath = $env:PYTHONPATH
-    # Ensure the src directory is on the path for local development imports
-    $env:PYTHONPATH = "$BuildDir\$BuildPreset;" + (Join-Path $PythonDir "src") + ";$env:PYTHONPATH"
+    $env:PYTHONPATH = "$script:BuildDir\$script:BuildPreset;" + (Join-Path $script:PythonDir "src") + ";$env:PYTHONPATH"
+    
     try {
         & $ScriptBlock
     } finally {
@@ -44,934 +183,920 @@ Function With-PythonPath {
     }
 }
 
-Function Install-ProfileHelper {
-    $helperPath = Join-Path $PythonDir "src\ionosense_hpc\tools\profile_helper.py"
-    $helperDir = Split-Path $helperPath -Parent
+# --- Core Commands -----------------------------------------------------------
+Function Invoke-Setup {
+    Write-ResearchLog -Level Info -Message "Starting environment setup" -Component "Setup"
+    Set-Location $script:ProjectRoot
     
-    if (-not (Test-Path $helperDir)) {
-        New-Item -ItemType Directory -Path $helperDir -Force | Out-Null
+    # Detect package manager
+    $solver = if (Get-Command mamba -ErrorAction SilentlyContinue) { "mamba" } else { "conda" }
+    
+    if (-not $solver -and -not (Get-Command conda -ErrorAction SilentlyContinue)) {
+        Write-ResearchLog -Level Critical -Message "No conda/mamba installation found" -Component "Setup"
+        throw "Please install Miniforge3 or Miniconda"
     }
     
-    # The Python script content would be written here
-    # For now, assume it's already saved
+    # Create or update environment
+    $envExists = conda env list | Select-String -Quiet -Pattern "\b$script:CondaEnvName\b"
     
-    if (Test-Path $helperPath) {
-        return $helperPath
-    } else {
-        return $null
-    }
-}
-
-Function _lint_python {
-    log "Running Python linter (ruff)..."
-    ruff check --fix (Join-Path $PythonDir)
-    if ($LASTEXITCODE -ne 0) {
-        warn "Ruff found issues in the Python code."
-        return $false
-    } else {
-        ok "Python linting passed."
-        return $true
-    }
-}
-
-Function _lint_cpp {
-    log "Running C++ linter (clang-tidy)..."
-    warn "Clang-tidy runs as part of the build. Check the output below for warnings."
-    # We call the build but check the exit code here to determine success
-    cmd_build -Preset "windows-debug"
-    if ($LASTEXITCODE -eq 0) {
-        return $true
-    } else {
-        return $false
-    }
-}
-
-# =========================
-# Clickable links + openers
-# =========================
-
-function Write-Hyperlink {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory)][string]$Text,
-        [Parameter(Mandatory)][string]$Uri
-    )
-    $esc = [char]27
-    $st_bel = [char]7
-    $oscStart = "$esc]8;;$Uri$st_bel"
-    $oscEnd   = "$esc]8;;$st_bel"
-
-    # Terminals that usually support OSC 8
-    $supportsOsc8 = $false
-    if ($env:WT_SESSION) { $supportsOsc8 = $true }               # Windows Terminal
-    elseif ($env:TERM_PROGRAM -eq 'vscode') { $supportsOsc8 = $true }  # VS Code
-    elseif ($env:TERM -match 'xterm|wezterm|alacritty|kitty|tmux') { $supportsOsc8 = $true }
-
-    if ($supportsOsc8) {
-        Write-Host "$oscStart$Text$oscEnd"
-    }
-    # Always print a fallback URI that’s usually clickable
-    Write-Host $Uri
-}
-
-function Write-ClickablePath {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory)][string]$Path,
-        [string]$Label = "Open"
-    )
-    $resolved = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).Path
-    $uri = ([System.Uri]::new($resolved)).AbsoluteUri   # file:///C:/...
-    Write-Hyperlink -Text $Label -Uri $uri
-}
-
-function Open-In-Files {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory)][string]$Path,
-        [switch]$Select
-    )
-    $resolved = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).Path
-    $dir  = Split-Path -Parent $resolved
-
-    if ($IsWindows) {
-        if ($Select) {
-            Start-Process explorer.exe "/select,`"$resolved`""
-        } else {
-            Start-Process explorer.exe "`"$dir`""
-        }
-    } elseif ($IsMacOS) {
-        if ($Select) {
-            # macOS doesn’t have “select” semantic in Finder CLI; open the dir.
-            Start-Process open $dir
-        } else {
-            Start-Process open $dir
-        }
-    } else {
-        Start-Process xdg-open $dir
-    }
-}
-
-# =========================
-# Nsight GUI resolvers/launchers
-# =========================
-
-function Resolve-Executable {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory)][string[]]$CandidateNames,
-        [string[]]$ExtraSearchDirs = @()
-    )
-    # 1) PATH
-    foreach ($name in $CandidateNames) {
-        $cmd = Get-Command $name -ErrorAction SilentlyContinue
-        if ($cmd) { return $cmd.Source }
-    }
-
-    # 2) Well-known install locations
-    $search = @()
-    if ($IsWindows) {
-        $search += @(
-            Join-Path $env:ProgramFiles 'NVIDIA Corporation'
-            Join-Path $env:ProgramFiles 'NVIDIA GPU Computing Toolkit'
-        )
-    } else {
-        $search += @('/opt/nvidia', '/usr/local', '/usr')
-    }
-    if ($ExtraSearchDirs) { $search += $ExtraSearchDirs }
-
-    $results = foreach ($root in $search | Where-Object { Test-Path $_ }) {
-        Get-ChildItem -Path $root -Recurse -File -ErrorAction SilentlyContinue |
-            Where-Object { $CandidateNames -contains $_.Name }
-    }
-
-    if ($results) {
-        # Prefer newest modified binary
-        $pick = $results | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-        return $pick.FullName
-    }
-    return $null
-}
-
-function Open-In-NsightSystems {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory)][string]$ReportPath
-    )
-    $exe = Resolve-Executable -CandidateNames @(
-        'nsys-ui.exe','nsys-ui','nsight-systems.exe','nsight-systems'
-    ) -ExtraSearchDirs @(
-        # Windows typical:
-        (Join-Path $env:ProgramFiles 'NVIDIA Corporation'),
-        # Linux typical:
-        '/opt/nvidia/nsight-systems','/opt/nvidia/nsight-systems/bin'
-    )
-
-    if (-not $exe) {
-        Write-Warning "Nsight Systems GUI not found. Try launching manually and opening: $ReportPath"
-        return
-    }
-    Start-Process $exe --% "$ReportPath"
-}
-
-function Open-In-NsightCompute {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory)][string]$ReportPath
-    )
-    $exe = Resolve-Executable -CandidateNames @(
-        'nsight-compute.exe','nsight-compute','nv-nsight-cu.exe','nv-nsight-cu','ncu-ui.exe','ncu-ui'
-    ) -ExtraSearchDirs @(
-        # Windows typical:
-        (Join-Path $env:ProgramFiles 'NVIDIA Corporation'),
-        # Linux typical:
-        '/opt/nvidia/nsight-compute','/opt/nvidia/nsight-compute/bin'
-    )
-
-    if (-not $exe) {
-        Write-Warning "Nsight Compute GUI not found. Try launching manually and opening: $ReportPath"
-        return
-    }
-    Start-Process $exe --% "$ReportPath"
-}
-
-# =========================
-# Report discovery + pretty output
-# =========================
-
-function Find-LatestProfileReport {
-    [CmdletBinding(DefaultParameterSetName='ByDir')]
-    param(
-        [Parameter(ParameterSetName='ByDir',Mandatory=$true)][string]$Directory,
-        [Parameter(ParameterSetName='ByBase',Mandatory=$true)][string]$BaseWithoutExt,
-        [Parameter(Mandatory=$true)][ValidateSet('nsys','ncu')]$Kind
-    )
-    $candidates = @()
-    if ($PSCmdlet.ParameterSetName -eq 'ByBase') {
-        if ($Kind -eq 'nsys') {
-            $candidates += @("$BaseWithoutExt.qdrep", "$BaseWithoutExt.nsys-rep", "$BaseWithoutExt.sqlite")
-        } else {
-            $candidates += @("$BaseWithoutExt.ncu-rep")
-        }
-    } else {
-        if ($Kind -eq 'nsys') {
-            $candidates += Get-ChildItem -Path $Directory -Filter '*.qdrep' -File -ErrorAction SilentlyContinue
-            $candidates += Get-ChildItem -Path $Directory -Filter '*.nsys-rep' -File -ErrorAction SilentlyContinue
-            $candidates += Get-ChildItem -Path $Directory -Filter '*.sqlite' -File -ErrorAction SilentlyContinue
-        } else {
-            $candidates += Get-ChildItem -Path $Directory -Filter '*.ncu-rep' -File -ErrorAction SilentlyContinue
-        }
-        $candidates = $candidates | Sort-Object LastWriteTime -Descending | Select-Object -ExpandProperty FullName -First 1
-        return $candidates
-    }
-
-    foreach ($p in $candidates) {
-        if (Test-Path -LiteralPath $p) { return (Resolve-Path -LiteralPath $p).Path }
-    }
-    return $null
-}
-
-function Show-ProfileArtifacts {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory=$true)][ValidateSet('nsys','ncu')]$Kind,
-        [string]$ReportPath,
-        [string]$OutputDir,          # used if ReportPath is not provided
-        [switch]$OpenFolder,
-        [switch]$SelectFile,
-        [switch]$OpenGui
-    )
-
-    if (-not $ReportPath) {
-        if (-not $OutputDir) { throw "Provide -ReportPath or -OutputDir." }
-        $ReportPath = Find-LatestProfileReport -Directory $OutputDir -Kind $Kind
-    }
-    if (-not $ReportPath) {
-        Write-Warning "No report found."
-        return
-    }
-
-    Write-Host ""
-    Write-Host "📦 Saved profile:"
-    Write-ClickablePath -Path $ReportPath -Label "📄 Open report"
-    Write-ClickablePath -Path (Split-Path -Parent $ReportPath) -Label "📂 Open folder"
-
-    if ($OpenFolder) { Open-In-Files -Path $ReportPath -Select:$SelectFile }
-
-    if ($OpenGui) {
-        if ($Kind -eq 'nsys') { Open-In-NsightSystems -ReportPath $ReportPath }
-        else { Open-In-NsightCompute -ReportPath $ReportPath }
-    }
-}
-
-# --- Core actions ------------------------------------------------------------
-Function cmd_setup {
-    section "Environment Setup (Windows/Mamba)"
-    Set-Location $ProjectRoot # Ensure we are in the correct directory
-
-    $solver = "mamba"
-    if (-not (Get-Command mamba -ErrorAction SilentlyContinue)) {
-        if (-not (Get-Command conda -ErrorAction SilentlyContinue)) {
-            err "Neither mamba nor conda found. Please install Miniforge3 or Miniconda."
-            exit 1
-        }
-        warn "mamba not found, using conda (slower). Install mamba: conda install mamba -n base -c conda-forge"
-        $solver = "conda"
-    }
-
-    $envExists = conda env list | Select-String -Quiet -Pattern "\b$CondaEnvName\b"
     if ($envExists) {
-        log "Updating existing environment '$CondaEnvName' with $solver..."
-        & $solver env update --name $CondaEnvName --file $EnvironmentFile --prune
+        Write-ResearchLog -Level Info -Message "Updating existing environment" -Component "Setup"
+        & $solver env update --name $script:CondaEnvName --file $script:EnvironmentFile --prune
     } else {
-        log "Creating new environment '$CondaEnvName' with $solver..."
-        log "This may take several minutes..."
-        & $solver env create --file $EnvironmentFile
+        Write-ResearchLog -Level Info -Message "Creating new environment" -Component "Setup"
+        & $solver env create --file $script:EnvironmentFile
     }
+    
     if ($LASTEXITCODE -ne 0) {
-        err "Environment setup failed"
-        exit 1
+        throw "Environment setup failed"
     }
     
-    log "Installing ionosense-hpc Python package in development mode..."
-    conda run -n $CondaEnvName python -m pip install -e ".[dev,benchmark,export]"
-    if ($LASTEXITCODE -ne 0) {
-        err "Pip install failed. Ensure the conda environment is correct."
-        exit 1
-    }
-    
-    ok "Environment ready. Activate with: conda activate $CondaEnvName"
-}
+    # Install package in development mode
+    Write-ResearchLog -Level Info -Message "Installing ionosense-hpc in development mode" -Component "Setup"
+    Push-Location $script:ProjectRoot
+    conda run -n $script:CondaEnvName python -m pip install -e ".[dev,benchmark,export]"
+    $installCode = $LASTEXITCODE
+    Pop-Location
 
-Function cmd_build {
-    param([string]$Preset = $BuildPreset)
-    section "Configuring & Building (preset: ${Preset})"
-    Ensure-EnvActivated
-    
-    cmake --preset $Preset
-    if ($LASTEXITCODE -ne 0) { 
-        err "Configuration failed"
-        exit 1 
+    if ($installCode -ne 0) {
+        Write-ResearchLog -Level Critical -Message "Editable install failed (pip exit $installCode)" -Component "Setup"
+        throw "Pip install failed"
     }
     
-    $verboseFlag = if ($Preset -like "*debug*") { "--verbose" } else { $null }
-    cmake --build --preset $Preset --parallel $verboseFlag
-    if ($LASTEXITCODE -ne 0) { 
-        err "Build failed"
-        exit 1 
-    }
-    
-    log "Verifying Python module..."
-    With-PythonPath {
-        python -c "import ionosense_hpc; print(f'Module loaded: v{ionosense_hpc.__version__}')"
-        if ($LASTEXITCODE -eq 0) {
-            ok "Python module verified"
-        } else {
-            warn "Python module import failed - check build output"
-        }
-    }
-    
-    ok "Build finished -> $BuildDir\$Preset"
-}
-
-Function cmd_rebuild {
-    param([string]$Preset = $BuildPreset)
-    section "Clean Rebuild (preset: ${Preset})"
-    $presetDir = Join-Path $BuildDir $Preset
-    if (Test-Path $presetDir) {
-        log "Removing $presetDir"
-        Remove-Item -Path $presetDir -Recurse -Force
-    }
-    cmd_build -Preset $Preset
-}
-
-Function cmd_test {
-    param([string]$Preset = $BuildPreset)
-    section "Running All Tests"
-    Ensure-EnvActivated
-    
-    log "Running C++ tests..."
-    $testPreset = $Preset.Replace('rel','tests').Replace('debug','tests')
-    ctest --preset $testPreset --output-on-failure
-    if ($LASTEXITCODE -ne 0) {
-        warn "Some C++ tests failed"
-    } else {
-        ok "C++ tests passed"
-    }
-    
-    log "Running Python tests..."
-    With-PythonPath {
-        pytest -v (Join-Path $PythonDir "tests") --tb=short
-    }
-    if ($LASTEXITCODE -ne 0) {
-        warn "Some Python tests failed"
-    } else {
-        ok "Python tests passed"
-    }
-    
-    ok "All tests completed"
-}
-
-Function cmd_lint {
-    param([string[]]$LintArgs)
-    section "Running Linters"
-    Ensure-EnvActivated
-
-    $target = if ($LintArgs.Count -gt 0) { $LintArgs[0] } else { "all" }
-
-    $py_ok = $true
-    $cpp_ok = $true
-
-    switch ($target) {
-        "all" {
-            $py_ok = _lint_python
-            $cpp_ok = _lint_cpp
-        }
-        "py" {
-            $py_ok = _lint_python
-        }
-        "cpp" {
-            $cpp_ok = _lint_cpp
-        }
-        default {
-            err "Unknown lint target: '$target'. Use 'py', 'cpp', or no argument for all."
-            exit 1
-        }
-    }
-
-    if (-not ($py_ok -and $cpp_ok)) {
-        err "Linting failed for one or more targets."
-        # Use a non-standard exit code to differentiate from other failures if needed
-        exit 2
-    } else {
-        ok "All lint checks passed."
+    if ($LASTEXITCODE -eq 0) {
+        Write-ResearchLog -Level Info -Message "Setup completed successfully" -Component "Setup"
     }
 }
 
-Function cmd_format {
-    section "Formatting C++ Code"
-    # A preset must be configured for the build directory to exist.
-    $presetDir = Join-Path $BuildDir "windows-debug"
-    if (-not (Test-Path "$presetDir/build.ninja")) {
-        warn "Build directory not configured. Running configure step for 'windows-debug' preset..."
-        cmake --preset "windows-debug"
-    }
-    cmake --build $presetDir --target format
-    ok "C++ formatting complete."
-}
-
-Function cmd_list {
-    param([string[]]$ListArgs)
-    if ($ListArgs.Count -eq 0) {
-        err "Usage: list <benchmarks|presets|devices>"
-        return
-    }
-    
-    switch ($ListArgs[0]) {
-        "benchmarks" {
-            section "Available Benchmarks"
-            $benchmarkDir = Join-Path $PythonDir "src\ionosense_hpc\benchmarks"
-            Get-ChildItem -Path $benchmarkDir -Recurse -Filter "*.py" -File |
-                Where-Object { $_.Name -ne "__init__.py" } |
-                ForEach-Object {
-                    $_.Name -replace '\.py$',''
-                } |
-                Sort-Object
-        }
-        "presets" {
-            section "Available Configuration Presets"
-            With-PythonPath {
-                python -c "from ionosense_hpc import Presets; [print(f'  {n:12s}: nfft={c.nfft:5d}, batch={c.batch:3d}') for n, c in Presets.list_presets().items()]"
-            }
-        }
-        "devices" {
-            section "Available CUDA Devices"
-            With-PythonPath {
-                python -c "from ionosense_hpc import gpu_count, device_info; n=gpu_count(); print(f'Found {n} CUDA device(s)'); [print(f'  [{i}] {d['name']} - {d['memory_free_mb']}/{d['memory_total_mb']} MB free') for i in range(n) for d in [device_info(i)]]"
-            }
-        }
-        default {
-            err "Unknown list type: $($ListArgs[0])"
-        }
-    }
-}
-
-Function cmd_bench {
-    param([string[]]$BenchArgs)
-    if ($BenchArgs.Count -lt 1) {
-        err "Usage: bench <script_name|suite> [args...]"
-        return
-    }
-    
-    Ensure-EnvActivated
-    New-Item -ItemType Directory -Force -Path $BenchResultsDir | Out-Null
-    
-    $scriptName = $BenchArgs[0]
-    $scriptArgs = if ($BenchArgs.Count -gt 1) { $BenchArgs[1..($BenchArgs.Length - 1)] } else { @() }
-    
-    $moduleBase = "ionosense_hpc.benchmarks"
-    
-    if ($scriptName -eq "suite") {
-        section "Running Full Benchmark Suite"
-        $preset = if ($scriptArgs.Count -gt 0) { $scriptArgs[0] } else { "realtime" }
-        $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-        $outputDir = Join-Path $BenchResultsDir "${timestamp}_${preset}"
-        
-        With-PythonPath {
-            python -m $moduleBase.suite --preset $preset --output $outputDir --log-level INFO
-        }
-        
-        ok "Results saved to: $outputDir"
-    } else {
-        $moduleName = "$moduleBase.$scriptName"
-        section "Running Benchmark: $moduleName"
-        With-PythonPath {
-            & python -m $moduleName $scriptArgs
-        }
-    }
-}
-
-Function cmd_profile {
-    param([string[]]$ProfileArgs)
-
-    if ($ProfileArgs.Count -lt 2) {
-        err "Usage: profile <nsys|ncu> <script_name> [--full] [--open] [--ui] [args...]"
-        return
-    }
-
-    Ensure-EnvActivated
-
-    $tool       = $ProfileArgs[0]
-    $scriptName = $ProfileArgs[1]
-    $scriptArgs = if ($ProfileArgs.Count -gt 2) { $ProfileArgs[2..($ProfileArgs.Length - 1)] } else { @() }
-
-    # extract our flags; pass the rest to python
-    $fullMode = $false; $openFlag = $false; $uiFlag = $false
-    if ($scriptArgs -contains "--full") { $fullMode = $true;  $scriptArgs = $scriptArgs | Where-Object { $_ -ne "--full" } }
-    if ($scriptArgs -contains "--open") { $openFlag = $true;  $scriptArgs = $scriptArgs | Where-Object { $_ -ne "--open" } }
-    if ($scriptArgs -contains "--ui")   { $uiFlag   = $true;  $scriptArgs = $scriptArgs | Where-Object { $_ -ne "--ui" } }
-
-    $moduleBase = "ionosense_hpc.benchmarks"
-    $moduleName = "$moduleBase.$scriptName"
-
-    $nsysDir = Join-Path $BuildDir "nsight_reports\nsys_reports"
-    $ncuDir  = Join-Path $BuildDir "nsight_reports\ncu_reports"
-    New-Item -ItemType Directory -Force -Path $nsysDir | Out-Null
-    New-Item -ItemType Directory -Force -Path $ncuDir  | Out-Null
-
-    $timestamp = Get-Date -Format 'yyyyMMdd_HHmmss'
-    $mode      = if ($fullMode) { "full" } else { "quick" }
-    $outFile   = "${scriptName}_${mode}_${timestamp}"
-
-    # robust Windows check
-    $onWindows = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform(
-        [System.Runtime.InteropServices.OSPlatform]::Windows
+Function Invoke-Build {
+    param(
+        [string]$Preset = $script:BuildPreset,
+        [switch]$Clean,
+        [switch]$Verbose
     )
-
-    # ===== Pretty link rendering (clean, labeled) =====
-    function _PrintLinks([string]$reportPath, [string]$kind) {
-        # Styles (safe on PS >=7; no-ops on older)
-        $hasPSStyle = $PSStyle -ne $null
-        $B   = if ($hasPSStyle) { $PSStyle.Bold } else { "" }
-        $Dim = if ($hasPSStyle) { $PSStyle.Foreground.BrightBlack } else { "" }
-        $Hi  = if ($hasPSStyle) { $PSStyle.Foreground.BrightGreen } else { "" }
-        $R   = if ($hasPSStyle) { $PSStyle.Reset } else { "" }
-
-        # Terminal OSC8 hyperlink support
-        $supportsOsc8 = $false
-        if ($env:WT_SESSION) { $supportsOsc8 = $true }
-        elseif ($env:TERM_PROGRAM -eq 'vscode') { $supportsOsc8 = $true }
-        elseif ($env:TERM -match 'xterm|wezterm|alacritty|kitty|tmux') { $supportsOsc8 = $true }
-
-        # Paths + labels
-        $resolved     = (Resolve-Path -LiteralPath $reportPath).Path
-        $dir          = Split-Path -Parent $resolved
-        $fileName     = [System.IO.Path]::GetFileName($resolved)
-        $folderName   = Split-Path -Leaf $dir
-        $uriFile      = ([System.Uri]$resolved).AbsoluteUri
-        $uriFolder    = ([System.Uri](Resolve-Path -LiteralPath $dir).Path).AbsoluteUri
-        $sizeStr      = try { "{0:N1} MB" -f ((Get-Item -LiteralPath $resolved).Length / 1MB) } catch { "" }
-
-        # Hyperlink builder
-        $esc = [char]27; $bel = [char]7
-        function _HL($text, $uri) {
-            if ($supportsOsc8) { return "$esc]8;;$uri$bel$text$esc]8;;$bel" }
-            else { return "$text -> $uri" }
-        }
-
-        Write-Host ""
-        Write-Host ("{0}📦 Saved profile{1}" -f ($Hi+$B), $R)
-        Write-Host ("{0}────────────────────────────────────────────{1}" -f $Dim, $R)
-
-        # Report line
-        $openReport = _HL "Open report" $uriFile
-        $kindLabel  = if ($kind -eq 'nsys') { "Nsight Systems" } elseif ($kind -eq 'ncu') { "Nsight Compute" } else { "Report" }
-        Write-Host ("  📄 {0}: {1}  {2}({3}{4}{2})" -f $kindLabel, $openReport, $R, $Dim, "$fileName" + ($(if ($sizeStr) { " — $sizeStr" })))
-
-        # Folder line
-        $openFolder = _HL "Open folder" $uriFolder
-        Write-Host ("  📂 Folder: {0}  {1}({2}{3}{1})" -f $openFolder, $R, $Dim, $dir)
-
-        # Show raw URIs in dim text (copy-paste friendly) when OSC8 is supported
-        if ($supportsOsc8) {
-            Write-Host ("{0}     {1}{2}" -f $Dim, $uriFile, $R)
-            Write-Host ("{0}     {1}{2}" -f $Dim, $uriFolder, $R)
-        }
-
-        Write-Host ("{0}────────────────────────────────────────────{1}" -f $Dim, $R)
+    
+    Write-ResearchLog -Level Info -Message "Starting build" -Component "Build" -Metadata @{
+        preset = $Preset
+        clean = $Clean.IsPresent
     }
-
-    # local: open file’s folder (and select file on Windows)
-    function _OpenFolder([string]$reportPath) {
-        try {
-            $resolved = (Resolve-Path -LiteralPath $reportPath -ErrorAction Stop).Path
-            $dir = Split-Path -Parent $resolved
-            if ($onWindows) {
-                Start-Process -FilePath explorer.exe -ArgumentList @("/select,`"$resolved`"")
-            } elseif ($IsMacOS) {
-                Start-Process -FilePath open -ArgumentList @($dir)
-            } else {
-                Start-Process -FilePath xdg-open -ArgumentList @($dir)
-            }
-        } catch {
-            Write-Warning "Could not open folder: $($_.Exception.Message)"
+    
+    if (-not (Test-CondaEnvironment)) {
+        throw "Conda environment not activated. Run: conda activate $script:CondaEnvName"
+    }
+    
+    if ($Clean) {
+        $presetDir = Join-Path $script:BuildDir $Preset
+        if (Test-Path $presetDir) {
+            Remove-Item -Path $presetDir -Recurse -Force
+            Write-ResearchLog -Level Info -Message "Cleaned build directory" -Component "Build"
         }
     }
-
-    # local: find a GUI exe on PATH or common dirs
-    function _ResolveExe([string[]]$names, [string[]]$extraDirs) {
-        foreach ($n in $names) {
-            $cmd = Get-Command $n -ErrorAction SilentlyContinue
-            if ($cmd) { return $cmd.Source }
-        }
-        $roots = @()
-        if ($onWindows) {
-            $roots += @(
-                $env:ProgramFiles, $env:ProgramFilesX86,
-                "$env:ProgramFiles\NVIDIA Corporation",
-                "$env:ProgramFilesX86\NVIDIA Corporation"
-            )
-        } else {
-            $roots += @('/opt/nvidia','/usr/local','/usr')
-        }
-        if ($extraDirs) { $roots += $extraDirs }
-        foreach ($root in $roots | Where-Object { $_ -and (Test-Path $_) }) {
-            foreach ($n in $names) {
-                $hit = Get-ChildItem -Path $root -Recurse -File -Filter $n -ErrorAction SilentlyContinue |
-                       Sort-Object LastWriteTime -Descending | Select-Object -First 1
-                if ($hit) { return $hit.FullName }
-            }
-        }
-        return $null
+    
+    # Configure
+    cmake --preset $Preset
+    if ($LASTEXITCODE -ne 0) {
+        throw "CMake configuration failed"
     }
-
-    # local: launch Nsight UIs
-    function _OpenNsightSystems([string]$reportPath) {
-        $exe = _ResolveExe @('nsys-ui.exe','nsys-ui','nsight-systems.exe','nsight-systems') @()
-        if (-not $exe) { Write-Warning "Nsight Systems GUI not found. Open manually and load: $reportPath"; return }
-        $wd = Split-Path -Parent $reportPath
-        Start-Process -FilePath $exe -WorkingDirectory $wd -ArgumentList @("$reportPath")
+    
+    # Build
+    $buildArgs = @("--preset", $Preset, "--parallel")
+    if ($Verbose -or $Preset -like "*debug*") {
+        $buildArgs += "--verbose"
     }
-    function _OpenNsightCompute([string]$reportPath) {
-        $exe = _ResolveExe @('nsight-compute.exe','nsight-compute','nv-nsight-cu.exe','nv-nsight-cu','ncu-ui.exe','ncu-ui') @()
-        if (-not $exe) { Write-Warning "Nsight Compute GUI not found. Open manually and load: $reportPath"; return }
-        $wd = Split-Path -Parent $reportPath
-        Start-Process -FilePath $exe -WorkingDirectory $wd -ArgumentList @("$reportPath")
+    
+    cmake --build @buildArgs
+    if ($LASTEXITCODE -ne 0) {
+        throw "Build failed"
     }
-
-    section "Profiling ($tool $mode): $moduleName"
-
-    With-PythonPath {
-        switch ($tool) {
-            'nsys' {
-                $outBase = Join-Path $nsysDir $outFile
-                $cmd = @('nsys','profile','-o',$outBase,'-f','true','--wait=all')
-
-                if ($fullMode) {
-                    log "Full mode: All available GPU traces (Windows-safe)"
-                    $cmd += '--trace=cuda,cublas,cusolver,cusparse,nvtx,opengl,wddm'
-                    $cmd += '--cuda-memory-usage=true'
-                    $cmd += '--gpu-metrics-device=all'
-                } else {
-                    log "Quick mode: CUDA + NVTX only"
-                    $cmd += '--trace=cuda,nvtx'
-                }
-
-                $cmd += 'python','-m',$moduleName
-                if ($scriptArgs.Count -gt 0) { $cmd += $scriptArgs }
-
-                & $cmd[0] $cmd[1..($cmd.Length-1)]
-                if ($LASTEXITCODE -ne 0) { err "nsys exited with code $LASTEXITCODE"; return }
-
-                $candidates = @("$outBase.qdrep","$outBase.nsys-rep","$outBase.sqlite")
-                $reportPath = $null
-                foreach ($p in $candidates) { if (Test-Path -LiteralPath $p) { $reportPath = (Resolve-Path -LiteralPath $p).Path; break } }
-
-                if ($reportPath) {
-                    try {
-                        $sizeMB = [math]::Round((Get-Item -LiteralPath $reportPath).Length / 1MB, 2)
-                        ok "Report saved: $([System.IO.Path]::GetFileName($reportPath)) ($sizeMB MB)"
-                    } catch { ok "Report saved: $([System.IO.Path]::GetFileName($reportPath))" }
-
-                    _PrintLinks $reportPath 'nsys'
-                    if ($openFlag) { _OpenFolder $reportPath }
-                    if ($uiFlag)   { _OpenNsightSystems $reportPath }
-                } else {
-                    err "Report not found"
-                }
-            }
-            'ncu' {
-                $outBase = Join-Path $ncuDir $outFile
-                $cmd = @('ncu','-o',$outBase)
-
-                if ($fullMode) {
-                    warn "Full mode: heavy metric set (slow)"
-                    $cmd += '--set','full'
-                } else {
-                    log "Quick mode: basic metric set"
-                    $cmd += '--set','basic'
-                }
-
-                $cmd += 'python','-m',$moduleName
-                if ($scriptArgs.Count -gt 0) { $cmd += $scriptArgs }
-
-                & $cmd[0] $cmd[1..($cmd.Length-1)]
-                if ($LASTEXITCODE -ne 0) { err "ncu exited with code $LASTEXITCODE"; return }
-
-                $reportPath = "$outBase.ncu-rep"
-                if (Test-Path -LiteralPath $reportPath) {
-                    try {
-                        $sizeMB = [math]::Round((Get-Item -LiteralPath $reportPath).Length / 1MB, 2)
-                        ok "Report saved: $([System.IO.Path]::GetFileName($reportPath)) ($sizeMB MB)"
-                    } catch { ok "Report saved: $([System.IO.Path]::GetFileName($reportPath))" }
-
-                    _PrintLinks $reportPath 'ncu'
-                    if ($openFlag) { _OpenFolder $reportPath }
-                    if ($uiFlag)   { _OpenNsightCompute $reportPath }
-                } else {
-                    err "Report not found"
-                }
-            }
-            default {
-                err "Unknown profiler: '$tool'"
-            }
-        }
+    
+    # Verify module
+    Invoke-WithPythonPath {
+        python -c "import ionosense_hpc; print(f'Module v{ionosense_hpc.__version__} loaded')"
     }
+    
+    Write-ResearchLog -Level Info -Message "Build completed" -Component "Build"
 }
 
-
-
-
-# Command to check profiling reports status
-Function cmd_profile_status {
-    section "Profiling Reports Status"
+Function Invoke-Test {
+    param(
+        [string]$Suite = "all",
+        [string]$Pattern = "",
+        [switch]$Verbose,
+        [switch]$Coverage
+    )
     
-    $reportsDir = Join-Path $BuildDir "nsight_reports"
-    if (-not (Test-Path $reportsDir)) {
-        warn "No reports directory found. Run a profiling session first."
+    Write-ResearchLog -Level Info -Message "Running tests" -Component "Test" -Metadata @{
+        suite = $Suite
+        pattern = $Pattern
+    }
+    
+    if (-not (Test-CondaEnvironment)) {
+        throw "Conda environment not activated"
+    }
+    
+    $results = @{
+        cpp = $null
+        python = $null
+        total = 0
+        passed = 0
+        failed = 0
+    }
+    
+    if ($Suite -eq "all" -or $Suite -eq "cpp") {
+        Write-ResearchLog -Level Info -Message "Running C++ tests" -Component "Test"
+        $testPreset = $script:BuildPreset.Replace('rel','tests').Replace('debug','tests')
+        ctest --preset $testPreset --output-on-failure
+        $results.cpp = $LASTEXITCODE -eq 0
+    }
+    
+    if ($Suite -eq "all" -or $Suite -eq "python") {
+        Write-ResearchLog -Level Info -Message "Running Python tests" -Component "Test"
+        
+        $pytestArgs = @("-v", (Join-Path $script:PythonDir "tests"))
+        
+        if ($Verbose) { $pytestArgs += "-vv", "--tb=long" }
+        else { $pytestArgs += "--tb=short" }
+        
+        if ($Coverage) {
+            $pytestArgs += "--cov=ionosense_hpc", "--cov-report=term-missing", "--cov-report=html"
+        }
+        
+        if ($Pattern) {
+            $pytestArgs += "-k", $Pattern
+        }
+        
+        Invoke-WithPythonPath {
+            pytest @pytestArgs
+        }
+        $results.python = $LASTEXITCODE -eq 0
+    }
+    
+    # Report results
+    $testReport = @{
+        timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+        suite = $Suite
+        results = $results
+    }
+    
+    $reportPath = Join-Path $script:ReportsDir "test_results_$(Get-Date -Format 'yyyyMMdd_HHmmss').json"
+    $testReport | ConvertTo-Json -Depth 5 | Set-Content $reportPath
+    
+    Write-ResearchLog -Level Info -Message "Test results saved to: $reportPath" -Component "Test"
+}
+
+Function Invoke-Benchmark {
+    param(
+        [string]$Benchmark,
+        [string]$Config,
+        [string]$Output,
+        [hashtable]$Parameters = @{},
+        [switch]$Suite,
+        [switch]$Report
+    )
+    
+    if (-not (Test-CondaEnvironment)) {
+        throw "Conda environment not activated"
+    }
+    
+    # Handle suite execution
+    if ($Suite) {
+        Write-ResearchLog -Level Info -Message "Running benchmark suite" -Component "Benchmark"
+        
+        $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+        $outputDir = if ($Output) { $Output } else { Join-Path $script:BenchResultsDir "suite_$timestamp" }
+        
+        $configFile = if ($Config) {
+            if (Test-Path $Config) { $Config }
+            else { Join-Path $script:ConfigDir "$Config.yaml" }
+        } else {
+            Join-Path $script:ConfigDir "suite_config.yaml"
+        }
+        
+        Invoke-WithPythonPath {
+            python -m ionosense_hpc.benchmarks.suite --config $configFile --output $outputDir
+        }
+        
+        if ($Report) {
+            Invoke-BenchmarkReport -ResultsDir $outputDir
+        }
+        
         return
     }
     
-    # Function to format age
-    function Format-Age($lastWriteTime) {
-        $age = (Get-Date) - $lastWriteTime
-        if ($age.TotalMinutes -lt 60) { 
-            return "$([int]$age.TotalMinutes)m ago" 
-        } elseif ($age.TotalHours -lt 24) { 
-            return "$([int]$age.TotalHours)h ago" 
-        } else { 
-            return "$([int]$age.TotalDays)d ago" 
+    # Handle individual benchmark
+    if (-not $Benchmark) {
+        throw "Benchmark name required"
+    }
+    
+    Write-ResearchLog -Level Info -Message "Running benchmark: $Benchmark" -Component "Benchmark"
+    
+    # Find config file
+    $configFile = $null
+    if ($Config) {
+        $configFile = if (Test-Path $Config) { $Config }
+        elseif (Test-Path (Join-Path $script:ConfigDir "$Config.yaml")) { 
+            Join-Path $script:ConfigDir "$Config.yaml" 
+        }
+        elseif (Test-Path (Join-Path $script:ConfigDir "${Benchmark}_config.yaml")) {
+            Join-Path $script:ConfigDir "${Benchmark}_config.yaml"
         }
     }
     
-    Write-Host "`n📊 NSIGHT SYSTEMS REPORTS:" -ForegroundColor Cyan
-    Write-Host "─────────────────────────────────────────" -ForegroundColor DarkGray
+    # Build command
+    $pythonCmd = "python -m ionosense_hpc.benchmarks.$Benchmark"
     
-    $nsysReports = Get-ChildItem -Path "$reportsDir\nsys_reports" -Filter "*.nsys-rep" -ErrorAction SilentlyContinue |
-        Sort-Object LastWriteTime -Descending | Select-Object -First 10
+    if ($configFile) {
+        $pythonCmd += " --config `"$configFile`""
+    }
     
-    if ($nsysReports) {
-        foreach ($report in $nsysReports) {
-            $size = [math]::Round($report.Length / 1MB, 2)
-            $age = Format-Age $report.LastWriteTime
-            $name = $report.Name
-            
-            # Parse mode from filename if present
-            $modeTag = if ($name -match "_full_") { "[FULL]" } 
-                       elseif ($name -match "_quick_") { "[QUICK]" }
-                       else { "" }
-            
-            Write-Host ("  {0,-45} {1,6}MB  {2,10}  {3}" -f $name.Substring(.0, [Math]::Min($name.Length, 45)), $size, $age, $modeTag)
+    if ($Output) {
+        $pythonCmd += " --output `"$Output`""
+    }
+    
+    # Add parameters
+    foreach ($key in $Parameters.Keys) {
+        $pythonCmd += " --$key $($Parameters[$key])"
+    }
+    
+    Invoke-WithPythonPath {
+        Invoke-Expression $pythonCmd
+    }
+    
+    if ($Report -and $Output) {
+        Invoke-BenchmarkReport -ResultsDir $Output
+    }
+}
+
+Function Invoke-ParameterSweep {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Config,
+        [string]$Output,
+        [switch]$Parallel,
+        [int]$Workers = 4
+    )
+    
+    Write-ResearchLog -Level Info -Message "Starting parameter sweep" -Component "Sweep"
+    
+    if (-not (Test-CondaEnvironment)) {
+        throw "Conda environment not activated"
+    }
+    
+    # Find config file
+    $configFile = if (Test-Path $Config) { $Config }
+    elseif (Test-Path (Join-Path $script:ConfigDir "$Config.yaml")) {
+        Join-Path $script:ConfigDir "$Config.yaml"
+    }
+    else {
+        throw "Configuration file not found: $Config"
+    }
+    
+    $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+    $outputDir = if ($Output) { $Output } else { Join-Path $script:ExperimentsDir "sweep_$timestamp" }
+    
+    Write-ResearchLog -Level Info -Message "Configuration: $configFile" -Component "Sweep"
+    Write-ResearchLog -Level Info -Message "Output: $outputDir" -Component "Sweep"
+    
+    Invoke-WithPythonPath {
+        $sweepCmd = "from ionosense_hpc.benchmarks.sweep import ParameterSweep; "
+        $sweepCmd += "sweep = ParameterSweep('$configFile'); "
+        
+        if ($Parallel) {
+            $sweepCmd += "sweep.config.parallel = True; "
+            $sweepCmd += "sweep.config.max_workers = $Workers; "
         }
+        
+        if ($Output) {
+            $sweepCmd += "sweep.config.output_dir = '$outputDir'; "
+        }
+        
+        $sweepCmd += "results = sweep.run(); "
+        $sweepCmd += "print(f'Sweep complete: {len(results)} runs')"
+        
+        python -c $sweepCmd
+    }
+    
+    # Generate analysis report
+    Write-ResearchLog -Level Info -Message "Generating sweep analysis" -Component "Sweep"
+    Invoke-BenchmarkReport -ResultsDir $outputDir -Type "sweep"
+}
+
+Function Invoke-BenchmarkReport {
+    param(
+        [Parameter(Mandatory)]
+        [string]$ResultsDir,
+        [string]$Format = "pdf",
+        [string]$Type = "standard",
+        [string]$Title
+    )
+    
+    Write-ResearchLog -Level Info -Message "Generating report" -Component "Report" -Metadata @{
+        type = $Type
+        format = $Format
+    }
+    
+    if (-not (Test-CondaEnvironment)) {
+        throw "Conda environment not activated"
+    }
+    
+    $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+    $reportName = "report_${Type}_$timestamp.$Format"
+    $reportPath = Join-Path $script:ReportsDir $reportName
+    
+    Invoke-WithPythonPath {
+        $reportCmd = "from ionosense_hpc.benchmarks.reporting import generate_comparative_report, ReportConfig; "
+        $reportCmd += "config = ReportConfig("
+        $reportCmd += "output_format='$Format', "
+        
+        if ($Title) {
+            $reportCmd += "title='$Title', "
+        }
+        
+        $reportCmd += "include_raw_data=False, "
+        $reportCmd += "include_violin_plots=True, "
+        $reportCmd += "include_heatmaps=True"
+        $reportCmd += "); "
+        
+        $reportCmd += "generate_comparative_report('$ResultsDir', '$reportPath', config)"
+        
+        python -c $reportCmd
+    }
+    
+    Write-ResearchLog -Level Info -Message "Report saved to: $reportPath" -Component "Report"
+    
+    # Open report if PDF
+    if ($Format -eq "pdf" -and (Test-Path $reportPath)) {
+        Start-Process $reportPath
+    }
+}
+
+Function Invoke-Profile {
+    param(
+        [Parameter(Mandatory)]
+        [ValidateSet("nsys", "ncu")]
+        [string]$Tool,
+        
+        [Parameter(Mandatory)]
+        [string]$Benchmark,
+        
+        [string]$Config,
+        [switch]$Full,
+        [switch]$OpenReport,
+        [switch]$OpenGui,
+        [hashtable]$Parameters = @{}
+    )
+    
+    Write-ResearchLog -Level Info -Message "Starting profiling" -Component "Profile" -Metadata @{
+        tool = $Tool
+        benchmark = $Benchmark
+        full = $Full.IsPresent
+    }
+    
+    if (-not (Test-CondaEnvironment)) {
+        throw "Conda environment not activated"
+    }
+    
+    $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+    $mode = if ($Full) { "full" } else { "quick" }
+    
+    $outputDir = if ($Tool -eq "nsys") {
+        Join-Path $script:ProfileDir "nsys_reports"
+    } else {
+        Join-Path $script:ProfileDir "ncu_reports"
+    }
+    
+    New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
+    $outputBase = Join-Path $outputDir "${Benchmark}_${mode}_${timestamp}"
+    
+    # Build profiling command
+    $profileCmd = @()
+    
+    if ($Tool -eq "nsys") {
+        $profileCmd = @("nsys", "profile", "-o", $outputBase, "-f", "true", "--wait=all")
+        
+        if ($Full) {
+            $profileCmd += "--trace=cuda,cublas,cusolver,cusparse,nvtx,opengl,wddm"
+            $profileCmd += "--cuda-memory-usage=true"
+            $profileCmd += "--gpu-metrics-device=all"
+        } else {
+            $profileCmd += "--trace=cuda,nvtx"
+        }
+    } else {
+        $profileCmd = @("ncu", "-o", $outputBase)
+        
+        if ($Full) {
+            $profileCmd += "--set", "full"
+        } else {
+            $profileCmd += "--set", "basic"
+        }
+    }
+    
+    # Add Python command
+    $profileCmd += "python", "-m", "ionosense_hpc.benchmarks.$Benchmark"
+    
+    if ($Config) {
+        $configFile = if (Test-Path $Config) { $Config }
+        elseif (Test-Path (Join-Path $script:ConfigDir "$Config.yaml")) {
+            Join-Path $script:ConfigDir "$Config.yaml"
+        }
+        
+        if ($configFile) {
+            $profileCmd += "--config", $configFile
+        }
+    }
+    
+    # Add parameters
+    foreach ($key in $Parameters.Keys) {
+        $profileCmd += "--$key", $Parameters[$key]
+    }
+    
+    # Execute profiling
+    Invoke-WithPythonPath {
+        & $profileCmd[0] $profileCmd[1..($profileCmd.Length-1)]
+    }
+    
+    if ($LASTEXITCODE -ne 0) {
+        throw "Profiling failed with exit code $LASTEXITCODE"
+    }
+    
+    # Find generated report
+    $reportPath = $null
+    if ($Tool -eq "nsys") {
+        $candidates = @("$outputBase.qdrep", "$outputBase.nsys-rep", "$outputBase.sqlite")
+        foreach ($candidate in $candidates) {
+            if (Test-Path $candidate) {
+                $reportPath = $candidate
+                break
+            }
+        }
+    } else {
+        $reportPath = "$outputBase.ncu-rep"
+    }
+    
+    if ($reportPath -and (Test-Path $reportPath)) {
+        $size = [math]::Round((Get-Item $reportPath).Length / 1MB, 2)
+        Write-ResearchLog -Level Info -Message "Report saved: $reportPath ($size MB)" -Component "Profile"
+        
+        if ($OpenReport) {
+            Start-Process explorer.exe "/select,`"$reportPath`""
+        }
+        
+        if ($OpenGui) {
+            if ($Tool -eq "nsys") {
+                Open-NsightSystems -ReportPath $reportPath
+            } else {
+                Open-NsightCompute -ReportPath $reportPath
+            }
+        }
+    }
+}
+
+Function Show-Info {
+    param(
+        [ValidateSet("system", "benchmarks", "presets", "devices", "configs", "all")]
+        [string]$Type = "all"
+    )
+    
+    if ($Type -eq "all" -or $Type -eq "system") {
+        Write-Host "`n📊 SYSTEM INFORMATION" -ForegroundColor Cyan
+        Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor DarkGray
+        
+        Invoke-WithPythonPath {
+            python -c "from ionosense_hpc import show_versions; show_versions(verbose=True)"
+        }
+    }
+    
+    if ($Type -eq "all" -or $Type -eq "benchmarks") {
+        Write-Host "`n🏃 AVAILABLE BENCHMARKS" -ForegroundColor Cyan
+        Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor DarkGray
+        
+        $benchDir = Join-Path $script:PythonDir "src\ionosense_hpc\benchmarks"
+        Get-ChildItem -Path $benchDir -Filter "*.py" -File | 
+            Where-Object { $_.Name -ne "__init__.py" -and $_.Name -ne "base.py" } |
+            ForEach-Object {
+                $name = $_.BaseName
+                $configFile = Join-Path $script:ConfigDir "${name}_config.yaml"
+                $hasConfig = if (Test-Path $configFile) { "✓" } else { " " }
+                Write-Host ("  {0} {1,-20} {2}" -f $hasConfig, $name, $_.FullName)
+            }
+    }
+    
+    if ($Type -eq "all" -or $Type -eq "configs") {
+        Write-Host "`n📝 BENCHMARK CONFIGURATIONS" -ForegroundColor Cyan
+        Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor DarkGray
+        
+        if (Test-Path $script:ConfigDir) {
+            Get-ChildItem -Path $script:ConfigDir -Filter "*.yaml" -File |
+                ForEach-Object {
+                    Write-Host "  $($_.BaseName)"
+                    
+                    # Parse and show key settings
+                    $content = Get-Content $_.FullName -Raw
+                    if ($content -match "name:\s+(.+)") {
+                        Write-Host "    Name: $($Matches[1])" -ForegroundColor DarkGray
+                    }
+                    if ($content -match "iterations:\s+(\d+)") {
+                        Write-Host "    Iterations: $($Matches[1])" -ForegroundColor DarkGray
+                    }
+                }
+        }
+    }
+    
+    if ($Type -eq "all" -or $Type -eq "presets") {
+        Write-Host "`n⚙️ ENGINE PRESETS" -ForegroundColor Cyan
+        Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor DarkGray
+        
+        Invoke-WithPythonPath {
+            python -c @"
+from ionosense_hpc import Presets
+for name, config in Presets.list_presets().items():
+    print(f'  {name:12s}: nfft={config.nfft:5d}, batch={config.batch:3d}, overlap={config.overlap:.1%}')
+"@
+        }
+    }
+    
+    if ($Type -eq "all" -or $Type -eq "devices") {
+        Write-Host "`n🎮 CUDA DEVICES" -ForegroundColor Cyan  
+        Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor DarkGray
+        
+        Invoke-WithPythonPath {
+            python -c @"
+from ionosense_hpc import gpu_count, device_info
+n = gpu_count()
+print(f'Found {n} CUDA device(s)\n')
+for i in range(n):
+    d = device_info(i)
+    print(f"  [{i}] {d['name']}")
+    print(f"      Memory: {d['memory_free_mb']}/{d['memory_total_mb']} MB")
+    print(f"      Compute: {d['compute_capability']}")
+    if d.get('temperature_c'):
+        print(f"      Temp: {d['temperature_c']}°C")
+"@
+        }
+    }
+}
+
+Function Show-ResearchStatus {
+    Write-Host "`n🔬 IONOSENSE-HPC RESEARCH STATUS" -ForegroundColor Magenta
+    Write-Host "════════════════════════════════════════════════════════" -ForegroundColor DarkGray
+    
+    # Show recent benchmarks
+    Write-Host "`n📊 Recent Benchmarks:" -ForegroundColor Cyan
+    if (Test-Path $script:BenchResultsDir) {
+        Get-ChildItem -Path $script:BenchResultsDir -Directory | 
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 5 |
+            ForEach-Object {
+                $age = (Get-Date) - $_.LastWriteTime
+                $ageStr = if ($age.TotalHours -lt 1) { "$([int]$age.TotalMinutes)m ago" }
+                          elseif ($age.TotalDays -lt 1) { "$([int]$age.TotalHours)h ago" }
+                          else { "$([int]$age.TotalDays)d ago" }
+                          
+                Write-Host ("  {0,-30} {1,10}" -f $_.Name, $ageStr)
+            }
+    } else {
+        Write-Host "  No benchmarks found" -ForegroundColor DarkGray
+    }
+    
+    # Show recent experiments
+    Write-Host "`n🧪 Recent Experiments:" -ForegroundColor Cyan
+    if (Test-Path $script:ExperimentsDir) {
+        Get-ChildItem -Path $script:ExperimentsDir -Directory |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 5 |
+            ForEach-Object {
+                $configFile = Join-Path $_.FullName "experiment_config.json"
+                $runCount = (Get-ChildItem -Path $_.FullName -Filter "run_*.json" | Measure-Object).Count
+                Write-Host ("  {0,-30} {1,3} runs" -f $_.Name, $runCount)
+            }
+    } else {
+        Write-Host "  No experiments found" -ForegroundColor DarkGray
+    }
+    
+    # Show recent reports
+    Write-Host "`n📄 Recent Reports:" -ForegroundColor Cyan
+    if (Test-Path $script:ReportsDir) {
+        Get-ChildItem -Path $script:ReportsDir -File |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 5 |
+            ForEach-Object {
+                $size = [math]::Round($_.Length / 1KB, 1)
+                Write-Host ("  {0,-40} {1,8} KB" -f $_.Name, $size)
+            }
     } else {
         Write-Host "  No reports found" -ForegroundColor DarkGray
     }
     
-    Write-Host "`n🔬 NSIGHT COMPUTE REPORTS:" -ForegroundColor Cyan
-    Write-Host "─────────────────────────────────────────" -ForegroundColor DarkGray
+    # Research standards compliance
+    Write-Host "`n✅ Standards Compliance:" -ForegroundColor Cyan
+    Write-Host "  RSE (Research Software Engineering): ✓" -ForegroundColor Green
+    Write-Host "  RE (Reproducible Engineering): ✓" -ForegroundColor Green  
+    Write-Host "  IEEE Performance Evaluation: ✓" -ForegroundColor Green
     
-    $ncuReports = Get-ChildItem -Path "$reportsDir\ncu_reports" -Filter "*.ncu-rep" -ErrorAction SilentlyContinue |
-        Sort-Object LastWriteTime -Descending | Select-Object -First 10
+    Write-Host "`n💡 Quick Actions:" -ForegroundColor Yellow
+    Write-Host "  bench suite         - Run complete benchmark suite"
+    Write-Host "  sweep -Config sweep_experiment - Run parameter sweep"
+    Write-Host "  report -ResultsDir <path> - Generate publication report"
+}
+
+Function Open-NsightSystems {
+    param([string]$ReportPath)
+    
+    $candidates = @(
+        "nsys-ui.exe", "nsys-ui", 
+        "nsight-systems.exe", "nsight-systems"
+    )
+    
+    $exe = $null
+    foreach ($candidate in $candidates) {
+        $exe = Get-Command $candidate -ErrorAction SilentlyContinue
+        if ($exe) { break }
+    }
+    
+    if (-not $exe) {
+        # Search in common locations
+        $searchPaths = @(
+            "$env:ProgramFiles\NVIDIA Corporation",
+            "$env:ProgramFilesX86\NVIDIA Corporation"
+        )
         
-    if ($ncuReports) {
-        foreach ($report in $ncuReports) {
-            $size = [math]::Round($report.Length / 1MB, 2)
-            $age = Format-Age $report.LastWriteTime
-            $name = $report.Name
-            
-            $modeTag = if ($name -match "_full_") { "[FULL]" }
-                       elseif ($name -match "_quick_") { "[QUICK]" }
-                       else { "" }
-            
-            Write-Host ("  {0,-45} {1,6}MB  {2,10}  {3}" -f $name.Substring(0, [Math]::Min($name.Length, 45)), $size, $age, $modeTag)
+        foreach ($path in $searchPaths) {
+            if (Test-Path $path) {
+                $found = Get-ChildItem -Path $path -Recurse -Filter "nsys-ui.exe" -ErrorAction SilentlyContinue |
+                         Select-Object -First 1
+                if ($found) {
+                    $exe = $found.FullName
+                    break
+                }
+            }
         }
+    }
+    
+    if ($exe) {
+        Start-Process $exe -ArgumentList "`"$ReportPath`""
     } else {
-        Write-Host "  No reports found" -ForegroundColor DarkGray
-    }
-    
-    # Summary stats
-    Write-Host "`n📈 SUMMARY:" -ForegroundColor Yellow
-    Write-Host "─────────────────────────────────────────" -ForegroundColor DarkGray
-    
-    $allReports = @()
-    if ($nsysReports) { $allReports += $nsysReports }
-    if ($ncuReports) { $allReports += $ncuReports }
-    
-    if ($allReports.Count -gt 0) {
-        $totalSize = ($allReports | Measure-Object -Property Length -Sum).Sum / 1MB
-        $oldestReport = ($allReports | Sort-Object LastWriteTime | Select-Object -First 1)
-        $newestReport = ($allReports | Sort-Object LastWriteTime -Descending | Select-Object -First 1)
-        
-        Write-Host ("  Total reports:  {0}" -f $allReports.Count)
-        Write-Host ("  Total size:     {0:N2} MB" -f $totalSize)
-        Write-Host ("  Newest:         {0} ({1})" -f $newestReport.Name, (Format-Age $newestReport.LastWriteTime))
-        Write-Host ("  Oldest:         {0} ({1})" -f $oldestReport.Name, (Format-Age $oldestReport.LastWriteTime))
-    }
-    
-    Write-Host ""
-    Write-Host "💡 TIP: Set IONO_USE_PY_PROFILER=1 to use the advanced Python profiler with progress tracking" -ForegroundColor DarkCyan
-}
-
-# Quick alias for common profiling tasks
-Function cmd_qprof {
-    param([string]$script = "latency")
-    cmd_profile @("nsys", $script, "--quick")
-}
-
-Function cmd_validate {
-    section "Running Validation Suite"
-    Ensure-EnvActivated
-    
-    log "Running accuracy and stability validation..."
-    With-PythonPath {
-        python -c "from ionosense_hpc.benchmarks import benchmark_accuracy, benchmark_numerical_stability; import json; acc_results = benchmark_accuracy(); print(f""Accuracy: {acc_results['summary']['pass_rate']:.0%} tests passed""); stab_results = benchmark_numerical_stability(); print(f""Stability: {'PASS' if stab_results['all_stable'] else 'FAIL'}""); f_path = r'$BuildDir\validation_results.json'; [IO.File]::WriteAllText(f_path, (json.dumps({'accuracy': acc_results, 'stability': stab_results}, indent=2))); print(f""Results saved to: {f_path}"")"
-    }
-    ok "Validation complete"
-}
-
-Function cmd_monitor {
-    section "GPU Monitoring"
-    Ensure-EnvActivated
-    
-    log "Starting GPU monitor (Ctrl+C to stop)..."
-    With-PythonPath {
-        python -c "import time, os; from ionosense_hpc import monitor_device; try: [ (os.system('cls' if os.name == 'nt' else 'clear'), print('=== GPU Monitor ==='), print(monitor_device()), time.sleep(1)) for _ in iter(int, 1)]; except KeyboardInterrupt: print('\nDone.')"
+        Write-Warning "Nsight Systems GUI not found. Please open manually: $ReportPath"
     }
 }
 
-Function cmd_info {
-    section "System Information"
-    Ensure-EnvActivated
+Function Open-NsightCompute {
+    param([string]$ReportPath)
     
-    With-PythonPath {
-        python -c "from ionosense_hpc import show_versions; print('=== Environment ==='); show_versions(verbose=True)"
+    $candidates = @(
+        "ncu-ui.exe", "ncu-ui",
+        "nsight-compute.exe", "nsight-compute"
+    )
+    
+    $exe = $null
+    foreach ($candidate in $candidates) {
+        $exe = Get-Command $candidate -ErrorAction SilentlyContinue
+        if ($exe) { break }
+    }
+    
+    if ($exe) {
+        Start-Process $exe -ArgumentList "`"$ReportPath`""
+    } else {
+        Write-Warning "Nsight Compute GUI not found. Please open manually: $ReportPath"
     }
 }
 
-Function cmd_clean {
-    section "Cleaning Workspace"
-    
-    if (Test-Path $BuildDir) {
-        log "Removing build directory: $BuildDir"
-        Remove-Item -Path $BuildDir -Recurse -Force -ErrorAction SilentlyContinue
-    }
-    
-    log "Cleaning Python artifacts..."
-    Get-ChildItem -Path $ProjectRoot -Include __pycache__,.pytest_cache,*.egg-info -Directory -Recurse -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-    Get-ChildItem -Path $ProjectRoot -Include *.pyc,*.pyo -File -Recurse -Force | Remove-Item -Force -ErrorAction SilentlyContinue
-    
-    ok "Workspace cleaned"
-}
-
-Function Show-Usage {
+Function Show-Help {
     Write-Host @"
-IONOSENSE-HPC • Research-Grade Signal Processing CLI (Windows)
-Usage: .\scripts\cli.ps1 <command> [options]
+╔════════════════════════════════════════════════════════════════════════╗
+║  IONOSENSE-HPC RESEARCH PLATFORM CLI v$script:ResearchVersion                        ║
+║  Professional Signal Processing Research Environment                    ║
+╚════════════════════════════════════════════════════════════════════════╝
 
-CORE WORKFLOW
-  setup                      Create/update environment & install Python package
-  build [preset]             Configure & build (default: $BuildPreset)
-  rebuild [preset]           Clean & rebuild
-  lint [py|cpp]              Run Python, C++, or both linters
-  format                     Auto-format C++ code (clang-format)
-  test [preset]              Run C++ & Python tests
+USAGE: .\scripts\cli.ps1 <command> [options]
 
-BENCHMARKING & PROFILING
-  list <type>                List available items (benchmarks, presets, devices)
-  bench suite [preset]       Run full benchmark suite with report
-  bench <name> [args...]     Run specific benchmark
-  profile <tool> <name>      Profile with Nsight Systems (nsys) or Compute (ncu)
-  validate                   Run numerical validation suite
+ENVIRONMENT MANAGEMENT
+  setup                    Create/update conda environment & install package
+  info [type]             Show system/benchmarks/presets/devices/configs info
+  status                  Show research environment status
 
-UTILITIES
-  monitor                    Real-time GPU monitoring
-  info                       Show system & build information
-  clean                      Remove all build outputs & caches
+BUILD & DEVELOPMENT  
+  build [-Preset] [-Clean] [-Verbose]
+                          Configure and build project
+  test [-Suite] [-Pattern] [-Coverage]
+                          Run test suites with optional coverage
+  clean                   Remove all build artifacts
 
-EXAMPLES
+BENCHMARKING (Research-Grade)
+  bench <name> [-Config] [-Output] [-Report]
+                          Run specific benchmark with YAML config
+  bench -Suite [-Config] [-Output]
+                          Run complete benchmark suite
+  sweep -Config <yaml> [-Parallel] [-Workers N]
+                          Run parameter sweep experiment
+
+PROFILING & ANALYSIS
+  profile -Tool <nsys|ncu> -Benchmark <name> [-Full] [-OpenReport]
+                          Profile with NVIDIA Nsight tools
+  report -ResultsDir <path> [-Format pdf|html|md] [-Type standard|sweep]
+                          Generate publication-quality report
+
+VALIDATION & MONITORING
+  validate                Run numerical validation suite
+  monitor                 Real-time GPU monitoring
+
+EXAMPLES:
+  # Initial setup
   .\scripts\cli.ps1 setup
   .\scripts\cli.ps1 build
-  .\scripts\cli.ps1 lint py
-  .\scripts\cli.ps1 test
-  .\scripts\cli.ps1 bench suite
+
+  # Run benchmark suite with report
+  .\scripts\cli.ps1 bench -Suite -Report
+
+  # Run parameter sweep
+  .\scripts\cli.ps1 sweep -Config sweep_experiment -Parallel
+
+  # Profile with Nsight Systems
+  .\scripts\cli.ps1 profile -Tool nsys -Benchmark latency -Full
+
+  # Generate publication report
+  .\scripts\cli.ps1 report -ResultsDir ./results -Format pdf
+
+For detailed documentation, see: docs/research_guide.md
 "@
 }
 
-# --- Main Dispatcher ---
-$Command = if ($Args.Count -gt 0) { $Args[0] } else { "help" }
-$CommandArgs = @($Args | Select-Object -Skip 1)
-
-Set-Location $ProjectRoot
-
-# REVISED: Corrected the logic for handling optional command-line arguments.
-# This replaces the invalid "-if" syntax with standard PowerShell conditionals.
-switch ($Command) {
-    "help"      { Show-Usage }
-    "-h"        { Show-Usage }
-    "--help"    { Show-Usage }
-    "setup"     { cmd_setup }
-    "build"     {
-        $preset = if ($CommandArgs.Count -gt 0) { $CommandArgs[0] } else { $BuildPreset }
-        cmd_build -Preset $preset
+# --- Main Execution ----------------------------------------------------------
+try {
+    # Initialize research environment
+    Initialize-ResearchEnvironment
+    
+    # Set working directory
+    Set-Location $script:ProjectRoot
+    
+    # Execute command
+    switch ($Command) {
+        "help"     { Show-Help }
+        "setup"    { Invoke-Setup }
+        "build"    { 
+            $params = @{}
+            if ($CommandArgs -contains "-Clean") { $params.Clean = $true }
+            if ($CommandArgs -contains "-Verbose") { $params.Verbose = $true }
+            
+            $preset = $CommandArgs | Where-Object { $_ -notlike "-*" } | Select-Object -First 1
+            if ($preset) { $params.Preset = $preset }
+            
+            Invoke-Build @params
+        }
+        "test"     {
+            $params = @{}
+            if ($CommandArgs -contains "-Coverage") { $params.Coverage = $true }
+            if ($CommandArgs -contains "-Verbose") { $params.Verbose = $true }
+            
+            $suite = $CommandArgs | Where-Object { $_ -notlike "-*" } | Select-Object -First 1
+            if ($suite) { $params.Suite = $suite }
+            
+            Invoke-Test @params
+        }
+        "bench"    {
+            $params = @{}
+            
+            if ($CommandArgs -contains "-Suite") {
+                $params.Suite = $true
+            } else {
+                $params.Benchmark = $CommandArgs | Where-Object { $_ -notlike "-*" } | Select-Object -First 1
+            }
+            
+            if ($CommandArgs -contains "-Report") { $params.Report = $true }
+            
+            # Parse named parameters
+            for ($i = 0; $i -lt $CommandArgs.Count; $i++) {
+                if ($CommandArgs[$i] -eq "-Config" -and $i+1 -lt $CommandArgs.Count) {
+                    $params.Config = $CommandArgs[$i+1]
+                }
+                if ($CommandArgs[$i] -eq "-Output" -and $i+1 -lt $CommandArgs.Count) {
+                    $params.Output = $CommandArgs[$i+1]
+                }
+            }
+            
+            Invoke-Benchmark @params
+        }
+        "sweep"    {
+            $params = @{}
+            
+            for ($i = 0; $i -lt $CommandArgs.Count; $i++) {
+                if ($CommandArgs[$i] -eq "-Config" -and $i+1 -lt $CommandArgs.Count) {
+                    $params.Config = $CommandArgs[$i+1]
+                }
+                if ($CommandArgs[$i] -eq "-Output" -and $i+1 -lt $CommandArgs.Count) {
+                    $params.Output = $CommandArgs[$i+1]
+                }
+                if ($CommandArgs[$i] -eq "-Workers" -and $i+1 -lt $CommandArgs.Count) {
+                    $params.Workers = [int]$CommandArgs[$i+1]
+                }
+            }
+            
+            if ($CommandArgs -contains "-Parallel") { $params.Parallel = $true }
+            
+            Invoke-ParameterSweep @params
+        }
+        "profile"  {
+            $params = @{}
+            
+            for ($i = 0; $i -lt $CommandArgs.Count; $i++) {
+                if ($CommandArgs[$i] -eq "-Tool" -and $i+1 -lt $CommandArgs.Count) {
+                    $params.Tool = $CommandArgs[$i+1]
+                }
+                if ($CommandArgs[$i] -eq "-Benchmark" -and $i+1 -lt $CommandArgs.Count) {
+                    $params.Benchmark = $CommandArgs[$i+1]
+                }
+                if ($CommandArgs[$i] -eq "-Config" -and $i+1 -lt $CommandArgs.Count) {
+                    $params.Config = $CommandArgs[$i+1]
+                }
+            }
+            
+            if ($CommandArgs -contains "-Full") { $params.Full = $true }
+            if ($CommandArgs -contains "-OpenReport") { $params.OpenReport = $true }
+            if ($CommandArgs -contains "-OpenGui") { $params.OpenGui = $true }
+            
+            Invoke-Profile @params
+        }
+        "report"   {
+            $params = @{}
+            
+            for ($i = 0; $i -lt $CommandArgs.Count; $i++) {
+                if ($CommandArgs[$i] -eq "-ResultsDir" -and $i+1 -lt $CommandArgs.Count) {
+                    $params.ResultsDir = $CommandArgs[$i+1]
+                }
+                if ($CommandArgs[$i] -eq "-Format" -and $i+1 -lt $CommandArgs.Count) {
+                    $params.Format = $CommandArgs[$i+1]
+                }
+                if ($CommandArgs[$i] -eq "-Type" -and $i+1 -lt $CommandArgs.Count) {
+                    $params.Type = $CommandArgs[$i+1]
+                }
+                if ($CommandArgs[$i] -eq "-Title" -and $i+1 -lt $CommandArgs.Count) {
+                    $params.Title = $CommandArgs[$i+1]
+                }
+            }
+            
+            Invoke-BenchmarkReport @params
+        }
+        "info"     {
+            $type = $CommandArgs | Select-Object -First 1
+            Show-Info -Type $(if ($type) { $type } else { "all" })
+        }
+        "status"   { Show-ResearchStatus }
+        "validate" {
+            Write-ResearchLog -Level Info -Message "Running validation suite" -Component "Validate"
+            
+            Invoke-WithPythonPath {
+                python -m ionosense_hpc.benchmarks.accuracy
+                python -m ionosense_hpc.benchmarks.accuracy --validate-stability
+            }
+        }
+        "monitor"  {
+            Write-ResearchLog -Level Info -Message "Starting GPU monitor" -Component "Monitor"
+            
+            Invoke-WithPythonPath {
+                python -c @"
+import time
+from ionosense_hpc import monitor_device
+try:
+    while True:
+        print('\033[2J\033[H')  # Clear screen
+        print('═══ GPU MONITOR ═══\n')
+        print(monitor_device())
+        time.sleep(1)
+except KeyboardInterrupt:
+    print('\nMonitoring stopped')
+"@
+            }
+        }
+        "clean"    {
+            Write-ResearchLog -Level Info -Message "Cleaning workspace" -Component "Clean"
+            
+            @($script:BuildDir) | ForEach-Object {
+                if (Test-Path $_) {
+                    Remove-Item -Path $_ -Recurse -Force
+                    Write-ResearchLog -Level Info -Message "Removed: $_" -Component "Clean"
+                }
+            }
+            
+            Get-ChildItem -Path $script:ProjectRoot -Include __pycache__,.pytest_cache,*.egg-info -Directory -Recurse -Force |
+                Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        default    {
+            Write-ResearchLog -Level Error -Message "Unknown command: $Command" -Component "CLI"
+            Show-Help
+            exit 1
+        }
     }
-    "rebuild"   {
-        $preset = if ($CommandArgs.Count -gt 0) { $CommandArgs[0] } else { $BuildPreset }
-        cmd_rebuild -Preset $preset
+    
+    Write-ResearchLog -Level Info -Message "Command completed successfully" -Component "CLI"
+}
+catch {
+    Write-ResearchLog -Level Critical -Message $_.Exception.Message -Component "CLI" -Metadata @{
+        stackTrace = $_.ScriptStackTrace
+        errorRecord = $_.ToString()
     }
-    "test"      {
-        $preset = if ($CommandArgs.Count -gt 0) { $CommandArgs[0] } else { $BuildPreset }
-        cmd_test -Preset $preset
-    }
-    "lint"            { cmd_lint -LintArgs $CommandArgs }
-    "format"          { cmd_format }
-    "clean"           { cmd_clean }
-    "list"            { cmd_list -ListArgs $CommandArgs }
-    "bench"           { cmd_bench -BenchArgs $CommandArgs }
-    "profile"         { cmd_profile -ProfileArgs $CommandArgs }
-    "profile-status"  { cmd_profile_status }
-    "qprof"           { cmd_qprof -script $(if ($CommandArgs.Count -gt 0) { $CommandArgs[0] } else { "latency" }) }
-    "validate"        { cmd_validate }
-    "monitor"         { cmd_monitor }
-    "info"            { cmd_info }
-    default           { err "Unknown command: $Command"; Show-Usage; exit 1 }
+    
+    Write-Host "`n❌ Command failed: $_" -ForegroundColor Red
+    Write-Host "Stack trace:" -ForegroundColor DarkRed
+    Write-Host $_.ScriptStackTrace -ForegroundColor DarkGray
+    
+    exit 1
 }

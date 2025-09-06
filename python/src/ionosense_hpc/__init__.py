@@ -1,8 +1,10 @@
-"""Ionosense-HPC: High-performance CUDA FFT engine for ULF/VLF signal processing.
+"""Ionosense-HPC: High-performance CUDA FFT engine and benchmarking suite.
 
 This package provides a Python interface to a high-performance CUDA-based
-signal processing engine optimized for real-time dual-channel FFT processing
-with <200μs latency targets.
+signal processing engine, optimized for real-time signal analysis.
+
+It also includes a professional, research-grade benchmarking infrastructure
+for reproducible performance evaluation.
 """
 
 import contextlib
@@ -12,11 +14,19 @@ import sys
 import warnings
 from pathlib import Path
 
+# ============================================================================
+# Version Info & Metadata
+# ============================================================================
+
 # Version info (single source of truth)
 from .__version__ import __version__, __version_info__
 
+__author__ = "Kevin Rahsaz"
+__standards__ = ["RSE", "RE", "IEEE-1057", "IEEE-754"]
+
+
 # ============================================================================
-# DLL Bootstrap for Windows
+# DLL Bootstrap for Windows (MUST RUN BEFORE CORE IMPORTS)
 # ============================================================================
 
 def _bootstrap_windows_dlls():
@@ -60,13 +70,12 @@ def _bootstrap_windows_dlls():
                 os.add_dll_directory(cuda_path)
             break
 
-
 # Run DLL bootstrap immediately
 _bootstrap_windows_dlls()
 
 
 # ============================================================================
-# Core Imports
+# Core Engine Imports
 # ============================================================================
 
 # Import exceptions first (no dependencies)
@@ -87,6 +96,7 @@ from .utils.device import current_device, device_info, gpu_count
 from .utils.signals import make_chirp, make_multitone, make_noise, make_sine
 
 # Import core engine classes (requires _engine module)
+# This block provides graceful failure if the C++ extension isn't built.
 try:
     from .core import Engine, Processor, RawEngine
     _ENGINE_AVAILABLE = True
@@ -120,21 +130,84 @@ except (ImportError, DllLoadError) as e:
 
 
 # ============================================================================
+# Benchmarking Suite Imports
+# ============================================================================
+
+# Note: Assuming benchmark modules are in a 'benchmarks' sub-package.
+# Adjust paths if your structure is different.
+
+# Base infrastructure
+from .benchmarks.base import (
+    BaseBenchmark,
+    BenchmarkConfig,
+    BenchmarkContext,
+    BenchmarkResult,
+    calculate_statistics,
+    load_benchmark_config,
+    save_benchmark_results,
+)
+
+# Benchmark implementations
+from .benchmarks.accuracy import AccuracyBenchmark, AccuracyBenchmarkConfig
+from .benchmarks.latency import (
+    LatencyBenchmark,
+    LatencyBenchmarkConfig,
+    StreamingLatencyBenchmark,
+    run_latency_benchmark_suite,
+)
+from .benchmarks.realtime import RealtimeBenchmark, RealtimeBenchmarkConfig
+from .benchmarks.suite import BenchmarkSuite, SuiteConfig, run_default_suite
+from .benchmarks.sweep import ExperimentConfig, ExperimentRun, ParameterSpec, ParameterSweep
+from .benchmarks.throughput import (
+    MemoryStressBenchmark,
+    ScalingBenchmark,
+    ThroughputBenchmark,
+    ThroughputBenchmarkConfig,
+)
+
+# Reporting and analysis
+from .benchmarks.reporting import BenchmarkReport, ReportConfig, generate_comparative_report
+
+# Benchmark-specific utilities
+from .utils.benchmark_utils import (
+    DataArchiver,
+    DeterministicGenerator,
+    SignalGenerator,
+    ValidationHelper,
+    create_test_signals,
+    validate_benchmark_results,
+)
+
+# Legacy functions for backward compatibility
+from .benchmarks.accuracy import (
+    benchmark_accuracy,
+    benchmark_numerical_stability,
+    benchmark_window_accuracy,
+)
+from .benchmarks.latency import benchmark_jitter, benchmark_latency
+from .benchmarks.realtime import benchmark_realtime
+from .benchmarks.throughput import benchmark_batch_scaling, benchmark_throughput
+
+
+# ============================================================================
 # Public API
 # ============================================================================
 
 __all__ = [
-    # Version
+    # -- Metadata --
     '__version__',
     '__version_info__',
-    # Main classes
+    '__author__',
+    '__standards__',
+
+    # -- Core Engine --
     'Processor',
     'Engine',
     'RawEngine',
-    # Configuration
     'EngineConfig',
     'Presets',
-    # Exceptions
+
+    # -- Core Exceptions --
     'IonosenseError',
     'ConfigError',
     'DeviceNotFoundError',
@@ -142,7 +215,8 @@ __all__ = [
     'EngineStateError',
     'EngineRuntimeError',
     'ValidationError',
-    # Utilities
+
+    # -- Core Utilities --
     'gpu_count',
     'current_device',
     'device_info',
@@ -150,9 +224,63 @@ __all__ = [
     'make_chirp',
     'make_noise',
     'make_multitone',
-    # Helper functions
     'show_versions',
-    'self_test'
+    'self_test',
+
+    # -- Benchmarking Infrastructure --
+    "BaseBenchmark",
+    "BenchmarkConfig",
+    "BenchmarkContext",
+    "BenchmarkResult",
+    "calculate_statistics",
+    "load_benchmark_config",
+    "save_benchmark_results",
+
+    # -- Benchmark Classes --
+    "AccuracyBenchmark",
+    "AccuracyBenchmarkConfig",
+    "LatencyBenchmark",
+    "LatencyBenchmarkConfig",
+    "StreamingLatencyBenchmark",
+    "RealtimeBenchmark",
+    "RealtimeBenchmarkConfig",
+    "ThroughputBenchmark",
+    "ThroughputBenchmarkConfig",
+    "ScalingBenchmark",
+    "MemoryStressBenchmark",
+
+    # -- Benchmarking Orchestration --
+    "BenchmarkSuite",
+    "SuiteConfig",
+    "ParameterSweep",
+    "ExperimentConfig",
+    "ExperimentRun",
+    "ParameterSpec",
+
+    # -- Benchmarking Reporting --
+    "BenchmarkReport",
+    "ReportConfig",
+    "generate_comparative_report",
+
+    # -- Benchmarking Utilities --
+    "DeterministicGenerator",
+    "SignalGenerator",
+    "ValidationHelper",
+    "DataArchiver",
+    "create_test_signals",
+    "validate_benchmark_results",
+
+    # -- Legacy Benchmark Functions --
+    "benchmark_accuracy",
+    "benchmark_latency",
+    "benchmark_jitter",
+    "benchmark_throughput",
+    "benchmark_batch_scaling",
+    "benchmark_realtime",
+    "benchmark_numerical_stability",
+    "benchmark_window_accuracy",
+    "run_latency_benchmark_suite",
+    "run_default_suite",
 ]
 
 
@@ -182,7 +310,8 @@ def show_versions(verbose: bool = True) -> dict:
     # Try to get CUDA version
     if _ENGINE_AVAILABLE:
         try:
-            from .core.raw_engine import RawEngine
+            # Re-import locally to avoid circular dependency issues if called before main import finishes
+            from .core import RawEngine
             engine = RawEngine()
             info = engine.get_runtime_info()
             versions['cuda'] = info.get('cuda_version', 'Unknown')
@@ -287,12 +416,14 @@ def self_test(verbose: bool = True) -> bool:
             print(f"   FAIL: {e}")
         all_passed = False
     finally:
-        proc.reset()
+        # Ensure processor is cleaned up even if tests fail
+        if 'proc' in locals() and proc.is_initialized:
+            proc.reset()
 
     # Test 5: Check for NaN/Inf in output
-    if verbose:
-        print("5. Checking numerical stability...")
     if 'output' in locals():
+        if verbose:
+            print("5. Checking numerical stability...")
         if np.any(np.isnan(output)) or np.any(np.isinf(output)):
             if verbose:
                 print("   FAIL: Output contains NaN or Inf")
@@ -303,10 +434,10 @@ def self_test(verbose: bool = True) -> bool:
 
     if verbose:
         print("-" * 40)
-        if all_passed:
+        if all_passed and _ENGINE_AVAILABLE and gpu_count() > 0:
             print("Self-test PASSED ✓")
         else:
-            print("Self-test completed with warnings")
+            print("Self-test completed with warnings or errors.")
 
     return all_passed
 
@@ -335,4 +466,4 @@ except Exception:
 if hasattr(sys, 'ps1'):  # Interactive mode
     print(f"Ionosense-HPC v{__version__} ready.")
     if not _ENGINE_AVAILABLE:
-        print("Warning: Engine module not available. Run build first.")
+        print(f"Warning: C++ engine module not available ({_ENGINE_ERROR}). Run build first.")

@@ -124,122 +124,68 @@ if (-not $Quiet) {
 }
 
 
-# === repo-aware CLI shortcuts (session-scoped) ===
+# === repo-aware CLI shortcuts (session-scoped, global funcs) ===
 
-# Resolve repo root from this script's location; fallback to CWD
+# Resolve repo root from this script's location; fallback to current dir
 try {
-    $scriptDir   = Split-Path -Parent $MyInvocation.MyCommand.Path
-    $defaultRepo = Resolve-Path (Join-Path $scriptDir '..') -ErrorAction Stop
+    $scriptDir  = Split-Path -Parent $MyInvocation.MyCommand.Path
+    $repoRoot   = Resolve-Path (Join-Path $scriptDir '..') -ErrorAction Stop
 } catch {
-    $defaultRepo = (Get-Location)
+    $repoRoot = Get-Location
 }
 
-$env:IONO_ROOT = "$defaultRepo"
-$script:IONO_CLI = Join-Path $env:IONO_ROOT 'scripts\cli.ps1'
+# Persist paths for this pwsh session
+$global:IONO_ROOT = "$repoRoot"
+$global:IONO_CLI  = Join-Path $global:IONO_ROOT 'scripts\cli.ps1'
 
-function iono {
+function global:iono {
     [CmdletBinding()]
     param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
-    if (-not (Test-Path $script:IONO_CLI)) {
-        Write-Error "cli.ps1 not found at $script:IONO_CLI"
+    if (-not (Test-Path $global:IONO_CLI)) {
+        Write-Error "cli.ps1 not found at $global:IONO_CLI"
         return
     }
-    & $script:IONO_CLI @Args
+    & $global:IONO_CLI @Args
 }
 
-# ----- ergonomic subcommand wrappers (these *prepend* the verb) -----
-function ib {
-    [CmdletBinding()]
-    param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
-    iono build @Args
-}
-function ir {
-    [CmdletBinding()]
-    param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
-    iono rebuild @Args
-}
-function it {
-    [CmdletBinding()]
-    param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
-    iono test @Args
-}
-function iprof {
-    [CmdletBinding()]
-    param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
-    iono profile @Args
-}
-function ibench {
-    [CmdletBinding()]
-    param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
-    iono bench @Args
-}
-function ilint {
-    [CmdletBinding()]
-    param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
-    iono lint @Args
-}
-function ifmt {
-    [CmdletBinding()]
-    param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
-    iono format @Args
-}
-function ival {
-    [CmdletBinding()]
-    param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
-    iono validate @Args
-}
-function imon {
-    [CmdletBinding()]
-    param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
-    iono monitor @Args
-}
-function iinfo {
-    [CmdletBinding()]
-    param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
-    iono info @Args
-}
-function iclean {
-    [CmdletBinding()]
-    param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
-    iono clean @Args
-}
+# Verb wrappers: prepend verb, then forward args (so ib → build, etc.)
+function global:ib     { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono build    @Args }
+function global:ir     { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono rebuild  @Args }
+function global:it     { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono test     @Args }
+function global:ilint  { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono lint     @Args }
+function global:ifmt   { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono format   @Args }
+function global:ibench { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono bench    @Args }
+function global:iprof  { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono profile  @Args }
+function global:ival   { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono validate @Args }
+function global:imon   { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono monitor  @Args }
+function global:iinfo  { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono info     @Args }
+function global:iclean { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono clean    @Args }
 
-# optional: muscle-memory shorthands
-function ibr { ir }         # rebuild (no args)
-function itp { it py }      # python tests
-function itc { it cpp }     # c++ tests
-function ipq { iprof nsys quick }  # nsys quick
-function ipf { iprof nsys full }   # nsys full
+# Optional tiny shorthands
+function global:ibr { ir }                # rebuild (no args)
+function global:itp { it py }             # python tests
+function global:itc { it cpp }            # c++ tests
+function global:ipq { iprof nsys quick }  # nsys quick
+function global:ipf { iprof nsys full }   # nsys full
 
-# ----- completions -----
-$ionoSubcmds = @('setup','build','rebuild','lint','format','test','list','bench','profile','validate','monitor','info','clean')
-$ionoTargets = @('cpp','py','latency','throughput','spectrogram','nsys','ncu','suite','quick','full','windows-rel','--ui','--help')
+# Tab-completion (simple + resilient)
+$global:IonoVerbs   = @('setup','build','rebuild','lint','format','test','list','bench','profile','validate','monitor','info','clean')
+$global:IonoTargets = @('cpp','py','suite','latency','throughput','spectrogram','nsys','ncu','quick','full','windows-rel','--ui','--help')
 
-Register-ArgumentCompleter -CommandName iono,ib,ir,it,iprof,ibench,ilint,ifmt,ival,imon,iinfo,iclean -ScriptBlock {
-    param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-
-    # tokens after the command
+Register-ArgumentCompleter -CommandName iono,ib,ir,it,ilint,ifmt,ibench,iprof,ival,imon,iinfo,iclean -ScriptBlock {
+    param($commandName,$parameterName,$wordToComplete,$commandAst,$fakeBoundParameters)
     $tokens = @()
     foreach ($e in $commandAst.CommandElements) {
         if ($e.Extent.Text -ne $commandName) { $tokens += $e.Extent.Text }
     }
-    # if wrapper (ib/ir/it/...), first token is already the verb; tailor list:
-    $verbForWrapper = @{
-        ib='build'; ir='rebuild'; it='test'; iprof='profile'; ibench='bench'; ilint='lint'; ifmt='format'; ival='validate'; imon='monitor'; iinfo='info'; iclean='clean'
-    }[$commandName]
-
-    $list = if ($verbForWrapper) {
-        # completing args for a fixed verb
-        $using:ionoTargets + $using:ionoSubcmds
-    } elseif ($tokens.Count -eq 0) {
-        $using:ionoSubcmds
+    if ($commandName -eq 'iono' -and $tokens.Count -eq 0) {
+        $list = $global:IonoVerbs
     } else {
-        $using:ionoTargets + $using:ionoSubcmds
+        $list = $global:IonoTargets + $global:IonoVerbs
     }
-
-    $list |
-      Where-Object { $_ -like "$wordToComplete*" } |
-      ForEach-Object {
-          [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
-      }
+    foreach ($it in $list) {
+        if ($it -like "$wordToComplete*") {
+            [System.Management.Automation.CompletionResult]::new($it,$it,'ParameterValue',$it)
+        }
+    }
 }

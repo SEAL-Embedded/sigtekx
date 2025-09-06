@@ -108,3 +108,4 @@ vgcore.*
 *.tmp
 *.swp
 *.swo
+.ionosense/
