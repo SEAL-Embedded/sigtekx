@@ -170,6 +170,14 @@ if(IONO_WITH_PYTHON)
         message(STATUS "[ionosense] Found CUDArt DLL(s): ${CUDART_DLLS}")
 
         add_custom_command(TARGET _engine POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${CUFFT_DLLS}
+                ${CUDART_DLLS}
+                ${_LIBS_DIR}
+            COMMENT "[ionosense] Staging CUDA runtime DLLs to ${_LIBS_DIR}"
+        )
+
+        add_custom_command(TARGET _engine POST_BUILD
             COMMAND ${Python3_EXECUTABLE} -c "import sys; sys.path.insert(0, '${CMAKE_CURRENT_SOURCE_DIR}/python'); import ionosense_hpc; print('[ionosense] Python extension import validated successfully.')"
             COMMENT "[ionosense] Validating Python extension import"
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
