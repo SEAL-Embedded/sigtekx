@@ -198,5 +198,5 @@ PYBIND11_MODULE(_engine, m) {
   m.def("select_best_device", &ionosense::engine_utils::select_best_device,
         "Selects the best available CUDA device.");
 
-  m.attr("__version__") = "1.0.0";
+  m.attr("__version__") = "0.8.0";
 }
