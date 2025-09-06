@@ -8,10 +8,9 @@ for reproducible research following RSE/RE standards.
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Self
+from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-
 
 # ============================================================================
 # Core Engine Configuration
@@ -98,17 +97,17 @@ class EngineConfig(BaseModel):
     # =====================================================================
     # RESEARCH METADATA (NEW)
     # =====================================================================
-    experiment_id: Optional[str] = Field(
+    experiment_id: str | None = Field(
         default=None,
         description="Unique identifier for research experiment."
     )
 
-    tags: List[str] = Field(
+    tags: list[str] = Field(
         default_factory=list,
         description="Tags for categorizing configurations."
     )
 
-    notes: Optional[str] = Field(
+    notes: str | None = Field(
         default=None,
         description="Free-form notes about this configuration."
     )
@@ -182,7 +181,7 @@ class EngineConfig(BaseModel):
         total_bytes = (bytes_per_input + bytes_per_output) * self.pinned_buffer_count * 3
         return total_bytes / (1024 * 1024)
 
-    def to_experiment_dict(self) -> Dict[str, Any]:
+    def to_experiment_dict(self) -> dict[str, Any]:
         """Export configuration with experiment metadata."""
         base_dict = self.model_dump()
         base_dict['_metadata'] = {
@@ -222,17 +221,17 @@ class ExperimentMetadata(BaseModel):
         description="Human-readable experiment name."
     )
 
-    description: Optional[str] = Field(
+    description: str | None = Field(
         default=None,
         description="Detailed experiment description."
     )
 
-    researcher: Optional[str] = Field(
+    researcher: str | None = Field(
         default=None,
         description="Name or ID of the researcher."
     )
 
-    project: Optional[str] = Field(
+    project: str | None = Field(
         default=None,
         description="Associated project or grant."
     )
@@ -242,12 +241,12 @@ class ExperimentMetadata(BaseModel):
         description="Experiment creation timestamp."
     )
 
-    tags: List[str] = Field(
+    tags: list[str] = Field(
         default_factory=list,
         description="Tags for categorization and search."
     )
 
-    standards: List[str] = Field(
+    standards: list[str] = Field(
         default_factory=lambda: ["RSE", "RE", "IEEE"],
         description="Compliance standards followed."
     )
@@ -257,27 +256,27 @@ class ExperimentMetadata(BaseModel):
         description="Experiment schema version."
     )
 
-    dependencies: Dict[str, str] = Field(
+    dependencies: dict[str, str] = Field(
         default_factory=dict,
         description="Software dependencies and versions."
     )
 
-    hardware_requirements: Dict[str, Any] = Field(
+    hardware_requirements: dict[str, Any] = Field(
         default_factory=dict,
         description="Required hardware specifications."
     )
 
-    related_experiments: List[str] = Field(
+    related_experiments: list[str] = Field(
         default_factory=list,
         description="IDs of related experiments."
     )
 
-    publications: List[str] = Field(
+    publications: list[str] = Field(
         default_factory=list,
         description="Related publications or reports."
     )
 
-    data_sources: List[str] = Field(
+    data_sources: list[str] = Field(
         default_factory=list,
         description="Input data sources or datasets."
     )
@@ -295,22 +294,22 @@ class ResearchConfig(BaseModel):
         description="Experiment metadata for reproducibility."
     )
 
-    engine_configs: Dict[str, EngineConfig] = Field(
+    engine_configs: dict[str, EngineConfig] = Field(
         default_factory=dict,
         description="Named engine configurations for the experiment."
     )
 
-    benchmark_configs: Dict[str, Dict[str, Any]] = Field(
+    benchmark_configs: dict[str, dict[str, Any]] = Field(
         default_factory=dict,
         description="Benchmark-specific configurations."
     )
 
-    parameter_sweeps: List[Dict[str, Any]] = Field(
+    parameter_sweeps: list[dict[str, Any]] = Field(
         default_factory=list,
         description="Parameter sweep specifications."
     )
 
-    output_settings: Dict[str, Any] = Field(
+    output_settings: dict[str, Any] = Field(
         default_factory=lambda: {
             "save_raw_data": True,
             "save_intermediate": True,
@@ -320,7 +319,7 @@ class ResearchConfig(BaseModel):
         description="Output and storage settings."
     )
 
-    reproducibility: Dict[str, Any] = Field(
+    reproducibility: dict[str, Any] = Field(
         default_factory=lambda: {
             "seed": 42,
             "deterministic": True,
@@ -330,7 +329,7 @@ class ResearchConfig(BaseModel):
         description="Reproducibility settings."
     )
 
-    analysis_settings: Dict[str, Any] = Field(
+    analysis_settings: dict[str, Any] = Field(
         default_factory=lambda: {
             "confidence_level": 0.95,
             "outlier_threshold": 3.0,
@@ -340,7 +339,7 @@ class ResearchConfig(BaseModel):
         description="Statistical analysis settings."
     )
 
-    reporting: Dict[str, Any] = Field(
+    reporting: dict[str, Any] = Field(
         default_factory=lambda: {
             "generate_report": True,
             "format": "pdf",
@@ -370,19 +369,19 @@ class ResearchConfig(BaseModel):
         """Save configuration to file with checksums."""
         import hashlib
         import json
-        
+
         data = self.model_dump()
-        
+
         # Add checksum for integrity
         content = json.dumps(data, sort_keys=True, indent=2)
         checksum = hashlib.sha256(content.encode()).hexdigest()
-        
+
         data['_integrity'] = {
             'checksum': checksum,
             'algorithm': 'sha256',
             'timestamp': datetime.now().isoformat()
         }
-        
+
         with open(path, 'w') as f:
             json.dump(data, f, indent=2, default=str)
 
@@ -391,17 +390,17 @@ class ResearchConfig(BaseModel):
         """Load configuration from file with optional verification."""
         import hashlib
         import json
-        
+
         with open(path) as f:
             data = json.load(f)
-        
+
         if verify and '_integrity' in data:
             integrity = data.pop('_integrity')
-            
+
             # Verify checksum
             content = json.dumps(data, sort_keys=True, indent=2)
             checksum = hashlib.sha256(content.encode()).hexdigest()
-            
+
             if checksum != integrity['checksum']:
                 from ionosense_hpc.exceptions import DataIntegrityError
                 raise DataIntegrityError(
@@ -409,7 +408,7 @@ class ResearchConfig(BaseModel):
                     expected_hash=integrity['checksum'],
                     actual_hash=checksum
                 )
-        
+
         return cls(**data)
 
 
@@ -439,7 +438,7 @@ class StageConfig(BaseModel):
         description="Whether this stage is enabled."
     )
 
-    parameters: Dict[str, Any] = Field(
+    parameters: dict[str, Any] = Field(
         default_factory=dict,
         description="Stage-specific parameters."
     )
@@ -473,7 +472,7 @@ class PipelineConfig(BaseModel):
         description="Pipeline name."
     )
 
-    stages: List[StageConfig] = Field(
+    stages: list[StageConfig] = Field(
         default_factory=lambda: [
             StageConfig(stage_type=StageType.WINDOW),
             StageConfig(stage_type=StageType.FFT),
@@ -498,16 +497,16 @@ class PipelineConfig(BaseModel):
 
     @field_validator('stages')
     @classmethod
-    def validate_stage_order(cls, v: List[StageConfig]) -> List[StageConfig]:
+    def validate_stage_order(cls, v: list[StageConfig]) -> list[StageConfig]:
         """Validate that stages are in a valid order."""
         # FFT must come before MAGNITUDE or PHASE
         fft_index = next((i for i, s in enumerate(v) if s.stage_type == StageType.FFT), -1)
         mag_index = next((i for i, s in enumerate(v) if s.stage_type == StageType.MAGNITUDE), -1)
         phase_index = next((i for i, s in enumerate(v) if s.stage_type == StageType.PHASE), -1)
-        
+
         if mag_index >= 0 and fft_index >= 0 and mag_index < fft_index:
             raise ValueError("MAGNITUDE stage must come after FFT stage")
         if phase_index >= 0 and fft_index >= 0 and phase_index < fft_index:
             raise ValueError("PHASE stage must come after FFT stage")
-        
+
         return v

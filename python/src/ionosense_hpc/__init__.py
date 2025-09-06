@@ -17,7 +17,6 @@ from pathlib import Path
 # ============================================================================
 # Version Info & Metadata
 # ============================================================================
-
 # Version info (single source of truth)
 from .__version__ import __version__, __version_info__
 
@@ -137,6 +136,15 @@ except (ImportError, DllLoadError) as e:
 # Adjust paths if your structure is different.
 
 # Base infrastructure
+# Benchmark implementations
+# Legacy functions for backward compatibility
+from .benchmarks.accuracy import (
+    AccuracyBenchmark,
+    AccuracyBenchmarkConfig,
+    benchmark_accuracy,
+    benchmark_numerical_stability,
+    benchmark_window_accuracy,
+)
 from .benchmarks.base import (
     BaseBenchmark,
     BenchmarkConfig,
@@ -146,16 +154,18 @@ from .benchmarks.base import (
     load_benchmark_config,
     save_benchmark_results,
 )
-
-# Benchmark implementations
-from .benchmarks.accuracy import AccuracyBenchmark, AccuracyBenchmarkConfig
 from .benchmarks.latency import (
     LatencyBenchmark,
     LatencyBenchmarkConfig,
     StreamingLatencyBenchmark,
+    benchmark_jitter,
+    benchmark_latency,
     run_latency_benchmark_suite,
 )
-from .benchmarks.realtime import RealtimeBenchmark, RealtimeBenchmarkConfig
+from .benchmarks.realtime import RealtimeBenchmark, RealtimeBenchmarkConfig, benchmark_realtime
+
+# Reporting and analysis
+from .benchmarks.reporting import BenchmarkReport, ReportConfig, generate_comparative_report
 from .benchmarks.suite import BenchmarkSuite, SuiteConfig, run_default_suite
 from .benchmarks.sweep import ExperimentConfig, ExperimentRun, ParameterSpec, ParameterSweep
 from .benchmarks.throughput import (
@@ -163,10 +173,9 @@ from .benchmarks.throughput import (
     ScalingBenchmark,
     ThroughputBenchmark,
     ThroughputBenchmarkConfig,
+    benchmark_batch_scaling,
+    benchmark_throughput,
 )
-
-# Reporting and analysis
-from .benchmarks.reporting import BenchmarkReport, ReportConfig, generate_comparative_report
 
 # Benchmark-specific utilities
 from .utils.benchmark_utils import (
@@ -177,17 +186,6 @@ from .utils.benchmark_utils import (
     create_test_signals,
     validate_benchmark_results,
 )
-
-# Legacy functions for backward compatibility
-from .benchmarks.accuracy import (
-    benchmark_accuracy,
-    benchmark_numerical_stability,
-    benchmark_window_accuracy,
-)
-from .benchmarks.latency import benchmark_jitter, benchmark_latency
-from .benchmarks.realtime import benchmark_realtime
-from .benchmarks.throughput import benchmark_batch_scaling, benchmark_throughput
-
 
 # ============================================================================
 # Public API

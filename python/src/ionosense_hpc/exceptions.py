@@ -5,7 +5,7 @@ Enhanced with research-specific exceptions for benchmarking,
 experiments, and reproducibility following RSE/RE standards.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 class IonosenseError(Exception):
@@ -114,7 +114,7 @@ class EngineRuntimeError(IonosenseError):
 
 class BenchmarkError(IonosenseError):
     """Base class for benchmark-related errors."""
-    
+
     def __init__(self, message: str, benchmark_name: str | None = None, **kwargs):
         super().__init__(message, benchmark_name=benchmark_name, **kwargs)
         self.benchmark_name = benchmark_name
@@ -122,7 +122,7 @@ class BenchmarkError(IonosenseError):
 
 class BenchmarkTimeoutError(BenchmarkError):
     """Benchmark iteration exceeded timeout."""
-    
+
     def __init__(self, benchmark_name: str, iteration: int, timeout_s: float):
         message = f"Benchmark '{benchmark_name}' iteration {iteration} exceeded {timeout_s}s timeout"
         hint = "Consider increasing timeout or optimizing the benchmark"
@@ -131,8 +131,8 @@ class BenchmarkTimeoutError(BenchmarkError):
 
 class BenchmarkValidationError(BenchmarkError):
     """Benchmark results failed validation."""
-    
-    def __init__(self, benchmark_name: str, reason: str, metrics: Dict[str, Any] | None = None):
+
+    def __init__(self, benchmark_name: str, reason: str, metrics: dict[str, Any] | None = None):
         message = f"Benchmark '{benchmark_name}' failed validation: {reason}"
         hint = "Check benchmark configuration and system performance"
         super().__init__(message, benchmark_name, reason=reason, metrics=metrics, hint=hint)
@@ -142,7 +142,7 @@ class BenchmarkValidationError(BenchmarkError):
 
 class ExperimentError(IonosenseError):
     """Base class for experiment-related errors."""
-    
+
     def __init__(self, message: str, experiment_id: str | None = None, **kwargs):
         super().__init__(message, experiment_id=experiment_id, **kwargs)
         self.experiment_id = experiment_id
@@ -150,7 +150,7 @@ class ExperimentError(IonosenseError):
 
 class ParameterSweepError(ExperimentError):
     """Error during parameter sweep execution."""
-    
+
     def __init__(self, message: str, parameter: str | None = None, value: Any = None, **kwargs):
         hint = None
         if parameter:
@@ -164,7 +164,7 @@ class ParameterSweepError(ExperimentError):
 
 class ReproducibilityError(IonosenseError):
     """Error related to research reproducibility."""
-    
+
     def __init__(self, message: str, missing_info: list[str] | None = None, **kwargs):
         hint = None
         if missing_info:
@@ -175,19 +175,19 @@ class ReproducibilityError(IonosenseError):
 
 class EnvironmentMismatchError(ReproducibilityError):
     """Environment doesn't match expected configuration for reproduction."""
-    
-    def __init__(self, expected: Dict[str, Any], actual: Dict[str, Any]):
+
+    def __init__(self, expected: dict[str, Any], actual: dict[str, Any]):
         differences = []
         for key in expected:
             if key in actual and expected[key] != actual[key]:
                 differences.append(f"{key}: expected={expected[key]}, actual={actual[key]}")
-        
+
         message = "Environment mismatch detected"
         if differences:
             message += f": {'; '.join(differences[:3])}"  # Show first 3 differences
             if len(differences) > 3:
                 message += f" (and {len(differences)-3} more)"
-        
+
         super().__init__(message, expected=expected, actual=actual, differences=differences)
         self.expected = expected
         self.actual = actual
@@ -196,7 +196,7 @@ class EnvironmentMismatchError(ReproducibilityError):
 
 class DataIntegrityError(IonosenseError):
     """Data corruption or integrity check failure."""
-    
+
     def __init__(self, message: str, expected_hash: str | None = None, actual_hash: str | None = None):
         hint = "Data may be corrupted or modified"
         if expected_hash and actual_hash:
@@ -212,7 +212,7 @@ class DataIntegrityError(IonosenseError):
 
 class AnalysisError(IonosenseError):
     """Error during result analysis."""
-    
+
     def __init__(self, message: str, analysis_type: str | None = None, **kwargs):
         super().__init__(message, analysis_type=analysis_type, **kwargs)
         self.analysis_type = analysis_type
@@ -220,7 +220,7 @@ class AnalysisError(IonosenseError):
 
 class ReportGenerationError(IonosenseError):
     """Error generating benchmark report."""
-    
+
     def __init__(self, message: str, report_format: str | None = None, **kwargs):
         hint = None
         if report_format == "pdf":
@@ -233,7 +233,7 @@ class ReportGenerationError(IonosenseError):
 
 class InsufficientDataError(AnalysisError):
     """Not enough data for statistical analysis."""
-    
+
     def __init__(self, required: int, actual: int, analysis_type: str | None = None):
         message = f"Insufficient data: need {required} samples, got {actual}"
         hint = "Increase number of iterations or check data collection"
@@ -248,7 +248,7 @@ class InsufficientDataError(AnalysisError):
 
 class WorkflowError(IonosenseError):
     """Error in research workflow execution."""
-    
+
     def __init__(self, message: str, workflow_stage: str | None = None, **kwargs):
         super().__init__(message, workflow_stage=workflow_stage, **kwargs)
         self.workflow_stage = workflow_stage
@@ -256,7 +256,7 @@ class WorkflowError(IonosenseError):
 
 class DependencyError(WorkflowError):
     """Required dependency not met."""
-    
+
     def __init__(self, message: str, missing_dependencies: list[str] | None = None):
         hint = None
         if missing_dependencies:
@@ -267,19 +267,19 @@ class DependencyError(WorkflowError):
 
 class ResourceExhaustedError(IonosenseError):
     """System resource exhausted (memory, disk, etc.)."""
-    
+
     def __init__(self, resource_type: str, required: Any = None, available: Any = None):
         message = f"{resource_type} exhausted"
         if required and available:
             message += f": required {required}, available {available}"
-        
+
         hint = None
         if resource_type.lower() == "gpu memory":
             hint = "Reduce batch size or nfft"
         elif resource_type.lower() == "disk space":
             hint = "Clean up old results or increase storage"
-            
-        super().__init__(message, hint=hint, resource_type=resource_type, 
+
+        super().__init__(message, hint=hint, resource_type=resource_type,
                         required=required, available=available)
         self.resource_type = resource_type
         self.required = required

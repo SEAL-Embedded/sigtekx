@@ -7,10 +7,9 @@ benchmark infrastructure following RSE best practices.
 """
 
 import json
-import tempfile
 from collections.abc import Generator
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 import numpy as np
 import pytest
@@ -24,7 +23,6 @@ from ionosense_hpc.benchmarks.base import (
 from ionosense_hpc.config import EngineConfig, Presets
 from ionosense_hpc.core import Processor
 from ionosense_hpc.utils import make_test_batch
-
 
 # ============================================================================
 # Directory Management
@@ -43,12 +41,12 @@ def temp_benchmark_dir(tmp_path: Path) -> Path:
     """Creates a temporary directory structure for benchmark results."""
     bench_dir = tmp_path / "benchmark_results"
     bench_dir.mkdir(exist_ok=True)
-    
+
     # Create subdirectories
     (bench_dir / "results").mkdir(exist_ok=True)
     (bench_dir / "reports").mkdir(exist_ok=True)
     (bench_dir / "experiments").mkdir(exist_ok=True)
-    
+
     return bench_dir
 
 
@@ -100,7 +98,7 @@ def sample_benchmark_result(
 ) -> BenchmarkResult:
     """Provides a sample benchmark result for testing."""
     measurements = np.random.randn(100) * 10 + 100  # Mean ~100, std ~10
-    
+
     return BenchmarkResult(
         name="test_result",
         config=benchmark_base_config.model_dump(),
@@ -131,11 +129,11 @@ def yaml_benchmark_config(temp_data_dir: Path) -> Path:
             {"type": "noise", "noise_type": "white"}
         ]
     }
-    
+
     config_path = temp_data_dir / "benchmark_config.yaml"
     with open(config_path, 'w') as f:
         yaml.dump(config, f)
-    
+
     return config_path
 
 
@@ -164,11 +162,11 @@ def yaml_sweep_config(temp_data_dir: Path) -> Path:
             "warmup_iterations": 2
         }
     }
-    
+
     config_path = temp_data_dir / "sweep_config.yaml"
     with open(config_path, 'w') as f:
         yaml.dump(config, f)
-    
+
     return config_path
 
 
@@ -189,28 +187,28 @@ def test_processor(validation_config: EngineConfig) -> Generator[Processor, None
 @pytest.fixture
 def mock_processor(monkeypatch) -> Processor:
     """Provides a mock processor that doesn't require GPU."""
-    
+
     class MockProcessor:
         def __init__(self, config=None):
             self.config = config or Presets.validation()
             self._initialized = False
-            
+
         def initialize(self):
             self._initialized = True
-            
+
         def process(self, data):
             # Return mock FFT output
             batch = self.config.batch
             bins = self.config.num_output_bins
             return np.random.randn(batch, bins).astype(np.float32)
-            
+
         def reset(self):
             self._initialized = False
-            
+
         @property
         def is_initialized(self):
             return self._initialized
-    
+
     monkeypatch.setattr("ionosense_hpc.core.Processor", MockProcessor)
     return MockProcessor()
 
@@ -245,10 +243,10 @@ def test_batch_data() -> np.ndarray:
 
 
 @pytest.fixture
-def test_signal_suite(seeded_rng: np.random.Generator) -> Dict[str, np.ndarray]:
+def test_signal_suite(seeded_rng: np.random.Generator) -> dict[str, np.ndarray]:
     """Provides a comprehensive suite of test signals."""
     from ionosense_hpc.utils.benchmark_utils import SignalGenerator
-    
+
     gen = SignalGenerator(seed=42)
     return gen.generate_test_suite(nfft=1024, sample_rate=48000)
 
@@ -277,7 +275,7 @@ def mock_device_info() -> dict:
 def mock_benchmark_results(temp_benchmark_dir: Path) -> List[Path]:
     """Creates mock benchmark result files for testing reporting."""
     results = []
-    
+
     for i in range(3):
         result = {
             "name": f"benchmark_{i}",
@@ -291,13 +289,13 @@ def mock_benchmark_results(temp_benchmark_dir: Path) -> List[Path]:
             },
             "passed": True
         }
-        
+
         result_path = temp_benchmark_dir / "results" / f"result_{i}.json"
         with open(result_path, 'w') as f:
             json.dump(result, f)
-        
+
         results.append(result_path)
-    
+
     return results
 
 
@@ -354,7 +352,7 @@ def skip_without_gpu(gpu_available: bool) -> None:
 def require_nsight() -> None:
     """Skip test if NVIDIA Nsight tools are not available."""
     import shutil
-    
+
     if not shutil.which('nsys') and not shutil.which('ncu'):
         pytest.skip("NVIDIA Nsight tools required")
 
@@ -367,24 +365,24 @@ def require_nsight() -> None:
 def benchmark_runner(temp_benchmark_dir: Path):
     """Provides a configured benchmark runner for testing."""
     from ionosense_hpc.benchmarks.base import BaseBenchmark
-    
+
     class TestBenchmark(BaseBenchmark):
         def setup(self):
             self.data = np.random.randn(100)
-            
+
         def execute_iteration(self):
             return float(np.mean(self.data) + np.random.randn() * 0.1)
-            
+
         def teardown(self):
             self.data = None
-    
+
     config = BenchmarkConfig(
         name="test_runner",
         iterations=10,
         warmup_iterations=2,
         output_format="json"
     )
-    
+
     return TestBenchmark(config)
 
 
@@ -392,7 +390,7 @@ def benchmark_runner(temp_benchmark_dir: Path):
 def parameter_sweep_runner(yaml_sweep_config: Path, temp_benchmark_dir: Path):
     """Provides a configured parameter sweep for testing."""
     from ionosense_hpc.benchmarks.sweep import ParameterSweep
-    
+
     sweep = ParameterSweep(str(yaml_sweep_config))
     sweep.config.output_dir = str(temp_benchmark_dir / "experiments")
     return sweep
@@ -432,7 +430,7 @@ def data_archiver(temp_benchmark_dir: Path):
 # ============================================================================
 
 @pytest.fixture
-def research_metadata() -> Dict[str, Any]:
+def research_metadata() -> dict[str, Any]:
     """Provides standard research metadata for experiments."""
     return {
         "experiment_id": "exp_20250101_000000",
@@ -445,7 +443,7 @@ def research_metadata() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def experiment_config(research_metadata: Dict[str, Any], temp_benchmark_dir: Path):
+def experiment_config(research_metadata: dict[str, Any], temp_benchmark_dir: Path):
     """Provides a complete experiment configuration."""
     return {
         "metadata": research_metadata,
@@ -465,4 +463,3 @@ def experiment_config(research_metadata: Dict[str, Any], temp_benchmark_dir: Pat
     }
 
 
-from typing import List

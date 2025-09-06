@@ -5,7 +5,7 @@ Numerical accuracy validation benchmark following IEEE standards.
 Upgraded to use BaseBenchmark framework for research-grade validation.
 """
 
-from typing import Any, Dict, List
+from typing import Any
 
 import numpy as np
 from scipy import signal as scipy_signal
@@ -19,28 +19,28 @@ from ionosense_hpc.utils import logger, make_chirp, make_multitone, make_noise, 
 
 class AccuracyBenchmarkConfig(BenchmarkConfig):
     """Configuration for accuracy validation benchmark."""
-    
+
     # Accuracy parameters
     absolute_tolerance: float = 1e-6
     relative_tolerance: float = 1e-5
     snr_threshold_db: float = 60.0
     phase_tolerance_deg: float = 1.0
-    
+
     # Test signal specifications
-    test_signals: List[Dict] = None
-    test_frequencies: List[float] = None  # For spectral tests
-    
+    test_signals: list[dict] = None
+    test_frequencies: list[float] = None  # For spectral tests
+
     # Validation types
     validate_parseval: bool = True  # Energy conservation
     validate_linearity: bool = True  # Superposition principle
     validate_time_invariance: bool = True
     validate_numerical_stability: bool = True
     validate_window_accuracy: bool = True
-    
+
     # Reference settings
     use_double_precision_reference: bool = True
     reference_implementation: str = "scipy"  # scipy, numpy, or custom
-    
+
     def __post_init__(self):
         """Set default test signals if not provided."""
         if self.test_signals is None:
@@ -64,19 +64,19 @@ class AccuracyBenchmark(BaseBenchmark):
     against known reference implementations, tests fundamental signal
     processing properties, and ensures IEEE-754 compliance.
     """
-    
+
     def __init__(self, config: AccuracyBenchmarkConfig | dict | None = None):
         """Initialize accuracy benchmark."""
         if isinstance(config, dict):
             config = AccuracyBenchmarkConfig(**config)
         super().__init__(config or AccuracyBenchmarkConfig(name="Accuracy"))
         self.config: AccuracyBenchmarkConfig = self.config
-        
+
         self.processor = None
         self.engine_config = None
         self.test_results = []
         self.validation_errors = []
-        
+
     def setup(self) -> None:
         """Initialize processor and prepare test signals."""
         # Get engine configuration
@@ -84,17 +84,17 @@ class AccuracyBenchmark(BaseBenchmark):
             self.engine_config = EngineConfig(**self.config.engine_config)
         else:
             self.engine_config = Presets.validation()
-            
+
         # Initialize processor
         self.processor = Processor(self.engine_config)
         self.processor.initialize()
-        
-        logger.info(f"Accuracy benchmark initialized:")
+
+        logger.info("Accuracy benchmark initialized:")
         logger.info(f"  Engine config: {self.engine_config}")
         logger.info(f"  Tolerance: rel={self.config.relative_tolerance}, "
                    f"abs={self.config.absolute_tolerance}")
         logger.info(f"  Test signals: {len(self.config.test_signals)}")
-        
+
     def execute_iteration(self) -> dict[str, float]:
         """Execute one complete accuracy validation suite."""
         metrics = {
@@ -105,47 +105,47 @@ class AccuracyBenchmark(BaseBenchmark):
             'max_error': 0,
             'mean_snr_db': 0
         }
-        
+
         errors = []
         snrs = []
-        
+
         # Test each signal type
         for signal_spec in self.config.test_signals:
             test_name = f"{signal_spec['type']}_{signal_spec.get('frequency', '')}"
-            
+
             # Generate test signal
             test_data = self._generate_test_signal(signal_spec)
-            
+
             # Process with engine
             gpu_output = self.processor.process(test_data)
-            
+
             # Compute reference
             ref_output = self._compute_reference_fft(test_data)
-            
+
             # Compare results
             comparison = self._compare_spectra(gpu_output, ref_output)
-            
+
             # Store results
             self.test_results.append({
                 'signal': signal_spec,
                 'comparison': comparison,
                 'passed': comparison['passed']
             })
-            
+
             metrics['total_tests'] += 1
             if comparison['passed']:
                 metrics['passed_tests'] += 1
             else:
                 metrics['failed_tests'] += 1
                 self.validation_errors.append(f"{test_name}: {comparison['error_reason']}")
-                
+
             errors.append(comparison['mean_error'])
             snrs.append(comparison['snr_db'])
-            
+
             if self.config.verbose:
                 status = "PASS" if comparison['passed'] else "FAIL"
                 logger.debug(f"  {test_name}: {status} (SNR={comparison['snr_db']:.1f}dB)")
-                
+
         # Additional validation tests
         if self.config.validate_parseval:
             parseval_result = self._test_parseval_theorem()
@@ -154,7 +154,7 @@ class AccuracyBenchmark(BaseBenchmark):
                 metrics['passed_tests'] += 1
             else:
                 metrics['failed_tests'] += 1
-                
+
         if self.config.validate_linearity:
             linearity_result = self._test_linearity()
             metrics['total_tests'] += 1
@@ -162,7 +162,7 @@ class AccuracyBenchmark(BaseBenchmark):
                 metrics['passed_tests'] += 1
             else:
                 metrics['failed_tests'] += 1
-                
+
         if self.config.validate_window_accuracy:
             window_result = self._test_window_function()
             metrics['total_tests'] += 1
@@ -170,35 +170,35 @@ class AccuracyBenchmark(BaseBenchmark):
                 metrics['passed_tests'] += 1
             else:
                 metrics['failed_tests'] += 1
-                
+
         # Calculate summary metrics
         if errors:
             metrics['mean_error'] = float(np.mean(errors))
             metrics['max_error'] = float(np.max(errors))
-            
+
         if snrs:
             metrics['mean_snr_db'] = float(np.mean(snrs))
             metrics['min_snr_db'] = float(np.min(snrs))
-            
+
         metrics['pass_rate'] = metrics['passed_tests'] / max(1, metrics['total_tests'])
-        
+
         return metrics
-        
+
     def teardown(self) -> None:
         """Clean up resources."""
         if self.processor:
             self.processor.reset()
             self.processor = None
-            
-    def _generate_test_signal(self, spec: Dict[str, Any]) -> np.ndarray:
+
+    def _generate_test_signal(self, spec: dict[str, Any]) -> np.ndarray:
         """Generate test signal based on specification."""
         nfft = self.engine_config.nfft
         batch = self.engine_config.batch
         sample_rate = self.engine_config.sample_rate_hz
         duration = nfft / sample_rate
-        
+
         signal_type = spec['type']
-        
+
         if signal_type == 'sine':
             signal = make_sine(
                 spec['frequency'], duration, sample_rate,
@@ -230,64 +230,64 @@ class AccuracyBenchmark(BaseBenchmark):
             signal = signal.astype(np.float32)
         else:
             signal = np.zeros(nfft, dtype=np.float32)
-            
+
         # Tile for batch processing
         return np.tile(signal, batch)
-        
+
     def _compute_reference_fft(self, data: np.ndarray) -> np.ndarray:
         """Compute reference FFT using scipy."""
         data = data.reshape(self.engine_config.batch, self.engine_config.nfft)
-        
+
         # Use double precision for reference if configured
         if self.config.use_double_precision_reference:
             data = data.astype(np.float64)
-            
+
         # Apply window (matching engine configuration)
         window = scipy_signal.windows.hann(self.engine_config.nfft, sym=False)
         data_windowed = data * window
-        
+
         # Compute FFT
         fft_result = rfft(data_windowed, axis=1)
-        
+
         # Convert to magnitude and scale
         magnitude = np.abs(fft_result) / self.engine_config.nfft
-        
+
         return magnitude.astype(np.float32)
-        
+
     def _compare_spectra(
-        self, 
-        gpu_output: np.ndarray, 
+        self,
+        gpu_output: np.ndarray,
         ref_output: np.ndarray
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Compare GPU output with reference."""
         # Ensure same shape
         assert gpu_output.shape == ref_output.shape, \
             f"Shape mismatch: {gpu_output.shape} vs {ref_output.shape}"
-            
+
         # Calculate errors
         abs_error = np.abs(gpu_output - ref_output)
         rel_error = abs_error / (np.abs(ref_output) + 1e-10)
-        
+
         # Calculate SNR
         signal_power = np.mean(ref_output**2)
         noise_power = np.mean(abs_error**2)
         snr_db = 10 * np.log10(signal_power / (noise_power + 1e-12))
-        
+
         # Check pass criteria
         max_rel_error = np.max(rel_error)
         max_abs_error = np.max(abs_error)
-        
+
         passed = (max_rel_error < self.config.relative_tolerance or
                  max_abs_error < self.config.absolute_tolerance) and \
                  snr_db > self.config.snr_threshold_db
-                 
+
         error_reason = ""
         if not passed:
             if max_rel_error >= self.config.relative_tolerance:
                 error_reason = f"Relative error {max_rel_error:.2e} exceeds tolerance"
             elif snr_db <= self.config.snr_threshold_db:
                 error_reason = f"SNR {snr_db:.1f}dB below threshold"
-                
+
         return {
             'passed': bool(passed),
             'max_rel_error': float(max_rel_error),
@@ -296,8 +296,8 @@ class AccuracyBenchmark(BaseBenchmark):
             'snr_db': float(snr_db),
             'error_reason': error_reason
         }
-        
-    def _test_parseval_theorem(self) -> Dict[str, bool]:
+
+    def _test_parseval_theorem(self) -> dict[str, bool]:
         """Test Parseval's theorem (energy conservation)."""
         # Generate test signal
         test_signal = make_noise(
@@ -305,87 +305,87 @@ class AccuracyBenchmark(BaseBenchmark):
             self.engine_config.sample_rate_hz,
             dtype=np.float32
         )
-        
+
         # Compute time-domain energy
         time_energy = np.sum(test_signal**2)
-        
+
         # Process and get frequency domain
         test_batch = np.tile(test_signal, self.engine_config.batch)
         freq_output = self.processor.process(test_batch)
-        
+
         # Compute frequency-domain energy (accounting for one-sided spectrum)
         freq_energy = np.sum(freq_output[0]**2)
         # Double all bins except DC and Nyquist
         freq_energy = freq_energy * 2 - freq_output[0, 0]**2
         if self.engine_config.nfft % 2 == 0:
             freq_energy -= freq_output[0, -1]**2
-            
+
         # Scale for FFT normalization
         freq_energy *= self.engine_config.nfft
-        
+
         # Check energy conservation
         rel_error = abs(time_energy - freq_energy) / time_energy
         passed = rel_error < 0.01  # 1% tolerance for energy conservation
-        
+
         if self.config.verbose:
             logger.debug(f"  Parseval test: time_energy={time_energy:.3f}, "
                         f"freq_energy={freq_energy:.3f}, error={rel_error:.2%}")
-                        
+
         return {'passed': passed, 'relative_error': float(rel_error)}
-        
-    def _test_linearity(self) -> Dict[str, bool]:
+
+    def _test_linearity(self) -> dict[str, bool]:
         """Test linearity (superposition principle)."""
         # Generate two signals
         duration = self.engine_config.nfft / self.engine_config.sample_rate_hz
         signal1 = make_sine(1000, duration, self.engine_config.sample_rate_hz, 0.5)
         signal2 = make_sine(2000, duration, self.engine_config.sample_rate_hz, 0.3)
-        
+
         # Process individually
         batch1 = np.tile(signal1, self.engine_config.batch)
         batch2 = np.tile(signal2, self.engine_config.batch)
-        
+
         output1 = self.processor.process(batch1)
         output2 = self.processor.process(batch2)
-        
+
         # Process sum
         sum_signal = signal1 + signal2
         sum_batch = np.tile(sum_signal, self.engine_config.batch)
         sum_output = self.processor.process(sum_batch)
-        
+
         # Check linearity
         expected_sum = output1 + output2
         error = np.max(np.abs(sum_output - expected_sum))
         passed = error < self.config.absolute_tolerance
-        
+
         if self.config.verbose:
             logger.debug(f"  Linearity test: max_error={error:.2e}")
-            
+
         return {'passed': passed, 'max_error': float(error)}
-        
-    def _test_window_function(self) -> Dict[str, bool]:
+
+    def _test_window_function(self) -> dict[str, bool]:
         """Validate window function implementation."""
         # Test with DC signal (all ones)
         test_signal = np.ones(self.engine_config.nfft, dtype=np.float32)
         test_batch = np.tile(test_signal, self.engine_config.batch)
-        
+
         # Process
         output = self.processor.process(test_batch)
-        
+
         # Expected: DC component should equal sum of window
         window = scipy_signal.windows.hann(self.engine_config.nfft, sym=False)
         expected_dc = np.sum(window) / self.engine_config.nfft
         actual_dc = output[0, 0]
-        
+
         error = abs(actual_dc - expected_dc) / expected_dc
         passed = error < 1e-4
-        
+
         if self.config.verbose:
             logger.debug(f"  Window test: expected_dc={expected_dc:.4f}, "
                         f"actual_dc={actual_dc:.4f}, error={error:.2e}")
-                        
+
         return {'passed': passed, 'relative_error': float(error)}
-        
-    def analyze_results(self, result: 'BenchmarkResult') -> Dict[str, Any]:
+
+    def analyze_results(self, result: 'BenchmarkResult') -> dict[str, Any]:
         """
         Analyze accuracy validation results.
         
@@ -399,7 +399,7 @@ class AccuracyBenchmark(BaseBenchmark):
                 'mean_snr_db': result.statistics.get('mean_snr_db', 0)
             }
         }
-        
+
         # Categorize failures
         if self.validation_errors:
             error_categories = {}
@@ -413,13 +413,13 @@ class AccuracyBenchmark(BaseBenchmark):
                     category = 'energy_conservation'
                 elif 'linearity' in error.lower():
                     category = 'linearity'
-                    
+
                 if category not in error_categories:
                     error_categories[category] = []
                 error_categories[category].append(error)
-                
+
             analysis['error_categories'] = error_categories
-            
+
         # Performance vs accuracy tradeoff analysis
         if hasattr(self, 'test_results') and self.test_results:
             # Find which signal types have worst accuracy
@@ -429,52 +429,52 @@ class AccuracyBenchmark(BaseBenchmark):
                 if sig_type not in by_signal_type:
                     by_signal_type[sig_type] = []
                 by_signal_type[sig_type].append(test['comparison']['snr_db'])
-                
+
             worst_signals = {}
             for sig_type, snrs in by_signal_type.items():
                 worst_signals[sig_type] = {
                     'mean_snr_db': float(np.mean(snrs)),
                     'min_snr_db': float(np.min(snrs))
                 }
-                
+
             analysis['signal_type_accuracy'] = worst_signals
-            
+
         return analysis
 
 
 if __name__ == '__main__':
     import argparse
-    
+
     parser = argparse.ArgumentParser(description='Accuracy validation benchmark')
     parser.add_argument('--config', help='Configuration YAML file')
     parser.add_argument('--tolerance', type=float, help='Error tolerance')
     parser.add_argument('--output', help='Output file for results')
     parser.add_argument('--validate-stability', action='store_true',
                        help='Run numerical stability tests')
-    
+
     args = parser.parse_args()
-    
+
     # Create configuration
     config = AccuracyBenchmarkConfig(
         name='accuracy_validation',
         iterations=1  # Single validation pass
     )
-    
+
     if args.tolerance:
         config.relative_tolerance = args.tolerance
         config.absolute_tolerance = args.tolerance
-        
+
     if args.validate_stability:
         config.validate_numerical_stability = True
-        
+
     # Run benchmark
     benchmark = AccuracyBenchmark(config)
     result = benchmark.run()
-    
+
     # Analyze
     analysis = benchmark.analyze_results(result)
     result.metadata['analysis'] = analysis
-    
+
     # Output
     if args.output:
         from ionosense_hpc.benchmarks.base import save_benchmark_results
