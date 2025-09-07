@@ -517,7 +517,19 @@ if __name__ == '__main__':
     save_benchmark_results(result, args.output)
 
     # Print summary
+    def _mean_of(stats: dict, key: str, default: float = 0.0) -> float:
+        val = stats.get(key, default)
+        if isinstance(val, dict):
+            return float(val.get('mean', default))
+        try:
+            return float(val)
+        except Exception:
+            return float(default)
+
     print("\nThroughput Results:")
-    print(f"  Frames/second: {result.statistics.get('frames_per_second', 0):.1f}")
-    print(f"  GB/second: {result.statistics.get('gb_per_second', 0):.2f}")
-    print(f"  MS/second: {result.statistics.get('samples_per_second', 0)/1e6:.2f}")
+    fps = _mean_of(result.statistics, 'frames_per_second', 0.0)
+    gbs = _mean_of(result.statistics, 'gb_per_second', 0.0)
+    sps = _mean_of(result.statistics, 'samples_per_second', 0.0)
+    print(f"  Frames/second: {fps:.1f}")
+    print(f"  GB/second: {gbs:.2f}")
+    print(f"  MS/second: {sps/1e6:.2f}")

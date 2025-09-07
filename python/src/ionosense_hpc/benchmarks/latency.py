@@ -425,16 +425,24 @@ def run_latency_benchmark_suite(
 
         results[name] = result
 
-        # Save individual result
+        # Save individual result with a filesystem-safe timestamp
+        def _safe_filename(s: str) -> str:
+            # Allow alnum, dash, underscore, dot; replace others with '-'
+            return ''.join(ch if (ch.isalnum() or ch in ('-', '_', '.')) else '-' for ch in s)
+
+        safe_ts = _safe_filename(result.context.timestamp)
         save_benchmark_results(
             result,
-            output_path / f"{name}_{result.context.timestamp}.json"
+            output_path / f"{name}_{safe_ts}.json"
         )
 
-        # Print summary
+        # Print summary using latency metric stats
+        lat_stats = result.statistics.get('latency_us', {}) if isinstance(result.statistics, dict) else {}
+        mean_lat = lat_stats.get('mean', 0.0) if isinstance(lat_stats, dict) else 0.0
+        p99_lat = lat_stats.get('p99', 0.0) if isinstance(lat_stats, dict) else 0.0
         logger.info(f"\n{name} Results:")
-        logger.info(f"  Mean: {result.statistics.get('mean', 0):.2f} µs")
-        logger.info(f"  P99: {result.statistics.get('p99', 0):.2f} µs")
+        logger.info(f"  Mean: {mean_lat:.2f} µs")
+        logger.info(f"  P99: {p99_lat:.2f} µs")
         if 'deadline_analysis' in analysis:
             da = analysis['deadline_analysis']
             logger.info(f"  Deadline compliance: {(1-da['violation_rate'])*100:.1f}%")

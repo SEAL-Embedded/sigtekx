@@ -25,7 +25,7 @@ except Exception:  # optional styling
     sns = None  # type: ignore
 from scipy import stats
 
-from ionosense_hpc.benchmarks.base import BenchmarkResult
+from ionosense_hpc.benchmarks.base import BenchmarkResult, BenchmarkContext
 from ionosense_hpc.utils import logger
 
 # Set publication-quality defaults (guard if matplotlib/seaborn present)
@@ -91,8 +91,13 @@ class BenchmarkReport:
         self.config = config or ReportConfig()
         self.figures = []
 
-        # Set color palette
-        sns.set_palette(self.config.color_palette)
+        # Set color palette (optional dependency)
+        try:
+            if sns is not None:
+                sns.set_palette(self.config.color_palette)
+        except Exception:
+            # Continue without seaborn styling if unavailable
+            pass
 
     def generate(self, output_path: str | Path) -> None:
         """
@@ -747,7 +752,7 @@ def generate_comparative_report(
                         result = BenchmarkResult(
                             name=item['name'],
                             config=item.get('config', {}),
-                            context=None,  # Would need to reconstruct
+                            context=BenchmarkContext(),  # Best-effort context for reporting
                             measurements=np.array(item['measurements']),
                             statistics=item.get('statistics', {}),
                             metadata=item.get('metadata', {})

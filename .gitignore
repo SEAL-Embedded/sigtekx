@@ -111,3 +111,4 @@ vgcore.*
 .ionosense/
 benchmark_results/
 experiments/
+results/

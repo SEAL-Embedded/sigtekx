@@ -285,9 +285,18 @@ class RealtimeBenchmark(BaseBenchmark):
         """Assess system's real-time capability."""
         stats = result.statistics
 
-        # Calculate headroom
-        mean_latency = stats.get('mean_latency_ms', 0)
-        p99_latency = stats.get('p99_latency_ms', mean_latency)
+        def _mean_of(stats_dict: dict, key: str, default: float = 0.0) -> float:
+            val = stats_dict.get(key, default)
+            if isinstance(val, dict):
+                return float(val.get('mean', default))
+            try:
+                return float(val)
+            except Exception:
+                return float(default)
+
+        # Calculate headroom using aggregated means
+        mean_latency = _mean_of(stats, 'mean_latency_ms', 0.0)
+        p99_latency = _mean_of(stats, 'p99_latency_ms', mean_latency)
         deadline = self.config.frame_deadline_ms
 
         headroom_mean = (deadline - mean_latency) / deadline

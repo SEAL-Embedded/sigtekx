@@ -164,6 +164,7 @@ class BenchmarkConfig(BaseModel):
     # Reproducibility
     seed: int = Field(default=42, description="Random seed for determinism")
     deterministic: bool = Field(default=True, description="Enable deterministic mode")
+    require_gpu: bool = Field(default=False, description="Fail validation if no CUDA GPU present")
 
     # Output control
     save_raw_data: bool = Field(default=True, description="Save raw measurements")
@@ -227,19 +228,40 @@ class BaseBenchmark(abc.ABC):
         """
         issues = []
 
-        # Check GPU availability
+        # Check GPU availability (only hard-require if configured)
         try:
-            from ionosense_hpc.utils import gpu_count
-            if gpu_count() == 0:
-                issues.append("No CUDA devices available")
+            from ionosense_hpc.utils import gpu_count, logger as _logger
+            n_gpu = gpu_count()
+            if self.config.require_gpu:
+                if n_gpu == 0:
+                    issues.append("No CUDA devices available")
+            else:
+                if n_gpu == 0:
+                    # Allow running in CPU/test environments; warn for visibility
+                    _logger.warning("No CUDA devices available; proceeding in CPU/test mode")
         except Exception as e:
-            issues.append(f"Failed to query GPU: {e}")
+            # Don't block execution on environment probe errors in baseline validation
+            if self.config.require_gpu:
+                issues.append(f"Failed to query GPU: {e}")
 
         # Check minimum driver version (example)
-        if 'cuda_version' in self.context.cuda_info:
-            cuda_ver = self.context.cuda_info.get('cuda_version', '')
-            if cuda_ver and cuda_ver < '11.0':
-                issues.append(f"CUDA version {cuda_ver} is below minimum 11.0")
+        cuda_ver = self.context.cuda_info.get('cuda_version')
+        if cuda_ver:
+            try:
+                def _vtuple(s: str) -> tuple[int, ...]:
+                    parts: list[str] = []
+                    num = ''
+                    for ch in s:
+                        if ch.isdigit() or ch == '.':
+                            parts.append(ch)
+                    clean = ''.join(parts).strip('.') or '0'
+                    return tuple(int(p) for p in clean.split('.') if p.isdigit())
+
+                if _vtuple(str(cuda_ver)) < _vtuple('11.0'):
+                    issues.append(f"CUDA version {cuda_ver} is below minimum 11.0")
+            except Exception:
+                # Best-effort only; ignore parsing failures
+                pass
 
         return len(issues) == 0, issues
 
@@ -374,10 +396,23 @@ def calculate_statistics(
     Returns:
         Dictionary of statistical metrics
     """
-    if len(data) == 0:
+    # Normalize input
+    data = np.asarray(data)
+
+    if data.size == 0:
         return {'error': 'No data'}
 
     config = config or BenchmarkConfig(name="default")
+
+    # Coerce boolean and non-numeric data to float for robust stats
+    if data.dtype == np.bool_:
+        data = data.astype(np.float32)
+    elif data.dtype.kind not in 'iufc':  # not integer/unsigned/float/complex
+        try:
+            data = data.astype(np.float64)
+        except Exception:
+            # Best-effort: map truthy/falsy to floats
+            data = np.array([float(x) for x in data], dtype=np.float64)
 
     # Remove outliers using Z-score method
     z_scores = np.abs((data - np.mean(data)) / (np.std(data) + 1e-10))
