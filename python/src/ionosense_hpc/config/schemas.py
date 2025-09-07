@@ -370,7 +370,8 @@ class ResearchConfig(BaseModel):
         data = self.model_dump()
 
         # Add checksum for integrity
-        content = json.dumps(data, sort_keys=True, indent=2)
+        # Use default=str to handle datetime and other non-JSON-native types
+        content = json.dumps(data, sort_keys=True, indent=2, default=str)
         checksum = hashlib.sha256(content.encode()).hexdigest()
 
         data['_integrity'] = {

@@ -144,8 +144,14 @@ class ResearchWorkflow:
 
         # Also save as YAML for readability
         yaml_path = self.base_dir / "configs" / "research_config.yaml"
+        # Convert non-serializable types (e.g., datetime) to strings via JSON round-trip
+        try:
+            cfg_dict = self.config.model_dump()
+            cfg_serializable = json.loads(json.dumps(cfg_dict, default=str))
+        except Exception:
+            cfg_serializable = self.config.model_dump()
         with open(yaml_path, 'w') as f:
-            yaml.dump(self.config.model_dump(), f, default=str)
+            yaml.safe_dump(cfg_serializable, f)
 
     def add_stage(
         self,
@@ -578,7 +584,6 @@ def create_research_workflow(
     return workflow
 
 
-import os
 
 import numpy as np
 

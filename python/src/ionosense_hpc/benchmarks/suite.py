@@ -367,10 +367,10 @@ import time
 
 import numpy as np
 
+
 def main(argv: list[str] | None = None) -> int:
     """Console entrypoint for `ionosense-bench` script."""
     import argparse
-    import sys as _sys
 
     parser = argparse.ArgumentParser(description='Run benchmark suite')
     parser.add_argument('--config', help='Suite configuration YAML file')

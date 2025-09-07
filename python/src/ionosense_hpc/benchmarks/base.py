@@ -7,8 +7,8 @@ RSE/RE/IEEE standards for reproducibility and statistical rigor.
 
 import abc
 import hashlib
-import os
 import json
+import os
 import platform
 import subprocess
 import sys
@@ -493,4 +493,3 @@ def save_benchmark_results(
     logger.info(f"Results saved to {output_path}")
 
 
-import os

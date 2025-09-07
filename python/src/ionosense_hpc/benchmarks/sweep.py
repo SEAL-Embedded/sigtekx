@@ -428,8 +428,12 @@ class ParameterSweep:
         output_dir: Path
     ) -> None:
         """Analyze relative importance of parameters on performance."""
-        from sklearn.ensemble import RandomForestRegressor
-        from sklearn.inspection import permutation_importance
+        try:
+            from sklearn.ensemble import RandomForestRegressor
+            from sklearn.inspection import permutation_importance
+        except Exception as e:
+            logger.warning(f"sklearn not available, skipping importance analysis: {e}")
+            return
 
         # Prepare data
         X = []
