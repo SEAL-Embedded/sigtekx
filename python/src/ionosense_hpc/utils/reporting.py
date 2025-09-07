@@ -1,6 +1,4 @@
 """
-python/src/ionosense_hpc/benchmarks/reporting.py
---------------------------------------------------------------------------------
 Advanced reporting and visualization system for benchmark results.
 Generates publication-quality plots and comprehensive statistical reports.
 """
@@ -10,30 +8,48 @@ from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 
-import matplotlib.pyplot as plt
+try:
+    import matplotlib.pyplot as plt
+    from matplotlib.backends.backend_pdf import PdfPages
+    MATPLOTLIB_AVAILABLE = True
+except Exception:  # ImportError or backend errors
+    plt = None  # type: ignore
+    PdfPages = None  # type: ignore
+    MATPLOTLIB_AVAILABLE = False
+
 import numpy as np
-import seaborn as sns
-from matplotlib.backends.backend_pdf import PdfPages
+try:
+    import seaborn as sns
+except Exception:  # optional styling
+    sns = None  # type: ignore
 from scipy import stats
 
 from ionosense_hpc.benchmarks.base import BenchmarkResult
 from ionosense_hpc.utils import logger
 
-# Set publication-quality defaults
-sns.set_style("whitegrid")
-plt.rcParams.update({
-    'font.size': 10,
-    'axes.labelsize': 11,
-    'axes.titlesize': 12,
-    'xtick.labelsize': 9,
-    'ytick.labelsize': 9,
-    'legend.fontsize': 9,
-    'figure.titlesize': 14,
-    'figure.dpi': 100,
-    'savefig.dpi': 300,
-    'savefig.bbox': 'tight',
-    'figure.constrained_layout.use': True
-})
+# Set publication-quality defaults (guard if matplotlib/seaborn present)
+if sns is not None:
+    try:
+        sns.set_style("whitegrid")
+    except Exception:
+        pass
+if MATPLOTLIB_AVAILABLE:
+    try:
+        plt.rcParams.update({
+            'font.size': 10,
+            'axes.labelsize': 11,
+            'axes.titlesize': 12,
+            'xtick.labelsize': 9,
+            'ytick.labelsize': 9,
+            'legend.fontsize': 9,
+            'figure.titlesize': 14,
+            'figure.dpi': 100,
+            'savefig.dpi': 300,
+            'savefig.bbox': 'tight',
+            'figure.constrained_layout.use': True
+        })
+    except Exception:
+        pass
 
 
 @dataclass

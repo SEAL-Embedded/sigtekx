@@ -6,6 +6,7 @@ Manages complete research pipelines with reproducibility guarantees.
 """
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -103,8 +104,9 @@ class ResearchWorkflow:
         # Generate workflow ID
         self.workflow_id = f"{self.metadata.experiment_id}_{datetime.now():%Y%m%d_%H%M%S}"
 
-        # Setup directories
-        self.base_dir = Path(f"./experiments/{self.workflow_id}")
+        # Setup directories (honor configured output root if provided)
+        output_root = Path(self.config.output_settings.get('output_dir', './experiments'))
+        self.base_dir = output_root / self.workflow_id
         self.setup_directories()
 
         # Initialize workflow stages

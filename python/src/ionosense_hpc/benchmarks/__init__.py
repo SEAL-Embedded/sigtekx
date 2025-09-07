@@ -31,22 +31,6 @@ from .sweep import (
     ParameterSweep,
 )
 
-# Convenience functional benchmarks
-from .accuracy import (
-    benchmark_accuracy,
-    benchmark_numerical_stability,
-    benchmark_window_accuracy,
-)
-from .latency import (
-    benchmark_jitter,
-    benchmark_latency,
-)
-from .realtime import benchmark_realtime
-from .throughput import (
-    benchmark_batch_scaling,
-    benchmark_throughput,
-)
-
 __all__ = [
     # Core primitives
     "BaseBenchmark",
@@ -65,13 +49,7 @@ __all__ = [
     "ExperimentRun",
     "ParameterSpec",
     "ParameterSweep",
-    # Functional benchmarks
-    "benchmark_accuracy",
-    "benchmark_window_accuracy",
-    "benchmark_numerical_stability",
-    "benchmark_latency",
-    "benchmark_jitter",
-    "benchmark_throughput",
-    "benchmark_batch_scaling",
-    "benchmark_realtime",
+    # Functional benchmarks are available as classes in submodules
+    # (accuracy, latency, throughput, realtime), but are not imported here
+    # to keep package import light and avoid optional dependency issues.
 ]

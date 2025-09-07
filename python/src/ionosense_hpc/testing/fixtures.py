@@ -272,7 +272,7 @@ def mock_device_info() -> dict:
 
 
 @pytest.fixture
-def mock_benchmark_results(temp_benchmark_dir: Path) -> List[Path]:
+def mock_benchmark_results(temp_benchmark_dir: Path) -> list[Path]:
     """Creates mock benchmark result files for testing reporting."""
     results = []
 

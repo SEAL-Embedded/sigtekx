@@ -109,3 +109,5 @@ vgcore.*
 *.swp
 *.swo
 .ionosense/
+benchmark_results/
+experiments/

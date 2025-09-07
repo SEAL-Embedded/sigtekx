@@ -117,8 +117,7 @@ class EngineConfig(BaseModel):
     # =====================================================================
     model_config = ConfigDict(
         validate_assignment=True,
-        use_enum_values=True,
-        json_encoders={datetime: lambda v: v.isoformat()}
+        use_enum_values=True
     )
 
     @field_validator('nfft')
@@ -282,8 +281,7 @@ class ExperimentMetadata(BaseModel):
     )
 
     model_config = ConfigDict(
-        validate_assignment=True,
-        json_encoders={datetime: lambda v: v.isoformat()}
+        validate_assignment=True
     )
 
 
@@ -350,8 +348,7 @@ class ResearchConfig(BaseModel):
     )
 
     model_config = ConfigDict(
-        validate_assignment=True,
-        json_encoders={datetime: lambda v: v.isoformat()}
+        validate_assignment=True
     )
 
     @model_validator(mode='after')

@@ -92,7 +92,6 @@ from .exceptions import (
 
 # Import utilities (may use pynvml)
 from .utils.device import current_device, device_info, gpu_count
-from .utils.signals import make_chirp, make_multitone, make_noise, make_sine
 
 # Import core engine classes (requires _engine module)
 # This block provides graceful failure if the C++ extension isn't built.
@@ -123,7 +122,7 @@ except (ImportError, DllLoadError) as e:
 
     warnings.warn(
         f"C++ engine module could not be loaded: {_ENGINE_ERROR}",
-        ImportWarning,
+        UserWarning,
         stacklevel=2,
     )
 
@@ -170,10 +169,6 @@ __all__ = [
     "gpu_count",
     "current_device",
     "device_info",
-    "make_sine",
-    "make_chirp",
-    "make_noise",
-    "make_multitone",
 
     # -- Diagnostics --
     "show_versions",

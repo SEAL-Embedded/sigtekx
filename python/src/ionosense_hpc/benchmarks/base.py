@@ -7,6 +7,7 @@ RSE/RE/IEEE standards for reproducibility and statistical rigor.
 
 import abc
 import hashlib
+import os
 import json
 import platform
 import subprocess
@@ -149,7 +150,7 @@ class BenchmarkConfig(BaseModel):
     # Core parameters
     name: str = Field(description="Benchmark name")
     iterations: int = Field(default=1000, gt=0, description="Number of iterations")
-    warmup_iterations: int = Field(default=100, ge=0, description="Warmup iterations")
+    warmup_iterations: int = Field(default=0, ge=0, description="Warmup iterations")
     timeout_seconds: float = Field(default=300.0, gt=0, description="Timeout per iteration")
 
     # Statistical parameters

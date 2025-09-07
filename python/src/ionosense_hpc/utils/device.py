@@ -7,8 +7,9 @@ try:
     import pynvml
     NVML_AVAILABLE = True
 except ImportError:
+    # Optional dependency: silently degrade without emitting import-time warnings.
+    # Tests treat ImportWarning as errors; runtime gracefully falls back to C++ queries.
     NVML_AVAILABLE = False
-    warnings.warn("pynvml not available; GPU monitoring limited", ImportWarning, stacklevel=2)
 
 
 def gpu_count() -> int:

@@ -286,7 +286,7 @@ Function Invoke-Build {
 
 Function Invoke-Test {
     param(
-        [string]$Suite = "all",
+        [ValidateSet("all","python","py","p","cpp","c++")][string]$Suite = "all",
         [string]$Pattern = "",
         [switch]$Verbose,
         [switch]$Coverage
@@ -300,6 +300,17 @@ Function Invoke-Test {
     if (-not (Test-CondaEnvironment)) {
         throw "Conda environment not activated"
     }
+
+    # Normalize suite aliases -> canonical values
+    $suiteNorm = ($Suite.ToLower())
+    switch ($suiteNorm) {
+        'py' { $suiteNorm = 'python' }
+        'p'  { $suiteNorm = 'python' }
+        'c++'{ $suiteNorm = 'cpp' }
+    }
+
+    $runCpp = ($suiteNorm -eq 'all' -or $suiteNorm -eq 'cpp')
+    $runPy  = ($suiteNorm -eq 'all' -or $suiteNorm -eq 'python')
     
     $results = @{
         cpp = $null
@@ -309,14 +320,14 @@ Function Invoke-Test {
         failed = 0
     }
     
-    if ($Suite -eq "all" -or $Suite -eq "cpp") {
+    if ($runCpp) {
         Write-ResearchLog -Level Info -Message "Running C++ tests" -Component "Test"
         $testPreset = $script:BuildPreset.Replace('rel','tests').Replace('debug','tests')
         ctest --preset $testPreset --output-on-failure
         $results.cpp = $LASTEXITCODE -eq 0
     }
     
-    if ($Suite -eq "all" -or $Suite -eq "python") {
+    if ($runPy) {
         Write-ResearchLog -Level Info -Message "Running Python tests" -Component "Test"
         
         $pytestArgs = @("-v", (Join-Path $script:PythonDir "tests"))
@@ -338,10 +349,22 @@ Function Invoke-Test {
         $results.python = $LASTEXITCODE -eq 0
     }
     
+    # Validate that at least one suite ran
+    $ranAny = $runCpp -or $runPy
+    if (-not $ranAny) {
+        Write-ResearchLog -Level Error -Message "Unknown or empty suite '$Suite'" -Component "Test"
+        throw "Unknown test suite '$Suite'. Use: all | python (py,p) | cpp (c++)."
+    }
+
+    # Determine overall status for requested suites
+    $failed = $false
+    if ($runCpp  -and $results.cpp   -ne $true) { $failed = $true }
+    if ($runPy   -and $results.python -ne $true) { $failed = $true }
+
     # Report results
     $testReport = @{
         timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-        suite = $Suite
+        suite = $suiteNorm
         results = $results
     }
     
@@ -349,6 +372,11 @@ Function Invoke-Test {
     $testReport | ConvertTo-Json -Depth 5 | Set-Content $reportPath
     
     Write-ResearchLog -Level Info -Message "Test results saved to: $reportPath" -Component "Test"
+
+    if ($failed) {
+        Write-ResearchLog -Level Error -Message "One or more requested test suites failed" -Component "Test"
+        throw "Tests failed. See report: $reportPath"
+    }
 }
 
 Function Invoke-Benchmark {
@@ -884,8 +912,8 @@ ENVIRONMENT MANAGEMENT
 BUILD & DEVELOPMENT  
   build [-Preset] [-Clean] [-Verbose]
                           Configure and build project
-  test [-Suite] [-Pattern] [-Coverage]
-                          Run test suites with optional coverage
+  test [-Suite all|python|py|cpp] [-Pattern] [-Coverage]
+                          Run tests (aliases: py/p for python, c++ for cpp)
   clean                   Remove all build artifacts
 
 BENCHMARKING (Research-Grade)
