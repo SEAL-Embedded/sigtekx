@@ -257,6 +257,7 @@ if(IONO_WITH_TESTS AND IONO_WITH_CUDA)
         tests/test_research_engine.cpp
         tests/test_processing_stage.cpp
         tests/test_cuda_wrappers.cpp
+        tests/test_nvtx_profiling.cpp
     )
     set_target_properties(test_engine PROPERTIES CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 
