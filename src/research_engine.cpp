@@ -84,7 +84,7 @@ class ResearchEngine::Impl {
 
     // --- Resource Allocation ---
     {
-      IONO_NVTX_RANGE("Create CUDA Streams", profiling::colors::CYAN);
+      IONO_NVTX_RANGE("Create CUDA Streams", profiling::colors::DARK_GRAY);
       streams_.clear();
       for (int i = 0; i < config.stream_count; ++i) {
         streams_.emplace_back();
@@ -92,7 +92,7 @@ class ResearchEngine::Impl {
     }
 
     {
-      IONO_NVTX_RANGE("Create CUDA Events", profiling::colors::CYAN);
+      IONO_NVTX_RANGE("Create CUDA Events", profiling::colors::DARK_GRAY);
       events_.clear();
       for (int i = 0; i < config.pinned_buffer_count * 2; ++i) {
         events_.emplace_back(cudaEventDisableTiming);
@@ -130,7 +130,9 @@ class ResearchEngine::Impl {
       const size_t total_bytes =
           (buffer_size + output_buffer_size + complex_buffer_size * 2) *
           static_cast<size_t>(config.pinned_buffer_count) * sizeof(float);
-      IONO_NVTX_RANGE("Allocate Device Buffers", profiling::colors::CYAN);
+      const std::string alloc_msg = profiling::format_memory_range(
+          "Allocate Device Buffers", total_bytes);
+      IONO_NVTX_RANGE(alloc_msg.c_str(), profiling::colors::CYAN);
 
       d_input_buffers_.clear();
       d_output_buffers_.clear();
@@ -194,7 +196,10 @@ class ResearchEngine::Impl {
     // --- Asynchronous Pipeline Execution ---
     // 1. Host-to-Device Transfer
     {
-      IONO_NVTX_RANGE("H2D Transfer", profiling::colors::GREEN);
+      const size_t bytes = num_samples * sizeof(float);
+      const std::string h2d_msg =
+          profiling::format_memory_range("H2D Transfer", bytes);
+      IONO_NVTX_RANGE(h2d_msg.c_str(), profiling::colors::GREEN);
       d_input.copy_from_host(input, num_samples, streams_[h2d_stream_idx].get());
       e_h2d_done.record(streams_[h2d_stream_idx].get());
     }
@@ -218,11 +223,14 @@ class ResearchEngine::Impl {
 
     // 3. Device-to-Host Transfer
     {
-      IONO_NVTX_RANGE("D2H Transfer", profiling::colors::ORANGE);
-      IONO_CUDA_CHECK(cudaStreamWaitEvent(streams_[d2h_stream_idx].get(),
-                                          e_compute_done.get(), 0));
       const size_t complex_elements =
           static_cast<size_t>(config_.num_output_bins()) * config_.batch;
+      const size_t bytes = complex_elements * sizeof(float);
+      const std::string d2h_msg =
+          profiling::format_memory_range("D2H Transfer", bytes);
+      IONO_NVTX_RANGE(d2h_msg.c_str(), profiling::colors::ORANGE);
+      IONO_CUDA_CHECK(cudaStreamWaitEvent(streams_[d2h_stream_idx].get(),
+                                          e_compute_done.get(), 0));
       d_output.copy_to_host(output, complex_elements,
                             streams_[d2h_stream_idx].get());
     }

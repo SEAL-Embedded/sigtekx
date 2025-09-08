@@ -371,7 +371,7 @@ void launch_scale_fft(float2* data, int num_elements, float scale,
 // --- CPU Helper Functions ---
 
 void generate_hann_window_cpu(float* window, int size, bool sqrt_norm) {
-  IONO_NVTX_RANGE("generate_hann_window_cpu", profiling::colors::CYAN);
+  IONO_NVTX_RANGE("generate_hann_window_cpu", profiling::colors::DARK_GRAY);
   const float pi = 3.14159265358979323846f;
   for (int i = 0; i < size; ++i) {
     float val = 0.5f * (1.0f - cosf(2.0f * pi * i / size));
