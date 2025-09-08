@@ -16,15 +16,15 @@
 
 #pragma once
 
-#include <cuda_runtime_api.h>
-
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
 
-#include "ionosense/cuda_wrappers.hpp"
+// Forward declare CUDA stream type to avoid including CUDA headers in C++ TUs
+struct CUstream_st;
+using cudaStream_t = CUstream_st*;
 
 namespace ionosense {
 

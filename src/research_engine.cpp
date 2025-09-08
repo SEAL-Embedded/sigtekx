@@ -14,6 +14,9 @@
  */
 
 #include "ionosense/research_engine.hpp"
+#include "ionosense/profiling_macros.hpp"  // Profiling second
+#include "ionosense/cuda_wrappers.hpp"
+#include "ionosense/processing_stage.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -21,9 +24,6 @@
 #include <numeric>
 #include <sstream>
 #include <stdexcept>
-
-#include "ionosense/cuda_wrappers.hpp"
-#include "ionosense/processing_stage.hpp"
 
 namespace ionosense {
 
@@ -76,20 +76,27 @@ class ResearchEngine::Impl {
    * @param config The configuration for the engine.
    */
   void initialize(const EngineConfig& config) {
+    IONO_NVTX_RANGE("ResearchEngine::Initialize", profiling::colors::DARK_GRAY);
     if (initialized_) {
       reset();  // Ensure clean state if re-initializing.
     }
     config_ = config;
 
     // --- Resource Allocation ---
-    streams_.clear();
-    for (int i = 0; i < config.stream_count; ++i) {
-      streams_.emplace_back();
+    {
+      IONO_NVTX_RANGE("Create CUDA Streams", profiling::colors::CYAN);
+      streams_.clear();
+      for (int i = 0; i < config.stream_count; ++i) {
+        streams_.emplace_back();
+      }
     }
 
-    events_.clear();
-    for (int i = 0; i < config.pinned_buffer_count * 2; ++i) {
-      events_.emplace_back(cudaEventDisableTiming);
+    {
+      IONO_NVTX_RANGE("Create CUDA Events", profiling::colors::CYAN);
+      events_.clear();
+      for (int i = 0; i < config.pinned_buffer_count * 2; ++i) {
+        events_.emplace_back(cudaEventDisableTiming);
+      }
     }
 
     // --- Stage Configuration ---
@@ -100,11 +107,17 @@ class ResearchEngine::Impl {
     stage_config_.warmup_iters = config.warmup_iters;
 
     // --- Pipeline Construction ---
-    if (stages_.empty()) {
-      stages_ = StageFactory::create_default_pipeline();
-    }
-    for (auto& stage : stages_) {
-      stage->initialize(stage_config_, streams_[0].get());
+    {
+      IONO_NVTX_RANGE("Initialize Pipeline Stages", profiling::colors::MAGENTA);
+      if (stages_.empty()) {
+        stages_ = StageFactory::create_default_pipeline();
+      }
+      for (auto& stage : stages_) {
+        {
+          IONO_NVTX_RANGE("Init Stage", profiling::colors::DARK_GRAY);
+          stage->initialize(stage_config_, streams_[0].get());
+        }
+      }
     }
 
     // --- Buffer Allocation ---
@@ -113,18 +126,25 @@ class ResearchEngine::Impl {
         static_cast<size_t>(config.num_output_bins()) * config.batch;
     const size_t complex_buffer_size = output_buffer_size;
 
-    d_input_buffers_.clear();
-    d_output_buffers_.clear();
-    d_intermediate_buffers_.clear();
+    {
+      const size_t total_bytes =
+          (buffer_size + output_buffer_size + complex_buffer_size * 2) *
+          static_cast<size_t>(config.pinned_buffer_count) * sizeof(float);
+      IONO_NVTX_RANGE("Allocate Device Buffers", profiling::colors::CYAN);
 
-    for (int i = 0; i < config.pinned_buffer_count; ++i) {
-      d_input_buffers_.emplace_back(buffer_size);
-      d_output_buffers_.emplace_back(output_buffer_size);
-      d_intermediate_buffers_.emplace_back(complex_buffer_size * 2);
+      d_input_buffers_.clear();
+      d_output_buffers_.clear();
+      d_intermediate_buffers_.clear();
+
+      for (int i = 0; i < config.pinned_buffer_count; ++i) {
+        d_input_buffers_.emplace_back(buffer_size);
+        d_output_buffers_.emplace_back(output_buffer_size);
+        d_intermediate_buffers_.emplace_back(complex_buffer_size * 2);
+      }
+
+      h_input_staging_.resize(buffer_size);
+      h_output_staging_.resize(output_buffer_size);
     }
-
-    h_input_staging_.resize(buffer_size);
-    h_output_staging_.resize(output_buffer_size);
 
     initialized_ = true;
 
@@ -135,6 +155,7 @@ class ResearchEngine::Impl {
 
     stats_ = ProcessingStats{};  // Reset stats after warmup.
     stats_.is_warmup = false;
+    IONO_NVTX_MARK("Initialization Complete", profiling::colors::CYAN);
   }
 
   /**
@@ -148,6 +169,7 @@ class ResearchEngine::Impl {
    * @param num_samples The total number of float samples in the input.
    */
   void process(const float* input, float* output, size_t num_samples) {
+    IONO_NVTX_RANGE_FUNCTION(profiling::colors::NVIDIA_BLUE);
     if (!initialized_) {
       throw std::runtime_error(
           "ResearchEngine is not initialized. Call initialize() first.");
@@ -171,33 +193,45 @@ class ResearchEngine::Impl {
 
     // --- Asynchronous Pipeline Execution ---
     // 1. Host-to-Device Transfer
-    d_input.copy_from_host(input, num_samples, streams_[h2d_stream_idx].get());
-    e_h2d_done.record(streams_[h2d_stream_idx].get());
+    {
+      IONO_NVTX_RANGE("H2D Transfer", profiling::colors::GREEN);
+      d_input.copy_from_host(input, num_samples, streams_[h2d_stream_idx].get());
+      e_h2d_done.record(streams_[h2d_stream_idx].get());
+    }
 
     // 2. Processing Pipeline (on compute stream)
     IONO_CUDA_CHECK(cudaStreamWaitEvent(streams_[compute_stream_idx].get(),
                                         e_h2d_done.get(), 0));
 
-    stages_[0]->process(d_input.get(), d_input.get(), num_samples,
-                        streams_[compute_stream_idx].get());
-    stages_[1]->process(d_input.get(), d_intermediate.get(), num_samples,
-                        streams_[compute_stream_idx].get());
-
-    const size_t complex_elements =
-        static_cast<size_t>(config_.num_output_bins()) * config_.batch;
-    stages_[2]->process(d_intermediate.get(), d_output.get(), complex_elements,
-                        streams_[compute_stream_idx].get());
-
-    e_compute_done.record(streams_[compute_stream_idx].get());
+    {
+      IONO_NVTX_RANGE("Compute Pipeline", profiling::colors::PURPLE);
+      stages_[0]->process(d_input.get(), d_input.get(), num_samples,
+                          streams_[compute_stream_idx].get());
+      stages_[1]->process(d_input.get(), d_intermediate.get(), num_samples,
+                          streams_[compute_stream_idx].get());
+      const size_t complex_elements =
+          static_cast<size_t>(config_.num_output_bins()) * config_.batch;
+      stages_[2]->process(d_intermediate.get(), d_output.get(), complex_elements,
+                          streams_[compute_stream_idx].get());
+      e_compute_done.record(streams_[compute_stream_idx].get());
+    }
 
     // 3. Device-to-Host Transfer
-    IONO_CUDA_CHECK(cudaStreamWaitEvent(streams_[d2h_stream_idx].get(),
-                                        e_compute_done.get(), 0));
-    d_output.copy_to_host(output, complex_elements,
-                          streams_[d2h_stream_idx].get());
+    {
+      IONO_NVTX_RANGE("D2H Transfer", profiling::colors::ORANGE);
+      IONO_CUDA_CHECK(cudaStreamWaitEvent(streams_[d2h_stream_idx].get(),
+                                          e_compute_done.get(), 0));
+      const size_t complex_elements =
+          static_cast<size_t>(config_.num_output_bins()) * config_.batch;
+      d_output.copy_to_host(output, complex_elements,
+                            streams_[d2h_stream_idx].get());
+    }
 
     // 4. Final Synchronization for this batch
-    IONO_CUDA_CHECK(cudaStreamSynchronize(streams_[d2h_stream_idx].get()));
+    {
+      IONO_NVTX_RANGE("Stream Sync", profiling::colors::YELLOW);
+      IONO_CUDA_CHECK(cudaStreamSynchronize(streams_[d2h_stream_idx].get()));
+    }
 
     // --- Statistics Update ---
     const auto end_time = std::chrono::high_resolution_clock::now();
@@ -217,12 +251,14 @@ class ResearchEngine::Impl {
    */
   void process_async(const float* input, size_t num_samples,
                      ResultCallback callback) {
+    IONO_NVTX_RANGE_FUNCTION(profiling::colors::NVIDIA_BLUE);
     if (!initialized_) {
       throw std::runtime_error("Engine not initialized");
     }
     std::vector<float> output(config_.num_output_bins() * config_.batch);
     process(input, output.data(), num_samples);
     if (callback) {
+      IONO_NVTX_RANGE("Result Callback", profiling::colors::CYAN);
       callback(output.data(), config_.num_output_bins(), config_.batch, stats_);
     }
   }
@@ -232,6 +268,7 @@ class ResearchEngine::Impl {
    * work.
    */
   void synchronize() {
+    IONO_NVTX_RANGE_FUNCTION(profiling::colors::YELLOW);
     for (auto& s : streams_) {
       s.synchronize();
     }
@@ -241,23 +278,32 @@ class ResearchEngine::Impl {
    * @brief Resets the engine, releasing all CUDA resources.
    */
   void reset() {
+    IONO_NVTX_RANGE_FUNCTION(profiling::colors::RED);
     if (!initialized_) return;
-    synchronize();
-    stages_.clear();
-    streams_.clear();
-    events_.clear();
-    d_input_buffers_.clear();
-    d_intermediate_buffers_.clear();
-    d_output_buffers_.clear();
-    h_input_staging_ = PinnedHostBuffer<float>();
-    h_output_staging_ = PinnedHostBuffer<float>();
+    {
+      IONO_NVTX_RANGE("Synchronize All Streams", profiling::colors::YELLOW);
+      synchronize();
+    }
+    {
+      IONO_NVTX_RANGE("Release Resources", profiling::colors::RED);
+      stages_.clear();
+      streams_.clear();
+      events_.clear();
+      d_input_buffers_.clear();
+      d_intermediate_buffers_.clear();
+      d_output_buffers_.clear();
+      h_input_staging_ = PinnedHostBuffer<float>();
+      h_output_staging_ = PinnedHostBuffer<float>();
+    }
     frame_counter_ = 0;
     initialized_ = false;
+    IONO_NVTX_MARK("Reset Complete", profiling::colors::RED);
   }
 
   ProcessingStats get_stats() const { return stats_; }
 
   RuntimeInfo get_runtime_info() const {
+    IONO_NVTX_RANGE_FUNCTION(profiling::colors::CYAN);
     RuntimeInfo info;
     int cuda_runtime_version = 0, cuda_driver_version = 0;
     IONO_CUDA_CHECK(cudaRuntimeGetVersion(&cuda_runtime_version));
@@ -284,7 +330,12 @@ class ResearchEngine::Impl {
   }
 
   bool is_initialized() const { return initialized_; }
-  void set_profiling_enabled(bool enabled) { profiling_enabled_ = enabled; }
+  void set_profiling_enabled(bool enabled) {
+    profiling_enabled_ = enabled;
+#ifdef IONOSENSE_ENABLE_PROFILING
+    profiling::set_profiling_enabled(enabled);
+#endif
+  }
   void add_stage(std::unique_ptr<IProcessingStage> stage) {
     stages_.push_back(std::move(stage));
   }
@@ -380,6 +431,7 @@ StageConfig ResearchEngine::get_stage_config() const {
 // ============================================================================
 
 std::unique_ptr<IPipelineEngine> create_engine(const std::string& engine_type) {
+  IONO_NVTX_RANGE("Create Engine", profiling::colors::DARK_GRAY);
   if (engine_type == "research") {
     return std::make_unique<ResearchEngine>();
   } else if (engine_type == "ife" || engine_type == "obe") {
@@ -394,6 +446,7 @@ std::unique_ptr<IPipelineEngine> create_engine(const std::string& engine_type) {
 
 namespace engine_utils {
 std::vector<std::string> get_available_devices() {
+  IONO_NVTX_RANGE_FUNCTION(profiling::colors::CYAN);
   std::vector<std::string> devices;
   int device_count = 0;
   if (cudaGetDeviceCount(&device_count) == cudaSuccess) {
@@ -411,6 +464,7 @@ std::vector<std::string> get_available_devices() {
 }
 
 int select_best_device() {
+  IONO_NVTX_RANGE_FUNCTION(profiling::colors::CYAN);
   int device_count = 0;
   IONO_CUDA_CHECK(cudaGetDeviceCount(&device_count));
   if (device_count == 0) {
@@ -431,6 +485,7 @@ int select_best_device() {
 }
 
 bool validate_config(const EngineConfig& cfg, std::string& error_msg) {
+  IONO_NVTX_RANGE_FUNCTION(profiling::colors::CYAN);
   if (cfg.nfft <= 0 || (cfg.nfft & (cfg.nfft - 1)) != 0) {
     error_msg = "nfft must be a positive power of 2.";
     return false;
@@ -460,6 +515,7 @@ bool validate_config(const EngineConfig& cfg, std::string& error_msg) {
 }
 
 size_t estimate_memory_usage(const EngineConfig& cfg) {
+  IONO_NVTX_RANGE_FUNCTION(profiling::colors::CYAN);
   size_t total = 0;
   const size_t input_bytes =
       static_cast<size_t>(cfg.nfft) * cfg.batch * sizeof(float);

@@ -24,7 +24,9 @@
         "CMAKE_BUILD_TYPE": "Release",
         "IONO_WITH_TESTS": "ON",
         "IONO_WITH_GRAPHS": "ON",
-        "IONO_WITH_PYTHON": "ON"
+        "IONO_WITH_PYTHON": "ON",
+        "IONO_WITH_NVTX": "ON",
+        "IONO_WITH_TIDY": "OFF"
       }
     },
     {
@@ -37,7 +39,9 @@
         "CMAKE_BUILD_TYPE": "Debug",
         "IONO_WITH_TESTS": "ON",
         "IONO_WITH_GRAPHS": "ON",
-        "IONO_WITH_PYTHON": "ON"
+        "IONO_WITH_PYTHON": "ON",
+        "IONO_WITH_NVTX": "ON",
+        "IONO_WITH_TIDY": "OFF"
       }
     },
     {
@@ -50,7 +54,9 @@
         "CMAKE_BUILD_TYPE": "Release",
         "IONO_WITH_TESTS": "ON",
         "IONO_WITH_GRAPHS": "ON",
-        "IONO_WITH_PYTHON": "ON"
+        "IONO_WITH_PYTHON": "ON",
+        "IONO_WITH_NVTX": "ON",
+        "IONO_WITH_TIDY": "OFF"
       }
     },
     {
@@ -63,7 +69,9 @@
         "CMAKE_BUILD_TYPE": "Debug",
         "IONO_WITH_TESTS": "ON",
         "IONO_WITH_GRAPHS": "ON",
-        "IONO_WITH_PYTHON": "ON"
+        "IONO_WITH_PYTHON": "ON",
+        "IONO_WITH_NVTX": "ON",
+        "IONO_WITH_TIDY": "OFF"
       }
     },
     {
@@ -76,7 +84,9 @@
         "CMAKE_BUILD_TYPE": "Release",
         "IONO_WITH_TESTS": "ON",
         "IONO_WITH_GRAPHS": "ON",
-        "IONO_WITH_PYTHON": "ON"
+        "IONO_WITH_PYTHON": "ON",
+        "IONO_WITH_NVTX": "ON",
+        "IONO_WITH_TIDY": "OFF"
       }
     },
     {
@@ -87,7 +97,9 @@
       "binaryDir": "${sourceDir}/build/ci",
       "cacheVariables": {
         "IONO_WITH_TESTS": "OFF",
-        "IONO_WITH_PYTHON": "ON"
+        "IONO_WITH_PYTHON": "ON",
+        "IONO_WITH_NVTX": "ON",
+        "IONO_WITH_TIDY": "OFF"
       }
     }
   ],

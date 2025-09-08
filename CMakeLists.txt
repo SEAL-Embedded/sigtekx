@@ -12,12 +12,15 @@ set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF) # (IPO) Interferes with nvcc's own L
 # Use the static C-Runtime on MSVC to match CUDA::cudart_static and avoid DLL dependencies
 if(MSVC)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    # Narrow Windows headers and avoid macro collisions with std::min/max
+    add_compile_definitions(WIN32_LEAN_AND_MEAN NOMINMAX)
 endif()
 
 option(IONO_WITH_TESTS   "Build tests"            ON)
 option(IONO_WITH_GRAPHS  "Enable CUDA Graphs"     ON)
 option(IONO_WITH_PYTHON  "Build Python bindings"  ON)
 option(IONO_WITH_CUDA    "Enable CUDA components" ON)
+option(IONO_WITH_NVTX    "Enable NVTX profiling"  ON)
 
 
 # ============================================================================
@@ -60,11 +63,13 @@ if(CLANG_FORMAT)
     add_custom_target(format COMMAND ${CLANG_FORMAT} -i ${ALL_CXX_FILES})
 endif()
 
+option(IONO_WITH_TIDY "Run clang-tidy static analysis" OFF)
 find_program(CLANG_TIDY clang-tidy)
-if(CLANG_TIDY)
+if(IONO_WITH_TIDY AND CLANG_TIDY)
+    # Keep checks focused and exclude noisy modernize ones by default
     set(CMAKE_CXX_CLANG_TIDY
         ${CLANG_TIDY}
-        -checks=-*,readability-*,performance-*,portability-*,modernize-*
+        -checks=-*,readability-*,performance-*,portability-*,modernize-*,-modernize-use-trailing-return-type,-modernize-use-nodiscard
         -header-filter=${CMAKE_CURRENT_SOURCE_DIR}/.*
         --extra-arg-before=--driver-mode=cl
         --extra-arg=/EHsc
@@ -80,7 +85,8 @@ find_package(Python3 3.11 REQUIRED      # provides [ Python3_EXECUTABLE, Python3
     COMPONENTS Interpreter Development)
 
 if(IONO_WITH_CUDA)
-find_package(CUDAToolkit REQUIRED)      # provides [ CUDAToolkit_INCLUDE_DIRS, CUDA::cudart_static, CUDA::cufft ]
+  # Modern CUDA discovery (NVTX3 is header-only and ships with toolkit)
+  find_package(CUDAToolkit 13.0 REQUIRED)
 endif()
 
 # --- Robust pybind11 discovery ---     # provides [ pybind11::module, pybind11::embed, ... ]
@@ -124,6 +130,7 @@ add_library(ion_engine OBJECT
     src/ops_fft.cu
     src/research_engine.cpp
     src/processing_stage.cpp
+    src/profiling_nvtx.cu
 )
 target_include_directories(ion_engine PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -131,6 +138,10 @@ target_include_directories(ion_engine PUBLIC
 )
 set_target_properties(ion_engine PROPERTIES CUDA_SEPARABLE_COMPILATION ON) # Enables device code linking between .cu files - Important!
 target_link_libraries(ion_engine PUBLIC CUDA::cufft)
+if(IONO_WITH_NVTX)
+  # Always compile profiling code; runtime will dynamically load NVTX if present
+  target_compile_definitions(ion_engine PUBLIC IONOSENSE_ENABLE_PROFILING)
+endif()
 endif()
 
 
@@ -147,6 +158,10 @@ if(IONO_WITH_PYTHON AND IONO_WITH_CUDA)
         CUDA::cudart_static
         CUDA::cufft
     )
+    if(IONO_WITH_NVTX)
+        # _engine compiles only bindings.cpp; profiling is handled in ion_engine object TUs.
+        target_compile_definitions(_engine PRIVATE IONOSENSE_ENABLE_PROFILING)
+    endif()
 
     # If building via scikit-build-core, install into the package path
     if(DEFINED SKBUILD)
@@ -255,6 +270,7 @@ if(IONO_WITH_TESTS AND IONO_WITH_CUDA)
         CUDA::cudart_static
         CUDA::cufft
     )
+    # NVTX3 is header-only in our integration; no additional linking required
 
     include(GoogleTest)
     gtest_discover_tests(test_engine)

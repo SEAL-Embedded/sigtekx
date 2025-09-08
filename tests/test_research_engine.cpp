@@ -22,6 +22,8 @@
 
 #include "ionosense/processing_stage.hpp"
 #include "ionosense/research_engine.hpp"
+// Ensure CUDA runtime symbols are available to this test
+#include "ionosense/cuda_wrappers.hpp"
 
 // IEEE Std 1003.1-2001 compliance for mathematical constants
 #ifndef M_PI

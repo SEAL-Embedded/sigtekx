@@ -14,14 +14,14 @@
  */
 
 #include "ionosense/processing_stage.hpp"
+#include "ionosense/profiling_macros.hpp"
+#include "ionosense/cuda_wrappers.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
 #include <string>
 #include <vector>
-
-#include "ionosense/cuda_wrappers.hpp"
 
 // --- External Kernel Launch Function Declarations (from ops_fft.cu) ---
 namespace ionosense {
@@ -56,27 +56,37 @@ class WindowStage::Impl {
   Impl() = default;
 
   void initialize(const StageConfig& config, cudaStream_t stream) {
+    IONO_NVTX_RANGE("WindowStage::Initialize", profiling::colors::DARK_GRAY);
     config_ = config;
 
     // Generate window coefficients on the host CPU.
-    std::vector<float> host_window(config.nfft);
-    bool sqrt_norm = (config.window_norm == StageConfig::WindowNorm::SQRT);
-    kernels::generate_hann_window_cpu(host_window.data(), config.nfft,
-                                      sqrt_norm);
+    {
+      IONO_NVTX_RANGE("Generate Window Coefficients", profiling::colors::CYAN);
+      std::vector<float> host_window(config.nfft);
+      bool sqrt_norm = (config.window_norm == StageConfig::WindowNorm::SQRT);
+      kernels::generate_hann_window_cpu(host_window.data(), config.nfft,
+                                        sqrt_norm);
 
-    // Allocate device memory and upload the window coefficients.
-    d_window_.resize(config.nfft);
-    d_window_.copy_from_host(host_window.data(), config.nfft, stream);
+      // Allocate device memory and upload the window coefficients.
+      d_window_.resize(config.nfft);
+      IONO_NVTX_RANGE("Upload Window Coefficients", profiling::colors::GREEN);
+      d_window_.copy_from_host(host_window.data(), config.nfft, stream);
+    }
 
     // Ensure the window is fully uploaded before subsequent stages might use
     // it.
-    IONO_CUDA_CHECK(cudaStreamSynchronize(stream));
+    {
+      IONO_NVTX_RANGE("Window Upload Sync", profiling::colors::YELLOW);
+      IONO_CUDA_CHECK(cudaStreamSynchronize(stream));
+    }
 
     initialized_ = true;
+    IONO_NVTX_MARK("WindowStage Ready", profiling::colors::CYAN);
   }
 
   void process(void* input, void* output, size_t num_samples,
                cudaStream_t stream) {
+    IONO_NVTX_RANGE("WindowStage::Execute", profiling::colors::PURPLE);
     if (!initialized_) {
       throw std::runtime_error("WindowStage not initialized");
     }
@@ -88,9 +98,12 @@ class WindowStage::Impl {
     const float* input_ptr = static_cast<const float*>(input);
     float* output_ptr = static_cast<float*>(output);
 
-    kernels::launch_apply_window(input_ptr, output_ptr, d_window_.get(),
-                                 config_.nfft, config_.batch, config_.nfft,
-                                 stream);
+    {
+      IONO_NVTX_RANGE("Window Kernel Launch", profiling::colors::PURPLE);
+      kernels::launch_apply_window(input_ptr, output_ptr, d_window_.get(),
+                                   config_.nfft, config_.batch, config_.nfft,
+                                   stream);
+    }
   }
 
   size_t get_workspace_size() const { return d_window_.bytes(); }
@@ -130,27 +143,33 @@ class FFTStage::Impl {
   Impl() = default;
 
   void initialize(const StageConfig& config, cudaStream_t stream) {
+    IONO_NVTX_RANGE("FFTStage::Initialize", profiling::colors::DARK_GRAY);
     config_ = config;
 
     // Configure dimensions for a batched 1D Real-to-Complex transform.
-    int n[] = {config.nfft};
-    plan_.create_plan_many(
-        1,                    // rank (1D transform)
-        n,                    // dimensions
-        nullptr,              // inembed (not used for simple layout)
-        1,                    // istride
-        config.nfft,          // idist (distance between batches)
-        nullptr,              // onembed
-        1,                    // ostride
-        config.nfft / 2 + 1,  // odist (distance for R2C output)
-        CUFFT_R2C,            // Transform type
-        config.batch,         // Number of transforms in the batch
-        stream);
+    {
+      IONO_NVTX_RANGE("Create cuFFT Plan", profiling::colors::CYAN);
+      int n[] = {config.nfft};
+      plan_.create_plan_many(
+          1,                    // rank (1D transform)
+          n,                    // dimensions
+          nullptr,              // inembed (not used for simple layout)
+          1,                    // istride
+          config.nfft,          // idist (distance between batches)
+          nullptr,              // onembed
+          1,                    // ostride
+          config.nfft / 2 + 1,  // odist (distance for R2C output)
+          CUFFT_R2C,            // Transform type
+          config.batch,         // Number of transforms in the batch
+          stream);
+    }
     initialized_ = true;
+    IONO_NVTX_MARK("FFTStage Ready", profiling::colors::CYAN);
   }
 
   void process(void* input, void* output, size_t num_samples,
                cudaStream_t /*stream*/) {
+    IONO_NVTX_RANGE("FFTStage::Execute", profiling::colors::PURPLE);
     if (!initialized_) {
       throw std::runtime_error("FFTStage not initialized");
     }
@@ -160,9 +179,12 @@ class FFTStage::Impl {
     }
 
     // Execute the R2C transform. Input is real, output is complex.
-    cufftReal* fft_real_input = static_cast<cufftReal*>(input);
-    cufftComplex* fft_cplx_output = reinterpret_cast<cufftComplex*>(output);
-    plan_.exec_r2c(fft_real_input, fft_cplx_output);
+    {
+      IONO_NVTX_RANGE("cuFFT Execution", profiling::colors::PURPLE);
+      cufftReal* fft_real_input = static_cast<cufftReal*>(input);
+      cufftComplex* fft_cplx_output = reinterpret_cast<cufftComplex*>(output);
+      plan_.exec_r2c(fft_real_input, fft_cplx_output);
+    }
   }
 
   size_t get_workspace_size() const { return plan_.work_size(); }
@@ -200,27 +222,32 @@ class MagnitudeStage::Impl {
   Impl() = default;
 
   void initialize(const StageConfig& cfg, cudaStream_t /*stream*/) {
+    IONO_NVTX_RANGE("MagnitudeStage::Initialize", profiling::colors::DARK_GRAY);
     config_ = cfg;
     num_output_bins_ = static_cast<int>(config_.nfft / 2 + 1);
 
     // Pre-calculate the scaling factor based on the selected policy.
-    switch (config_.scale_policy) {
-      case StageConfig::ScalePolicy::ONE_OVER_N:
-        scale_ = 1.0f / static_cast<float>(config_.nfft);
-        break;
-      case StageConfig::ScalePolicy::ONE_OVER_SQRT_N:
-        scale_ = 1.0f / std::sqrt(static_cast<float>(config_.nfft));
-        break;
-      case StageConfig::ScalePolicy::NONE:
-      default:
-        scale_ = 1.0f;
-        break;
+    {
+      IONO_NVTX_RANGE("Calculate Scaling Factor", profiling::colors::CYAN);
+      switch (config_.scale_policy) {
+        case StageConfig::ScalePolicy::ONE_OVER_N:
+          scale_ = 1.0f / static_cast<float>(config_.nfft);
+          break;
+        case StageConfig::ScalePolicy::ONE_OVER_SQRT_N:
+          scale_ = 1.0f / std::sqrt(static_cast<float>(config_.nfft));
+          break;
+        case StageConfig::ScalePolicy::NONE:
+        default:
+          scale_ = 1.0f;
+          break;
+      }
     }
     initialized_ = true;
   }
 
   void process(void* input, void* output, size_t num_elements,
                cudaStream_t stream) {
+    IONO_NVTX_RANGE("MagnitudeStage::Execute", profiling::colors::PURPLE);
     if (!initialized_) {
       throw std::runtime_error("MagnitudeStage not initialized");
     }
@@ -246,8 +273,11 @@ class MagnitudeStage::Impl {
       throw std::runtime_error("MagnitudeStage: unsupported input layout");
     }
 
-    kernels::launch_magnitude(complex_input, mag_output, bins_per_frame, frames,
-                              inferred_stride, scale_, stream);
+    {
+      IONO_NVTX_RANGE("Magnitude Kernel Launch", profiling::colors::PURPLE);
+      kernels::launch_magnitude(complex_input, mag_output, bins_per_frame,
+                                frames, inferred_stride, scale_, stream);
+    }
   }
 
   size_t get_workspace_size() const { return 0; }
@@ -279,25 +309,36 @@ size_t MagnitudeStage::get_workspace_size() const {
 // ============================================================================
 
 std::unique_ptr<IProcessingStage> StageFactory::create(StageType type) {
+  IONO_NVTX_RANGE("StageFactory::Create", profiling::colors::DARK_GRAY);
   switch (type) {
-    case StageType::WINDOW:
+    case StageType::WINDOW: {
+      IONO_NVTX_MARK("Create WindowStage", profiling::colors::MAGENTA);
       return std::make_unique<WindowStage>();
-    case StageType::FFT:
+    }
+    case StageType::FFT: {
+      IONO_NVTX_MARK("Create FFTStage", profiling::colors::MAGENTA);
       return std::make_unique<FFTStage>();
-    case StageType::MAGNITUDE:
+    }
+    case StageType::MAGNITUDE: {
+      IONO_NVTX_MARK("Create MagnitudeStage", profiling::colors::MAGENTA);
       return std::make_unique<MagnitudeStage>();
-    default:
+    }
+    default: {
       throw std::invalid_argument(
           "Unknown stage type requested from StageFactory");
+    }
   }
 }
 
 std::vector<std::unique_ptr<IProcessingStage>>
 StageFactory::create_default_pipeline() {
+  IONO_NVTX_RANGE("StageFactory::CreateDefaultPipeline",
+                  profiling::colors::DARK_GRAY);
   std::vector<std::unique_ptr<IProcessingStage>> stages;
   stages.push_back(create(StageType::WINDOW));
   stages.push_back(create(StageType::FFT));
   stages.push_back(create(StageType::MAGNITUDE));
+  IONO_NVTX_MARK("Default Pipeline Created", profiling::colors::MAGENTA);
   return stages;
 }
 
@@ -308,6 +349,7 @@ StageFactory::create_default_pipeline() {
 namespace window_utils {
 
 void generate_hann_window(float* window, int size, bool sqrt_norm) {
+    IONO_NVTX_RANGE("Generate Hann Window", profiling::colors::CYAN);
   const float pi = 3.14159265358979323846f;
   for (int i = 0; i < size; ++i) {
     // Standard Hann window formula
@@ -317,6 +359,7 @@ void generate_hann_window(float* window, int size, bool sqrt_norm) {
 }
 
 void normalize_window(float* window, int size, StageConfig::WindowNorm norm) {
+  IONO_NVTX_RANGE("Normalize Window", profiling::colors::CYAN);
   if (norm == StageConfig::WindowNorm::UNITY) {
     float sum = 0.0f;
     for (int i = 0; i < size; ++i) {

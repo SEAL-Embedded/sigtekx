@@ -13,6 +13,7 @@ dependencies:
   # CUDA toolchain (NVCC + dev libs)
   - cuda-compiler=13.0
   - cuda-libraries-dev=13.0
+  - cuda-nvtx-dev=13.0
 
   # C++ testing
   - gtest

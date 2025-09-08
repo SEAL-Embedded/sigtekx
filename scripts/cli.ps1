@@ -239,12 +239,14 @@ Function Invoke-Build {
     param(
         [string]$Preset = $script:BuildPreset,
         [switch]$Clean,
-        [switch]$Verbose
+        [switch]$Verbose,
+        [switch]$NoNvtx
     )
     
     Write-ResearchLog -Level Info -Message "Starting build" -Component "Build" -Metadata @{
         preset = $Preset
         clean = $Clean.IsPresent
+        no_nvtx = $NoNvtx.IsPresent
     }
     
     if (-not (Test-CondaEnvironment)) {
@@ -259,8 +261,10 @@ Function Invoke-Build {
         }
     }
     
-    # Configure
-    cmake --preset $Preset
+    # Configure (allow overriding some cache vars via flags)
+    $configureArgs = @("--preset", $Preset)
+    if ($NoNvtx) { $configureArgs += @("-D","IONO_WITH_NVTX=OFF") }
+    cmake @configureArgs
     if ($LASTEXITCODE -ne 0) {
         throw "CMake configuration failed"
     }
@@ -969,12 +973,28 @@ try {
         "setup"    { Invoke-Setup }
         "build"    { 
             $params = @{}
-            if ($CommandArgs -contains "-Clean") { $params.Clean = $true }
+            if ($CommandArgs -contains "-Clean")   { $params.Clean   = $true }
             if ($CommandArgs -contains "-Verbose") { $params.Verbose = $true }
-            
-            $preset = $CommandArgs | Where-Object { $_ -notlike "-*" } | Select-Object -First 1
-            if ($preset) { $params.Preset = $preset }
-            
+            if ($CommandArgs -contains "-NoNvtx")  { $params.NoNvtx  = $true }
+
+            # Support explicit -Preset <name>
+            for ($i = 0; $i -lt $CommandArgs.Count; $i++) {
+                if ($CommandArgs[$i] -eq "-Preset" -and $i+1 -lt $CommandArgs.Count) {
+                    $params.Preset = $CommandArgs[$i+1]
+                }
+            }
+
+            # Map convenience flags to presets if no explicit -Preset
+            if (-not $params.ContainsKey('Preset')) {
+                if ($CommandArgs -contains "-Debug") { $params.Preset = "windows-debug" }
+                elseif ($CommandArgs -contains "-Release" -or $CommandArgs -contains "-Rel") { $params.Preset = "windows-rel" }
+                else {
+                    # First non-flag token can still override
+                    $presetToken = $CommandArgs | Where-Object { $_ -notlike "-*" } | Select-Object -First 1
+                    if ($presetToken) { $params.Preset = $presetToken }
+                }
+            }
+
             Invoke-Build @params
         }
         "test"     {
