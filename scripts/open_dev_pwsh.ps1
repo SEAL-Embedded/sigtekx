@@ -82,16 +82,29 @@ function Activate-CondaEnv {
     if ($NoConda) { return }
     if ($env:CONDA_DEFAULT_ENV -eq $Name) { Info "Conda env '$Name' already active."; return }
 
-    $runner = $null
-    if (Get-Command mamba -ErrorAction SilentlyContinue) { $runner = 'mamba' }
-    elseif (Get-Command conda -ErrorAction SilentlyContinue) { $runner = 'conda' }
+    $activated = $false
 
-    if (-not $runner) { Warn "conda/mamba not found on PATH. Skipping env activation."; return }
+    foreach ($runner in @('mamba','conda')) {
+        $cmd = Get-Command $runner -ErrorAction SilentlyContinue
+        if (-not $cmd) { continue }
 
-    & $runner activate $Name
-    if ($env:CONDA_DEFAULT_ENV -eq $Name) { Ok "Activated '$Name' via $runner." }
-    else { Warn "Tried to activate '$Name' via $runner, but it didn’t stick." }
+        try {
+            & $runner activate $Name 2>$null | Out-Null
+            if ($env:CONDA_DEFAULT_ENV -eq $Name) {
+                Ok "Activated '$Name' via $runner."
+                $activated = $true
+                break
+            }
+        } catch {
+            # ignore and try the next runner
+        }
+    }
+
+    if (-not $activated) {
+        Warn "Tried to activate '$Name' via mamba/conda, but it didn’t stick."
+    }
 }
+
 
 # ----- Ensure conda is available on PATH (robust for non-profile sessions) -----
 function Ensure-CondaOnPath {
