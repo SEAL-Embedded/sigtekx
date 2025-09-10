@@ -16,11 +16,10 @@ from ionosense_hpc.config import EngineConfig, Presets
 from ionosense_hpc.core import Processor
 from ionosense_hpc.utils import logger, make_chirp, make_multitone, make_noise, make_sine
 from ionosense_hpc.utils.profiling import (
+    ProfileColor,
     nvtx_range,
     setup_range,
     teardown_range,
-    ProfilingDomain,
-    ProfileColor,
 )
 
 
@@ -408,7 +407,7 @@ class AccuracyBenchmark(BaseBenchmark):
         Returns:
             Dictionary with detailed accuracy analysis
         """
-        from ionosense_hpc.utils.profiling import nvtx_range, ProfileColor
+        from ionosense_hpc.utils.profiling import ProfileColor, nvtx_range
         with nvtx_range("AnalyzeAccuracyResults", color=ProfileColor.ORANGE):
             analysis = {
                 'summary': {

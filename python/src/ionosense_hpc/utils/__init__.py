@@ -17,23 +17,23 @@ from .device import (
 )
 from .logging import log_config, log_device_info, log_performance, logger, setup_logging
 from .profiling import (
-    nvtx_range,
-    nvtx_decorate,
-    benchmark_range,
-    compute_range,
-    transfer_range,
-    setup_range,
-    teardown_range,
-    sync_range,
-    warmup_range,
-    mark_event,
-    profile_iterator,
+    NVTX_AVAILABLE,
+    ProfileCategory,
+    ProfileColor,
     ProfilingContext,
     ProfilingDomain,
-    ProfileColor,
-    ProfileCategory,
+    benchmark_range,
+    compute_range,
     initialize_profiling,
-    NVTX_AVAILABLE,
+    mark_event,
+    nvtx_decorate,
+    nvtx_range,
+    profile_iterator,
+    setup_range,
+    sync_range,
+    teardown_range,
+    transfer_range,
+    warmup_range,
 )
 
 

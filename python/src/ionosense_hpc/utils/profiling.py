@@ -9,9 +9,10 @@ behaves as a no-op with minimal overhead.
 from __future__ import annotations
 
 import functools
+from collections.abc import Callable
 from contextlib import contextmanager
 from enum import Enum
-from typing import Any, Callable
+from typing import Any
 
 try:  # Optional dependency
     import nvtx  # type: ignore

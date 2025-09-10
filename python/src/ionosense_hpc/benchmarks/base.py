@@ -24,13 +24,13 @@ from pydantic import BaseModel, Field
 
 from ionosense_hpc.utils import logger
 from ionosense_hpc.utils.profiling import (
+    ProfileColor,
+    ProfilingDomain,
     benchmark_range,
     nvtx_range,
     setup_range,
     teardown_range,
     warmup_range,
-    ProfilingDomain,
-    ProfileColor,
 )
 
 T = TypeVar('T')
@@ -239,7 +239,8 @@ class BaseBenchmark(abc.ABC):
 
         # Check GPU availability (only hard-require if configured)
         try:
-            from ionosense_hpc.utils import gpu_count, logger as _logger
+            from ionosense_hpc.utils import gpu_count
+            from ionosense_hpc.utils import logger as _logger
             n_gpu = gpu_count()
             if self.config.require_gpu:
                 if n_gpu == 0:

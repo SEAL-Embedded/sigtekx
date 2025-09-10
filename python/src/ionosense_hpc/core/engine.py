@@ -9,16 +9,16 @@ from ionosense_hpc.core.raw_engine import RawEngine
 from ionosense_hpc.exceptions import EngineStateError, ValidationError
 from ionosense_hpc.utils.logging import log_config, log_performance, logger
 from ionosense_hpc.utils.profiling import (
-    nvtx_decorate,
-    nvtx_range,
-    compute_range,
-    transfer_range,
-    sync_range,
-    warmup_range,
-    setup_range,
-    teardown_range,
     ProfileColor,
     ProfilingDomain,
+    compute_range,
+    nvtx_decorate,
+    nvtx_range,
+    setup_range,
+    sync_range,
+    teardown_range,
+    transfer_range,
+    warmup_range,
 )
 
 

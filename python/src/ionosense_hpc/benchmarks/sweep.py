@@ -25,14 +25,10 @@ from ionosense_hpc.benchmarks.base import (
 )
 from ionosense_hpc.utils import logger
 from ionosense_hpc.utils.profiling import (
+    ProfileColor,
+    ProfilingDomain,
     benchmark_range,
     nvtx_range,
-    setup_range,
-    teardown_range,
-    compute_range,
-    ProfilingDomain,
-    ProfileColor,
-    mark_event,
 )
 
 

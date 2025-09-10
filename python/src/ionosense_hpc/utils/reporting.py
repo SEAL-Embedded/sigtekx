@@ -25,7 +25,7 @@ except Exception:  # optional styling
     sns = None  # type: ignore
 from scipy import stats
 
-from ionosense_hpc.benchmarks.base import BenchmarkResult, BenchmarkContext
+from ionosense_hpc.benchmarks.base import BenchmarkContext, BenchmarkResult
 from ionosense_hpc.utils import logger
 
 # Set publication-quality defaults (guard if matplotlib/seaborn present)

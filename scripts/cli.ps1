@@ -479,6 +479,117 @@ Function Invoke-Format {
     }
 }
 
+# --- Linting ---------------------------------------------------------------
+Function Invoke-Lint {
+    param(
+        [ValidateSet("all","python","py","cpp","c++")][string]$Target = "all",
+        [switch]$Fix,
+        [switch]$Verbose
+    )
+
+    $targetNorm = ($Target.ToLower())
+    switch ($targetNorm) {
+        'py' { $targetNorm = 'python' }
+        'c++'{ $targetNorm = 'cpp' }
+    }
+
+    Write-ResearchLog -Level Info -Message "Running lint" -Component "Lint" -Metadata @{
+        target = $targetNorm
+        fix = $Fix.IsPresent
+    }
+
+    $overallFailed = $false
+
+    # --- Python (ruff) ---
+    if ($targetNorm -eq 'all' -or $targetNorm -eq 'python') {
+        $ruffExe = $null
+        foreach ($cmd in @('ruff','ruff.exe')) {
+            $found = Get-Command $cmd -ErrorAction SilentlyContinue
+            if ($found) { $ruffExe = $found.Source; break }
+        }
+        if (-not $ruffExe) {
+            # Fallback to python -m ruff
+            $pyExe = if ($env:CONDA_PREFIX) { Join-Path $env:CONDA_PREFIX 'python.exe' } else { 'python' }
+            $ruffExe = $pyExe
+            $useModule = $true
+        } else { $useModule = $false }
+
+    $pyPaths = @(
+            (Join-Path $script:PythonDir 'src'),
+            (Join-Path $script:PythonDir 'tests')
+        )
+
+        $args = @()
+        if ($useModule) { $args += @('-m','ruff') }
+        $args += @('check')
+        if ($Fix) { $args += '--fix' }
+        if ($Verbose) { $args += '-v' }
+        $args += $pyPaths
+
+        Write-ResearchLog -Level Info -Message "Ruff check starting" -Component "Lint" -Metadata @{ fix = $Fix.IsPresent }
+        & $ruffExe @args
+        if ($LASTEXITCODE -ne 0) {
+            $overallFailed = $true
+            Write-ResearchLog -Level Error -Message "Python lint failed" -Component "Lint"
+        } else {
+            Write-ResearchLog -Level Info -Message "Python lint passed" -Component "Lint"
+        }
+    }
+
+    # --- C++ (clang-format as lint) ---
+    if ($targetNorm -eq 'all' -or $targetNorm -eq 'cpp') {
+        $clang = $null
+        foreach ($cmd in @('clang-format','clang-format.exe')) {
+            $found = Get-Command $cmd -ErrorAction SilentlyContinue
+            if ($found) { $clang = $found.Source; break }
+        }
+        if (-not $clang) {
+            Write-ResearchLog -Level Error -Message "clang-format not found for C++ lint" -Component "Lint"
+            Write-Host "Install with: 'conda install -c conda-forge clang-format' or 'winget install LLVM.LLVM'" -ForegroundColor Yellow
+            $overallFailed = $true
+        } else {
+            # Reuse the same file discovery logic as format
+            $root = $script:ProjectRoot
+            $targets = @(
+                (Join-Path $root 'src'),
+                (Join-Path $root 'include'),
+                (Join-Path $root 'bindings'),
+                (Join-Path $root 'tests')
+            )
+
+            $excludeNames = @('build','out','dist','_skbuild','.venv','.tox','.mypy_cache','_deps')
+            $patterns = @('*.c','*.cc','*.cpp','*.cxx','*.h','*.hpp','*.hxx','*.cu','*.cuh')
+            $files = @()
+            foreach ($t in $targets) {
+                if (Test-Path -LiteralPath $t) {
+                    $files += Get-ChildItem -LiteralPath $t -Recurse -File -Include $patterns |
+                        Where-Object { $excludeNames -notcontains $_.Directory.Name }
+                }
+            }
+            $files = $files | ForEach-Object { $_.FullName } | Sort-Object -Unique
+
+            if ($files.Count -eq 0) {
+                Write-ResearchLog -Level Info -Message "No C/C++ files to lint" -Component "Lint"
+            } else {
+                if ($Verbose) { $files | ForEach-Object { Write-Host "Lint (C++ format check): $_" -ForegroundColor DarkGray } }
+                & $clang -n -Werror -style=file @files
+                if ($LASTEXITCODE -ne 0) {
+                    $overallFailed = $true
+                    Write-ResearchLog -Level Error -Message "C++ format lint failed" -Component "Lint"
+                } else {
+                    Write-ResearchLog -Level Info -Message "C++ format lint passed" -Component "Lint"
+                }
+            }
+        }
+    }
+
+    if ($overallFailed) {
+        throw "Lint failures detected"
+    } else {
+        Write-ResearchLog -Level Info -Message "Lint passed" -Component "Lint"
+    }
+}
+
 Function Invoke-Benchmark {
     param(
         [string]$Benchmark,
@@ -1016,6 +1127,8 @@ BUILD & DEVELOPMENT
                           Run tests (aliases: py/p for python, c++ for cpp)
   format [paths] [-Check] [-Verbose]
                           Format C/C++ code with .clang-format
+  lint [all|python|py|cpp] [-Fix] [-Verbose]
+                          Lint Python (ruff) and/or C++ (format check)
   clean                   Remove all build artifacts
 
 BENCHMARKING (Research-Grade)
@@ -1138,6 +1251,16 @@ try {
             if ($paths -and $paths.Count -gt 0) { $params.Paths = $paths }
 
             Invoke-Format @params
+        }
+        "lint"     {
+            $params = @{}
+            if ($CommandArgs -contains "-Fix")     { $params.Fix     = $true }
+            if ($CommandArgs -contains "-Verbose") { $params.Verbose = $true }
+
+            $target = $CommandArgs | Where-Object { $_ -notlike "-*" } | Select-Object -First 1
+            if ($target) { $params.Target = $target }
+
+            Invoke-Lint @params
         }
         "sweep"    {
             $params = @{}

@@ -16,12 +16,12 @@ from ionosense_hpc.config import EngineConfig, Presets
 from ionosense_hpc.core import Processor
 from ionosense_hpc.utils import get_memory_usage, logger, make_test_batch
 from ionosense_hpc.utils.profiling import (
+    ProfileColor,
+    ProfilingDomain,
+    compute_range,
     nvtx_range,
     setup_range,
     teardown_range,
-    compute_range,
-    ProfilingDomain,
-    ProfileColor,
 )
 
 

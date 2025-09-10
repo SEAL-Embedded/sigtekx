@@ -31,6 +31,7 @@ from .sweep import (
     ParameterSweep,
 )
 
+
 # Lazy loaders for benchmark classes (avoid heavy imports at module import time)
 def get_latency_benchmark():
     from .latency import LatencyBenchmark, StreamingLatencyBenchmark
@@ -38,7 +39,7 @@ def get_latency_benchmark():
 
 
 def get_throughput_benchmark():
-    from .throughput import ThroughputBenchmark, ScalingBenchmark, MemoryStressBenchmark
+    from .throughput import MemoryStressBenchmark, ScalingBenchmark, ThroughputBenchmark
     return ThroughputBenchmark, ScalingBenchmark, MemoryStressBenchmark
 
 

@@ -15,13 +15,11 @@ from ionosense_hpc.config import EngineConfig, Presets
 from ionosense_hpc.core import Processor
 from ionosense_hpc.utils import logger, make_test_batch
 from ionosense_hpc.utils.profiling import (
-    benchmark_range,
+    ProfileColor,
+    ProfilingDomain,
     nvtx_range,
     setup_range,
     teardown_range,
-    warmup_range,
-    ProfilingDomain,
-    ProfileColor,
 )
 
 
@@ -178,7 +176,7 @@ class LatencyBenchmark(BaseBenchmark):
         Returns:
             Dictionary of analysis results
         """
-        from ionosense_hpc.utils.profiling import nvtx_range, ProfileColor
+        from ionosense_hpc.utils.profiling import ProfileColor, nvtx_range
         with nvtx_range("AnalyzeResults", color=ProfileColor.ORANGE):
             if isinstance(result.measurements, dict):
                 latencies = result.measurements.get('latency_us', np.array([]))

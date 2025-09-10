@@ -16,13 +16,12 @@ from ionosense_hpc.exceptions import EngineStateError
 from ionosense_hpc.utils.device import device_info, monitor_device
 from ionosense_hpc.utils.logging import logger
 from ionosense_hpc.utils.profiling import (
+    ProfileColor,
+    ProfilingDomain,
+    compute_range,
     nvtx_decorate,
     setup_range,
     teardown_range,
-    compute_range,
-    warmup_range,
-    ProfileColor,
-    ProfilingDomain,
 )
 
 

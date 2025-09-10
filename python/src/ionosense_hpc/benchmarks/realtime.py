@@ -15,12 +15,11 @@ from ionosense_hpc.config import EngineConfig, Presets
 from ionosense_hpc.core import Processor
 from ionosense_hpc.utils import logger, make_test_batch
 from ionosense_hpc.utils.profiling import (
+    ProfileColor,
+    compute_range,
     nvtx_range,
     setup_range,
     teardown_range,
-    compute_range,
-    ProfilingDomain,
-    ProfileColor,
 )
 
 
@@ -234,7 +233,7 @@ class RealtimeBenchmark(BaseBenchmark):
         Returns:
             Dictionary with real-time specific analysis
         """
-        from ionosense_hpc.utils.profiling import nvtx_range, ProfileColor
+        from ionosense_hpc.utils.profiling import ProfileColor, nvtx_range
         analysis = {}
         with nvtx_range("AnalyzeResults", color=ProfileColor.ORANGE):
             # Frame timing analysis

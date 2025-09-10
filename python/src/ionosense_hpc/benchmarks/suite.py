@@ -26,13 +26,11 @@ from ionosense_hpc.benchmarks.throughput import ScalingBenchmark, ThroughputBenc
 from ionosense_hpc.config import Presets
 from ionosense_hpc.utils import logger
 from ionosense_hpc.utils.profiling import (
-    benchmark_range,
-    nvtx_range,
-    setup_range,
-    teardown_range,
-    ProfilingDomain,
     ProfileColor,
+    ProfilingDomain,
+    benchmark_range,
     mark_event,
+    nvtx_range,
 )
 
 
