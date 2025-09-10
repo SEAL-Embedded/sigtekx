@@ -590,6 +590,87 @@ Function Invoke-Lint {
     }
 }
 
+# --- Clean -----------------------------------------------------------------
+Function Invoke-Clean {
+    param(
+        [switch]$All,
+        [switch]$Verbose
+    )
+
+    Write-ResearchLog -Level Info -Message "Cleaning workspace" -Component "Clean" -Metadata @{
+        all = $All.IsPresent
+    }
+
+    $removed = @()
+
+    Function Remove-Target {
+        param([string]$Path)
+        if (-not $Path) { return }
+        if (Test-Path -LiteralPath $Path) {
+            try {
+                if ($Verbose) { Write-Host ("Removing: {0}" -f $Path) -ForegroundColor DarkGray }
+                Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop
+                $removed += $Path
+                Write-ResearchLog -Level Info -Message "Removed: $Path" -Component "Clean"
+            }
+            catch {
+                Write-ResearchLog -Level Warning -Message "Failed to remove: $Path" -Component "Clean" -Metadata @{ error = $_.Exception.Message }
+            }
+        }
+    }
+
+    # Default: build artifacts and Python caches/extension
+    $root = $script:ProjectRoot
+    $defaultDirs = @(
+        $script:BuildDir,
+        (Join-Path $root 'out')
+    )
+    foreach ($d in $defaultDirs) { Remove-Target -Path $d }
+
+    # Python caches and egg-info anywhere in repo
+    Get-ChildItem -Path $root -Include '__pycache__','.pytest_cache','*.egg-info' -Directory -Recurse -Force -ErrorAction SilentlyContinue |
+        ForEach-Object {
+            Remove-Target -Path $_.FullName
+        }
+
+    # Remove compiled Python extension and staged libs
+    $pySrc = Join-Path $script:PythonDir 'src'
+    $ionDir = Join-Path $pySrc 'ionosense_hpc'
+    $engineDir = Join-Path $ionDir 'core'
+    if (Test-Path -LiteralPath $engineDir) {
+        Get-ChildItem -Path $engineDir -Filter '_engine.*' -File -ErrorAction SilentlyContinue |
+            ForEach-Object { Remove-Target -Path $_.FullName }
+    }
+    $libsDir = Join-Path $ionDir '.libs'
+    foreach ($sub in @('', 'windows', 'linux')) {
+        $libPath = if ($sub) { Join-Path $libsDir $sub } else { $libsDir }
+        Remove-Target -Path $libPath
+    }
+
+    if ($All) {
+        # Research artifacts and extra caches
+        $allDirs = @(
+            (Join-Path $root 'results'),
+            (Join-Path $root 'benchmark_results'),
+            (Join-Path $root 'experiments'),
+            $script:ReportsDir,
+            $script:ExperimentsDir,
+            $script:ProfileDir,
+            $script:LogRoot,
+            (Join-Path $root 'dist'),
+            (Join-Path $root '.mypy_cache'),
+            (Join-Path $root '.ruff_cache')
+        )
+        foreach ($d in $allDirs) { Remove-Target -Path $d }
+
+        # Coverage artifacts
+        foreach ($f in @('.coverage')) { Remove-Target -Path (Join-Path $root $f) }
+        Remove-Target -Path (Join-Path $root 'htmlcov')
+    }
+
+    Write-ResearchLog -Level Info -Message "Clean completed" -Component "Clean"
+}
+
 Function Invoke-Benchmark {
     param(
         [string]$Benchmark,
@@ -1129,7 +1210,7 @@ BUILD & DEVELOPMENT
                           Format C/C++ code with .clang-format
   lint [all|python|py|cpp] [-Fix] [-Verbose]
                           Lint Python (ruff) and/or C++ (format check)
-  clean                   Remove all build artifacts
+  clean [-All]            Remove build artifacts (and results/logs with -All)
 
 BENCHMARKING (Research-Grade)
   bench <name> [-Config] [-Output] [-Report]
@@ -1354,17 +1435,10 @@ except KeyboardInterrupt:
             }
         }
         "clean"    {
-            Write-ResearchLog -Level Info -Message "Cleaning workspace" -Component "Clean"
-            
-            @($script:BuildDir) | ForEach-Object {
-                if (Test-Path $_) {
-                    Remove-Item -Path $_ -Recurse -Force
-                    Write-ResearchLog -Level Info -Message "Removed: $_" -Component "Clean"
-                }
-            }
-            
-            Get-ChildItem -Path $script:ProjectRoot -Include __pycache__,.pytest_cache,*.egg-info -Directory -Recurse -Force |
-                Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+            $params = @{}
+            if ($CommandArgs -contains "-All")     { $params.All     = $true }
+            if ($CommandArgs -contains "-Verbose") { $params.Verbose = $true }
+            Invoke-Clean @params
         }
         default    {
             Write-ResearchLog -Level Error -Message "Unknown command: $Command" -Component "CLI"
