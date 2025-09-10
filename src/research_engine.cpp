@@ -14,9 +14,6 @@
  */
 
 #include "ionosense/research_engine.hpp"
-#include "ionosense/profiling_macros.hpp"  // Profiling second
-#include "ionosense/cuda_wrappers.hpp"
-#include "ionosense/processing_stage.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -24,6 +21,10 @@
 #include <numeric>
 #include <sstream>
 #include <stdexcept>
+
+#include "ionosense/cuda_wrappers.hpp"
+#include "ionosense/processing_stage.hpp"
+#include "ionosense/profiling_macros.hpp"  // Profiling second
 
 namespace ionosense {
 
@@ -200,7 +201,8 @@ class ResearchEngine::Impl {
       const std::string h2d_msg =
           profiling::format_memory_range("H2D Transfer", bytes);
       IONO_NVTX_RANGE(h2d_msg.c_str(), profiling::colors::GREEN);
-      d_input.copy_from_host(input, num_samples, streams_[h2d_stream_idx].get());
+      d_input.copy_from_host(input, num_samples,
+                             streams_[h2d_stream_idx].get());
       e_h2d_done.record(streams_[h2d_stream_idx].get());
     }
 
@@ -216,8 +218,8 @@ class ResearchEngine::Impl {
                           streams_[compute_stream_idx].get());
       const size_t complex_elements =
           static_cast<size_t>(config_.num_output_bins()) * config_.batch;
-      stages_[2]->process(d_intermediate.get(), d_output.get(), complex_elements,
-                          streams_[compute_stream_idx].get());
+      stages_[2]->process(d_intermediate.get(), d_output.get(),
+                          complex_elements, streams_[compute_stream_idx].get());
       e_compute_done.record(streams_[compute_stream_idx].get());
     }
 

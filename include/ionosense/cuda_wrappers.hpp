@@ -23,36 +23,36 @@
 
 // Tame problematic Windows macros that can collide with C++ identifiers
 #ifdef _WIN32
-#  ifdef small
-#    undef small
-#  endif
-#  ifdef min
-#    undef min
-#  endif
-#  ifdef max
-#    undef max
-#  endif
-#  ifdef near
-#    undef near
-#  endif
-#  ifdef far
-#    undef far
-#  endif
-#  ifdef interface
-#    undef interface
-#  endif
-#  ifdef ERROR
-#    undef ERROR
-#  endif
-#  ifdef string
-#    undef string
-#  endif
-#  ifdef byte
-#    undef byte
-#  endif
-#  ifdef hyper
-#    undef hyper
-#  endif
+#ifdef small
+#undef small
+#endif
+#ifdef min
+#undef min
+#endif
+#ifdef max
+#undef max
+#endif
+#ifdef near
+#undef near
+#endif
+#ifdef far
+#undef far
+#endif
+#ifdef interface
+#undef interface
+#endif
+#ifdef ERROR
+#undef ERROR
+#endif
+#ifdef string
+#undef string
+#endif
+#ifdef byte
+#undef byte
+#endif
+#ifdef hyper
+#undef hyper
+#endif
 #endif
 
 #include <cstring>  // For std::memset

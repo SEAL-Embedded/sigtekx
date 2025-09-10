@@ -14,14 +14,15 @@
  */
 
 #include "ionosense/processing_stage.hpp"
-#include "ionosense/profiling_macros.hpp"
-#include "ionosense/cuda_wrappers.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
 #include <string>
 #include <vector>
+
+#include "ionosense/cuda_wrappers.hpp"
+#include "ionosense/profiling_macros.hpp"
 
 // --- External Kernel Launch Function Declarations (from ops_fft.cu) ---
 namespace ionosense {
@@ -61,7 +62,8 @@ class WindowStage::Impl {
 
     // Generate window coefficients on the host CPU.
     {
-      IONO_NVTX_RANGE("Generate Window Coefficients", profiling::colors::DARK_GRAY);
+      IONO_NVTX_RANGE("Generate Window Coefficients",
+                      profiling::colors::DARK_GRAY);
       std::vector<float> host_window(config.nfft);
       bool sqrt_norm = (config.window_norm == StageConfig::WindowNorm::SQRT);
       kernels::generate_hann_window_cpu(host_window.data(), config.nfft,
@@ -71,8 +73,8 @@ class WindowStage::Impl {
       d_window_.resize(config.nfft);
       {
         const size_t bytes = static_cast<size_t>(config.nfft) * sizeof(float);
-        const std::string msg = profiling::format_memory_range(
-            "Upload Window Coefficients", bytes);
+        const std::string msg =
+            profiling::format_memory_range("Upload Window Coefficients", bytes);
         IONO_NVTX_RANGE(msg.c_str(), profiling::colors::GREEN);
       }
       d_window_.copy_from_host(host_window.data(), config.nfft, stream);
@@ -91,8 +93,8 @@ class WindowStage::Impl {
 
   void process(void* input, void* output, size_t num_samples,
                cudaStream_t stream) {
-    const std::string range_name = profiling::format_stage_range(
-        "Window", config_.batch, config_.nfft);
+    const std::string range_name =
+        profiling::format_stage_range("Window", config_.batch, config_.nfft);
     IONO_NVTX_RANGE(range_name.c_str(), profiling::colors::PURPLE);
     if (!initialized_) {
       throw std::runtime_error("WindowStage not initialized");
@@ -176,8 +178,8 @@ class FFTStage::Impl {
 
   void process(void* input, void* output, size_t num_samples,
                cudaStream_t /*stream*/) {
-    const std::string range_name = profiling::format_stage_range(
-        "FFT", config_.batch, config_.nfft);
+    const std::string range_name =
+        profiling::format_stage_range("FFT", config_.batch, config_.nfft);
     IONO_NVTX_RANGE(range_name.c_str(), profiling::colors::PURPLE);
     if (!initialized_) {
       throw std::runtime_error("FFTStage not initialized");
@@ -256,8 +258,8 @@ class MagnitudeStage::Impl {
 
   void process(void* input, void* output, size_t num_elements,
                cudaStream_t stream) {
-    const std::string range_name = profiling::format_stage_range(
-        "Magnitude", config_.batch, config_.nfft);
+    const std::string range_name =
+        profiling::format_stage_range("Magnitude", config_.batch, config_.nfft);
     IONO_NVTX_RANGE(range_name.c_str(), profiling::colors::PURPLE);
     if (!initialized_) {
       throw std::runtime_error("MagnitudeStage not initialized");
@@ -360,7 +362,7 @@ StageFactory::create_default_pipeline() {
 namespace window_utils {
 
 void generate_hann_window(float* window, int size, bool sqrt_norm) {
-    IONO_NVTX_RANGE("Generate Hann Window", profiling::colors::DARK_GRAY);
+  IONO_NVTX_RANGE("Generate Hann Window", profiling::colors::DARK_GRAY);
   const float pi = 3.14159265358979323846f;
   for (int i = 0; i < size; ++i) {
     // Standard Hann window formula

@@ -16,10 +16,10 @@
 #include <string>
 #include <vector>
 
+#include "ionosense/cuda_wrappers.hpp"
+#include "ionosense/processing_stage.hpp"  // for ProcessingStats definition
 #include "ionosense/profiling_macros.hpp"
 #include "ionosense/research_engine.hpp"
-#include "ionosense/processing_stage.hpp"  // for ProcessingStats definition
-#include "ionosense/cuda_wrappers.hpp"
 
 using namespace ionosense;
 
@@ -99,11 +99,11 @@ TEST(NvtxProfilingTest, BenchmarkPhasesRun) {
   {
     IONO_NVTX_RANGE("Benchmark Phase", profiling::colors::NVIDIA_BLUE);
     for (int i = 0; i < iterations; ++i) {
-      const std::string iter_name =
-          "Benchmark Iteration " + std::to_string(i);
+      const std::string iter_name = "Benchmark Iteration " + std::to_string(i);
       IONO_NVTX_RANGE(iter_name.c_str(), profiling::colors::NVIDIA_BLUE);
       auto t0 = std::chrono::high_resolution_clock::now();
-      EXPECT_NO_THROW(engine.process(input.data(), output.data(), input.size()));
+      EXPECT_NO_THROW(
+          engine.process(input.data(), output.data(), input.size()));
       auto t1 = std::chrono::high_resolution_clock::now();
       latencies.push_back(
           std::chrono::duration<float, std::micro>(t1 - t0).count());

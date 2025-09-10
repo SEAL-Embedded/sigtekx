@@ -23,10 +23,10 @@
 #include <cuda_runtime.h>
 #include <cufft.h>
 
-#include "ionosense/profiling_macros.hpp"
-
 #include <algorithm>
 #include <cmath>
+
+#include "ionosense/profiling_macros.hpp"
 
 namespace ionosense {
 namespace kernels {

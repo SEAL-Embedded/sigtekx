@@ -383,6 +383,102 @@ Function Invoke-Test {
     }
 }
 
+# --- Code Formatting ---------------------------------------------------------
+Function Invoke-Format {
+    param(
+        [string[]]$Paths = @('src','include','bindings','tests'),
+        [switch]$Check,
+        [switch]$Verbose
+    )
+
+    Write-ResearchLog -Level Info -Message "Formatting C/C++ sources" -Component "Format" -Metadata @{
+        check = $Check.IsPresent
+        paths = ($Paths -join ',')
+    }
+
+    # Resolve clang-format
+    $clang = $null
+    foreach ($cmd in @('clang-format','clang-format.exe')) {
+        $found = Get-Command $cmd -ErrorAction SilentlyContinue
+        if ($found) { $clang = $found.Source; break }
+    }
+
+    if (-not $clang) {
+        Write-ResearchLog -Level Error -Message "clang-format not found in PATH" -Component "Format"
+        Write-Host "Install with: 'conda install -c conda-forge clang-format' or 'winget install LLVM.LLVM'" -ForegroundColor Yellow
+        throw "clang-format is required to format sources"
+    }
+
+    # Expand provided paths relative to project root
+    $root = $script:ProjectRoot
+    $targets = @()
+    foreach ($p in $Paths) {
+        if (-not $p) { continue }
+        $full = if ([IO.Path]::IsPathRooted($p)) { $p } else { Join-Path $root $p }
+        if (Test-Path -LiteralPath $full) { $targets += $full }
+        else { Write-ResearchLog -Level Warning -Message "Path not found: $p" -Component "Format" }
+    }
+
+    if ($targets.Count -eq 0) {
+        Write-ResearchLog -Level Error -Message "No valid paths to format" -Component "Format"
+        throw "No valid paths to format"
+    }
+
+    # Collect source files (avoid build/output dirs even if user passed '.')
+    $excludeNames = @('build','out','dist','_skbuild','.venv','.tox','.mypy_cache','_deps')
+    $patterns = @('*.c','*.cc','*.cpp','*.cxx','*.h','*.hpp','*.hxx','*.cu','*.cuh')
+    $files = @()
+    foreach ($t in $targets) {
+        if ((Get-Item $t).PSIsContainer) {
+            $files += Get-ChildItem -LiteralPath $t -Recurse -File -Include $patterns |
+                Where-Object { $excludeNames -notcontains $_.Directory.Name }
+        } else {
+            # Single file provided
+            if ($patterns | ForEach-Object { $_.Replace('*','') } | Where-Object { $t.ToLower().EndsWith($_.Trim('.').ToLower()) }) {
+                $files += Get-Item -LiteralPath $t
+            }
+        }
+    }
+
+    # De-duplicate and ensure within repo
+    $files = $files | ForEach-Object { $_.FullName } | Sort-Object -Unique |
+        Where-Object { $_.StartsWith($root, [System.StringComparison]::OrdinalIgnoreCase) }
+
+    if ($files.Count -eq 0) {
+        Write-ResearchLog -Level Warning -Message "No C/C++ files found to format" -Component "Format"
+        return
+    }
+
+    Write-ResearchLog -Level Info -Message ("Found {0} files" -f $files.Count) -Component "Format"
+
+    $styleArg = "-style=file"
+    $exitCode = 0
+
+    if ($Check) {
+        # Check mode: no changes, fail if reformat would change files
+        & $clang -n -Werror $styleArg @files
+        $exitCode = $LASTEXITCODE
+        if ($exitCode -ne 0) {
+            Write-ResearchLog -Level Error -Message "Formatting violations detected" -Component "Format"
+            throw "clang-format check failed"
+        } else {
+            Write-ResearchLog -Level Info -Message "All files properly formatted" -Component "Format"
+        }
+    } else {
+        if ($Verbose) {
+            $files | ForEach-Object { Write-Host "Formatting: $_" -ForegroundColor DarkGray }
+        }
+        & $clang -i $styleArg @files
+        $exitCode = $LASTEXITCODE
+        if ($exitCode -ne 0) {
+            Write-ResearchLog -Level Error -Message "clang-format failed (exit $exitCode)" -Component "Format"
+            throw "clang-format failed"
+        } else {
+            Write-ResearchLog -Level Info -Message "Formatting completed" -Component "Format"
+        }
+    }
+}
+
 Function Invoke-Benchmark {
     param(
         [string]$Benchmark,
@@ -918,6 +1014,8 @@ BUILD & DEVELOPMENT
                           Configure and build project
   test [-Suite all|python|py|cpp] [-Pattern] [-Coverage]
                           Run tests (aliases: py/p for python, c++ for cpp)
+  format [paths] [-Check] [-Verbose]
+                          Format C/C++ code with .clang-format
   clean                   Remove all build artifacts
 
 BENCHMARKING (Research-Grade)
@@ -1029,6 +1127,17 @@ try {
             }
             
             Invoke-Benchmark @params
+        }
+        "format"   {
+            $params = @{}
+            if ($CommandArgs -contains "-Check")   { $params.Check   = $true }
+            if ($CommandArgs -contains "-Verbose") { $params.Verbose = $true }
+
+            # Any non-flag arguments are paths
+            $paths = $CommandArgs | Where-Object { $_ -and $_ -notlike "-*" }
+            if ($paths -and $paths.Count -gt 0) { $params.Paths = $paths }
+
+            Invoke-Format @params
         }
         "sweep"    {
             $params = @{}

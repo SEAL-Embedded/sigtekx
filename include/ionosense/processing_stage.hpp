@@ -69,7 +69,7 @@ struct StageConfig {
   enum class OutputMode {
     MAGNITUDE,
     COMPLEX_PASSTHROUGH
-  };                                               ///< Desired output format.
+  };  ///< Desired output format.
   OutputMode output_mode = OutputMode::MAGNITUDE;  ///< Output format.
 
   // --- Execution Parameters ---
