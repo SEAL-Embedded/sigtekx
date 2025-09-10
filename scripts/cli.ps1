@@ -1422,7 +1422,7 @@ try {
             Invoke-WithPythonPath {
                 python -c @"
 import time
-from ionosense_hpc import monitor_device
+from ionosense_hpc.utils import monitor_device
 try:
     while True:
         print('\033[2J\033[H')  # Clear screen
@@ -1433,6 +1433,7 @@ except KeyboardInterrupt:
     print('\nMonitoring stopped')
 "@
             }
+            if ($LASTEXITCODE -ne 0) { throw "GPU monitor exited with error (python exit $LASTEXITCODE)" }
         }
         "clean"    {
             $params = @{}
