@@ -11,7 +11,7 @@ import numpy as np
 from scipy import signal as scipy_signal
 from scipy.fft import rfft
 
-from ionosense_hpc.benchmarks.base import BaseBenchmark, BenchmarkConfig
+from ionosense_hpc.benchmarks.base import BaseBenchmark, BenchmarkConfig, BenchmarkResult
 from ionosense_hpc.config import EngineConfig, Presets
 from ionosense_hpc.core import Processor
 from ionosense_hpc.utils import logger, make_chirp, make_multitone, make_noise, make_sine
@@ -78,10 +78,10 @@ class AccuracyBenchmark(BaseBenchmark):
         super().__init__(config or AccuracyBenchmarkConfig(name="Accuracy"))
         self.config: AccuracyBenchmarkConfig = self.config
 
-        self.processor = None
-        self.engine_config = None
-        self.test_results = []
-        self.validation_errors = []
+        self.processor: Processor | None = None
+        self.engine_config: EngineConfig | None = None
+        self.test_results: list[dict[str, Any]] = []
+        self.validation_errors: list[str] = []
 
     def setup(self) -> None:
         """Initialize processor and prepare test signals (NVTX-instrumented)."""
@@ -207,6 +207,7 @@ class AccuracyBenchmark(BaseBenchmark):
 
     def _generate_test_signal(self, spec: dict[str, Any]) -> np.ndarray:
         """Generate test signal based on specification."""
+        assert self.engine_config is not None
         nfft = self.engine_config.nfft
         batch = self.engine_config.batch
         sample_rate = self.engine_config.sample_rate_hz
@@ -251,6 +252,7 @@ class AccuracyBenchmark(BaseBenchmark):
 
     def _compute_reference_fft(self, data: np.ndarray) -> np.ndarray:
         """Compute reference FFT using scipy."""
+        assert self.engine_config is not None
         data = data.reshape(self.engine_config.batch, self.engine_config.nfft)
 
         # Use double precision for reference if configured
@@ -312,8 +314,10 @@ class AccuracyBenchmark(BaseBenchmark):
             'error_reason': error_reason
         }
 
-    def _test_parseval_theorem(self) -> dict[str, bool]:
+    def _test_parseval_theorem(self) -> dict[str, bool | float]:
         """Test Parseval's theorem (energy conservation)."""
+        assert self.engine_config is not None
+        assert self.processor is not None
         # Generate test signal
         test_signal = make_noise(
             self.engine_config.nfft / self.engine_config.sample_rate_hz,
@@ -348,8 +352,10 @@ class AccuracyBenchmark(BaseBenchmark):
 
         return {'passed': passed, 'relative_error': float(rel_error)}
 
-    def _test_linearity(self) -> dict[str, bool]:
+    def _test_linearity(self) -> dict[str, bool | float]:
         """Test linearity (superposition principle)."""
+        assert self.engine_config is not None
+        assert self.processor is not None
         # Generate two signals
         duration = self.engine_config.nfft / self.engine_config.sample_rate_hz
         signal1 = make_sine(1000, duration, self.engine_config.sample_rate_hz, 0.5)
@@ -377,8 +383,10 @@ class AccuracyBenchmark(BaseBenchmark):
 
         return {'passed': passed, 'max_error': float(error)}
 
-    def _test_window_function(self) -> dict[str, bool]:
+    def _test_window_function(self) -> dict[str, bool | float]:
         """Validate window function implementation."""
+        assert self.engine_config is not None
+        assert self.processor is not None
         # Test with DC signal (all ones)
         test_signal = np.ones(self.engine_config.nfft, dtype=np.float32)
         test_batch = np.tile(test_signal, self.engine_config.batch)
@@ -400,7 +408,7 @@ class AccuracyBenchmark(BaseBenchmark):
 
         return {'passed': passed, 'relative_error': float(error)}
 
-    def analyze_results(self, result: 'BenchmarkResult') -> dict[str, Any]:
+    def analyze_results(self, result: BenchmarkResult) -> dict[str, Any]:
         """
         Analyze accuracy validation results.
         
@@ -419,7 +427,7 @@ class AccuracyBenchmark(BaseBenchmark):
 
             # Categorize failures
             if self.validation_errors:
-                error_categories = {}
+                error_categories: dict[str, list[str]] = {}
                 for error in self.validation_errors:
                     category = 'unknown'
                     if 'relative error' in error.lower():
@@ -440,14 +448,14 @@ class AccuracyBenchmark(BaseBenchmark):
             # Performance vs accuracy tradeoff analysis
             if hasattr(self, 'test_results') and self.test_results:
                 # Find which signal types have worst accuracy
-                by_signal_type = {}
+                by_signal_type: dict[str, list[float]] = {}
                 for test in self.test_results:
                     sig_type = test['signal']['type']
                     if sig_type not in by_signal_type:
                         by_signal_type[sig_type] = []
                     by_signal_type[sig_type].append(test['comparison']['snr_db'])
 
-                worst_signals = {}
+                worst_signals: dict[str, dict[str, float]] = {}
                 for sig_type, snrs in by_signal_type.items():
                     worst_signals[sig_type] = {
                         'mean_snr_db': float(np.mean(snrs)),

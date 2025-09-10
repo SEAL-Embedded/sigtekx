@@ -11,10 +11,10 @@ from collections.abc import Generator
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
-import yaml
+import yaml  # type: ignore[import-untyped]
 from pydantic import BaseModel, Field
 
 from ionosense_hpc.benchmarks.base import (
@@ -43,7 +43,7 @@ class ParameterSpec(BaseModel):
     def generate_values(self) -> list[Any]:
         """Generate parameter values based on specification."""
         if self.values is not None:
-            return self.values
+            return cast(list[Any], self.values)
 
         if self.range is not None:
             if self.type == 'int':
@@ -54,27 +54,27 @@ class ParameterSpec(BaseModel):
                 ))
             elif self.type == 'float':
                 if 'step' in self.range:
-                    values = []
+                    values: list[float] = []
                     current = self.range['start']
                     while current <= self.range['stop']:
                         values.append(current)
                         current += self.range['step']
-                    return values
+                    return cast(list[Any], values)
                 else:
                     # Logarithmic or linear spacing
                     n_points = self.range.get('n_points', 10)
                     if self.range.get('log_scale', False):
-                        return np.logspace(
+                        return cast(list[Any], np.logspace(
                             np.log10(self.range['start']),
                             np.log10(self.range['stop']),
                             n_points
-                        ).tolist()
+                        ).tolist())
                     else:
-                        return np.linspace(
+                        return cast(list[Any], np.linspace(
                             self.range['start'],
                             self.range['stop'],
                             n_points
-                        ).tolist()
+                        ).tolist())
 
         raise ValueError(f"No values or range specified for parameter {self.name}")
 
@@ -113,7 +113,7 @@ class ExperimentRun:
 
     run_id: str
     parameter_values: dict
-    config: BenchmarkConfig
+    config: BenchmarkConfig | None
     result: BenchmarkResult | None = None
     error: str | None = None
 
@@ -122,7 +122,10 @@ class ExperimentRun:
         return {
             'run_id': self.run_id,
             'parameters': self.parameter_values,
-            'config': self.config.model_dump() if hasattr(self.config, 'model_dump') else dict(self.config),
+            'config': (
+                self.config.model_dump() if (self.config is not None and hasattr(self.config, 'model_dump'))
+                else (dict(self.config) if self.config is not None else None)
+            ),
             'result': self.result.to_dict() if self.result else None,
             'error': self.error
         }
@@ -150,8 +153,8 @@ class ParameterSweep:
 
         self.config = config
         self.context = BenchmarkContext()
-        self.runs = []
-        self.results = []
+        self.runs: list[ExperimentRun] = []
+        self.results: list[ExperimentRun] = []
 
         # Create output directory
         self.output_dir = Path(self.config.output_dir) / self.config.name
@@ -162,9 +165,9 @@ class ParameterSweep:
 
     def _load_config(self, path: str) -> dict:
         """Load configuration from file."""
-        path = Path(path)
-        with open(path) as f:
-            if path.suffix in ['.yaml', '.yml']:
+        path_obj = Path(path)
+        with open(path_obj) as f:
+            if path_obj.suffix in ['.yaml', '.yml']:
                 return yaml.safe_load(f)
             else:
                 return json.load(f)
@@ -280,7 +283,7 @@ class ParameterSweep:
         """Dynamically load benchmark class."""
         module_path, class_name = self.config.benchmark_class.rsplit('.', 1)
         module = __import__(module_path, fromlist=[class_name])
-        return getattr(module, class_name)
+        return cast(type[BaseBenchmark], getattr(module, class_name))
 
     def run(self) -> list[ExperimentRun]:
         """Execute the complete parameter sweep (NVTX-instrumented)."""
@@ -443,15 +446,15 @@ class ParameterSweep:
     ) -> None:
         """Analyze relative importance of parameters on performance."""
         try:
-            from sklearn.ensemble import RandomForestRegressor
-            from sklearn.inspection import permutation_importance
+            from sklearn.ensemble import RandomForestRegressor  # type: ignore[import-not-found]
+            from sklearn.inspection import permutation_importance  # type: ignore[import-not-found]
         except Exception as e:
             logger.warning(f"sklearn not available, skipping importance analysis: {e}")
             return
 
         # Prepare data
-        X = []
-        y = []
+        X: list[list[float]] = []
+        y: list[float] = []
         param_names = list(runs[0].parameter_values.keys())
 
         for run in runs:
@@ -463,15 +466,15 @@ class ParameterSweep:
             logger.warning("Too few samples for importance analysis")
             return
 
-        X = np.array(X)
-        y = np.array(y)
+        X_arr = np.array(X)
+        y_arr = np.array(y)
 
         # Train random forest
         rf = RandomForestRegressor(n_estimators=100, random_state=42)
-        rf.fit(X, y)
+        rf.fit(X_arr, y_arr)
 
         # Calculate importance
-        importance = permutation_importance(rf, X, y, n_repeats=10, random_state=42)
+        importance = permutation_importance(rf, X_arr, y_arr, n_repeats=10, random_state=42)
 
         # Save importance scores
         importance_data = {
@@ -533,8 +536,12 @@ class ParameterSweep:
         """Generate markdown summary report."""
         report_path = output_dir / 'report.md'
 
-        successful = [r for r in results if r.result is not None]
+        successful: list[ExperimentRun] = [r for r in results if r.result is not None]
         failed = [r for r in results if r.error is not None]
+
+        def _mean_key(r: ExperimentRun) -> float:
+            assert r.result is not None
+            return float(r.result.statistics.get('mean', float('inf')))
 
         with open(report_path, 'w') as f:
             f.write(f"# Experiment Report: {self.config.name}\n\n")
@@ -558,15 +565,13 @@ class ParameterSweep:
                 f.write("## Best Configurations\n\n")
 
                 # Sort by mean performance
-                best_runs = sorted(
-                    successful,
-                    key=lambda r: r.result.statistics.get('mean', float('inf'))
-                )[:5]
+                best_runs = sorted(successful, key=_mean_key)[:5]
 
                 f.write("### Top 5 by Mean Latency\n\n")
                 for i, run in enumerate(best_runs, 1):
                     f.write(f"{i}. **{run.run_id}**\n")
                     f.write(f"   - Parameters: {run.parameter_values}\n")
+                    assert run.result is not None
                     f.write(f"   - Mean: {run.result.statistics.get('mean', 0):.2f} µs\n")
                     f.write(f"   - P99: {run.result.statistics.get('p99', 0):.2f} µs\n\n")
 

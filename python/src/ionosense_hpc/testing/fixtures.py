@@ -372,6 +372,7 @@ def benchmark_runner(temp_benchmark_dir: Path):
             self.data = np.random.randn(100)
 
         def execute_iteration(self):
+            assert self.data is not None
             return float(np.mean(self.data) + np.random.randn() * 0.1)
 
         def teardown(self):

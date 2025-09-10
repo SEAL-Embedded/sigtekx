@@ -133,7 +133,7 @@ class BenchmarkSuite:
 
     def _get_benchmarks_to_run(self) -> list[str]:
         """Determine which benchmarks to run based on configuration."""
-        benchmarks = self.config.benchmarks.copy()
+        benchmarks: list[str] = list(self.config.benchmarks) if self.config.benchmarks is not None else []
 
         # Remove excluded benchmarks
         if self.config.exclude:
