@@ -1,7 +1,9 @@
-"""Utility functions for ionosense-hpc.
+"""Utility functions for ionosense-hpc with NVTX profiling support.
 
 This package re-exports selected helpers and provides lazy wrappers for
 signal generators to avoid importing heavy optional deps at module import time.
+It also exposes NVTX profiling helpers if the optional `nvtx` package is
+installed; otherwise, these functions are safe no-ops.
 """
 
 from .device import (
@@ -14,7 +16,25 @@ from .device import (
     monitor_device,
 )
 from .logging import log_config, log_device_info, log_performance, logger, setup_logging
-from .profiling import nvtx_range
+from .profiling import (
+    nvtx_range,
+    nvtx_decorate,
+    benchmark_range,
+    compute_range,
+    transfer_range,
+    setup_range,
+    teardown_range,
+    sync_range,
+    warmup_range,
+    mark_event,
+    profile_iterator,
+    ProfilingContext,
+    ProfilingDomain,
+    ProfileColor,
+    ProfileCategory,
+    initialize_profiling,
+    NVTX_AVAILABLE,
+)
 
 
 # --- Lazy signal wrappers (import scipy-dependent code only on use) ---
@@ -66,5 +86,21 @@ __all__ = [
     'make_test_batch',
     # Profiling
     'nvtx_range',
+    'nvtx_decorate',
+    'benchmark_range',
+    'compute_range',
+    'transfer_range',
+    'setup_range',
+    'teardown_range',
+    'sync_range',
+    'warmup_range',
+    'mark_event',
+    'profile_iterator',
+    'ProfilingContext',
+    'ProfilingDomain',
+    'ProfileColor',
+    'ProfileCategory',
+    'initialize_profiling',
+    'NVTX_AVAILABLE',
     # Reporting (import from ionosense_hpc.benchmarks.reporting when needed)
 ]

@@ -1,8 +1,9 @@
-"""High-level context manager for the signal processing engine.
+"""High-level context manager for the signal processing engine with NVTX.
 
 This module provides the `Processor`, a user-friendly interface to the CUDA
-FFT engine. It uses a context manager for automatic resource management and
-offers presets for common use cases like real-time and batch processing.
+FFT engine with NVTX instrumentation for key operations. It uses a context
+manager for automatic resource management and offers presets for common use
+cases like real-time and batch processing.
 """
 
 from typing import Any
@@ -14,6 +15,15 @@ from ionosense_hpc.core.engine import Engine
 from ionosense_hpc.exceptions import EngineStateError
 from ionosense_hpc.utils.device import device_info, monitor_device
 from ionosense_hpc.utils.logging import logger
+from ionosense_hpc.utils.profiling import (
+    nvtx_decorate,
+    setup_range,
+    teardown_range,
+    compute_range,
+    warmup_range,
+    ProfileColor,
+    ProfilingDomain,
+)
 
 
 class Processor:
@@ -71,6 +81,11 @@ class Processor:
         if auto_init and config is not None:
             self.initialize()
 
+    @nvtx_decorate(
+        message="Processor.initialize",
+        color=ProfileColor.DARK_GRAY,
+        domain=ProfilingDomain.CORE,
+    )
     def initialize(self, config: EngineConfig | None = None) -> None:
         """Allocates GPU resources and prepares the engine for processing.
 
@@ -84,20 +99,29 @@ class Processor:
             ValueError: If no configuration is available.
             EngineRuntimeError: If GPU initialization fails.
         """
-        if config is not None:
-            self._config = config
+        with setup_range("Processor.initialize"):
+            if config is not None:
+                self._config = config
 
-        if self._config is None:
-            raise ValueError("No configuration provided")
+            if self._config is None:
+                raise ValueError("No configuration provided")
 
-        info = device_info()
-        logger.info(f"Initializing on device: {info['name']}")
-        logger.info(f"  Memory: {info['memory_free_mb']}/{info['memory_total_mb']} MB free")
+            info = device_info()
+            logger.info(f"Initializing on device: {info['name']}")
+            logger.info(
+                f"  Memory: {info['memory_free_mb']}/{info['memory_total_mb']} MB free"
+            )
 
-        self._engine.initialize(self._config)
-        self._is_initialized = True
-        logger.info("Processor initialized successfully")
+            self._engine.initialize(self._config)
+            self._is_initialized = True
+            logger.info("Processor initialized successfully")
 
+    @nvtx_decorate(
+        message="Processor.process",
+        color=ProfileColor.PURPLE,
+        domain=ProfilingDomain.CORE,
+        include_args=False,
+    )
     def process(
         self,
         input_data: np.ndarray | list,
@@ -133,6 +157,11 @@ class Processor:
 
         return output
 
+    @nvtx_decorate(
+        message="Processor.process_stream",
+        color=ProfileColor.NVIDIA_BLUE,
+        domain=ProfilingDomain.CORE,
+    )
     def process_stream(
         self,
         data_generator,
@@ -159,13 +188,19 @@ class Processor:
             if max_frames and frame_count >= max_frames:
                 break
 
-            output = self.process(frame_data)
+            with compute_range(f"StreamFrame_{frame_count}"):
+                output = self.process(frame_data)
             outputs.append(output)
             frame_count += 1
 
         logger.info(f"Processed {frame_count} frames from stream")
         return outputs
 
+    @nvtx_decorate(
+        message="Processor.benchmark",
+        color=ProfileColor.NVIDIA_BLUE,
+        domain=ProfilingDomain.CORE,
+    )
     def benchmark(
         self,
         n_iterations: int = 100,
@@ -190,10 +225,11 @@ class Processor:
         latencies = []
         logger.info(f"Running benchmark with {n_iterations} iterations...")
 
-        for _ in range(n_iterations):
-            self.process(input_data)
-            stats = self._engine.get_stats()
-            latencies.append(stats['latency_us'])
+        for i in range(n_iterations):
+            with compute_range(f"BenchmarkIteration_{i}"):
+                self.process(input_data)
+                stats = self._engine.get_stats()
+                latencies.append(stats['latency_us'])
 
         latencies = np.array(latencies)
         results = {
@@ -211,12 +247,18 @@ class Processor:
                    f"p99={results['p99_latency_us']:.1f} μs")
         return results
 
+    @nvtx_decorate(
+        message="Processor.reset",
+        color=ProfileColor.RED,
+        domain=ProfilingDomain.CORE,
+    )
     def reset(self) -> None:
         """Resets the engine, freeing all GPU resources."""
-        self._engine.reset()
-        self._is_initialized = False
-        self._processing_history.clear()
-        logger.info("Processor reset")
+        with teardown_range("Processor.reset"):
+            self._engine.reset()
+            self._is_initialized = False
+            self._processing_history.clear()
+            logger.info("Processor reset")
 
     def get_stats(self) -> dict[str, Any]:
         """Gets current performance statistics from the engine and processor.

@@ -24,6 +24,16 @@ from ionosense_hpc.benchmarks.base import (
     BenchmarkResult,
 )
 from ionosense_hpc.utils import logger
+from ionosense_hpc.utils.profiling import (
+    benchmark_range,
+    nvtx_range,
+    setup_range,
+    teardown_range,
+    compute_range,
+    ProfilingDomain,
+    ProfileColor,
+    mark_event,
+)
 
 
 class ParameterSpec(BaseModel):
@@ -277,48 +287,56 @@ class ParameterSweep:
         return getattr(module, class_name)
 
     def run(self) -> list[ExperimentRun]:
-        """Execute the complete parameter sweep."""
-        logger.info(f"Starting experiment: {self.config.name}")
-        logger.info(f"Output directory: {self.output_dir}")
+        """Execute the complete parameter sweep (NVTX-instrumented)."""
+        with benchmark_range(f"ParameterSweep_{self.config.name}"):
+            logger.info(f"Starting experiment: {self.config.name}")
+            logger.info(f"Output directory: {self.output_dir}")
 
-        # Generate parameter grid
-        param_grid = list(self.generate_parameter_grid())
-        logger.info(f"Parameter grid size: {len(param_grid)}")
+            # Generate parameter grid
+            with nvtx_range("GenerateParameterGrid", color=ProfileColor.YELLOW, domain=ProfilingDomain.BENCHMARK):
+                param_grid = list(self.generate_parameter_grid())
+            logger.info(f"Parameter grid size: {len(param_grid)}")
 
-        # Execute runs
-        if self.config.parallel:
-            results = self._run_parallel(param_grid)
-        else:
-            results = self._run_sequential(param_grid)
+            # Execute runs
+            if self.config.parallel:
+                with nvtx_range("RunParallel", color=ProfileColor.PURPLE, domain=ProfilingDomain.BENCHMARK):
+                    results = self._run_parallel(param_grid)
+            else:
+                with nvtx_range("RunSequential", color=ProfileColor.PURPLE, domain=ProfilingDomain.BENCHMARK):
+                    results = self._run_sequential(param_grid)
 
-        # Save final results
-        self._save_results(results)
+            # Save final results
+            with nvtx_range("SaveResults", color=ProfileColor.ORANGE):
+                self._save_results(results)
 
-        # Generate aggregate analysis
-        if self.config.aggregate_results:
-            self._generate_analysis(results)
+            # Generate aggregate analysis
+            if self.config.aggregate_results:
+                with nvtx_range("AggregateAnalysis", color=ProfileColor.ORANGE):
+                    self._generate_analysis(results)
 
-        logger.info(f"Experiment complete: {len(results)} runs")
-        return results
+            logger.info(f"Experiment complete: {len(results)} runs")
+            return results
 
     def _run_sequential(self, param_grid: list[dict]) -> list[ExperimentRun]:
         """Run benchmarks sequentially."""
         results = []
 
         for i, parameters in enumerate(param_grid):
-            run_id = f"run_{i:04d}"
-            run = self.run_single(parameters, run_id)
-            results.append(run)
+            with nvtx_range(f"Run_{i:04d}", color=ProfileColor.PURPLE, domain=ProfilingDomain.BENCHMARK, payload=i):
+                run_id = f"run_{i:04d}"
+                run = self.run_single(parameters, run_id)
+                results.append(run)
 
-            # Periodic saving
-            if (i + 1) % self.config.save_interval == 0:
-                self._save_results(results)
-                logger.info(f"Progress: {i+1}/{len(param_grid)} runs complete")
+                # Periodic saving
+                if (i + 1) % self.config.save_interval == 0:
+                    with nvtx_range("SaveIntermediate", color=ProfileColor.ORANGE):
+                        self._save_results(results)
+                    logger.info(f"Progress: {i+1}/{len(param_grid)} runs complete")
 
-            # Check for failures
-            if run.error and not self.config.continue_on_error:
-                logger.error(f"Stopping due to error: {run.error}")
-                break
+                # Check for failures
+                if run.error and not self.config.continue_on_error:
+                    logger.error(f"Stopping due to error: {run.error}")
+                    break
 
         return results
 

@@ -15,6 +15,13 @@ from ionosense_hpc.benchmarks.base import BaseBenchmark, BenchmarkConfig
 from ionosense_hpc.config import EngineConfig, Presets
 from ionosense_hpc.core import Processor
 from ionosense_hpc.utils import logger, make_chirp, make_multitone, make_noise, make_sine
+from ionosense_hpc.utils.profiling import (
+    nvtx_range,
+    setup_range,
+    teardown_range,
+    ProfilingDomain,
+    ProfileColor,
+)
 
 
 class AccuracyBenchmarkConfig(BenchmarkConfig):
@@ -78,22 +85,25 @@ class AccuracyBenchmark(BaseBenchmark):
         self.validation_errors = []
 
     def setup(self) -> None:
-        """Initialize processor and prepare test signals."""
-        # Get engine configuration
-        if self.config.engine_config:
-            self.engine_config = EngineConfig(**self.config.engine_config)
-        else:
-            self.engine_config = Presets.validation()
+        """Initialize processor and prepare test signals (NVTX-instrumented)."""
+        with setup_range("AccuracyBenchmark.setup"):
+            # Get engine configuration
+            if self.config.engine_config:
+                self.engine_config = EngineConfig(**self.config.engine_config)
+            else:
+                self.engine_config = Presets.validation()
 
-        # Initialize processor
-        self.processor = Processor(self.engine_config)
-        self.processor.initialize()
+            # Initialize processor
+            with nvtx_range("InitializeProcessor", color=ProfileColor.DARK_GRAY):
+                self.processor = Processor(self.engine_config)
+                self.processor.initialize()
 
-        logger.info("Accuracy benchmark initialized:")
-        logger.info(f"  Engine config: {self.engine_config}")
-        logger.info(f"  Tolerance: rel={self.config.relative_tolerance}, "
-                   f"abs={self.config.absolute_tolerance}")
-        logger.info(f"  Test signals: {len(self.config.test_signals)}")
+            logger.info("Accuracy benchmark initialized:")
+            logger.info(f"  Engine config: {self.engine_config}")
+            logger.info(
+                f"  Tolerance: rel={self.config.relative_tolerance}, abs={self.config.absolute_tolerance}"
+            )
+            logger.info(f"  Test signals: {len(self.config.test_signals)}")
 
     def execute_iteration(self) -> dict[str, float]:
         """Execute one complete accuracy validation suite."""
@@ -113,24 +123,29 @@ class AccuracyBenchmark(BaseBenchmark):
         for signal_spec in self.config.test_signals:
             test_name = f"{signal_spec['type']}_{signal_spec.get('frequency', '')}"
 
-            # Generate test signal
-            test_data = self._generate_test_signal(signal_spec)
+            with nvtx_range("TestSignal", color=ProfileColor.PURPLE, payload=test_name):
+                # Generate test signal
+                with nvtx_range("GenerateSignal", color=ProfileColor.ORANGE):
+                    test_data = self._generate_test_signal(signal_spec)
 
-            # Process with engine
-            gpu_output = self.processor.process(test_data)
+                # Process with engine
+                with nvtx_range("ProcessGPU", color=ProfileColor.PURPLE):
+                    gpu_output = self.processor.process(test_data)
 
-            # Compute reference
-            ref_output = self._compute_reference_fft(test_data)
+                # Compute reference
+                with nvtx_range("ComputeReference", color=ProfileColor.GREEN):
+                    ref_output = self._compute_reference_fft(test_data)
 
-            # Compare results
-            comparison = self._compare_spectra(gpu_output, ref_output)
+                # Compare results
+                with nvtx_range("CompareResults", color=ProfileColor.YELLOW):
+                    comparison = self._compare_spectra(gpu_output, ref_output)
 
-            # Store results
-            self.test_results.append({
-                'signal': signal_spec,
-                'comparison': comparison,
-                'passed': comparison['passed']
-            })
+                # Store results
+                self.test_results.append({
+                    'signal': signal_spec,
+                    'comparison': comparison,
+                    'passed': comparison['passed']
+                })
 
             metrics['total_tests'] += 1
             if comparison['passed']:
@@ -185,10 +200,11 @@ class AccuracyBenchmark(BaseBenchmark):
         return metrics
 
     def teardown(self) -> None:
-        """Clean up resources."""
-        if self.processor:
-            self.processor.reset()
-            self.processor = None
+        """Clean up resources (NVTX-instrumented)."""
+        with teardown_range("AccuracyBenchmark.teardown"):
+            if self.processor:
+                self.processor.reset()
+                self.processor = None
 
     def _generate_test_signal(self, spec: dict[str, Any]) -> np.ndarray:
         """Generate test signal based on specification."""
@@ -392,54 +408,56 @@ class AccuracyBenchmark(BaseBenchmark):
         Returns:
             Dictionary with detailed accuracy analysis
         """
-        analysis = {
-            'summary': {
-                'all_passed': result.statistics.get('failed_tests', 0) == 0,
-                'pass_rate': result.statistics.get('pass_rate', 0),
-                'mean_snr_db': result.statistics.get('mean_snr_db', 0)
-            }
-        }
-
-        # Categorize failures
-        if self.validation_errors:
-            error_categories = {}
-            for error in self.validation_errors:
-                category = 'unknown'
-                if 'relative error' in error.lower():
-                    category = 'precision'
-                elif 'snr' in error.lower():
-                    category = 'noise_floor'
-                elif 'parseval' in error.lower():
-                    category = 'energy_conservation'
-                elif 'linearity' in error.lower():
-                    category = 'linearity'
-
-                if category not in error_categories:
-                    error_categories[category] = []
-                error_categories[category].append(error)
-
-            analysis['error_categories'] = error_categories
-
-        # Performance vs accuracy tradeoff analysis
-        if hasattr(self, 'test_results') and self.test_results:
-            # Find which signal types have worst accuracy
-            by_signal_type = {}
-            for test in self.test_results:
-                sig_type = test['signal']['type']
-                if sig_type not in by_signal_type:
-                    by_signal_type[sig_type] = []
-                by_signal_type[sig_type].append(test['comparison']['snr_db'])
-
-            worst_signals = {}
-            for sig_type, snrs in by_signal_type.items():
-                worst_signals[sig_type] = {
-                    'mean_snr_db': float(np.mean(snrs)),
-                    'min_snr_db': float(np.min(snrs))
+        from ionosense_hpc.utils.profiling import nvtx_range, ProfileColor
+        with nvtx_range("AnalyzeAccuracyResults", color=ProfileColor.ORANGE):
+            analysis = {
+                'summary': {
+                    'all_passed': result.statistics.get('failed_tests', 0) == 0,
+                    'pass_rate': result.statistics.get('pass_rate', 0),
+                    'mean_snr_db': result.statistics.get('mean_snr_db', 0)
                 }
+            }
 
-            analysis['signal_type_accuracy'] = worst_signals
+            # Categorize failures
+            if self.validation_errors:
+                error_categories = {}
+                for error in self.validation_errors:
+                    category = 'unknown'
+                    if 'relative error' in error.lower():
+                        category = 'precision'
+                    elif 'snr' in error.lower():
+                        category = 'noise_floor'
+                    elif 'parseval' in error.lower():
+                        category = 'energy_conservation'
+                    elif 'linearity' in error.lower():
+                        category = 'linearity'
 
-        return analysis
+                    if category not in error_categories:
+                        error_categories[category] = []
+                    error_categories[category].append(error)
+
+                analysis['error_categories'] = error_categories
+
+            # Performance vs accuracy tradeoff analysis
+            if hasattr(self, 'test_results') and self.test_results:
+                # Find which signal types have worst accuracy
+                by_signal_type = {}
+                for test in self.test_results:
+                    sig_type = test['signal']['type']
+                    if sig_type not in by_signal_type:
+                        by_signal_type[sig_type] = []
+                    by_signal_type[sig_type].append(test['comparison']['snr_db'])
+
+                worst_signals = {}
+                for sig_type, snrs in by_signal_type.items():
+                    worst_signals[sig_type] = {
+                        'mean_snr_db': float(np.mean(snrs)),
+                        'min_snr_db': float(np.min(snrs))
+                    }
+
+                analysis['signal_type_accuracy'] = worst_signals
+
+            return analysis
 
 
 if __name__ == '__main__':

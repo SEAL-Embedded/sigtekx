@@ -15,6 +15,14 @@ from ionosense_hpc.benchmarks.base import BaseBenchmark, BenchmarkConfig
 from ionosense_hpc.config import EngineConfig, Presets
 from ionosense_hpc.core import Processor
 from ionosense_hpc.utils import get_memory_usage, logger, make_test_batch
+from ionosense_hpc.utils.profiling import (
+    nvtx_range,
+    setup_range,
+    teardown_range,
+    compute_range,
+    ProfilingDomain,
+    ProfileColor,
+)
 
 
 class ThroughputBenchmarkConfig(BenchmarkConfig):
@@ -64,121 +72,109 @@ class ThroughputBenchmark(BaseBenchmark):
         self.resource_samples = []
 
     def setup(self) -> None:
-        """Initialize processor for throughput testing."""
-        # Use throughput-optimized preset
-        if self.config.engine_config:
-            self.engine_config = EngineConfig(**self.config.engine_config)
-        else:
-            self.engine_config = Presets.throughput()
+        """Initialize processor for throughput testing (NVTX-instrumented)."""
+        with setup_range("ThroughputBenchmark.setup"):
+            # Use throughput-optimized preset
+            if self.config.engine_config:
+                self.engine_config = EngineConfig(**self.config.engine_config)
+            else:
+                self.engine_config = Presets.throughput()
 
-        self.processor = Processor(self.engine_config)
-        self.processor.initialize()
+            with nvtx_range("InitializeProcessor", color=ProfileColor.DARK_GRAY):
+                self.processor = Processor(self.engine_config)
+                self.processor.initialize()
 
-        # Pre-generate test data
-        self.test_data = make_test_batch(
-            self.engine_config.nfft,
-            self.engine_config.batch,
-            signal_type='noise',
-            seed=self.config.seed
-        )
+            # Pre-generate test data
+            with nvtx_range("GenerateTestData", color=ProfileColor.ORANGE):
+                self.test_data = make_test_batch(
+                    self.engine_config.nfft,
+                    self.engine_config.batch,
+                    signal_type='noise',
+                    seed=self.config.seed
+                )
 
-        # Force garbage collection before measurement
-        gc.collect()
+            # Force garbage collection before measurement
+            gc.collect()
 
-        logger.info("Throughput benchmark initialized")
-        logger.info(f"  Configuration: {self.engine_config}")
+            logger.info("Throughput benchmark initialized")
+            logger.info(f"  Configuration: {self.engine_config}")
 
     def execute_iteration(self) -> dict[str, float]:
-        """Execute throughput measurement."""
-        metrics = {}
+        """Execute throughput measurement (NVTX-instrumented)."""
+        with nvtx_range("ThroughputMeasurement", color=ProfileColor.NVIDIA_BLUE, domain=ProfilingDomain.BENCHMARK):
+            metrics: dict[str, float] = {}
 
-        # Determine test parameters
-        bytes_per_sample = 4  # float32
-        samples_per_batch = self.engine_config.nfft * self.engine_config.batch
-        bytes_per_batch = samples_per_batch * bytes_per_sample
+            # Determine test parameters
+            bytes_per_sample = 4  # float32
+            samples_per_batch = self.engine_config.nfft * self.engine_config.batch
+            bytes_per_batch = samples_per_batch * bytes_per_sample
 
-        if self.config.data_size_gb is not None:
-            total_bytes = self.config.data_size_gb * (1024**3)
-            n_batches = int(total_bytes / bytes_per_batch)
-            test_mode = 'data_size'
-        else:
-            # Estimate batches for duration-based test
-            estimated_fps = 1000  # Initial estimate
-            n_batches = int(self.config.test_duration_s * estimated_fps)
-            test_mode = 'duration'
+            if self.config.data_size_gb is not None:
+                total_bytes = self.config.data_size_gb * (1024**3)
+                n_batches = int(total_bytes / bytes_per_batch)
+                test_mode = 'data_size'
+            else:
+                estimated_fps = 1000
+                n_batches = int(self.config.test_duration_s * estimated_fps)
+                test_mode = 'duration'
 
-        # Get initial memory state
-        if self.config.measure_memory_bandwidth:
-            initial_mem_mb, total_mem_mb = get_memory_usage()
+            if self.config.measure_memory_bandwidth:
+                initial_mem_mb, total_mem_mb = get_memory_usage()
 
-        # Start timing
-        start_time = time.perf_counter()
-        bytes_processed = 0
-        frames_processed = 0
+            start_time = time.perf_counter()
+            bytes_processed = 0
+            frames_processed = 0
 
-        # Process data
-        if test_mode == 'data_size':
-            for _ in range(n_batches):
-                _ = self.processor.process(self.test_data)
-                bytes_processed += bytes_per_batch
-                frames_processed += 1
+            with compute_range(f"ProcessBatches_{test_mode}"):
+                if test_mode == 'data_size':
+                    for batch_idx in range(n_batches):
+                        with nvtx_range(f"Batch_{batch_idx}", color=ProfileColor.PURPLE, payload=batch_idx):
+                            _ = self.processor.process(self.test_data)
+                            bytes_processed += bytes_per_batch
+                            frames_processed += 1
+                            if self.config.monitor_gpu_utilization and frames_processed % 100 == 0:
+                                with nvtx_range("SampleResources", color=ProfileColor.ORANGE):
+                                    self._sample_resources()
+                else:
+                    while (time.perf_counter() - start_time) < self.config.test_duration_s:
+                        with nvtx_range(f"Frame_{frames_processed}", color=ProfileColor.PURPLE):
+                            _ = self.processor.process(self.test_data)
+                            bytes_processed += bytes_per_batch
+                            frames_processed += 1
+                            if self.config.monitor_gpu_utilization and frames_processed % 100 == 0:
+                                with nvtx_range("SampleResources", color=ProfileColor.ORANGE):
+                                    self._sample_resources()
 
-                # Resource monitoring
-                if self.config.monitor_gpu_utilization and frames_processed % 100 == 0:
-                    self._sample_resources()
-        else:
-            # Duration-based processing
-            while (time.perf_counter() - start_time) < self.config.test_duration_s:
-                _ = self.processor.process(self.test_data)
-                bytes_processed += bytes_per_batch
-                frames_processed += 1
+            end_time = time.perf_counter()
+            elapsed_seconds = end_time - start_time
 
-                if self.config.monitor_gpu_utilization and frames_processed % 100 == 0:
-                    self._sample_resources()
+            with nvtx_range("CalculateMetrics", color=ProfileColor.YELLOW):
+                gb_processed = bytes_processed / (1024**3)
+                metrics['frames_processed'] = frames_processed
+                metrics['gb_processed'] = gb_processed
+                metrics['elapsed_seconds'] = elapsed_seconds
+                metrics['frames_per_second'] = frames_processed / elapsed_seconds if elapsed_seconds > 0 else 0
+                metrics['gb_per_second'] = gb_processed / elapsed_seconds if elapsed_seconds > 0 else 0
+                metrics['samples_per_second'] = (frames_processed * samples_per_batch) / elapsed_seconds if elapsed_seconds > 0 else 0
 
-        # End timing
-        end_time = time.perf_counter()
-        elapsed_seconds = end_time - start_time
+                if self.config.measure_memory_bandwidth:
+                    metrics.update(self._calculate_memory_bandwidth(bytes_processed, elapsed_seconds, initial_mem_mb))
+                if self.config.measure_pcie_bandwidth:
+                    metrics.update(self._calculate_pcie_bandwidth(bytes_processed, elapsed_seconds))
+                if self.resource_samples:
+                    metrics.update(self._summarize_resource_usage())
 
-        # Calculate throughput metrics
-        gb_processed = bytes_processed / (1024**3)
-
-        metrics['frames_processed'] = frames_processed
-        metrics['gb_processed'] = gb_processed
-        metrics['elapsed_seconds'] = elapsed_seconds
-        metrics['frames_per_second'] = frames_processed / elapsed_seconds if elapsed_seconds > 0 else 0
-        metrics['gb_per_second'] = gb_processed / elapsed_seconds if elapsed_seconds > 0 else 0
-        metrics['samples_per_second'] = (frames_processed * samples_per_batch) / elapsed_seconds if elapsed_seconds > 0 else 0
-
-        # Memory bandwidth analysis
-        if self.config.measure_memory_bandwidth:
-            metrics.update(self._calculate_memory_bandwidth(
-                bytes_processed,
-                elapsed_seconds,
-                initial_mem_mb
-            ))
-
-        # PCIe bandwidth analysis
-        if self.config.measure_pcie_bandwidth:
-            metrics.update(self._calculate_pcie_bandwidth(
-                bytes_processed,
-                elapsed_seconds
-            ))
-
-        # Resource utilization
-        if self.resource_samples:
-            metrics.update(self._summarize_resource_usage())
-
-        return metrics
+            return metrics
 
     def teardown(self) -> None:
-        """Clean up resources."""
-        if self.processor:
-            self.processor.reset()
-            self.processor = None
-        self.test_data = None
-        self.resource_samples = []
-        gc.collect()
+        """Clean up resources (NVTX-instrumented)."""
+        with teardown_range("ThroughputBenchmark.teardown"):
+            if self.processor:
+                self.processor.reset()
+                self.processor = None
+            self.test_data = None
+            self.resource_samples = []
+            gc.collect()
 
     def _sample_resources(self) -> None:
         """Sample current resource usage."""

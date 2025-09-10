@@ -23,6 +23,15 @@ import yaml
 from pydantic import BaseModel, Field
 
 from ionosense_hpc.utils import logger
+from ionosense_hpc.utils.profiling import (
+    benchmark_range,
+    nvtx_range,
+    setup_range,
+    teardown_range,
+    warmup_range,
+    ProfilingDomain,
+    ProfileColor,
+)
 
 T = TypeVar('T')
 
@@ -272,74 +281,104 @@ class BaseBenchmark(abc.ABC):
         Returns:
             BenchmarkResult containing all measurements and statistics
         """
-        logger.info(f"Starting benchmark: {self.config.name}")
-        logger.info(f"Environment: {self.context.environment_hash}")
+        with benchmark_range(f"Benchmark_{self.config.name}"):
+            logger.info(f"Starting benchmark: {self.config.name}")
+            logger.info(f"Environment: {self.context.environment_hash}")
 
-        # Validate environment
-        is_valid, issues = self.validate_environment()
-        if not is_valid:
-            logger.error(f"Environment validation failed: {issues}")
-            return BenchmarkResult(
-                name=self.config.name,
-                config=self.config.model_dump(),
-                context=self.context,
-                measurements=np.array([]),
-                passed=False,
-                errors=issues
-            )
+            # Validate environment
+            is_valid, issues = self.validate_environment()
+            if not is_valid:
+                logger.error(f"Environment validation failed: {issues}")
+                return BenchmarkResult(
+                    name=self.config.name,
+                    config=self.config.model_dump(),
+                    context=self.context,
+                    measurements=np.array([]),
+                    passed=False,
+                    errors=issues,
+                )
 
-        measurements = []
-        errors = []
+            measurements: list[float | dict] = []
+            errors: list[str] = []
 
-        try:
-            # Setup phase
-            logger.info("Setup phase...")
-            self.setup()
-
-            # Warmup phase
-            if self.config.warmup_iterations > 0:
-                logger.info(f"Running {self.config.warmup_iterations} warmup iterations...")
-                for _ in range(self.config.warmup_iterations):
-                    _ = self.execute_iteration()
-
-            # Measurement phase
-            logger.info(f"Running {self.config.iterations} measurement iterations...")
-            for i in range(self.config.iterations):
-                try:
-                    # Add timeout protection
-                    start_time = time.perf_counter()
-                    result = self.execute_iteration()
-                    elapsed = time.perf_counter() - start_time
-
-                    if elapsed > self.config.timeout_seconds:
-                        raise TimeoutError(f"Iteration {i} exceeded timeout")
-
-                    if isinstance(result, dict):
-                        measurements.append(result)
-                    else:
-                        measurements.append(float(result))
-
-                    # Progress reporting
-                    if self.config.verbose and (i + 1) % max(1, self.config.iterations // 10) == 0:
-                        logger.debug(f"  Progress: {i + 1}/{self.config.iterations}")
-
-                except Exception as e:
-                    logger.warning(f"Iteration {i} failed: {e}")
-                    errors.append(f"Iteration {i}: {str(e)}")
-                    if len(errors) > self.config.iterations * 0.1:  # Fail if >10% errors
-                        raise RuntimeError("Too many iteration failures")
-
-        except Exception as e:
-            logger.error(f"Benchmark failed: {e}")
-            errors.append(f"Fatal: {str(e)}")
-
-        finally:
-            # Teardown phase
-            logger.info("Teardown phase...")
             try:
-                self.teardown()
+                # Setup phase
+                with setup_range("Benchmark.setup"):
+                    logger.info("Setup phase...")
+                    self.setup()
+
+                # Warmup phase
+                if self.config.warmup_iterations > 0:
+                    with warmup_range(
+                        f"Warmup_{self.config.warmup_iterations}_iterations"
+                    ):
+                        logger.info(
+                            f"Running {self.config.warmup_iterations} warmup iterations..."
+                        )
+                        for w in range(self.config.warmup_iterations):
+                            with nvtx_range(
+                                f"WarmupIter_{w}",
+                                color=ProfileColor.LIGHT_GRAY,
+                                domain=ProfilingDomain.BENCHMARK,
+                                payload=w,
+                            ):
+                                _ = self.execute_iteration()
+
+                # Measurement phase
+                with nvtx_range(
+                    "MeasurementPhase",
+                    color=ProfileColor.NVIDIA_BLUE,
+                    domain=ProfilingDomain.BENCHMARK,
+                ):
+                    logger.info(
+                        f"Running {self.config.iterations} measurement iterations..."
+                    )
+                    for i in range(self.config.iterations):
+                        try:
+                            start_time = time.perf_counter()
+                            with nvtx_range(
+                                f"Iteration_{i}",
+                                color=ProfileColor.PURPLE,
+                                domain=ProfilingDomain.BENCHMARK,
+                                payload=i,
+                            ):
+                                result = self.execute_iteration()
+                            elapsed = time.perf_counter() - start_time
+
+                            if elapsed > self.config.timeout_seconds:
+                                raise TimeoutError(
+                                    f"Iteration {i} exceeded timeout"
+                                )
+
+                            if isinstance(result, dict):
+                                measurements.append(result)
+                            else:
+                                measurements.append(float(result))
+
+                            if self.config.verbose and (i + 1) % max(
+                                1, self.config.iterations // 10
+                            ) == 0:
+                                logger.debug(
+                                    f"  Progress: {i + 1}/{self.config.iterations}"
+                                )
+
+                        except Exception as e:
+                            logger.warning(f"Iteration {i} failed: {e}")
+                            errors.append(f"Iteration {i}: {str(e)}")
+                            if len(errors) > self.config.iterations * 0.1:
+                                raise RuntimeError("Too many iteration failures")
+
             except Exception as e:
-                logger.warning(f"Teardown failed: {e}")
+                logger.error(f"Benchmark failed: {e}")
+                errors.append(f"Fatal: {str(e)}")
+
+            finally:
+                with teardown_range("Benchmark.teardown"):
+                    logger.info("Teardown phase...")
+                    try:
+                        self.teardown()
+                    except Exception as e:
+                        logger.warning(f"Teardown failed: {e}")
 
         # Process results
         if not measurements:

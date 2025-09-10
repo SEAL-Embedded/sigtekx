@@ -25,6 +25,15 @@ from ionosense_hpc.benchmarks.realtime import RealtimeBenchmark
 from ionosense_hpc.benchmarks.throughput import ScalingBenchmark, ThroughputBenchmark
 from ionosense_hpc.config import Presets
 from ionosense_hpc.utils import logger
+from ionosense_hpc.utils.profiling import (
+    benchmark_range,
+    nvtx_range,
+    setup_range,
+    teardown_range,
+    ProfilingDomain,
+    ProfileColor,
+    mark_event,
+)
 
 
 @dataclass
@@ -172,59 +181,75 @@ class BenchmarkSuite:
         Returns:
             Dictionary containing all results and metadata
         """
-        logger.info(f"Starting benchmark suite: {self.config.name}")
-        logger.info(f"Output directory: {self.output_dir}")
+        suite_name = f"BenchmarkSuite_{self.config.name}"
+        with benchmark_range(suite_name):
+            logger.info(f"Starting benchmark suite: {self.config.name}")
+            logger.info(f"Output directory: {self.output_dir}")
 
-        self.suite_metadata['start_time'] = datetime.now().isoformat()
-        suite_start = time.perf_counter()
+            self.suite_metadata['start_time'] = datetime.now().isoformat()
+            suite_start = time.perf_counter()
 
-        benchmarks_to_run = self._get_benchmarks_to_run()
-        logger.info(f"Will run {len(benchmarks_to_run)} benchmarks: {benchmarks_to_run}")
+            benchmarks_to_run = self._get_benchmarks_to_run()
+            logger.info(f"Will run {len(benchmarks_to_run)} benchmarks: {benchmarks_to_run}")
 
-        failed_benchmarks = []
+            failed_benchmarks = []
 
-        for idx, benchmark_name in enumerate(benchmarks_to_run, 1):
-            logger.info(f"\n{'='*60}")
-            logger.info(f"Running {idx}/{len(benchmarks_to_run)}: {benchmark_name}")
-            logger.info(f"{'='*60}")
+            for idx, benchmark_name in enumerate(benchmarks_to_run, 1):
+                with nvtx_range(
+                    f"RunBenchmark_{benchmark_name}",
+                    color=ProfileColor.NVIDIA_BLUE,
+                    domain=ProfilingDomain.BENCHMARK,
+                    payload=f"{idx}/{len(benchmarks_to_run)}",
+                ):
+                    logger.info(f"\n{'='*60}")
+                    logger.info(f"Running {idx}/{len(benchmarks_to_run)}: {benchmark_name}")
+                    logger.info(f"{'='*60}")
 
-            try:
-                # Get benchmark class
-                benchmark_class = self.BENCHMARK_REGISTRY[benchmark_name]
+                    try:
+                        mark_event(f"Start_{benchmark_name}", color=ProfileColor.GREEN)
 
-                # Create configuration
-                config = self._create_benchmark_config(benchmark_name)
+                        # Get benchmark class
+                        benchmark_class = self.BENCHMARK_REGISTRY[benchmark_name]
 
-                # Instantiate and run benchmark
-                benchmark = benchmark_class(config)
-                result = benchmark.run()
+                        # Create configuration
+                        with nvtx_range("CreateConfig", color=ProfileColor.DARK_GRAY):
+                            config = self._create_benchmark_config(benchmark_name)
 
-                # Add suite metadata to result
-                result.metadata['suite'] = self.config.name
-                result.metadata['benchmark_index'] = idx
+                        # Instantiate and run benchmark
+                        with nvtx_range("ExecuteBenchmark", color=ProfileColor.PURPLE):
+                            benchmark = benchmark_class(config)
+                            result = benchmark.run()
 
-                # Store result
-                self.results.append(result)
+                        # Add suite metadata to result
+                        result.metadata['suite'] = self.config.name
+                        result.metadata['benchmark_index'] = idx
 
-                # Save intermediate results if configured
-                if self.config.save_intermediate:
-                    result_path = self.output_dir / f"{benchmark_name}_result.json"
-                    save_benchmark_results(result, result_path)
+                        # Store result
+                        self.results.append(result)
 
-                logger.info(f"✓ {benchmark_name} completed successfully")
+                        # Save intermediate results if configured
+                        if self.config.save_intermediate:
+                            with nvtx_range("SaveResult", color=ProfileColor.ORANGE):
+                                result_path = self.output_dir / f"{benchmark_name}_result.json"
+                                save_benchmark_results(result, result_path)
 
-                # Run analysis if available
-                if hasattr(benchmark, 'analyze_results'):
-                    analysis = benchmark.analyze_results(result)
-                    result.metadata['analysis'] = analysis
+                        mark_event(f"Complete_{benchmark_name}", color=ProfileColor.GREEN)
+                        logger.info(f"✓ {benchmark_name} completed successfully")
 
-            except Exception as e:
-                logger.error(f"✗ {benchmark_name} failed: {e}")
-                failed_benchmarks.append((benchmark_name, str(e)))
+                        # Run analysis if available
+                        if hasattr(benchmark, 'analyze_results'):
+                            with nvtx_range("AnalyzeResults", color=ProfileColor.ORANGE):
+                                analysis = benchmark.analyze_results(result)
+                                result.metadata['analysis'] = analysis
 
-                if self.config.stop_on_failure:
-                    logger.error("Stopping suite due to failure")
-                    break
+                    except Exception as e:
+                        logger.error(f"✗ {benchmark_name} failed: {e}")
+                        mark_event(f"Failed_{benchmark_name}", color=ProfileColor.RED)
+                        failed_benchmarks.append((benchmark_name, str(e)))
+
+                        if self.config.stop_on_failure:
+                            logger.error("Stopping suite due to failure")
+                            break
 
         # Calculate suite duration
         suite_end = time.perf_counter()

@@ -14,6 +14,14 @@ from ionosense_hpc.benchmarks.base import BaseBenchmark, BenchmarkConfig
 from ionosense_hpc.config import EngineConfig, Presets
 from ionosense_hpc.core import Processor
 from ionosense_hpc.utils import logger, make_test_batch
+from ionosense_hpc.utils.profiling import (
+    nvtx_range,
+    setup_range,
+    teardown_range,
+    compute_range,
+    ProfilingDomain,
+    ProfileColor,
+)
 
 
 class RealtimeBenchmarkConfig(BenchmarkConfig):
@@ -56,38 +64,41 @@ class RealtimeBenchmark(BaseBenchmark):
         self.dropped_frames = 0
 
     def setup(self) -> None:
-        """Initialize processor and prepare streaming infrastructure."""
-        # Get engine configuration
-        if self.config.engine_config:
-            self.engine_config = EngineConfig(**self.config.engine_config)
-        else:
-            self.engine_config = Presets.realtime()
+        """Initialize processor and prepare streaming infrastructure (NVTX-instrumented)."""
+        with setup_range("RealtimeBenchmark.setup"):
+            # Get engine configuration
+            if self.config.engine_config:
+                self.engine_config = EngineConfig(**self.config.engine_config)
+            else:
+                self.engine_config = Presets.realtime()
 
-        # Calculate frame deadline
-        if self.config.frame_deadline_ms is None:
-            self.config.frame_deadline_ms = self.engine_config.hop_duration_ms
+            # Calculate frame deadline
+            if self.config.frame_deadline_ms is None:
+                self.config.frame_deadline_ms = self.engine_config.hop_duration_ms
 
-        # Initialize processor
-        self.processor = Processor(self.engine_config)
-        self.processor.initialize()
+            # Initialize processor
+            with nvtx_range("InitializeProcessor", color=ProfileColor.DARK_GRAY):
+                self.processor = Processor(self.engine_config)
+                self.processor.initialize()
 
-        # Pre-generate test data for consistent frames
-        self.test_data = make_test_batch(
-            self.engine_config.nfft,
-            self.engine_config.batch,
-            signal_type='noise',
-            seed=self.config.seed
-        )
+            # Pre-generate test data for consistent frames
+            with nvtx_range("GenerateTestData", color=ProfileColor.ORANGE):
+                self.test_data = make_test_batch(
+                    self.engine_config.nfft,
+                    self.engine_config.batch,
+                    signal_type='noise',
+                    seed=self.config.seed
+                )
 
-        # Calculate total frames
-        self.total_frames = int(
-            self.config.stream_duration_s * 1000 / self.config.frame_deadline_ms
-        )
+            # Calculate total frames
+            self.total_frames = int(
+                self.config.stream_duration_s * 1000 / self.config.frame_deadline_ms
+            )
 
-        logger.info("Real-time benchmark initialized:")
-        logger.info(f"  Duration: {self.config.stream_duration_s}s")
-        logger.info(f"  Frame deadline: {self.config.frame_deadline_ms:.2f}ms")
-        logger.info(f"  Total frames: {self.total_frames}")
+            logger.info("Real-time benchmark initialized:")
+            logger.info(f"  Duration: {self.config.stream_duration_s}s")
+            logger.info(f"  Frame deadline: {self.config.frame_deadline_ms:.2f}ms")
+            logger.info(f"  Total frames: {self.total_frames}")
 
     def execute_iteration(self) -> dict[str, float]:
         """Execute one complete streaming session."""
@@ -149,10 +160,12 @@ class RealtimeBenchmark(BaseBenchmark):
                     time.sleep(self.config.io_delay_ms / 1000)
 
                 # Process the frame
-                output = self.processor.process(self.test_data)
+                with compute_range(f"Frame_{frame_idx}"):
+                    output = self.processor.process(self.test_data)
 
                 # Ensure GPU sync for accurate timing
-                self.processor._engine.synchronize()
+                with nvtx_range("Sync", color=ProfileColor.YELLOW):
+                    self.processor._engine.synchronize()
 
             except Exception as e:
                 logger.error(f"Frame {frame_idx} processing failed: {e}")
@@ -207,11 +220,12 @@ class RealtimeBenchmark(BaseBenchmark):
         return metrics
 
     def teardown(self) -> None:
-        """Clean up resources."""
-        if self.processor:
-            self.processor.reset()
-            self.processor = None
-        self.test_data = None
+        """Clean up resources (NVTX-instrumented)."""
+        with teardown_range("RealtimeBenchmark.teardown"):
+            if self.processor:
+                self.processor.reset()
+                self.processor = None
+            self.test_data = None
 
     def analyze_results(self, result: 'BenchmarkResult') -> dict[str, Any]:
         """
@@ -220,20 +234,21 @@ class RealtimeBenchmark(BaseBenchmark):
         Returns:
             Dictionary with real-time specific analysis
         """
+        from ionosense_hpc.utils.profiling import nvtx_range, ProfileColor
         analysis = {}
+        with nvtx_range("AnalyzeResults", color=ProfileColor.ORANGE):
+            # Frame timing analysis
+            if self.frame_times:
+                analysis['timing_stability'] = self._analyze_timing_stability()
 
-        # Frame timing analysis
-        if self.frame_times:
-            analysis['timing_stability'] = self._analyze_timing_stability()
+            # Deadline compliance patterns
+            if self.deadline_misses:
+                analysis['deadline_patterns'] = self._analyze_deadline_patterns()
 
-        # Deadline compliance patterns
-        if self.deadline_misses:
-            analysis['deadline_patterns'] = self._analyze_deadline_patterns()
+            # System capability assessment
+            analysis['system_capability'] = self._assess_system_capability(result)
 
-        # System capability assessment
-        analysis['system_capability'] = self._assess_system_capability(result)
-
-        return analysis
+            return analysis
 
     def _analyze_timing_stability(self) -> dict:
         """Analyze timing stability and predictability."""

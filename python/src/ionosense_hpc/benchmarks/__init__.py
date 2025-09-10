@@ -31,6 +31,26 @@ from .sweep import (
     ParameterSweep,
 )
 
+# Lazy loaders for benchmark classes (avoid heavy imports at module import time)
+def get_latency_benchmark():
+    from .latency import LatencyBenchmark, StreamingLatencyBenchmark
+    return LatencyBenchmark, StreamingLatencyBenchmark
+
+
+def get_throughput_benchmark():
+    from .throughput import ThroughputBenchmark, ScalingBenchmark, MemoryStressBenchmark
+    return ThroughputBenchmark, ScalingBenchmark, MemoryStressBenchmark
+
+
+def get_accuracy_benchmark():
+    from .accuracy import AccuracyBenchmark
+    return AccuracyBenchmark
+
+
+def get_realtime_benchmark():
+    from .realtime import RealtimeBenchmark
+    return RealtimeBenchmark
+
 __all__ = [
     # Core primitives
     "BaseBenchmark",
@@ -49,7 +69,9 @@ __all__ = [
     "ExperimentRun",
     "ParameterSpec",
     "ParameterSweep",
-    # Functional benchmarks are available as classes in submodules
-    # (accuracy, latency, throughput, realtime), but are not imported here
-    # to keep package import light and avoid optional dependency issues.
+    # Lazy loaders for benchmark classes
+    "get_latency_benchmark",
+    "get_throughput_benchmark",
+    "get_accuracy_benchmark",
+    "get_realtime_benchmark",
 ]

@@ -1,4 +1,4 @@
-"""Mid-level engine wrapper with validation and buffer management."""
+"""Mid-level engine wrapper with validation, buffer management, and NVTX profiling."""
 
 from typing import Any
 
@@ -8,6 +8,18 @@ from ionosense_hpc.config import EngineConfig, validate_batch_size, validate_inp
 from ionosense_hpc.core.raw_engine import RawEngine
 from ionosense_hpc.exceptions import EngineStateError, ValidationError
 from ionosense_hpc.utils.logging import log_config, log_performance, logger
+from ionosense_hpc.utils.profiling import (
+    nvtx_decorate,
+    nvtx_range,
+    compute_range,
+    transfer_range,
+    sync_range,
+    warmup_range,
+    setup_range,
+    teardown_range,
+    ProfileColor,
+    ProfilingDomain,
+)
 
 
 class Engine:
@@ -36,6 +48,11 @@ class Engine:
         if config is not None:
             self.initialize(config)
 
+    @nvtx_decorate(
+        message="Engine.initialize",
+        color=ProfileColor.DARK_GRAY,
+        domain=ProfilingDomain.CORE,
+    )
     def initialize(self, config: EngineConfig) -> None:
         """Initialize the engine with configuration.
 
@@ -45,33 +62,42 @@ class Engine:
         Raises:
             EngineRuntimeError: If initialization fails
         """
-        # Store config
-        self._config = config
+        with setup_range("Engine.initialize"):
+            # Store config
+            self._config = config
 
-        # Pre-allocate buffers
-        input_size = config.nfft * config.batch
-        output_size = config.num_output_bins * config.batch
+            # Pre-allocate buffers
+            input_size = config.nfft * config.batch
+            output_size = config.num_output_bins * config.batch
 
-        self._input_buffer = np.zeros(input_size, dtype=np.float32)
-        self._output_buffer = np.zeros(output_size, dtype=np.float32)
+            with nvtx_range("AllocateBuffers", color=ProfileColor.DARK_GRAY):
+                self._input_buffer = np.zeros(input_size, dtype=np.float32)
+                self._output_buffer = np.zeros(output_size, dtype=np.float32)
 
-        # Initialize raw engine
-        config_dict = config.model_dump()
-        self._raw_engine.initialize(config_dict)
+            # Initialize raw engine
+            with nvtx_range("InitializeRawEngine", color=ProfileColor.DARK_GRAY):
+                config_dict = config.model_dump()
+                self._raw_engine.initialize(config_dict)
 
-        # Reset statistics
-        self._frame_count = 0
-        self._total_latency_us = 0.0
+            # Reset statistics
+            self._frame_count = 0
+            self._total_latency_us = 0.0
 
-        # Log configuration
-        log_config(config)
-        logger.info(f"Engine initialized with preset buffers: "
-                   f"input={input_size}, output={output_size}")
+            # Log configuration
+            log_config(config)
+            logger.info(
+                f"Engine initialized with preset buffers: input={input_size}, output={output_size}"
+            )
 
-        # Run warmup if configured
-        if config.warmup_iters > 0:
-            self._run_warmup(config.warmup_iters)
+            # Run warmup if configured
+            if config.warmup_iters > 0:
+                self._run_warmup(config.warmup_iters)
 
+    @nvtx_decorate(
+        message="Engine.process",
+        color=ProfileColor.PURPLE,
+        domain=ProfilingDomain.CORE,
+    )
     def process(
         self,
         input_data: np.ndarray | list,
@@ -93,26 +119,29 @@ class Engine:
         if not self.is_initialized:
             raise EngineStateError("Engine not initialized")
 
-        # Convert and validate input
-        if not isinstance(input_data, np.ndarray):
-            input_data = np.asarray(input_data, dtype=np.float32)
+        with nvtx_range("ValidateInput", color=ProfileColor.YELLOW):
+            # Convert and validate input
+            if not isinstance(input_data, np.ndarray):
+                input_data = np.asarray(input_data, dtype=np.float32)
 
-        input_data = validate_input_array(
-            input_data,
-            expected_dtype=np.float32,
-            name="input_data"
-        )
+            input_data = validate_input_array(
+                input_data,
+                expected_dtype=np.float32,
+                name="input_data",
+            )
 
         # Validate size
         validate_batch_size(input_data, self._config)
 
         # Copy to internal buffer if needed
-        if input_data.shape != self._input_buffer.shape:
-            input_data = input_data.flatten()
-        np.copyto(self._input_buffer, input_data)
+        with transfer_range("CopyInput", direction="H2D"):
+            if input_data.shape != self._input_buffer.shape:
+                input_data = input_data.flatten()
+            np.copyto(self._input_buffer, input_data)
 
         # Process through raw engine
-        result = self._raw_engine.process(self._input_buffer)
+        with compute_range("RawProcess"):
+            result = self._raw_engine.process(self._input_buffer)
 
         # Update statistics
         if not self._is_warming_up:
@@ -127,13 +156,19 @@ class Engine:
                 raise ValidationError(
                     "Output buffer shape mismatch",
                     expected=str(expected_shape),
-                    got=str(output.shape)
+                    got=str(output.shape),
                 )
-            np.copyto(output, result)
+            with transfer_range("CopyOutput", direction="D2H"):
+                np.copyto(output, result)
             return output
 
         return result
 
+    @nvtx_decorate(
+        message="Engine.process_frames",
+        color=ProfileColor.NVIDIA_BLUE,
+        domain=ProfilingDomain.CORE,
+    )
     def process_frames(
         self,
         input_data: np.ndarray,
@@ -154,12 +189,13 @@ class Engine:
         if hop_size is None:
             hop_size = self._config.hop_size
 
-        # Validate input
-        input_data = validate_input_array(
-            input_data,
-            expected_dtype=np.float32,
-            name="input_data"
-        )
+        with nvtx_range("ValidateFramedInput", color=ProfileColor.YELLOW):
+            # Validate input
+            input_data = validate_input_array(
+                input_data,
+                expected_dtype=np.float32,
+                name="input_data",
+            )
 
         # Calculate number of frames
         frame_size = self._config.nfft * self._config.batch
@@ -176,27 +212,41 @@ class Engine:
         output_shape = (n_frames, self._config.batch, self._config.num_output_bins)
         output = np.zeros(output_shape, dtype=np.float32)
 
-        for i in range(n_frames):
-            start_idx = i * hop_size * self._config.batch
-            end_idx = start_idx + frame_size
-            frame_data = input_data[start_idx:end_idx]
-            output[i] = self.process(frame_data)
+        with compute_range(f"ProcessFrames_{n_frames}"):
+            for i in range(n_frames):
+                with nvtx_range(f"Frame_{i}", color=ProfileColor.PURPLE, payload=i):
+                    start_idx = i * hop_size * self._config.batch
+                    end_idx = start_idx + frame_size
+                    frame_data = input_data[start_idx:end_idx]
+                    output[i] = self.process(frame_data)
 
         return output
 
+    @nvtx_decorate(
+        message="Engine.reset",
+        color=ProfileColor.RED,
+        domain=ProfilingDomain.CORE,
+    )
     def reset(self) -> None:
         """Reset the engine to uninitialized state."""
-        self._raw_engine.reset()
-        self._config = None
-        self._input_buffer = None
-        self._output_buffer = None
-        self._frame_count = 0
-        self._total_latency_us = 0.0
-        logger.info("Engine reset")
+        with teardown_range("Engine.reset"):
+            self._raw_engine.reset()
+            self._config = None
+            self._input_buffer = None
+            self._output_buffer = None
+            self._frame_count = 0
+            self._total_latency_us = 0.0
+            logger.info("Engine reset")
 
+    @nvtx_decorate(
+        message="Engine.synchronize",
+        color=ProfileColor.YELLOW,
+        domain=ProfilingDomain.CORE,
+    )
     def synchronize(self) -> None:
         """Synchronize all CUDA streams."""
-        self._raw_engine.synchronize()
+        with sync_range("Engine.synchronize"):
+            self._raw_engine.synchronize()
 
     def get_stats(self) -> dict[str, Any]:
         """Get accumulated performance statistics.
@@ -248,8 +298,12 @@ class Engine:
             dtype=np.float32
         )
 
-        for _ in range(iterations):
-            self.process(dummy_input)
+        with warmup_range("EngineWarmup"):
+            for i in range(iterations):
+                with nvtx_range(
+                    f"WarmupIteration_{i}", color=ProfileColor.LIGHT_GRAY, payload=i
+                ):
+                    self.process(dummy_input)
 
         self._is_warming_up = False
         self._frame_count = 0

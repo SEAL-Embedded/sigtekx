@@ -14,6 +14,15 @@ from ionosense_hpc.benchmarks.base import BaseBenchmark, BenchmarkConfig, Benchm
 from ionosense_hpc.config import EngineConfig, Presets
 from ionosense_hpc.core import Processor
 from ionosense_hpc.utils import logger, make_test_batch
+from ionosense_hpc.utils.profiling import (
+    benchmark_range,
+    nvtx_range,
+    setup_range,
+    teardown_range,
+    warmup_range,
+    ProfilingDomain,
+    ProfileColor,
+)
 
 
 class LatencyBenchmarkConfig(BenchmarkConfig):
@@ -58,54 +67,64 @@ class LatencyBenchmark(BaseBenchmark):
         self.last_timestamp = None
 
     def setup(self) -> None:
-        """Initialize processor and prepare test data."""
-        # Get engine config from preset or override
-        if self.config.engine_config:
-            engine_config = EngineConfig(**self.config.engine_config)
-        else:
-            engine_config = Presets.realtime()
+        """Initialize processor and prepare test data (NVTX-instrumented)."""
+        with setup_range("LatencyBenchmark.setup"):
+            # Get engine config from preset or override
+            if self.config.engine_config:
+                engine_config = EngineConfig(**self.config.engine_config)
+            else:
+                engine_config = Presets.realtime()
 
-        # Initialize processor
-        self.processor = Processor(engine_config)
-        self.processor.initialize()
+            # Initialize processor
+            with nvtx_range("InitializeProcessor", color=ProfileColor.DARK_GRAY):
+                self.processor = Processor(engine_config)
+                self.processor.initialize()
 
-        # Prepare deterministic test data
-        self.test_data = make_test_batch(
-            nfft=engine_config.nfft,
-            batch=engine_config.batch,
-            signal_type=self.config.test_signal_type,
-            frequency=self.config.test_frequency,
-            seed=self.config.seed
-        )
+            # Prepare deterministic test data
+            with nvtx_range("PrepareTestData", color=ProfileColor.ORANGE):
+                self.test_data = make_test_batch(
+                    nfft=engine_config.nfft,
+                    batch=engine_config.batch,
+                    signal_type=self.config.test_signal_type,
+                    frequency=self.config.test_frequency,
+                    seed=self.config.seed,
+                )
 
-        # Setup GPU timing if requested
-        if self.config.measure_gpu_time:
-            try:
-                # Note: This would require exposing CUDA events from C++
-                # For now, we'll use CPU timing with proper synchronization
-                logger.info("GPU event timing not yet exposed in Python API, using synchronized CPU timing")
-                self.config.measure_gpu_time = False
-            except Exception as e:
-                logger.warning(f"Failed to setup GPU events: {e}")
+            # Setup GPU timing if requested
+            if self.config.measure_gpu_time:
+                try:
+                    logger.info(
+                        "GPU event timing not yet exposed in Python API, using synchronized CPU timing"
+                    )
+                    self.config.measure_gpu_time = False
+                except Exception as e:
+                    logger.warning(f"Failed to setup GPU events: {e}")
 
-        logger.info("Latency benchmark setup complete")
-        logger.info(f"  Engine config: {engine_config}")
-        logger.info(f"  Test signal: {self.config.test_signal_type} @ {self.config.test_frequency} Hz")
+            logger.info("Latency benchmark setup complete")
+            logger.info(f"  Engine config: {engine_config}")
+            logger.info(
+                f"  Test signal: {self.config.test_signal_type} @ {self.config.test_frequency} Hz"
+            )
 
     def execute_iteration(self) -> dict[str, float]:
-        """Execute single iteration with comprehensive timing."""
+        """Execute single iteration with comprehensive timing and NVTX markers."""
         # Pre-iteration synchronization for accurate timing
-        self.processor._engine.synchronize()
+        with nvtx_range("PreIterationSync", color=ProfileColor.YELLOW):
+            self.processor._engine.synchronize()
 
         # Start timing
         t_start_cpu = time.perf_counter()
         t_start_ns = time.perf_counter_ns()
 
         # Process data
-        output = self.processor.process(self.test_data)
+        with nvtx_range(
+            "ProcessIteration", color=ProfileColor.PURPLE, domain=ProfilingDomain.BENCHMARK
+        ):
+            output = self.processor.process(self.test_data)
 
         # Post-processing synchronization
-        self.processor._engine.synchronize()
+        with nvtx_range("PostIterationSync", color=ProfileColor.YELLOW):
+            self.processor._engine.synchronize()
 
         # End timing
         t_end_cpu = time.perf_counter()
@@ -144,12 +163,13 @@ class LatencyBenchmark(BaseBenchmark):
         return metrics
 
     def teardown(self) -> None:
-        """Clean up resources."""
-        if self.processor:
-            self.processor.reset()
-            self.processor = None
-        self.test_data = None
-        self.gpu_events = None
+        """Clean up resources (NVTX-instrumented)."""
+        with teardown_range("LatencyBenchmark.teardown"):
+            if self.processor:
+                self.processor.reset()
+                self.processor = None
+            self.test_data = None
+            self.gpu_events = None
 
     def analyze_results(self, result: BenchmarkResult) -> dict[str, Any]:
         """
@@ -158,24 +178,26 @@ class LatencyBenchmark(BaseBenchmark):
         Returns:
             Dictionary of analysis results
         """
-        if isinstance(result.measurements, dict):
-            latencies = result.measurements.get('latency_us', np.array([]))
-        else:
-            latencies = result.measurements
+        from ionosense_hpc.utils.profiling import nvtx_range, ProfileColor
+        with nvtx_range("AnalyzeResults", color=ProfileColor.ORANGE):
+            if isinstance(result.measurements, dict):
+                latencies = result.measurements.get('latency_us', np.array([]))
+            else:
+                latencies = result.measurements
 
-        if len(latencies) == 0:
-            return {'error': 'No latency measurements'}
+            if len(latencies) == 0:
+                return {'error': 'No latency measurements'}
 
-        analysis = {
-            'deadline_analysis': self._analyze_deadline_compliance(latencies),
-            'distribution_analysis': self._analyze_distribution(latencies),
-            'trend_analysis': self._analyze_trends(latencies)
-        }
+            analysis = {
+                'deadline_analysis': self._analyze_deadline_compliance(latencies),
+                'distribution_analysis': self._analyze_distribution(latencies),
+                'trend_analysis': self._analyze_trends(latencies)
+            }
 
-        if self.config.analyze_jitter and len(self.interval_times) > 1:
-            analysis['jitter_analysis'] = self._analyze_jitter()
+            if self.config.analyze_jitter and len(self.interval_times) > 1:
+                analysis['jitter_analysis'] = self._analyze_jitter()
 
-        return analysis
+            return analysis
 
     def _analyze_deadline_compliance(self, latencies: np.ndarray) -> dict:
         """Analyze real-time deadline compliance."""
@@ -408,44 +430,55 @@ def run_latency_benchmark_suite(
     output_path.mkdir(parents=True, exist_ok=True)
 
     for name, config in variants:
-        logger.info(f"\n{'='*60}")
-        logger.info(f"Running {name} variant...")
-        logger.info(f"{'='*60}")
+        with nvtx_range(
+            f"RunVariant_{name}", color=ProfileColor.NVIDIA_BLUE, domain=ProfilingDomain.BENCHMARK
+        ):
+            logger.info(f"\n{'='*60}")
+            logger.info(f"Running {name} variant...")
+            logger.info(f"{'='*60}")
 
-        if name == 'streaming':
-            benchmark = StreamingLatencyBenchmark(config)
-        else:
-            benchmark = LatencyBenchmark(config)
+            if name == 'streaming':
+                benchmark = StreamingLatencyBenchmark(config)
+            else:
+                benchmark = LatencyBenchmark(config)
 
-        result = benchmark.run()
+            result = benchmark.run()
 
-        # Perform additional analysis
-        analysis = benchmark.analyze_results(result)
-        result.metadata['analysis'] = analysis
+            # Perform additional analysis
+            analysis = benchmark.analyze_results(result)
+            result.metadata['analysis'] = analysis
 
-        results[name] = result
+            results[name] = result
 
-        # Save individual result with a filesystem-safe timestamp
-        def _safe_filename(s: str) -> str:
-            # Allow alnum, dash, underscore, dot; replace others with '-'
-            return ''.join(ch if (ch.isalnum() or ch in ('-', '_', '.')) else '-' for ch in s)
+            # Save individual result with a filesystem-safe timestamp
+            def _safe_filename(s: str) -> str:
+                # Allow alnum, dash, underscore, dot; replace others with '-'
+                return ''.join(
+                    ch if (ch.isalnum() or ch in ('-', '_', '.')) else '-' for ch in s
+                )
 
-        safe_ts = _safe_filename(result.context.timestamp)
-        save_benchmark_results(
-            result,
-            output_path / f"{name}_{safe_ts}.json"
-        )
+            safe_ts = _safe_filename(result.context.timestamp)
+            save_benchmark_results(
+                result,
+                output_path / f"{name}_{safe_ts}.json",
+            )
 
-        # Print summary using latency metric stats
-        lat_stats = result.statistics.get('latency_us', {}) if isinstance(result.statistics, dict) else {}
-        mean_lat = lat_stats.get('mean', 0.0) if isinstance(lat_stats, dict) else 0.0
-        p99_lat = lat_stats.get('p99', 0.0) if isinstance(lat_stats, dict) else 0.0
-        logger.info(f"\n{name} Results:")
-        logger.info(f"  Mean: {mean_lat:.2f} µs")
-        logger.info(f"  P99: {p99_lat:.2f} µs")
-        if 'deadline_analysis' in analysis:
-            da = analysis['deadline_analysis']
-            logger.info(f"  Deadline compliance: {(1-da['violation_rate'])*100:.1f}%")
+            # Print summary using latency metric stats
+            lat_stats = (
+                result.statistics.get('latency_us', {})
+                if isinstance(result.statistics, dict)
+                else {}
+            )
+            mean_lat = lat_stats.get('mean', 0.0) if isinstance(lat_stats, dict) else 0.0
+            p99_lat = lat_stats.get('p99', 0.0) if isinstance(lat_stats, dict) else 0.0
+            logger.info(f"\n{name} Results:")
+            logger.info(f"  Mean: {mean_lat:.2f} µs")
+            logger.info(f"  P99: {p99_lat:.2f} µs")
+            if 'deadline_analysis' in analysis:
+                da = analysis['deadline_analysis']
+                logger.info(
+                    f"  Deadline compliance: {(1-da['violation_rate'])*100:.1f}%"
+                )
 
     return results
 
