@@ -9,11 +9,11 @@ benchmark infrastructure following RSE best practices.
 import json
 from collections.abc import Generator
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pytest
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from ionosense_hpc.benchmarks.base import (
     BenchmarkConfig,
@@ -210,7 +210,7 @@ def mock_processor(monkeypatch) -> Processor:
             return self._initialized
 
     monkeypatch.setattr("ionosense_hpc.core.Processor", MockProcessor)
-    return MockProcessor()
+    return cast(Processor, MockProcessor())
 
 
 # ============================================================================
@@ -227,19 +227,19 @@ def seeded_rng() -> np.random.Generator:
 def test_sine_data() -> np.ndarray:
     """Generates a standard 1 kHz sine wave for spectral validation."""
     from ionosense_hpc.utils import make_sine
-    return make_sine(
+    return cast(np.ndarray, make_sine(
         frequency=1000,
         duration=0.1,
         sample_rate=48000,
         amplitude=1.0,
         dtype=np.float32
-    )
+    ))
 
 
 @pytest.fixture
 def test_batch_data() -> np.ndarray:
     """Generates standard dual-channel batch data for testing."""
-    return make_test_batch(nfft=1024, batch=2, signal_type='sine', frequency=1000, seed=42)
+    return cast(np.ndarray, make_test_batch(nfft=1024, batch=2, signal_type='sine', frequency=1000, seed=42))
 
 
 @pytest.fixture
@@ -306,25 +306,25 @@ def mock_benchmark_results(temp_benchmark_dir: Path) -> list[Path]:
 @pytest.fixture(params=['sine', 'chirp', 'noise', 'multitone'])
 def test_signal_type(request) -> str:
     """Parametrized fixture that provides different signal type names."""
-    return request.param
+    return cast(str, request.param)
 
 
 @pytest.fixture(params=[256, 512, 1024, 2048])
 def test_nfft_size(request) -> int:
     """Parametrized fixture that provides different FFT sizes."""
-    return request.param
+    return cast(int, request.param)
 
 
 @pytest.fixture(params=[1, 2, 4, 8])
 def test_batch_size(request) -> int:
     """Parametrized fixture that provides different batch sizes."""
-    return request.param
+    return cast(int, request.param)
 
 
 @pytest.fixture(params=['grid', 'random', 'latin_hypercube'])
 def sweep_type(request) -> str:
     """Parametrized fixture for different sweep types."""
-    return request.param
+    return cast(str, request.param)
 
 
 # ============================================================================
@@ -367,6 +367,7 @@ def benchmark_runner(temp_benchmark_dir: Path):
     from ionosense_hpc.benchmarks.base import BaseBenchmark
 
     class TestBenchmark(BaseBenchmark):
+        data: np.ndarray | None = None
         def setup(self):
             self.data = np.random.randn(100)
 

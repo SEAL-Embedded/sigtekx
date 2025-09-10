@@ -9,9 +9,9 @@ import json
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from ionosense_hpc.benchmarks.accuracy import AccuracyBenchmark
 from ionosense_hpc.benchmarks.base import (
@@ -42,8 +42,8 @@ class SuiteConfig:
     description: str = "Full benchmark suite for performance evaluation"
 
     # Benchmark selection
-    benchmarks: list[str] = None  # None means all
-    exclude: list[str] = None
+    benchmarks: list[str] | None = None  # None means all
+    exclude: list[str] | None = None
 
     # Execution control
     stop_on_failure: bool = False
@@ -100,12 +100,12 @@ class BenchmarkSuite:
         self.config = config
         self.context = BenchmarkContext()
         self.results: list[BenchmarkResult] = []
-        self.suite_metadata = {
+        self.suite_metadata: dict[str, Any] = {
             'name': self.config.name,
             'description': self.config.description,
             'start_time': None,
             'end_time': None,
-            'total_duration_s': 0,
+            'total_duration_s': 0.0,
             'environment': self.context.to_dict()
         }
 
@@ -170,7 +170,7 @@ class BenchmarkSuite:
         elif 'accuracy' in benchmark_name:
             base_config['engine_config'] = Presets.validation().model_dump()
 
-        return BenchmarkConfig(**base_config)
+        return BenchmarkConfig(**cast(dict[str, Any], base_config))
 
     def run(self) -> dict[str, Any]:
         """

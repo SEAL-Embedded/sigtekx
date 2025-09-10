@@ -15,7 +15,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from ionosense_hpc.benchmarks.base import BenchmarkContext, BenchmarkResult
 from ionosense_hpc.benchmarks.suite import BenchmarkSuite, SuiteConfig
@@ -158,7 +158,7 @@ class ResearchWorkflow:
         name: str,
         stage_type: str,
         config: dict[str, Any],
-        dependencies: list[str] = None
+        dependencies: list[str] | None = None
     ) -> WorkflowStage:
         """Add a stage to the workflow."""
         stage = WorkflowStage(
@@ -182,7 +182,7 @@ class ResearchWorkflow:
 
     def capture_environment(self) -> dict[str, Any]:
         """Capture complete environment for reproducibility."""
-        env = {
+        env: dict[str, Any] = {
             'python_version': sys.version,
             'platform': sys.platform,
             'cwd': str(Path.cwd()),
@@ -287,6 +287,7 @@ class ResearchWorkflow:
         stage.start_time = datetime.now()
 
         try:
+            result: Any = None
             if stage.stage_type == "setup":
                 result = self._run_setup_stage(stage)
             elif stage.stage_type == "benchmark":
@@ -344,7 +345,7 @@ class ResearchWorkflow:
 
         return {'environment': env, 'dependencies_verified': True}
 
-    def _run_benchmark_stage(self, stage: WorkflowStage) -> BenchmarkResult:
+    def _run_benchmark_stage(self, stage: WorkflowStage) -> dict[str, Any]:
         """Run benchmark suite stage."""
         suite_config = SuiteConfig(**stage.config)
         suite_config.output_dir = str(self.base_dir / "results" / stage.name)
@@ -545,8 +546,8 @@ class ResearchWorkflow:
 
 def create_research_workflow(
     name: str,
-    researcher: str = None,
-    description: str = None
+    researcher: str | None = None,
+    description: str | None = None
 ) -> ResearchWorkflow:
     """
     Convenience function to create a standard research workflow.
