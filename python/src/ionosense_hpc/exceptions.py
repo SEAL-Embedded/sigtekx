@@ -33,9 +33,15 @@ class IonosenseError(Exception):
 class ConfigError(IonosenseError):
     """Configuration validation or compatibility error."""
 
-    def __init__(self, message: str, field: str | None = None, value: Any = None):
-        hint = None
-        if field:
+    def __init__(
+        self,
+        message: str,
+        field: str | None = None,
+        value: Any = None,
+        hint: str | None = None,
+    ):
+        # If no explicit hint provided, build a simple field-based hint
+        if hint is None and field:
             hint = f"Check the '{field}' field"
             if value is not None:
                 hint += f" (current value: {value})"

@@ -4,4 +4,4 @@ from .definitions import StageType, get_stage_info, list_future_stages, list_imp
 from .registry import StageRegistry, get_stage, list_stages, register_stage
 
 # Note: These are kept private as they're not part of the public API yet
-__all__ = []
+__all__: list[str] = []

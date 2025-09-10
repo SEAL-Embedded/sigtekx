@@ -144,7 +144,7 @@ check_untyped_defs = true
 no_implicit_optional = true
 show_error_codes = true
 explicit_package_bases = true
-package_path = "python/src"
+mypy_path = "python/src"
 
 [[tool.mypy.overrides]]
 module = [

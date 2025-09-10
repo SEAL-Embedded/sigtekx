@@ -8,6 +8,8 @@ processing engine.
 """
 
 import numpy as np
+from numpy.typing import DTypeLike
+from typing import Any
 from scipy import signal as sp_signal
 
 
@@ -17,7 +19,7 @@ def make_sine(
     sample_rate: int = 48000,
     amplitude: float = 1.0,
     phase: float = 0.0,
-    dtype: np.dtype = np.float32,
+    dtype: DTypeLike = np.float32,
 ) -> np.ndarray:
     """
     Generate a sine wave signal.
@@ -46,7 +48,7 @@ def make_chirp(
     sample_rate: int = 48000,
     method: str = "linear",
     amplitude: float = 1.0,
-    dtype: np.dtype = np.float32,
+    dtype: DTypeLike = np.float32,
 ) -> np.ndarray:
     """
     Generate a chirp (frequency sweep) signal using SciPy.
@@ -66,10 +68,12 @@ def make_chirp(
     num_samples = int(duration * sample_rate)
     t = np.linspace(0.0, duration, num_samples, endpoint=False, dtype=np.float64)
     # SciPy's chirp is defined from -1 to 1, so we scale it by amplitude
-    signal = amplitude * sp_signal.chirp(
+    sig = amplitude * sp_signal.chirp(
         t, f0=f_start, f1=f_end, t1=duration, method=method
     )
-    return signal.astype(dtype)
+    # Ensure concrete ndarray type for typing
+    arr = np.asarray(sig)
+    return arr.astype(dtype)
 
 
 def make_noise(
@@ -78,7 +82,7 @@ def make_noise(
     noise_type: str = "white",
     amplitude: float = 1.0,
     seed: int | None = None,
-    dtype: np.dtype = np.float32,
+    dtype: DTypeLike = np.float32,
 ) -> np.ndarray:
     """
     Generate a noise signal.
@@ -246,10 +250,12 @@ def make_test_batch(
                 duration=duration, sample_rate=sample_rate, seed=channel_seed, **kwargs
             )
         elif signal_type == "zeros":
+            assert base_signal is not None
             channel_signal = base_signal.copy()
         else:
             # Add a small amount of noise to each channel to make them unique.
-            noise_amp = 0.01 * np.mean(np.abs(base_signal))
+            assert base_signal is not None
+            noise_amp = float(0.01 * np.mean(np.abs(base_signal)))
             noise = make_noise(
                 duration=duration,
                 sample_rate=sample_rate,

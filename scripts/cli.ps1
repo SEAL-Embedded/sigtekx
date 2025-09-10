@@ -671,6 +671,66 @@ Function Invoke-Clean {
     Write-ResearchLog -Level Info -Message "Clean completed" -Component "Clean"
 }
 
+# --- Type Checking ----------------------------------------------------------
+Function Invoke-Typecheck {
+    param(
+        [switch]$Strict,
+        [switch]$IncludeTests,
+        [switch]$Verbose
+    )
+
+    Write-ResearchLog -Level Info -Message "Running mypy type checking" -Component "Typecheck" -Metadata @{
+        strict = $Strict.IsPresent
+    }
+
+    # Resolve mypy
+    $mypyExe = $null
+    foreach ($cmd in @('mypy','mypy.exe')) {
+        $found = Get-Command $cmd -ErrorAction SilentlyContinue
+        if ($found) { $mypyExe = $found.Source; break }
+    }
+    if (-not $mypyExe) {
+        # Fallback to python -m mypy
+        $pyExe = if ($env:CONDA_PREFIX) { Join-Path $env:CONDA_PREFIX 'python.exe' } else { 'python' }
+        $mypyExe = $pyExe
+        $useModule = $true
+    } else { $useModule = $false }
+
+    $pySrc   = Join-Path $script:PythonDir 'src'
+    $pyTests = Join-Path $script:PythonDir 'tests'
+    $targets = @()
+    if (Test-Path -LiteralPath $pySrc)   { $targets += $pySrc }
+    if ($IncludeTests -and (Test-Path -LiteralPath $pyTests)) { $targets += $pyTests }
+    if ($targets.Count -eq 0) {
+        Write-ResearchLog -Level Warning -Message "No python targets to typecheck" -Component "Typecheck"
+        return
+    }
+
+    # Ensure mypy can resolve package imports from tests
+    $oldMypyPath = $env:MYPYPATH
+    $env:MYPYPATH = if ($oldMypyPath) { "$pySrc;$oldMypyPath" } else { $pySrc }
+
+    try {
+        $args = @()
+        if ($useModule) { $args += @('-m','mypy') }
+        if ($Verbose) { $args += '-v' }
+        if ($Strict) { $args += '--strict' }
+        # mypy auto-reads pyproject.toml [tool.mypy]
+        $args += $targets
+
+        & $mypyExe @args
+        if ($LASTEXITCODE -ne 0) {
+            Write-ResearchLog -Level Error -Message "Typechecking failed" -Component "Typecheck"
+            throw "mypy reported errors"
+        } else {
+            Write-ResearchLog -Level Info -Message "Typechecking passed" -Component "Typecheck"
+        }
+    }
+    finally {
+        $env:MYPYPATH = $oldMypyPath
+    }
+}
+
 Function Invoke-Benchmark {
     param(
         [string]$Benchmark,
@@ -1210,6 +1270,8 @@ BUILD & DEVELOPMENT
                           Format C/C++ code with .clang-format
   lint [all|python|py|cpp] [-Fix] [-Verbose]
                           Lint Python (ruff) and/or C++ (format check)
+  typecheck [-Strict] [-IncludeTests] [-Verbose]
+                          Run mypy type checking (src only by default)
   clean [-All]            Remove build artifacts (and results/logs with -All)
 
 BENCHMARKING (Research-Grade)
@@ -1342,6 +1404,13 @@ try {
             if ($target) { $params.Target = $target }
 
             Invoke-Lint @params
+        }
+        "typecheck"{
+            $params = @{}
+            if ($CommandArgs -contains "-Strict")  { $params.Strict  = $true }
+            if ($CommandArgs -contains "-IncludeTests") { $params.IncludeTests = $true }
+            if ($CommandArgs -contains "-Verbose") { $params.Verbose = $true }
+            Invoke-Typecheck @params
         }
         "sweep"    {
             $params = @{}

@@ -32,10 +32,11 @@ def setup_logging(
     Returns:
         The configured logger instance.
     """
-    log_level = level or os.environ.get('IONO_LOG_LEVEL', 'INFO')
+    # Ensure a concrete string and guard against None for mypy
+    lvl_str = level or os.environ.get('IONO_LOG_LEVEL') or 'INFO'
     fmt = format_string or '[%(asctime)s] %(name)s %(levelname)s: %(message)s'
 
-    logger.setLevel(getattr(logging, log_level.upper()))
+    logger.setLevel(getattr(logging, lvl_str.upper(), logging.INFO))
     logger.handlers.clear()
 
     console_handler = logging.StreamHandler(sys.stdout)

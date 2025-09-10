@@ -6,4 +6,4 @@ import from `ionosense_hpc.testing.fixtures` and `ionosense_hpc.testing.validato
 directly as needed.
 """
 
-__all__ = []
+__all__: list[str] = []

@@ -31,7 +31,7 @@ class DeterministicGenerator:
         """
         self.base_seed = base_seed
         self.context = context
-        self._rng_cache = {}
+        self._rng_cache: dict[str, np.random.Generator] = {}
 
     def get_rng(self, stream_id: str = "main") -> np.random.Generator:
         """
@@ -86,7 +86,7 @@ class SignalGenerator:
         Returns:
             Dictionary of test signals
         """
-        signals = {}
+        signals: dict[str, np.ndarray] = {}
 
         # Time vector
         t = np.arange(nfft) / sample_rate
@@ -232,7 +232,7 @@ class ValidationHelper:
         Returns:
             Validation results dictionary
         """
-        results = {
+        results: dict[str, Any] = {
             'name': name,
             'valid': True,
             'warnings': [],
@@ -567,7 +567,7 @@ class DataArchiver:
 
     def _flatten_dict(self, d: dict, parent_key: str = '') -> dict:
         """Flatten nested dictionary."""
-        items = []
+        items: list[tuple[str, Any]] = []
         for k, v in d.items():
             new_key = f"{parent_key}.{k}" if parent_key else k
             if isinstance(v, dict):

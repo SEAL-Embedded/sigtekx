@@ -135,7 +135,7 @@ def assert_snr(
     assert snr_db >= min_snr_db, \
         f"SNR {snr_db:.1f} dB is below minimum {min_snr_db:.1f} dB"
 
-    return snr_db
+    return float(snr_db)
 
 
 def validate_fft_symmetry(
@@ -189,7 +189,7 @@ def calculate_thd(
         return 0.0
 
     thd = np.sqrt(harmonic_power / fundamental_power) * 100
-    return thd
+    return float(thd)
 
 def compare_with_reference(
     actual: np.ndarray,
