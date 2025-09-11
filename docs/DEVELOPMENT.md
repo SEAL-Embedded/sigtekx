@@ -1,367 +1,619 @@
 # Development Guide
 
-Technical documentation for contributors and maintainers of ionosense-hpc-lib.
+This guide is for developers contributing to ionosense-hpc. It covers the CLI-based development environment, architecture, coding standards, and contribution workflow.
+
+## Table of Contents
+
+- [Development Environment](#development-environment)
+- [CLI Development Workflow](#cli-development-workflow)
+- [Project Structure](#project-structure)
+- [Architecture Overview](#architecture-overview)
+- [Building from Source](#building-from-source)
+- [Coding Standards](#coding-standards)
+- [Testing](#testing)
+- [Debugging](#debugging)
+- [Contributing](#contributing)
+- [Release Process](#release-process)
+
+## Development Environment
+
+### Prerequisites
+
+- **Operating System**: Linux (Ubuntu 20.04+), Windows 10/11 with WSL2, or Windows native
+- **Python**: 3.8 or higher
+- **CUDA Toolkit**: 11.0 or higher
+- **Compiler**: GCC 9+ (Linux), MSVC 2019+ (Windows)
+- **CMake**: 3.18 or higher
+- **Git**: 2.25 or higher
+
+### Setting Up Development Environment
+
+#### Linux/WSL2
+
+```bash
+# Clone the repository with submodules
+git clone --recursive https://github.com/your-org/ionosense-hpc.git
+cd ionosense-hpc
+
+# One-command setup using CLI
+./scripts/cli.sh setup
+
+# Verify environment
+./scripts/cli.sh doctor
+```
+
+#### Windows
+
+```powershell
+# Clone the repository
+git clone --recursive https://github.com/your-org/ionosense-hpc.git
+cd ionosense-hpc
+
+# Start enhanced development shell
+.\scripts\open_dev_pwsh.ps1
+
+# One-command setup using alias
+iono setup
+
+# Verify environment
+iono doctor
+```
+
+## CLI Development Workflow
+
+The ionosense-hpc CLI provides a unified interface for all development tasks, with platform-specific optimizations.
+
+### Linux/WSL2 Commands
+
+```bash
+# Environment management
+./scripts/cli.sh setup          # Create conda environment and install deps
+./scripts/cli.sh doctor         # Comprehensive environment check
+./scripts/cli.sh info           # Show system/project information
+
+# Build and development
+./scripts/cli.sh build          # Configure and build (release)
+./scripts/cli.sh build linux-debug  # Debug build
+./scripts/cli.sh rebuild        # Clean rebuild
+./scripts/cli.sh clean          # Clean build artifacts
+
+# Code quality
+./scripts/cli.sh format         # Format C++ code with clang-format
+./scripts/cli.sh format --check # Check formatting without changes
+./scripts/cli.sh lint           # Lint Python (ruff) and C++ (format check)
+./scripts/cli.sh typecheck      # Run mypy type checking
+./scripts/cli.sh check          # Run format, lint, typecheck, and quick tests
+
+# Testing
+./scripts/cli.sh test           # Run all tests
+./scripts/cli.sh test py        # Python tests only
+./scripts/cli.sh test cpp       # C++ tests only
+./scripts/cli.sh test --coverage  # With coverage report
+
+# Research and benchmarking
+./scripts/cli.sh bench latency  # Run specific benchmark
+./scripts/cli.sh bench suite    # Run complete benchmark suite
+./scripts/cli.sh profile nsys latency  # Profile with Nsight Systems
+./scripts/cli.sh sweep experiment.yaml  # Parameter sweep
+./scripts/cli.sh validate       # Numerical validation suite
+./scripts/cli.sh monitor        # Real-time GPU monitoring
+```
+
+### Windows Development Shell
+
+The enhanced development shell (`.\scripts\open_dev_pwsh.ps1`) provides:
+
+- **Automatic MSVC Setup**: Configures 64-bit Visual Studio tools
+- **Conda Integration**: Activates ionosense-hpc environment  
+- **Smart Aliases**: Convenient shortcuts with tab completion
+- **Repository Awareness**: Commands work from any subdirectory
+
+```powershell
+# Start development shell (one-time per session)
+.\scripts\open_dev_pwsh.ps1
+
+# Available aliases and shortcuts:
+iono <command>        # Main CLI alias
+ib                    # Build (iono build)
+ir                    # Rebuild (iono rebuild)
+it                    # Test all (iono test)
+itp                   # Test Python only (iono test py)
+itc                   # Test C++ only (iono test cpp)
+
+# Code quality shortcuts
+ifmt                  # Format code (iono format)
+ilint                 # Lint code (iono lint)
+
+# Benchmarking shortcuts
+ibench latency        # Run latency benchmark
+iprof nsys latency    # Profile with Nsight
+ipq                   # Quick Nsight profile
+ipf                   # Full Nsight profile
+
+# Utilities
+ival                  # Validate (iono validate)
+imon                  # Monitor GPU (iono monitor)
+iinfo                 # System info (iono info)
+iclean                # Clean (iono clean)
+
+# Tab completion works for all commands and arguments
+iono <TAB>           # Shows available commands
+ibench <TAB>         # Shows available benchmarks
+iprof <TAB>          # Shows profiling options
+```
+
+### Daily Development Cycle
+
+**Linux/WSL2:**
+```bash
+# Start development session
+cd ionosense-hpc
+./scripts/cli.sh doctor         # Check environment health
+
+# Make changes to code...
+
+# Verify changes
+./scripts/cli.sh check          # Format, lint, typecheck, quick tests
+./scripts/cli.sh build          # Build with changes
+./scripts/cli.sh test           # Full test suite
+
+# Research workflow
+./scripts/cli.sh bench latency  # Performance validation
+./scripts/cli.sh profile nsys latency  # Detailed profiling
+```
+
+**Windows:**
+```powershell
+# Start development session
+.\scripts\open_dev_pwsh.ps1     # Enhanced shell with all tools
+iono doctor                     # Check environment health
+
+# Make changes to code...
+
+# Verify changes (using aliases)
+iono check                      # Format, lint, typecheck, quick tests
+ib                             # Build with changes  
+it                             # Full test suite
+
+# Research workflow
+ibench latency                 # Performance validation
+iprof nsys latency            # Detailed profiling
+```
+
+## Project Structure
+
+```
+ionosense-hpc-lib/
+├── bindings/                   # C++/Python binding configurations
+│   └── bindings.cpp              # pybind11 entrypoint
+├── include/                    # C++ public headers
+│   └── ionosense/                # Main library header directory
+│       ├── cuda_wrappers.hpp     # RAII wrappers for CUDA/cuFFT resources
+│       ├── processing_stage.hpp  # Abstract interface for processing stages
+│       └── research_engine.hpp   # Public C++ API for the research engine
+├── src/                        # C++ source code implementations
+│   ├── ops_fft.cu                # CUDA kernels for windowing and magnitude calculations
+│   ├── processing_stage.cpp      # Implementations for concrete processing stages
+│   └── research_engine.cpp       # ResearchEngine implementation details
+├── tests/                      # C++ unit tests
+├── python/                     # Python package source and tests
+│   ├── src/                    # Source code for the Python package
+│   │   └── ionosense_hpc/        # The main Python package
+│   │       ├── benchmarks/       # Performance benchmarking tools
+│   │       ├── config/           # Configuration management
+│   │       ├── core/             # Core Python logic wrapping the C++ library
+│   │       ├── stages/           # Python representations of processing stages
+│   │       ├── testing/          # Utilities for testing the Python code
+│   │       └── utils/            # Utility functions
+│   └── tests/                  # Python unit and integration tests
+├── scripts/                    # Command-line interface and utility scripts
+│   ├── cli.ps1                   # PowerShell CLI script for Windows
+│   ├── cli.sh                    # Bash CLI script for Linux/macOS
+│   └── open_dev_pwsh.ps1         # Enhanced Windows development shell
+└── docs/                       # Project documentation
+```
 
 ## Architecture Overview
 
-### System Layers
+### Layer Architecture
 
 ```
-Application Layer (Python)
-    ├── High-level API (FFTProcessor)
-    ├── Analysis tools (metrics, validators)
-    └── I/O utilities (signals, formats)
-          ↓
-Binding Layer (Pybind11)
-    ├── Zero-copy buffer views
-    ├── Exception translation
-    └── Property exposure
-          ↓
-Core Engine (C++)
-    ├── Stream management (3 concurrent)
-    ├── Memory pools (pinned host/device)
-    └── CUDA Graph orchestration
-          ↓
-CUDA Layer
-    ├── cuFFT plans
-    ├── Custom kernels (window, magnitude)
-    └── Async memory operations
+┌─────────────────────────────────────┐
+│         Python API Layer            │  <- User Interface
+├─────────────────────────────────────┤
+│         Processor Class             │  <- High-level Context Manager
+├─────────────────────────────────────┤
+│          Engine Class               │  <- Mid-level Validation
+├─────────────────────────────────────┤
+│         RawEngine Class             │  <- Low-level C++ Wrapper
+├─────────────────────────────────────┤
+│      C++ ResearchEngine             │  <- Core Implementation
+├─────────────────────────────────────┤
+│         CUDA Kernels                │  <- GPU Acceleration
+└─────────────────────────────────────┘
 ```
 
-### Key Design Decisions
+### Key Components
 
-1. **3-Stream Concurrency**: Overlaps H2D, compute, D2H transfers
-2. **CUDA Graphs**: Reduces kernel launch overhead to <10 μs
-3. **Pinned Memory**: Enables async transfers and zero-copy Python access
-4. **PIMPL Pattern**: Hides CUDA dependencies from header files
+1. **Processor**: High-level interface with context management
+2. **Engine**: Mid-level wrapper with validation and buffer management
+3. **RawEngine**: Thin Python wrapper around C++ extension
+4. **ResearchEngine**: C++ implementation with CUDA kernels
+5. **Benchmarks**: Comprehensive performance evaluation framework
+6. **Config**: Pydantic-based configuration with validation
 
-## Build System
+## Building from Source
 
-### CMake Structure
+### Using CLI (Recommended)
 
-```cmake
-ionosense_hpc/
-├── CMakeLists.txt          # Main build configuration
-├── CMakePresets.json       # Platform-specific presets
-├── src/
-│   ├── fft_engine.cpp     # Host orchestration
-│   └── ops_fft.cu         # CUDA kernels
-├── bindings/
-│   └── bindings.cpp       # Pybind11 wrapper
-└── tests/
-    └── test_fft_engine.cpp # GoogleTest suite
+**Linux/WSL2:**
+```bash
+# Clean build
+./scripts/cli.sh clean
+./scripts/cli.sh build
+
+# Debug build
+./scripts/cli.sh build linux-debug
+
+# Verbose build with all output
+./scripts/cli.sh build --verbose
+
+# Build without NVTX profiling
+./scripts/cli.sh build --no-nvtx
 ```
 
-### Build Options
+**Windows (Development Shell):**
+```powershell
+# Start enhanced shell
+.\scripts\open_dev_pwsh.ps1
+
+# Clean build using aliases
+iclean
+ib                    # or 'iono build'
+
+# Debug build
+iono build windows-debug
+
+# Verbose build
+ib --verbose
+
+# Build without NVTX profiling  
+ib --no-nvtx
+```
+
+### Manual Build (Advanced)
+
+If you need to customize the build beyond CLI options:
 
 ```bash
-# Debug build with symbols
-cmake --preset linux-debug
+# Configure manually
+cd cpp
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j$(nproc)
 
-# Release with all optimizations
-cmake --preset linux-rel
-
-# Custom options
-cmake -DIONO_WITH_GRAPHS=OFF  # Disable CUDA Graphs
-cmake -DIONO_WITH_PYTHON=OFF  # Skip Python bindings
-cmake -DCMAKE_CUDA_ARCHITECTURES="75;86"  # Target specific GPUs
+# Install Python package in development mode
+cd ../../python
+pip install -e .
 ```
 
-### Platform Notes
+## Coding Standards
 
-**Linux/WSL**:
-- Uses GCC 14 from conda-forge
-- Links against static CUDA runtime
+### Python Code Style
 
-**Windows**:
-- Uses VS2022 build tools (via conda)
-- Copies CUDA DLLs to `.libs/windows/`
-- Supports both Ninja and VS generators
+- **Style Guide**: PEP 8 with 100-character line limit
+- **Type Hints**: Required for all public APIs
+- **Docstrings**: Google style for all public functions/classes
+- **Formatting**: Enforced by `cli.sh format` / `ifmt`
+- **Linting**: Enforced by `cli.sh lint` / `ilint`
 
-## Code Organization
+```python
+def process_signal(
+    data: np.ndarray,
+    config: EngineConfig | None = None,
+    validate: bool = True
+) -> np.ndarray:
+    """Process a signal using the FFT engine.
+    
+    Args:
+        data: Input signal array
+        config: Optional engine configuration
+        validate: Whether to validate input
+        
+    Returns:
+        Magnitude spectrum array
+        
+    Raises:
+        ValidationError: If input validation fails
+    """
+```
 
-### C++ Core (`src/`, `include/`)
+### C++ Code Style
+
+- **Style Guide**: Google C++ Style Guide
+- **Formatting**: Enforced by `cli.sh format` / `ifmt` (clang-format)
+- **Naming**: snake_case for functions, CamelCase for classes
+- **Headers**: Include guards and forward declarations
+- **Memory**: RAII and smart pointers
 
 ```cpp
-// include/ionosense/fft_engine.hpp
-class RtFftEngine {
+class ResearchEngine {
 public:
-    // Public API - stable
-    void execute_async(int stream_idx);
-    void sync_stream(int stream_idx);
+    explicit ResearchEngine(const EngineConfig& config);
+    ~ResearchEngine();
+    
+    // Delete copy operations
+    ResearchEngine(const ResearchEngine&) = delete;
+    ResearchEngine& operator=(const ResearchEngine&) = delete;
+    
+    // Move operations
+    ResearchEngine(ResearchEngine&&) noexcept = default;
+    ResearchEngine& operator=(ResearchEngine&&) noexcept = default;
+    
+    void process(const float* input, float* output);
     
 private:
-    // PIMPL to hide CUDA types
-    struct Impl;
-    Impl* p_;
-};
-
-// src/fft_engine.cpp
-struct RtFftEngine::Impl {
-    // All CUDA resources here
-    cudaStream_t streams_[3];
-    cufftHandle plans_[3];
-    // ...
+    class Impl;
+    std::unique_ptr<Impl> pImpl;
 };
 ```
 
-### CUDA Kernels (`src/ops_fft.cu`)
+### Git Commit Messages
 
-```cuda
-// Keep kernels simple and focused
-__global__ void applyWindowKernel(float* data, const float* window, 
-                                  int nfft, int batch) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= nfft * batch) return;
-    
-    int sample_idx = idx % nfft;
-    data[idx] *= window[sample_idx];
-}
+Follow the Conventional Commits specification:
 
-// Thin wrapper for launch
-void apply_window_async(float* d_data, const float* d_window,
-                       int nfft, int batch, cudaStream_t stream) {
-    dim3 threads(256);
-    dim3 blocks((nfft * batch + threads.x - 1) / threads.x);
-    applyWindowKernel<<<blocks, threads, 0, stream>>>(
-        d_data, d_window, nfft, batch);
-}
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
 ```
 
-### Python Bindings (`bindings/bindings.cpp`)
+Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
 
-```cpp
-// Zero-copy numpy views
-.def("pinned_input", [](RtFftEngine &self, int idx) {
-    float* ptr = self.pinned_input(idx);
-    return py::array_t<float>(/* buffer_info */);
-})
+Example:
+```
+feat(benchmarks): add parameter sweep functionality
 
-// Property exposure
-.def_property("use_graphs",
-    &RtFftEngine::get_use_graphs,
-    &RtFftEngine::set_use_graphs)
+- Implement grid and random search strategies
+- Add Latin Hypercube sampling support
+- Include results aggregation and analysis
+
+Closes #123
 ```
 
 ## Testing
 
-### C++ Unit Tests
+### Running Tests with CLI
 
+**Linux/WSL2:**
 ```bash
-# Run all C++ tests
-ctest --preset linux-tests
+# Run all tests
+./scripts/cli.sh test
 
-# Run specific test
-./build/linux-rel/test_engine --gtest_filter=FftEngineTest.BufferAccess*
-
-# With verbose output
-ctest --preset linux-tests -V
-```
-
-### Python Tests
-
-```bash
-# Run all Python tests
-pytest python/tests -v
+# Run specific test suites
+./scripts/cli.sh test py         # Python only
+./scripts/cli.sh test cpp        # C++ only
 
 # Run with coverage
-pytest python/tests --cov=ionosense_hpc --cov-report=html
+./scripts/cli.sh test --coverage
 
-# Run specific test
-pytest python/tests/test_engine.py::test_runtime_graph_toggle
+# Run specific patterns
+./scripts/cli.sh test --pattern "test_engine"
+
+# Verbose output
+./scripts/cli.sh test --verbose
 ```
 
-### Integration Tests
+**Windows (Development Shell):**
+```powershell
+# Run all tests
+it                              # or 'iono test'
+
+# Run specific test suites  
+itp                             # Python only (iono test py)
+itc                             # C++ only (iono test cpp)
+
+# Run with coverage
+iono test --coverage
+
+# Run specific patterns
+iono test --pattern "test_engine"
+
+# Verbose output
+it --verbose
+```
+
+### Test Categories
+
+- **Unit Tests**: Test individual components in isolation
+- **Integration Tests**: Test component interactions
+- **Benchmark Tests**: Validate benchmark infrastructure
+- **GPU Tests**: Tests requiring CUDA hardware (marked with `@pytest.mark.gpu`)
+
+### Writing Tests
 
 ```python
-# python/tests/test_integration.py
-def test_end_to_end_accuracy():
-    """Validate against NumPy reference."""
-    processor = FFTProcessor(fft_size=1024)
+import pytest
+import numpy as np
+from ionosense_hpc import Processor, Presets
+
+@pytest.mark.gpu
+class TestProcessor:
+    """Test processor functionality."""
     
-    # Known signal
-    fs = 48000
-    freq = 1000
-    t = np.arange(1024) / fs
-    signal = np.sin(2 * np.pi * freq * t).astype(np.float32)
-    
-    # Process
-    gpu_result = processor.process(signal, signal)
-    
-    # Reference
-    cpu_result = np.abs(np.fft.rfft(signal * np.hanning(1024)))
-    
-    # Compare
-    rms_error = np.sqrt(np.mean((gpu_result[0] - cpu_result)**2))
-    assert rms_error < 1e-5
+    def test_basic_processing(self):
+        """Test basic signal processing."""
+        config = Presets.validation()
+        test_data = np.random.randn(config.nfft * config.batch).astype(np.float32)
+        
+        with Processor(config) as proc:
+            output = proc.process(test_data)
+            
+            assert output.shape == (config.batch, config.num_output_bins)
+            assert not np.any(np.isnan(output))
 ```
-
-## Profiling
-
-### Nsight Systems (Timeline)
-
-```bash
-# Profile with NVTX markers
-./scripts/cli.sh profile nsys raw_throughput -n 8192
-
-# Open in GUI
-nsys-ui build/nsight_reports/nsys_reports/raw_throughput_*.nsys-rep
-```
-
-### Nsight Compute (Kernel Analysis)
-
-```bash
-# Profile kernels
-./scripts/cli.sh profile ncu verify_accuracy -n 4096
-
-# Specific kernel
-ncu --kernel-name applyWindowKernel --set full python benchmarks/fft/verify_accuracy.py
-```
-
-### Python Profiling
-
-```python
-# Add to benchmark scripts
-from ionosense_hpc.core.profiling import nvtx_range
-
-with nvtx_range("critical_section"):
-    result = processor.process(data)
-```
-
-## Contributing
-
-### Development Setup
-
-```bash
-# Fork and clone
-git clone https://github.com/YOUR_USERNAME/ionosense-hpc-lib.git
-cd ionosense-hpc-lib
-
-# Create feature branch
-git checkout -b feature/your-feature
-
-# Setup pre-commit hooks (future)
-pre-commit install
-```
-
-### Code Style
-
-**C++**:
-- Follow Google C++ Style Guide
-- Use `snake_case` for variables, `PascalCase` for classes
-- Keep lines under 100 characters
-- Document with Doxygen-style comments
-
-**Python**:
-- Follow PEP 8
-- Use type hints for public APIs
-- Docstrings in NumPy style
-- Black formatter (line length 100)
-
-**CUDA**:
-- Kernel names end with `Kernel`
-- Use `__restrict__` for pointer arguments
-- Check bounds explicitly
-- Prefer `float` over `double` for performance
-
-### Commit Messages
-
-```
-type(scope): brief description
-
-Longer explanation if needed. Reference issues.
-
-Fixes #123
-```
-
-Types: `feat`, `fix`, `docs`, `test`, `perf`, `refactor`, `build`
-
-### Pull Request Process
-
-1. **Create PR** from feature branch
-2. **Pass CI** - all tests must pass
-3. **Benchmarks** - include performance impact
-4. **Review** - address feedback
-5. **Squash merge** - maintain clean history
 
 ## Debugging
 
-### CUDA Errors
+### Using CLI Debug Features
 
+**Environment Debugging:**
 ```bash
-# Enable detailed CUDA errors
-export CUDA_LAUNCH_BLOCKING=1
-./scripts/cli.sh test
+# Linux/WSL2
+./scripts/cli.sh doctor          # Comprehensive environment check
+./scripts/cli.sh info system     # System information
+export IONO_LOG_LEVEL=DEBUG     # Enable debug logging
 
-# Check for memory leaks
-cuda-memcheck python python/tests/test_engine.py
+# Windows (in dev shell)
+iono doctor                      # Comprehensive environment check
+iono info system                 # System information
+$env:IONO_LOG_LEVEL="DEBUG"     # Enable debug logging
 ```
 
-### Python Debugging
+**Build Debugging:**
+```bash
+# Linux/WSL2
+./scripts/cli.sh build linux-debug  # Debug build
+./scripts/cli.sh build --verbose    # Verbose build output
 
-```python
-# Enable verbose engine output
-engine = RtFftEngine(4096, 32, use_graphs=True, verbose=True)
+# Windows (in dev shell)
+iono build windows-debug         # Debug build
+ib --verbose                     # Verbose build output
+```
 
-# Use pdb
-import pdb; pdb.set_trace()
+### CUDA Debugging
+
+```bash
+# Enable CUDA error checking
+export CUDA_LAUNCH_BLOCKING=1
+
+# Run with cuda-memcheck (Linux)
+cuda-memcheck python your_script.py
+
+# Profile with Nsight (both platforms)
+./scripts/cli.sh profile nsys benchmark_name  # Linux
+iprof nsys benchmark_name                     # Windows
 ```
 
 ### Common Issues
 
-| Issue | Solution |
-|-------|----------|
-| `cudaErrorInvalidDevice` | Check GPU availability with `nvidia-smi` |
-| `cufftInvalidPlan` | Ensure FFT size is power of 2 |
-| Import error on Windows | Check `.libs/windows/` for CUDA DLLs |
-| Segfault in tests | Run with `cuda-gdb` or check buffer sizes |
+1. **CLI Not Found**
+   - Linux: `chmod +x scripts/cli.sh`
+   - Windows: Use `.\scripts\open_dev_pwsh.ps1` for enhanced shell
 
-## Performance Optimization
+2. **Build Failures**
+   - Run `./scripts/cli.sh doctor` / `iono doctor` first
+   - Check CUDA toolkit installation
+   - Verify conda environment activation
 
-### Current Bottlenecks
+3. **Import Errors**
+   - Rebuild: `./scripts/cli.sh rebuild` / `ir`
+   - Check Python path in conda environment
 
-1. **Memory Transfers**: ~40% of latency
-   - Solution: Larger batches, persistent kernels
+## Contributing
+
+### Development Workflow
+
+1. **Setup Development Environment**
+   ```bash
+   # Linux/WSL2
+   git clone --recursive https://github.com/your-org/ionosense-hpc.git
+   cd ionosense-hpc
+   ./scripts/cli.sh setup
    
-2. **Kernel Launch**: ~15% without graphs
-   - Solution: CUDA Graphs (implemented)
+   # Windows
+   git clone --recursive https://github.com/your-org/ionosense-hpc.git
+   cd ionosense-hpc
+   .\scripts\open_dev_pwsh.ps1
+   iono setup
+   ```
+
+2. **Create Feature Branch**
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+
+3. **Development Loop**
+   ```bash
+   # Linux/WSL2
+   ./scripts/cli.sh check         # Format, lint, typecheck, quick tests
+   ./scripts/cli.sh build         # Build changes
+   ./scripts/cli.sh test          # Full test suite
    
-3. **cuFFT Planning**: One-time cost
-   - Solution: Plan reuse (implemented)
+   # Windows (in dev shell)
+   iono check                     # Format, lint, typecheck, quick tests
+   ib                            # Build changes
+   it                            # Full test suite
+   ```
 
-### Future Optimizations
+4. **Commit and Push**
+   ```bash
+   git add .
+   git commit -m "feat(component): description"
+   git push origin feature/your-feature-name
+   ```
 
-- **Persistent Kernels**: Reduce launch overhead further
-- **Tensor Cores**: Mixed precision for magnitude calculation
-- **Multi-GPU**: Distribute across multiple devices
-- **NVSHMEM**: Direct GPU-to-GPU communication
+5. **Create Pull Request** on GitHub
+
+### Pre-commit Checks
+
+The CLI provides aggregated checks for code quality:
+
+```bash
+# Linux/WSL2
+./scripts/cli.sh check           # Format, lint, typecheck, quick tests
+./scripts/cli.sh check --staged  # Only check staged files
+
+# Windows (in dev shell)
+iono check                       # Format, lint, typecheck, quick tests
+iono check --staged              # Only check staged files
+```
+
+This runs:
+- `format --check`: Verify C++ formatting
+- `lint`: Python (ruff) and C++ linting
+- `typecheck`: mypy type checking
+- Quick Python tests (excluding slow/GPU tests)
 
 ## Release Process
 
+### Version Management
+
 ```bash
-# 1. Update version
-# python/ionosense_hpc/__init__.py
-__version__ = "0.1.0"
+# Linux/WSL2
+./scripts/cli.sh info            # Check current version
+./scripts/cli.sh test            # Full test suite
+./scripts/cli.sh bench suite     # Performance regression check
 
-# 2. Run full test suite
-./scripts/cli.sh test
-pytest python/tests --cov=ionosense_hpc
+# Windows (in dev shell)
+iono info                        # Check current version
+it                              # Full test suite
+ibench suite                    # Performance regression check
+```
 
-# 3. Benchmark
-./scripts/cli.sh bench raw_throughput
-./scripts/cli.sh bench verify_accuracy
+### Build and Package
 
-# 4. Tag release
-git tag -a v0.1.0 -m "Release v0.1.0: Feature description"
-git push origin v0.1.0
+```bash
+# Linux/WSL2
+./scripts/cli.sh clean --all     # Clean everything
+./scripts/cli.sh build          # Fresh release build
+./scripts/cli.sh test            # Verify build
 
-# 5. Build wheels (future automation)
-python -m build --wheel python/
+# Windows (in dev shell)
+iclean --all                    # Clean everything
+ib                             # Fresh release build
+it                             # Verify build
 ```
 
 ## Resources
 
+- **CLI Help**: `./scripts/cli.sh help` / `iono help`
+- **Environment Check**: `./scripts/cli.sh doctor` / `iono doctor`
+- **System Info**: `./scripts/cli.sh info` / `iono info`
 - [CUDA Programming Guide](https://docs.nvidia.com/cuda/cuda-c-programming-guide/)
 - [cuFFT Documentation](https://docs.nvidia.com/cuda/cufft/)
-- [CUDA Graphs](https://developer.nvidia.com/blog/cuda-graphs/)
-- [Pybind11 Documentation](https://pybind11.readthedocs.io/)
+- [Python Packaging Guide](https://packaging.python.org/)
+- [Pydantic Documentation](https://docs.pydantic.dev/)
+- [Pytest Documentation](https://docs.pytest.org/)
