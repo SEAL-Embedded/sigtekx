@@ -801,6 +801,64 @@ Function Invoke-Typecheck {
     }
 }
 
+# --- Check Aggregator -------------------------------------------------------
+Function Invoke-Check {
+    param(
+        [switch]$Staged,
+        [switch]$Verbose
+    )
+
+    Write-ResearchLog -Level Info -Message "Running aggregated checks" -Component "Check" -Metadata @{
+        staged = $Staged.IsPresent
+    }
+
+    if (-not (Test-CondaEnvironment)) {
+        throw "Conda environment not activated"
+    }
+
+    # 1) Format (check mode)
+    try {
+        Invoke-Format -Check:$true -Staged:$Staged -Verbose:$Verbose
+    } catch {
+        Write-ResearchLog -Level Error -Message "Format check failed" -Component "Check" -Metadata @{ step = 'format' }
+        throw
+    }
+
+    # 2) Lint
+    try {
+        Invoke-Lint -Target 'all' -Staged:$Staged -Verbose:$Verbose
+    } catch {
+        Write-ResearchLog -Level Error -Message "Lint failed" -Component "Check" -Metadata @{ step = 'lint' }
+        throw
+    }
+
+    # 3) Typecheck (non-strict, src only)
+    try {
+        Invoke-Typecheck -Verbose:$Verbose
+    } catch {
+        Write-ResearchLog -Level Error -Message "Typecheck failed" -Component "Check" -Metadata @{ step = 'typecheck' }
+        throw
+    }
+
+    # 4) Quick Python tests subset (skip slow/gpu/benchmark; fail fast)
+    try {
+        $kExpr = 'not slow and not gpu and not benchmark'
+        $pytestArgs = @('-k', $kExpr, '--maxfail=1', '--tb=short')
+        if ($Verbose) { $pytestArgs += '-vv' } else { $pytestArgs += '-q' }
+
+        Write-ResearchLog -Level Info -Message "Running quick Python tests" -Component "Check" -Metadata @{ k = $kExpr }
+        Invoke-WithPythonPath {
+            pytest @pytestArgs
+        }
+        if ($LASTEXITCODE -ne 0) { throw "Quick tests failed (pytest exit $LASTEXITCODE)" }
+    } catch {
+        Write-ResearchLog -Level Error -Message "Quick Python tests failed" -Component "Check" -Metadata @{ step = 'pytest' }
+        throw
+    }
+
+    Write-ResearchLog -Level Info -Message "All checks passed" -Component "Check"
+}
+
 # --- Doctor (Environment/Tooling Verification) -----------------------------
 Function Invoke-Doctor {
     param(
@@ -1507,6 +1565,8 @@ BUILD & DEVELOPMENT
   typecheck [-Strict] [-IncludeTests] [-Verbose]
                           Run mypy type checking (src only by default)
   doctor [-Strict]        Verify environment/tooling and summarize status
+  check [-Staged] [-Verbose]
+                          Run format -Check, lint, typecheck, and quick tests
   clean [-All]            Remove build artifacts (and results/logs with -All)
 
 BENCHMARKING (Research-Grade)
@@ -1726,6 +1786,12 @@ try {
             if ($CommandArgs -contains "-Strict")  { $params.Strict  = $true }
             if ($CommandArgs -contains "-Verbose") { $params.Verbose = $true }
             Invoke-Doctor @params
+        }
+        "check"    {
+            $params = @{}
+            if ($CommandArgs -contains "-Staged")  { $params.Staged  = $true }
+            if ($CommandArgs -contains "-Verbose") { $params.Verbose = $true }
+            Invoke-Check @params
         }
         "validate" {
             Write-ResearchLog -Level Info -Message "Running validation suite" -Component "Validate"
