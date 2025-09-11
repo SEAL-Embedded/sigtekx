@@ -731,6 +731,168 @@ Function Invoke-Typecheck {
     }
 }
 
+# --- Doctor (Environment/Tooling Verification) -----------------------------
+Function Invoke-Doctor {
+    param(
+        [switch]$Strict,
+        [switch]$Verbose
+    )
+
+    Write-ResearchLog -Level Info -Message "Running environment doctor" -Component "Doctor" -Metadata @{
+        strict = $Strict.IsPresent
+    }
+
+    $checks = New-Object System.Collections.ArrayList
+
+    function Resolve-Exe {
+        param([string[]]$Candidates)
+        foreach ($c in $Candidates) {
+            $cmd = Get-Command $c -ErrorAction SilentlyContinue
+            if ($cmd) { return $cmd.Source }
+        }
+        return $null
+    }
+
+    function Get-VersionString {
+        param([string]$Exe, [string[]]$Args = @('--version'))
+        try {
+            foreach ($a in $Args) {
+                $p = & $Exe $a 2>&1
+                if ($LASTEXITCODE -eq 0 -and $p) {
+                    $line = ($p | Select-Object -First 1).ToString().Trim()
+                    if ($line) { return $line }
+                }
+            }
+        } catch {}
+        return $null
+    }
+
+    function Add-Check {
+        param([string]$Name, [string]$Status, [string]$Detail)
+        [void]$checks.Add([PSCustomObject]@{ Component = $Name; Status = $Status; Detail = $Detail })
+    }
+
+    # Python / Conda
+    $pyExe = if ($env:CONDA_PREFIX) { Join-Path $env:CONDA_PREFIX 'python.exe' } else { 'python' }
+    $pyVer = try { (& $pyExe --version 2>&1 | Select-Object -First 1).Trim() } catch { $null }
+    if ($pyVer) { $pyStatus = 'OK'; $pyDetail = $pyVer } else { $pyStatus = 'FAIL'; $pyDetail = 'python not found in PATH' }
+    Add-Check -Name 'Python' -Status $pyStatus -Detail $pyDetail
+
+    $condaActive = Test-CondaEnvironment
+    if ($condaActive) { $condaStatus='OK'; $condaDetail = "active: $env:CONDA_DEFAULT_ENV" }
+    else { $condaStatus='FAIL'; $condaDetail = "inactive or wrong env (expected: $script:CondaEnvName)" }
+    Add-Check -Name 'Conda' -Status $condaStatus -Detail $condaDetail
+
+    # Build tools (required)
+    foreach ($tool in @(
+        @{ name='CMake';         candidates=@('cmake','cmake.exe');             verArgs=@('--version');          required=$true },
+        @{ name='Ninja';         candidates=@('ninja','ninja.exe');             verArgs=@('--version');          required=$true },
+        @{ name='clang-format';  candidates=@('clang-format','clang-format.exe');verArgs=@('--version');          required=$true }
+    )) {
+        $exe = Resolve-Exe $tool.candidates
+        if ($exe) {
+            $ver = Get-VersionString -Exe $exe -Args $tool.verArgs
+            if ($ver) { $detail = $ver } else { $detail = $exe }
+            Add-Check -Name $tool.name -Status 'OK' -Detail $detail
+        } else {
+            Add-Check -Name $tool.name -Status 'FAIL' -Detail 'not found in PATH'
+        }
+    }
+
+    # Python tooling (required)
+    foreach ($pytool in @(
+        @{ name='ruff'; candidates=@('ruff','ruff.exe'); module='ruff' },
+        @{ name='mypy'; candidates=@('mypy','mypy.exe'); module='mypy' }
+    )) {
+        $exe = Resolve-Exe $pytool.candidates
+        if ($exe) {
+            $ver = Get-VersionString -Exe $exe -Args @('--version','-V')
+            if ($ver) { $detail = $ver } else { $detail = $exe }
+            Add-Check -Name $pytool.name -Status 'OK' -Detail $detail
+        } else {
+            # Fallback to python -m
+            try {
+                $out = & $pyExe -m $pytool.module --version 2>&1
+                if ($LASTEXITCODE -eq 0) {
+                    $line = ($out | Select-Object -First 1).ToString().Trim()
+                    Add-Check -Name $pytool.name -Status 'OK' -Detail ("via python -m: " + $line)
+                } else {
+                    Add-Check -Name $pytool.name -Status 'FAIL' -Detail 'not found (exe nor module)'
+                }
+            } catch {
+                Add-Check -Name $pytool.name -Status 'FAIL' -Detail 'not found (exe nor module)'
+            }
+        }
+    }
+
+    # CUDA Toolkit / Driver (optional)
+    $nvcc = Resolve-Exe @('nvcc','nvcc.exe')
+    if ($nvcc) {
+        $ver = Get-VersionString -Exe $nvcc -Args @('--version')
+        if ($ver) { $detail = $ver } else { $detail = $nvcc }
+        Add-Check -Name 'CUDA Toolkit (nvcc)' -Status 'OK' -Detail $detail
+    } else {
+        Add-Check -Name 'CUDA Toolkit (nvcc)' -Status 'WARN' -Detail 'not found; CUDA build disabled'
+    }
+
+    $nvsmi = Resolve-Exe @('nvidia-smi','nvidia-smi.exe')
+    if ($nvsmi) {
+        $ver = try { (& $nvsmi '--version' 2>&1 | Select-Object -First 1).Trim() } catch { $null }
+        if ($ver) { $detail = $ver } else { $detail = $nvsmi }
+        Add-Check -Name 'CUDA Driver (nvidia-smi)' -Status 'OK' -Detail $detail
+    } else {
+        Add-Check -Name 'CUDA Driver (nvidia-smi)' -Status 'WARN' -Detail 'not found; no driver detected'
+    }
+
+    # Nsight tools (optional)
+    $nsys = Resolve-Exe @('nsys','nsys.exe','nsight-systems','nsight-systems.exe')
+    if ($nsys) { $st='OK'; $dt=$nsys } else { $st='WARN'; $dt='not found' }
+    Add-Check -Name 'Nsight Systems (CLI)' -Status $st -Detail $dt
+
+    $ncu = Resolve-Exe @('ncu','ncu.exe','nsight-compute','nsight-compute.exe')
+    if ($ncu) { $st='OK'; $dt=$ncu } else { $st='WARN'; $dt='not found' }
+    Add-Check -Name 'Nsight Compute (CLI)' -Status $st -Detail $dt
+
+    $nsysUi = Resolve-Exe @('nsys-ui','nsys-ui.exe','nsight-systems.exe','nsight-systems.bat')
+    if (-not $nsysUi) {
+        foreach ($root in @("$env:ProgramFiles\NVIDIA Corporation","$env:ProgramFilesX86\NVIDIA Corporation")) {
+            if ($root -and (Test-Path $root)) {
+                $found = Get-ChildItem -Path $root -Recurse -File -ErrorAction SilentlyContinue -Include 'nsys-ui.exe','nsys-ui.bat','nsight-systems.exe' | Select-Object -First 1
+                if ($found) { $nsysUi = $found.FullName; break }
+            }
+        }
+    }
+    if ($nsysUi) { $st='OK'; $dt=$nsysUi } else { $st='WARN'; $dt='not found' }
+    Add-Check -Name 'Nsight Systems (UI)' -Status $st -Detail $dt
+
+    $ncuUi = Resolve-Exe @('ncu-ui','ncu-ui.exe','nsight-compute.exe')
+    if ($ncuUi) { $st='OK'; $dt=$ncuUi } else { $st='WARN'; $dt='not found' }
+    Add-Check -Name 'Nsight Compute (UI)' -Status $st -Detail $dt
+
+    # Print summary
+    Write-Host "`n🩺 Environment Doctor Summary" -ForegroundColor Cyan
+    Write-Host   "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor DarkGray
+    $ok   = 0
+    $warn = 0
+    $fail = 0
+    foreach ($c in $checks) {
+        $color = switch ($c.Status) { 'OK' { 'Green' } 'WARN' { 'Yellow' } 'FAIL' { 'Red' } default { 'Gray' } }
+        if ($c.Status -eq 'OK') { $ok++ }
+        elseif ($c.Status -eq 'WARN') { $warn++ }
+        elseif ($c.Status -eq 'FAIL') { $fail++ }
+        Write-Host ("{0,-28} {1,-6} {2}" -f $c.Component, $c.Status, $c.Detail) -ForegroundColor $color
+    }
+    Write-Host   "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor DarkGray
+    Write-Host ("OK: {0}  WARN: {1}  FAIL: {2}" -f $ok,$warn,$fail)
+
+    if ($fail -gt 0) {
+        Write-ResearchLog -Level Warning -Message ("Doctor found {0} failure(s)" -f $fail) -Component "Doctor"
+        if ($Strict) { throw "Doctor checks failed ($fail)" }
+    } else {
+        Write-ResearchLog -Level Info -Message "Doctor checks passed (no failures)" -Component "Doctor"
+    }
+}
+
 Function Invoke-Benchmark {
     param(
         [string]$Benchmark,
@@ -1272,6 +1434,7 @@ BUILD & DEVELOPMENT
                           Lint Python (ruff) and/or C++ (format check)
   typecheck [-Strict] [-IncludeTests] [-Verbose]
                           Run mypy type checking (src only by default)
+  doctor [-Strict]        Verify environment/tooling and summarize status
   clean [-All]            Remove build artifacts (and results/logs with -All)
 
 BENCHMARKING (Research-Grade)
@@ -1477,6 +1640,12 @@ try {
             Show-Info -Type $(if ($type) { $type } else { "all" })
         }
         "status"   { Show-ResearchStatus }
+        "doctor"   {
+            $params = @{}
+            if ($CommandArgs -contains "-Strict")  { $params.Strict  = $true }
+            if ($CommandArgs -contains "-Verbose") { $params.Verbose = $true }
+            Invoke-Doctor @params
+        }
         "validate" {
             Write-ResearchLog -Level Info -Message "Running validation suite" -Component "Validate"
             
