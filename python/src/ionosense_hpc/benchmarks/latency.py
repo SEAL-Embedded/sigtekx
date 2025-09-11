@@ -327,7 +327,9 @@ class StreamingLatencyBenchmark(LatencyBenchmark):
 
         # Create larger buffer for streaming simulation
         assert self.processor is not None
-        engine_config = self.processor.config
+        cfg = self.processor.config
+        assert cfg is not None
+        engine_config: EngineConfig = cfg
         stream_duration_s = max(10.0, self.config.iterations * 0.001)
         stream_samples = int(stream_duration_s * engine_config.sample_rate_hz)
 
@@ -345,7 +347,9 @@ class StreamingLatencyBenchmark(LatencyBenchmark):
     def execute_iteration(self) -> dict[str, float]:
         """Process next chunk from stream."""
         assert self.processor is not None
-        engine_config = self.processor.config
+        cfg2 = self.processor.config
+        assert cfg2 is not None
+        engine_config: EngineConfig = cfg2
         chunk_size = engine_config.nfft * engine_config.batch
 
         # Get next chunk with overlap

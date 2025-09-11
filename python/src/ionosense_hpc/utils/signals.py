@@ -9,7 +9,7 @@ processing engine.
 
 import numpy as np
 from numpy.typing import DTypeLike
-from typing import Any
+from typing import Any, cast
 from scipy import signal as sp_signal
 
 
@@ -38,7 +38,7 @@ def make_sine(
     num_samples = int(duration * sample_rate)
     t = np.linspace(0.0, duration, num_samples, endpoint=False, dtype=np.float64)
     signal = amplitude * np.sin(2 * np.pi * frequency * t + phase)
-    return signal.astype(dtype)
+    return cast(np.ndarray, signal.astype(dtype))
 
 
 def make_chirp(
@@ -73,7 +73,7 @@ def make_chirp(
     )
     # Ensure concrete ndarray type for typing
     arr = np.asarray(sig)
-    return arr.astype(dtype)
+    return cast(np.ndarray, arr.astype(dtype))
 
 
 def make_noise(
@@ -132,7 +132,7 @@ def make_noise(
     if signal_rms > 1e-9:
         signal = (signal / signal_rms) * amplitude
 
-    return signal.astype(dtype)
+    return cast(np.ndarray, signal.astype(dtype))
 
 
 def make_multitone(
@@ -141,7 +141,7 @@ def make_multitone(
     sample_rate: int = 48000,
     amplitudes: list[float] | np.ndarray | None = None,
     phases: list[float] | np.ndarray | None = None,
-    dtype: np.dtype = np.float32,
+    dtype: DTypeLike = np.float32,
 ) -> np.ndarray:
     """
     Generate a multi-tone signal.
@@ -180,7 +180,7 @@ def make_multitone(
     for freq, amp, phase in zip(frequencies, amplitudes, phases, strict=True):
         signal += amp * np.sin(2 * np.pi * freq * t + phase)
 
-    return signal.astype(dtype)
+    return cast(np.ndarray, signal.astype(dtype))
 
 
 def make_test_batch(
@@ -235,7 +235,7 @@ def make_test_batch(
             base_signal = np.pad(base_signal, (0, nfft - len(base_signal)))
 
     if batch == 1 and base_signal is not None:
-        return base_signal
+        return cast(np.ndarray, base_signal)
     if batch == 1 and signal_type == "noise":
         return make_noise(
             duration=duration, sample_rate=sample_rate, seed=seed, **kwargs

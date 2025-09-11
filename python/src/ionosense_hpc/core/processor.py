@@ -6,7 +6,7 @@ manager for automatic resource management and offers presets for common use
 cases like real-time and batch processing.
 """
 
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 
@@ -71,11 +71,11 @@ class Processor:
             else:
                 raise ValueError(f"Unknown preset: {config}")
 
-        self._config = config
-        self._engine = Engine()
+        self._config: EngineConfig | None = config
+        self._engine: Engine = Engine()
         self._is_initialized = False
         self._context_active = False
-        self._processing_history = []
+        self._processing_history: list[dict[str, Any]] = []
 
         if auto_init and config is not None:
             self.initialize()
@@ -154,7 +154,7 @@ class Processor:
             'shape': output.shape
         })
 
-        return output
+        return cast(np.ndarray, output)
 
     @nvtx_decorate(
         message="Processor.process_stream",
@@ -219,18 +219,19 @@ class Processor:
             raise EngineStateError("Processor not initialized")
 
         if input_data is None:
+            assert self._config is not None
             input_data = np.zeros(self._config.nfft * self._config.batch, dtype=np.float32)
 
-        latencies = []
+        latencies_list: list[float] = []
         logger.info(f"Running benchmark with {n_iterations} iterations...")
 
         for i in range(n_iterations):
             with compute_range(f"BenchmarkIteration_{i}"):
                 self.process(input_data)
                 stats = self._engine.get_stats()
-                latencies.append(stats['latency_us'])
+                latencies_list.append(stats['latency_us'])
 
-        latencies = np.array(latencies)
+        latencies = np.array(latencies_list)
         results = {
             'n_iterations': n_iterations,
             'mean_latency_us': float(np.mean(latencies)),

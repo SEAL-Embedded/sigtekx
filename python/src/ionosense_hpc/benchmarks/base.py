@@ -16,10 +16,10 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 import numpy as np
-import yaml
+import yaml  # type: ignore[import-untyped]
 from pydantic import BaseModel, Field
 
 from ionosense_hpc.utils import logger
@@ -128,8 +128,8 @@ class BenchmarkResult:
     name: str
     config: dict
     context: BenchmarkContext
-    measurements: np.ndarray
-    statistics: dict = field(default_factory=dict)
+    measurements: Any
+    statistics: dict[str, Any] = field(default_factory=dict)
     metadata: dict = field(default_factory=dict)
     passed: bool = True
     errors: list = field(default_factory=list)
@@ -195,7 +195,7 @@ class BaseBenchmark(abc.ABC):
             config = BenchmarkConfig(**config)
         self.config = config or BenchmarkConfig(name=self.__class__.__name__)
         self.context = BenchmarkContext()
-        self.results = []
+        self.results: list[BenchmarkResult] = []
         self._setup_reproducibility()
 
     def _setup_reproducibility(self) -> None:
@@ -299,7 +299,7 @@ class BaseBenchmark(abc.ABC):
                     errors=issues,
                 )
 
-            measurements: list[float | dict] = []
+            measurements: list[float | dict[str, Any]] = []
             errors: list[str] = []
 
             try:
@@ -343,7 +343,7 @@ class BaseBenchmark(abc.ABC):
                                 domain=ProfilingDomain.BENCHMARK,
                                 payload=i,
                             ):
-                                result = self.execute_iteration()
+                                iter_result = self.execute_iteration()
                             elapsed = time.perf_counter() - start_time
 
                             if elapsed > self.config.timeout_seconds:
@@ -351,10 +351,10 @@ class BaseBenchmark(abc.ABC):
                                     f"Iteration {i} exceeded timeout"
                                 )
 
-                            if isinstance(result, dict):
-                                measurements.append(result)
+                            if isinstance(iter_result, dict):
+                                measurements.append(iter_result)
                             else:
-                                measurements.append(float(result))
+                                measurements.append(float(iter_result))
 
                             if self.config.verbose and (i + 1) % max(
                                 1, self.config.iterations // 10
@@ -393,12 +393,14 @@ class BaseBenchmark(abc.ABC):
             )
 
         # Convert to numpy array
+        measurements_array: Any
         if isinstance(measurements[0], dict):
             # Multi-metric case
-            metrics = {}
-            for key in measurements[0].keys():
-                metrics[key] = np.array([m[key] for m in measurements])
-            measurements_array = metrics
+            md = cast(list[dict[str, Any]], measurements)
+            metrics_dict: dict[str, np.ndarray] = {}
+            for key in md[0].keys():
+                metrics_dict[key] = np.array([d[key] for d in md])
+            measurements_array = metrics_dict
         else:
             measurements_array = np.array(measurements)
 
@@ -517,9 +519,9 @@ def load_benchmark_config(path: Path | str) -> dict[str, Any]:
 
     with open(path) as f:
         if path.suffix in ['.yaml', '.yml']:
-            return yaml.safe_load(f)
+            return cast(dict[str, Any], yaml.safe_load(f))
         elif path.suffix == '.json':
-            return json.load(f)
+            return cast(dict[str, Any], json.load(f))
         else:
             raise ValueError(f"Unsupported config format: {path.suffix}")
 

@@ -8,6 +8,7 @@ for reproducible performance evaluation.
 """
 
 import contextlib
+from typing import TYPE_CHECKING, Any, Type
 import os
 import platform
 import sys
@@ -94,17 +95,24 @@ from .exceptions import (
 from .utils.device import current_device, device_info, gpu_count
 
 # Import core engine classes (requires _engine module)
-# This block provides graceful failure if the C++ extension isn't built.
+# Provide type-only imports for mypy and graceful runtime fallback.
+Engine: Any
+Processor: Any
+RawEngine: Any
+if TYPE_CHECKING:
+    from .core import Engine as EngineType, Processor as ProcessorType, RawEngine as RawEngineType
 try:
-    from .core import Engine, Processor, RawEngine
+    from .core import Engine as _Engine, Processor as _Processor, RawEngine as _RawEngine
+    Engine = _Engine  # runtime name
+    Processor = _Processor
+    RawEngine = _RawEngine
     _ENGINE_AVAILABLE = True
 except (ImportError, DllLoadError) as e:
     _ENGINE_AVAILABLE = False
     _ENGINE_ERROR = str(e)
 
-    # Provide dummy classes for better error messages
-    class Processor:
-        def __init__(self, *args, **kwargs):
+    class _UnavailableEngineProxy:
+        def __init__(self, *args: Any, **kwargs: Any):
             raise RuntimeError(
                 f"Engine not available: {_ENGINE_ERROR}\n"
                 f"Please ensure the package was built correctly:\n"
@@ -112,13 +120,9 @@ except (ImportError, DllLoadError) as e:
                 f"  Windows: .\\scripts\\cli.ps1 build"
             )
 
-    class Engine:
-        def __init__(self, *args, **kwargs):
-            raise RuntimeError(f"Engine not available: {_ENGINE_ERROR}")
-
-    class RawEngine:
-        def __init__(self, *args, **kwargs):
-            raise RuntimeError(f"Engine not available: {_ENGINE_ERROR}")
+    Engine = _UnavailableEngineProxy
+    Processor = _UnavailableEngineProxy
+    RawEngine = _UnavailableEngineProxy
 
     warnings.warn(
         f"C++ engine module could not be loaded: {_ENGINE_ERROR}",

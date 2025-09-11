@@ -38,9 +38,9 @@ class Engine:
             config: Engine configuration (can be set later)
         """
         self._raw_engine = RawEngine()
-        self._config = None
-        self._input_buffer = None
-        self._output_buffer = None
+        self._config: EngineConfig | None = None
+        self._input_buffer: np.ndarray | None = None
+        self._output_buffer: np.ndarray | None = None
         self._frame_count = 0
         self._total_latency_us = 0.0
         self._is_warming_up = False
@@ -126,15 +126,17 @@ class Engine:
 
             input_data = validate_input_array(
                 input_data,
-                expected_dtype=np.float32,
+                expected_dtype=np.dtype(np.float32),
                 name="input_data",
             )
 
         # Validate size
+        assert self._config is not None
         validate_batch_size(input_data, self._config)
 
         # Copy to internal buffer if needed
         with transfer_range("CopyInput", direction="H2D"):
+            assert self._input_buffer is not None
             if input_data.shape != self._input_buffer.shape:
                 input_data = input_data.flatten()
             np.copyto(self._input_buffer, input_data)
@@ -187,17 +189,19 @@ class Engine:
             raise EngineStateError("Engine not initialized")
 
         if hop_size is None:
+            assert self._config is not None
             hop_size = self._config.hop_size
 
         with nvtx_range("ValidateFramedInput", color=ProfileColor.YELLOW):
             # Validate input
             input_data = validate_input_array(
                 input_data,
-                expected_dtype=np.float32,
+                expected_dtype=np.dtype(np.float32),
                 name="input_data",
             )
 
         # Calculate number of frames
+        assert self._config is not None
         frame_size = self._config.nfft * self._config.batch
         if len(input_data) < frame_size:
             raise ValidationError(
@@ -293,6 +297,7 @@ class Engine:
         self._is_warming_up = True
 
         # Create dummy data
+        assert self._config is not None
         dummy_input = np.zeros(
             self._config.nfft * self._config.batch,
             dtype=np.float32

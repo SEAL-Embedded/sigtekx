@@ -19,7 +19,7 @@ def import_engine():
     """
     try:
         # This assumes DLL bootstrap has already happened in __init__.py
-        from . import _engine
+        from . import _engine  # type: ignore[attr-defined]
         return _engine
     except ImportError as e:
         # Check for common error patterns
@@ -95,7 +95,7 @@ class RawEngine:
             if not input_data.flags['C_CONTIGUOUS']:
                 input_data = np.ascontiguousarray(input_data)
 
-            return self._engine.process(input_data)
+            return self._engine.process(input_data)  # type: ignore[no-any-return]
         except RuntimeError as e:
             error_str = str(e)
             if "size mismatch" in error_str.lower():
@@ -177,7 +177,7 @@ class RawEngine:
         """
         try:
             engine_module = import_engine()
-            return engine_module.get_available_devices()
+            return engine_module.get_available_devices()  # type: ignore[no-any-return]
         except Exception as e:
             warnings.warn(f"Failed to query devices: {e}", stacklevel=2)
             return []
@@ -191,7 +191,7 @@ class RawEngine:
         """
         try:
             engine_module = import_engine()
-            return engine_module.select_best_device()
+            return int(engine_module.select_best_device())  # type: ignore[no-any-return]
         except Exception:
             return 0  # Default to device 0
 

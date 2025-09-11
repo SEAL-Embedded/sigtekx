@@ -66,10 +66,10 @@ class ThroughputBenchmark(BaseBenchmark):
         super().__init__(config or ThroughputBenchmarkConfig(name="EnhancedThroughput"))
         self.config: ThroughputBenchmarkConfig = self.config
 
-        self.processor = None
-        self.engine_config = None
-        self.test_data = None
-        self.resource_samples = []
+        self.processor: Processor | None = None
+        self.engine_config: EngineConfig | None = None
+        self.test_data: np.ndarray | None = None
+        self.resource_samples: list[dict[str, Any]] = []
 
     def setup(self) -> None:
         """Initialize processor for throughput testing (NVTX-instrumented)."""
@@ -101,6 +101,9 @@ class ThroughputBenchmark(BaseBenchmark):
 
     def execute_iteration(self) -> dict[str, float]:
         """Execute throughput measurement (NVTX-instrumented)."""
+        assert self.processor is not None
+        assert self.engine_config is not None
+        assert self.test_data is not None
         with nvtx_range("ThroughputMeasurement", color=ProfileColor.NVIDIA_BLUE, domain=ProfilingDomain.BENCHMARK):
             metrics: dict[str, float] = {}
 
@@ -182,13 +185,13 @@ class ThroughputBenchmark(BaseBenchmark):
             from ionosense_hpc.utils import device_info
             info = device_info()
 
-            sample = {
+            sample: dict[str, Any] = {
                 'timestamp': time.perf_counter(),
-                'memory_used_mb': info.get('memory_total_mb', 0) - info.get('memory_free_mb', 0),
-                'gpu_utilization': info.get('utilization_gpu', 0),
-                'memory_utilization': info.get('utilization_memory', 0),
-                'temperature_c': info.get('temperature_c', 0),
-                'power_w': info.get('power_w', 0)
+                'memory_used_mb': float(info.get('memory_total_mb', 0) or 0) - float(info.get('memory_free_mb', 0) or 0),
+                'gpu_utilization': float(info.get('utilization_gpu', 0) or 0),
+                'memory_utilization': float(info.get('utilization_memory', 0) or 0),
+                'temperature_c': float(info.get('temperature_c', 0) or 0),
+                'power_w': float(info.get('power_w', 0) or 0)
             }
             self.resource_samples.append(sample)
         except Exception as e:
@@ -264,9 +267,9 @@ class ThroughputBenchmark(BaseBenchmark):
         if powers:
             summary['power_mean_w'] = np.mean(powers)
             summary['power_max_w'] = np.max(powers)
-            summary['energy_consumed_wh'] = (np.mean(powers) *
-                                            (self.resource_samples[-1]['timestamp'] -
-                                             self.resource_samples[0]['timestamp'])) / 3600
+            t_end = float(self.resource_samples[-1]['timestamp'])
+            t_start = float(self.resource_samples[0]['timestamp'])
+            summary['energy_consumed_wh'] = (np.mean(powers) * (t_end - t_start)) / 3600
 
         return summary
 
@@ -281,7 +284,7 @@ class ScalingBenchmark(ThroughputBenchmark):
 
     def __init__(self, config: ThroughputBenchmarkConfig | None = None):
         super().__init__(config)
-        self.scaling_results = []
+        self.scaling_results: list[dict[str, Any]] = []
 
     def run_scaling_analysis(self) -> dict[str, Any]:
         """Run comprehensive scaling analysis."""

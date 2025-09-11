@@ -8,7 +8,8 @@ Provides deterministic signal generation, validation helpers, and data analysis.
 import hashlib
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
+from numpy.typing import DTypeLike
 
 import numpy as np
 
@@ -73,7 +74,7 @@ class SignalGenerator:
         self,
         nfft: int,
         sample_rate: int = 48000,
-        dtype: np.dtype = np.float32
+        dtype: DTypeLike = np.float32
     ) -> dict[str, np.ndarray]:
         """
         Generate comprehensive test signal suite.
@@ -161,7 +162,7 @@ class SignalGenerator:
         else:
             phase = 2 * np.pi * f0 * t
 
-        return np.sin(phase)
+        return cast(np.ndarray, np.sin(phase))
 
     def _generate_pink_noise(self, n: int, rng: np.random.Generator) -> np.ndarray:
         """Generate pink (1/f) noise."""
@@ -180,13 +181,13 @@ class SignalGenerator:
         pink = np.fft.irfft(fft, n)
 
         # Normalize
-        return pink / np.std(pink)
+        return cast(np.ndarray, pink / np.std(pink))
 
     def _generate_brown_noise(self, n: int, rng: np.random.Generator) -> np.ndarray:
         """Generate brown (1/f²) noise via integration."""
         white = rng.standard_normal(n)
         brown = np.cumsum(white)
-        return brown / np.std(brown)
+        return cast(np.ndarray, brown / np.std(brown))
 
     def _generate_pulse_train(
         self,
@@ -476,7 +477,7 @@ class DataArchiver:
                 raise FileNotFoundError(f"Version not found: {version}")
 
         with open(archive_path) as f:
-            return json.load(f)
+            return cast(dict[str, Any], json.load(f))
 
     def compare_versions(
         self,
@@ -498,7 +499,7 @@ class DataArchiver:
         results1 = self.load_results(experiment_name, version1)
         results2 = self.load_results(experiment_name, version2)
 
-        comparison = {
+        comparison: dict[str, Any] = {
             'experiment': experiment_name,
             'version1': version1,
             'version2': version2,
@@ -516,6 +517,7 @@ class DataArchiver:
             keys2 = set(self._flatten_dict(r2).keys())
             common_keys = keys1 & keys2
 
+            differences: dict[str, dict[str, float]] = {}
             for key in common_keys:
                 v1 = self._get_nested_value(r1, key)
                 v2 = self._get_nested_value(r2, key)
@@ -523,12 +525,14 @@ class DataArchiver:
                 if isinstance(v1, (int, float)) and isinstance(v2, (int, float)):
                     diff = v2 - v1
                     pct_change = (diff / v1 * 100) if v1 != 0 else 0
-                    comparison['differences'][key] = {
+                    differences[key] = {
                         'v1': v1,
                         'v2': v2,
                         'diff': diff,
                         'pct_change': pct_change
                     }
+
+            comparison['differences'] = differences
 
         return comparison
 

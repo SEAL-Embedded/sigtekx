@@ -189,15 +189,15 @@ class ParameterSweep:
 
         if self.config.sweep_type == 'grid':
             # Full factorial grid search
-            for combo in itertools.product(*param_values):
-                yield dict(zip(param_names, combo, strict=False))
+            for combo_grid in itertools.product(*param_values):
+                yield dict(zip(param_names, combo_grid, strict=False))
 
         elif self.config.sweep_type == 'random':
             # Random sampling
             rng = np.random.RandomState(42)  # Deterministic
             for _ in range(self.config.n_samples):
-                combo: list[Any] = [rng.choice(vals) for vals in param_values]
-                yield dict(zip(param_names, combo, strict=False))
+                combo_rand: list[Any] = [rng.choice(vals) for vals in param_values]
+                yield dict(zip(param_names, combo_rand, strict=False))
 
         elif self.config.sweep_type == 'latin_hypercube':
             # Latin Hypercube Sampling for better coverage
@@ -209,8 +209,8 @@ class ParameterSweep:
                 # Fall back to random sampling
                 rng = np.random.RandomState(42)
                 for _ in range(self.config.n_samples):
-                    combo = [rng.choice(vals) for vals in param_values]
-                    yield dict(zip(param_names, combo, strict=False))
+                    combo_fallback = [rng.choice(vals) for vals in param_values]
+                    yield dict(zip(param_names, combo_fallback, strict=False))
                 return
 
             n_params = len(param_names)
@@ -219,12 +219,12 @@ class ParameterSweep:
 
             # Scale samples to parameter ranges
             for point in sample:
-                combo: list[Any] = []
+                combo_lhs: list[Any] = []
                 for i, (name, values) in enumerate(zip(param_names, param_values, strict=False)):
                     idx = int(point[i] * len(values))
                     idx = min(idx, len(values) - 1)
-                    combo.append(values[idx])
-                yield dict(zip(param_names, combo, strict=False))
+                    combo_lhs.append(values[idx])
+                yield dict(zip(param_names, combo_lhs, strict=False))
 
         else:
             raise ValueError(f"Unknown sweep type: {self.config.sweep_type}")

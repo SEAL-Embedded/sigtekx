@@ -2,6 +2,7 @@
 
 import contextlib
 import warnings
+from typing import Any
 
 try:
     import pynvml
@@ -23,7 +24,7 @@ def gpu_count() -> int:
             pynvml.nvmlInit()
             count = pynvml.nvmlDeviceGetCount()
             pynvml.nvmlShutdown()
-            return count
+            return int(count)
         except Exception:
             pass
 
@@ -49,7 +50,7 @@ def current_device() -> int:
         return 0
 
 
-def device_info(device_id: int | None = None) -> dict[str, any]:
+def device_info(device_id: int | None = None) -> dict[str, Any]:
     """Get detailed information about a CUDA device.
 
     Args:
@@ -134,8 +135,8 @@ def get_memory_usage() -> tuple[int, int]:
         Tuple of (used_mb, total_mb)
     """
     info = device_info()
-    total = info['memory_total_mb']
-    free = info['memory_free_mb']
+    total = int(info['memory_total_mb'])
+    free = int(info['memory_free_mb'])
     used = total - free if total > 0 else 0
     return used, total
 
@@ -159,7 +160,13 @@ def get_compute_capability(device_id: int | None = None) -> tuple[int, int]:
         Tuple of (major, minor) compute capability
     """
     info = device_info(device_id)
-    return info.get('compute_capability', (0, 0))
+    cc = info.get('compute_capability', (0, 0))
+    if isinstance(cc, tuple) and len(cc) == 2:
+        try:
+            return int(cc[0]), int(cc[1])
+        except Exception:
+            return (0, 0)
+    return (0, 0)
 
 
 def monitor_device(device_id: int | None = None) -> str:
@@ -173,10 +180,10 @@ def monitor_device(device_id: int | None = None) -> str:
     """
     info = device_info(device_id)
 
+    used_mb = int(info['memory_total_mb']) - int(info['memory_free_mb'])
     lines = [
         f"Device {info['id']}: {info['name']}",
-        f"  Memory: {info['memory_total_mb'] - info['memory_free_mb']}/"
-        f"{info['memory_total_mb']} MB used",
+        f"  Memory: {used_mb}/{int(info['memory_total_mb'])} MB used",
         f"  Compute Capability: {info['compute_capability'][0]}.{info['compute_capability'][1]}"
     ]
 
