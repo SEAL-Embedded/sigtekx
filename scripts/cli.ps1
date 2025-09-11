@@ -327,7 +327,9 @@ Function Invoke-Test {
     if ($runCpp) {
         Write-ResearchLog -Level Info -Message "Running C++ tests" -Component "Test"
         $testPreset = $script:BuildPreset.Replace('rel','tests').Replace('debug','tests')
-        ctest --preset $testPreset --output-on-failure
+        $ctestArgs = @('--preset', $testPreset, '--output-on-failure')
+        if ($Pattern) { $ctestArgs += @('-R', $Pattern) }
+        ctest @ctestArgs
         $results.cpp = $LASTEXITCODE -eq 0
     }
     
@@ -1518,6 +1520,13 @@ try {
             $params = @{}
             if ($CommandArgs -contains "-Coverage") { $params.Coverage = $true }
             if ($CommandArgs -contains "-Verbose") { $params.Verbose = $true }
+            
+            # Named args
+            for ($i = 0; $i -lt $CommandArgs.Count; $i++) {
+                if ($CommandArgs[$i] -eq "-Pattern" -and $i+1 -lt $CommandArgs.Count) {
+                    $params.Pattern = $CommandArgs[$i+1]
+                }
+            }
             
             $suite = $CommandArgs | Where-Object { $_ -notlike "-*" } | Select-Object -First 1
             if ($suite) { $params.Suite = $suite }
