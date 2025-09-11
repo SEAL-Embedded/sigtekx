@@ -5,6 +5,7 @@ Generates publication-quality plots and comprehensive statistical reports.
 
 import json
 from collections import defaultdict
+from typing import Any
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -89,7 +90,7 @@ class BenchmarkReport:
         """
         self.results = results if isinstance(results, list) else [results]
         self.config = config or ReportConfig()
-        self.figures = []
+        self.figures: list[Any] = []
 
         # Set color palette (optional dependency)
         try:
@@ -538,7 +539,7 @@ class BenchmarkReport:
     def _create_correlation_matrix(self) -> None:
         """Create correlation matrix between different metrics."""
         # Collect all metrics across benchmarks
-        all_data = defaultdict(list)
+        all_data: defaultdict[str, list[float]] = defaultdict(list)
 
         for result in self.results:
             if isinstance(result.measurements, dict):

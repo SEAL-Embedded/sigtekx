@@ -5,7 +5,7 @@ Numerical accuracy validation benchmark following IEEE standards.
 Upgraded to use BaseBenchmark framework for research-grade validation.
 """
 
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 from scipy import signal as scipy_signal
@@ -33,8 +33,8 @@ class AccuracyBenchmarkConfig(BenchmarkConfig):
     phase_tolerance_deg: float = 1.0
 
     # Test signal specifications
-    test_signals: list[dict] = None
-    test_frequencies: list[float] = None  # For spectral tests
+    test_signals: list[dict] | None = None
+    test_frequencies: list[float] | None = None  # For spectral tests
 
     # Validation types
     validate_parseval: bool = True  # Energy conservation
@@ -102,24 +102,28 @@ class AccuracyBenchmark(BaseBenchmark):
             logger.info(
                 f"  Tolerance: rel={self.config.relative_tolerance}, abs={self.config.absolute_tolerance}"
             )
-            logger.info(f"  Test signals: {len(self.config.test_signals)}")
+            logger.info(f"  Test signals: {len(self.config.test_signals or [])}")
 
     def execute_iteration(self) -> dict[str, float]:
         """Execute one complete accuracy validation suite."""
-        metrics = {
-            'total_tests': 0,
-            'passed_tests': 0,
-            'failed_tests': 0,
-            'mean_error': 0,
-            'max_error': 0,
-            'mean_snr_db': 0
+        # Ensure processor available
+        assert self.processor is not None
+        metrics: dict[str, float] = {
+            'total_tests': 0.0,
+            'passed_tests': 0.0,
+            'failed_tests': 0.0,
+            'mean_error': 0.0,
+            'max_error': 0.0,
+            'mean_snr_db': 0.0,
+            'min_snr_db': 0.0,
+            'pass_rate': 0.0,
         }
 
-        errors = []
-        snrs = []
+        errors: list[float] = []
+        snrs: list[float] = []
 
         # Test each signal type
-        for signal_spec in self.config.test_signals:
+        for signal_spec in (self.config.test_signals or []):
             test_name = f"{signal_spec['type']}_{signal_spec.get('frequency', '')}"
 
             with nvtx_range("TestSignal", color=ProfileColor.PURPLE, payload=test_name):
@@ -146,11 +150,11 @@ class AccuracyBenchmark(BaseBenchmark):
                     'passed': comparison['passed']
                 })
 
-            metrics['total_tests'] += 1
+            metrics['total_tests'] += 1.0
             if comparison['passed']:
-                metrics['passed_tests'] += 1
+                metrics['passed_tests'] += 1.0
             else:
-                metrics['failed_tests'] += 1
+                metrics['failed_tests'] += 1.0
                 self.validation_errors.append(f"{test_name}: {comparison['error_reason']}")
 
             errors.append(comparison['mean_error'])
@@ -163,27 +167,27 @@ class AccuracyBenchmark(BaseBenchmark):
         # Additional validation tests
         if self.config.validate_parseval:
             parseval_result = self._test_parseval_theorem()
-            metrics['total_tests'] += 1
+            metrics['total_tests'] += 1.0
             if parseval_result['passed']:
-                metrics['passed_tests'] += 1
+                metrics['passed_tests'] += 1.0
             else:
-                metrics['failed_tests'] += 1
+                metrics['failed_tests'] += 1.0
 
         if self.config.validate_linearity:
             linearity_result = self._test_linearity()
-            metrics['total_tests'] += 1
+            metrics['total_tests'] += 1.0
             if linearity_result['passed']:
-                metrics['passed_tests'] += 1
+                metrics['passed_tests'] += 1.0
             else:
-                metrics['failed_tests'] += 1
+                metrics['failed_tests'] += 1.0
 
         if self.config.validate_window_accuracy:
             window_result = self._test_window_function()
-            metrics['total_tests'] += 1
+            metrics['total_tests'] += 1.0
             if window_result['passed']:
-                metrics['passed_tests'] += 1
+                metrics['passed_tests'] += 1.0
             else:
-                metrics['failed_tests'] += 1
+                metrics['failed_tests'] += 1.0
 
         # Calculate summary metrics
         if errors:
@@ -269,7 +273,7 @@ class AccuracyBenchmark(BaseBenchmark):
         # Convert to magnitude and scale
         magnitude = np.abs(fft_result) / self.engine_config.nfft
 
-        return magnitude.astype(np.float32)
+        return cast(np.ndarray, magnitude.astype(np.float32))
 
     def _compare_spectra(
         self,

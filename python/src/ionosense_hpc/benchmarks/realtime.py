@@ -10,7 +10,7 @@ from typing import Any
 
 import numpy as np
 
-from ionosense_hpc.benchmarks.base import BaseBenchmark, BenchmarkConfig
+from ionosense_hpc.benchmarks.base import BaseBenchmark, BenchmarkConfig, BenchmarkResult
 from ionosense_hpc.config import EngineConfig, Presets
 from ionosense_hpc.core import Processor
 from ionosense_hpc.utils import logger, make_test_batch
@@ -55,12 +55,12 @@ class RealtimeBenchmark(BaseBenchmark):
         super().__init__(config or RealtimeBenchmarkConfig(name="Realtime"))
         self.config: RealtimeBenchmarkConfig = self.config
 
-        self.processor = None
-        self.engine_config = None
-        self.test_data = None
-        self.frame_times = []
-        self.deadline_misses = []
-        self.dropped_frames = 0
+        self.processor: Processor | None = None
+        self.engine_config: EngineConfig | None = None
+        self.test_data: np.ndarray | None = None
+        self.frame_times: list[float] = []
+        self.deadline_misses: list[int] = []
+        self.dropped_frames: int = 0
 
     def setup(self) -> None:
         """Initialize processor and prepare streaming infrastructure (NVTX-instrumented)."""
@@ -96,19 +96,26 @@ class RealtimeBenchmark(BaseBenchmark):
 
             logger.info("Real-time benchmark initialized:")
             logger.info(f"  Duration: {self.config.stream_duration_s}s")
-            logger.info(f"  Frame deadline: {self.config.frame_deadline_ms:.2f}ms")
+            if self.config.frame_deadline_ms is not None:
+                logger.info(f"  Frame deadline: {self.config.frame_deadline_ms:.2f}ms")
+            else:
+                logger.info("  Frame deadline: (unset)")
             logger.info(f"  Total frames: {self.total_frames}")
 
     def execute_iteration(self) -> dict[str, float]:
         """Execute one complete streaming session."""
-        metrics = {
-            'frames_processed': 0,
-            'frames_dropped': 0,
-            'deadline_misses': 0,
-            'mean_latency_ms': 0,
-            'max_latency_ms': 0,
-            'mean_jitter_ms': 0,
-            'deadline_compliance_rate': 0
+        # Ensure required components are initialized
+        assert self.processor is not None
+        assert self.test_data is not None
+        assert self.config.frame_deadline_ms is not None
+        metrics: dict[str, float] = {
+            'frames_processed': 0.0,
+            'frames_dropped': 0.0,
+            'deadline_misses': 0.0,
+            'mean_latency_ms': 0.0,
+            'max_latency_ms': 0.0,
+            'mean_jitter_ms': 0.0,
+            'deadline_compliance_rate': 0.0
         }
 
         frame_latencies = []
@@ -121,7 +128,8 @@ class RealtimeBenchmark(BaseBenchmark):
 
         for frame_idx in range(self.total_frames):
             # Calculate when this frame should be processed
-            target_time = session_start + (frame_idx * self.config.frame_deadline_ms / 1000)
+            deadline_ms = float(self.config.frame_deadline_ms)
+            target_time = session_start + (frame_idx * deadline_ms / 1000)
 
             # Simulate frame arrival timing
             if self.config.strict_timing:
@@ -180,7 +188,7 @@ class RealtimeBenchmark(BaseBenchmark):
             # Check deadline compliance
             total_frame_time = (process_end - frame_arrival_time) * 1000
             if total_frame_time > self.config.frame_deadline_ms:
-                metrics['deadline_misses'] += 1
+                metrics['deadline_misses'] += 1.0
                 self.deadline_misses.append(frame_idx)
 
             # Track inter-frame timing for jitter
@@ -189,11 +197,11 @@ class RealtimeBenchmark(BaseBenchmark):
                 inter_frame_times.append(inter_frame_time)
 
             last_frame_time = frame_arrival_time
-            metrics['frames_processed'] += 1
+            metrics['frames_processed'] += 1.0
 
             # Progress reporting
             if self.config.verbose and frame_idx % 100 == 0:
-                compliance_rate = 1 - (metrics['deadline_misses'] / max(1, frame_idx))
+                compliance_rate = 1 - (metrics['deadline_misses'] / max(1.0, float(frame_idx)))
                 logger.debug(f"Frame {frame_idx}/{self.total_frames}: "
                            f"Compliance={compliance_rate:.1%}")
 
@@ -204,13 +212,13 @@ class RealtimeBenchmark(BaseBenchmark):
             metrics['p99_latency_ms'] = float(np.percentile(frame_latencies, 99))
 
         if inter_frame_times:
-            expected_inter_frame = self.config.frame_deadline_ms
+            expected_inter_frame = float(self.config.frame_deadline_ms)
             jitters = np.abs(np.array(inter_frame_times) - expected_inter_frame)
             metrics['mean_jitter_ms'] = float(np.mean(jitters))
             metrics['max_jitter_ms'] = float(np.max(jitters))
 
         metrics['deadline_compliance_rate'] = (
-            1 - (metrics['deadline_misses'] / max(1, metrics['frames_processed']))
+            1 - (metrics['deadline_misses'] / max(1.0, metrics['frames_processed']))
         )
 
         # Store for analysis
@@ -295,7 +303,7 @@ class RealtimeBenchmark(BaseBenchmark):
             'miss_indices': misses.tolist()
         }
 
-    def _assess_system_capability(self, result: 'BenchmarkResult') -> dict:
+    def _assess_system_capability(self, result: BenchmarkResult) -> dict:
         """Assess system's real-time capability."""
         stats = result.statistics
 
@@ -311,10 +319,10 @@ class RealtimeBenchmark(BaseBenchmark):
         # Calculate headroom using aggregated means
         mean_latency = _mean_of(stats, 'mean_latency_ms', 0.0)
         p99_latency = _mean_of(stats, 'p99_latency_ms', mean_latency)
-        deadline = self.config.frame_deadline_ms
+        deadline = float(self.config.frame_deadline_ms) if self.config.frame_deadline_ms is not None else 0.0
 
-        headroom_mean = (deadline - mean_latency) / deadline
-        headroom_p99 = (deadline - p99_latency) / deadline
+        headroom_mean = (deadline - mean_latency) / deadline if deadline > 0 else 0.0
+        headroom_p99 = (deadline - p99_latency) / deadline if deadline > 0 else 0.0
 
         # Determine capability level
         if headroom_p99 > 0.5:

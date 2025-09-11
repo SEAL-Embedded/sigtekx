@@ -163,14 +163,14 @@ class ParameterSweep:
         # Save experiment configuration
         self._save_config()
 
-    def _load_config(self, path: str) -> dict:
+    def _load_config(self, path: str) -> dict[str, Any]:
         """Load configuration from file."""
         path_obj = Path(path)
         with open(path_obj) as f:
             if path_obj.suffix in ['.yaml', '.yml']:
-                return yaml.safe_load(f)
+                return cast(dict[str, Any], yaml.safe_load(f))
             else:
-                return json.load(f)
+                return cast(dict[str, Any], json.load(f))
 
     def _save_config(self) -> None:
         """Save experiment configuration for reproducibility."""
@@ -184,20 +184,20 @@ class ParameterSweep:
     def generate_parameter_grid(self) -> Generator[dict, None, None]:
         """Generate parameter combinations based on sweep type."""
         # Extract parameter names and values
-        param_names = [p.name for p in self.config.parameters]
-        param_values = [p.generate_values() for p in self.config.parameters]
+        param_names: list[str] = [p.name for p in self.config.parameters]
+        param_values: list[list[Any]] = [p.generate_values() for p in self.config.parameters]
 
         if self.config.sweep_type == 'grid':
             # Full factorial grid search
-            for combination in itertools.product(*param_values):
-                yield dict(zip(param_names, combination, strict=False))
+            for combo in itertools.product(*param_values):
+                yield dict(zip(param_names, combo, strict=False))
 
         elif self.config.sweep_type == 'random':
             # Random sampling
             rng = np.random.RandomState(42)  # Deterministic
             for _ in range(self.config.n_samples):
-                combination = [rng.choice(vals) for vals in param_values]
-                yield dict(zip(param_names, combination, strict=False))
+                combo: list[Any] = [rng.choice(vals) for vals in param_values]
+                yield dict(zip(param_names, combo, strict=False))
 
         elif self.config.sweep_type == 'latin_hypercube':
             # Latin Hypercube Sampling for better coverage
@@ -209,8 +209,8 @@ class ParameterSweep:
                 # Fall back to random sampling
                 rng = np.random.RandomState(42)
                 for _ in range(self.config.n_samples):
-                    combination = [rng.choice(vals) for vals in param_values]
-                    yield dict(zip(param_names, combination, strict=False))
+                    combo = [rng.choice(vals) for vals in param_values]
+                    yield dict(zip(param_names, combo, strict=False))
                 return
 
             n_params = len(param_names)
@@ -219,12 +219,12 @@ class ParameterSweep:
 
             # Scale samples to parameter ranges
             for point in sample:
-                combination = []
+                combo: list[Any] = []
                 for i, (name, values) in enumerate(zip(param_names, param_values, strict=False)):
                     idx = int(point[i] * len(values))
                     idx = min(idx, len(values) - 1)
-                    combination.append(values[idx])
-                yield dict(zip(param_names, combination, strict=False))
+                    combo.append(values[idx])
+                yield dict(zip(param_names, combo, strict=False))
 
         else:
             raise ValueError(f"Unknown sweep type: {self.config.sweep_type}")

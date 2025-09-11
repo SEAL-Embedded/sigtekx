@@ -58,11 +58,11 @@ class LatencyBenchmark(BaseBenchmark):
         super().__init__(config or LatencyBenchmarkConfig(name="EnhancedLatency"))
         self.config: LatencyBenchmarkConfig = self.config  # Type hint
 
-        self.processor = None
-        self.test_data = None
+        self.processor: Processor | None = None
+        self.test_data: np.ndarray | None = None
         self.gpu_events = None
-        self.interval_times = []  # For jitter analysis
-        self.last_timestamp = None
+        self.interval_times: list[float] = []  # For jitter analysis
+        self.last_timestamp: float | None = None
 
     def setup(self) -> None:
         """Initialize processor and prepare test data (NVTX-instrumented)."""
@@ -106,6 +106,8 @@ class LatencyBenchmark(BaseBenchmark):
 
     def execute_iteration(self) -> dict[str, float]:
         """Execute single iteration with comprehensive timing and NVTX markers."""
+        assert self.processor is not None
+        assert self.test_data is not None
         # Pre-iteration synchronization for accurate timing
         with nvtx_range("PreIterationSync", color=ProfileColor.YELLOW):
             self.processor._engine.synchronize()
@@ -316,7 +318,7 @@ class StreamingLatencyBenchmark(LatencyBenchmark):
 
     def __init__(self, config: LatencyBenchmarkConfig | None = None):
         super().__init__(config)
-        self.stream_buffer = None
+        self.stream_buffer: np.ndarray | None = None
         self.stream_position = 0
 
     def setup(self) -> None:
@@ -324,6 +326,7 @@ class StreamingLatencyBenchmark(LatencyBenchmark):
         super().setup()
 
         # Create larger buffer for streaming simulation
+        assert self.processor is not None
         engine_config = self.processor.config
         stream_duration_s = max(10.0, self.config.iterations * 0.001)
         stream_samples = int(stream_duration_s * engine_config.sample_rate_hz)
@@ -341,6 +344,7 @@ class StreamingLatencyBenchmark(LatencyBenchmark):
 
     def execute_iteration(self) -> dict[str, float]:
         """Process next chunk from stream."""
+        assert self.processor is not None
         engine_config = self.processor.config
         chunk_size = engine_config.nfft * engine_config.batch
 
@@ -349,13 +353,15 @@ class StreamingLatencyBenchmark(LatencyBenchmark):
         start_idx = self.stream_position * hop_size
         end_idx = start_idx + chunk_size
 
-        if end_idx > len(self.stream_buffer):
+        buf = self.stream_buffer
+        assert buf is not None
+        if end_idx > len(buf):
             # Wrap around for continuous streaming
             self.stream_position = 0
             start_idx = 0
             end_idx = chunk_size
 
-        chunk = self.stream_buffer[start_idx:end_idx]
+        chunk = buf[start_idx:end_idx]
 
         # Replace test data with stream chunk
         original_data = self.test_data
@@ -369,8 +375,8 @@ class StreamingLatencyBenchmark(LatencyBenchmark):
         self.stream_position += 1
 
         # Add streaming-specific metrics
-        metrics['stream_position'] = self.stream_position
-        metrics['buffer_utilization'] = (end_idx / len(self.stream_buffer))
+        metrics['stream_position'] = float(self.stream_position)
+        metrics['buffer_utilization'] = (end_idx / float(len(buf)))
 
         return metrics
 
@@ -435,6 +441,7 @@ def run_latency_benchmark_suite(
             logger.info(f"Running {name} variant...")
             logger.info(f"{'='*60}")
 
+            benchmark: LatencyBenchmark
             if name == 'streaming':
                 benchmark = StreamingLatencyBenchmark(config)
             else:
@@ -496,6 +503,7 @@ if __name__ == '__main__':
         results = run_latency_benchmark_suite(args.config, args.output)
     else:
         config = LatencyBenchmarkConfig(name=f'latency_{args.variant}')
+        benchmark: LatencyBenchmark
         if args.variant == 'streaming':
             benchmark = StreamingLatencyBenchmark(config)
         else:
