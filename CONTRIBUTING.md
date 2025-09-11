@@ -4,7 +4,6 @@ Thank you for your interest in contributing to ionosense-hpc! This document prov
 
 ## Table of Contents
 
-- [Code of Conduct](#code-of-conduct)
 - [Getting Started](#getting-started)
 - [CLI-Based Development Workflow](#cli-based-development-workflow)
 - [How to Contribute](#how-to-contribute)
