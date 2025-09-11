@@ -55,10 +55,10 @@ endif()
 find_program(CLANG_FORMAT clang-format)
 if(CLANG_FORMAT)
     file(GLOB_RECURSE ALL_CXX_FILES
-        "src/*.cpp" "src/*.cu"
-        "include/ionosense/*.hpp"
-        "tests/*.cpp"
-        "bindings/*.cpp"
+        "cpp/src/*.cpp" "src/*.cu"
+        "cpp/include/ionosense/*.hpp"
+        "cpp/tests/*.cpp"
+        "cpp/bindings/*.cpp"
     )
     add_custom_target(format COMMAND ${CLANG_FORMAT} -i ${ALL_CXX_FILES})
 endif()
@@ -127,13 +127,13 @@ FetchContent_Declare(
 # ============================================================================
 if(IONO_WITH_CUDA)
 add_library(ion_engine OBJECT
-    src/ops_fft.cu
-    src/research_engine.cpp
-    src/processing_stage.cpp
-    src/profiling_nvtx.cu
+    cpp/src/ops_fft.cu
+    cpp/src/research_engine.cpp
+    cpp/src/processing_stage.cpp
+    cpp/src/profiling_nvtx.cu
 )
 target_include_directories(ion_engine PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/cpp/include
     ${CUDAToolkit_INCLUDE_DIRS}
 )
 set_target_properties(ion_engine PROPERTIES CUDA_SEPARABLE_COMPILATION ON) # Enables device code linking between .cu files - Important!
@@ -149,9 +149,9 @@ endif()
 # Python module (pybind11)
 # ============================================================================
 if(IONO_WITH_PYTHON AND IONO_WITH_CUDA)
-    pybind11_add_module(_engine SHARED bindings/bindings.cpp) # produces [ _engine.pyd (Win) / _engine.so (linux) ]
+    pybind11_add_module(_engine SHARED cpp/bindings/bindings.cpp) # produces [ _engine.pyd (Win) / _engine.so (linux) ]
 
-    target_include_directories(_engine PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    target_include_directories(_engine PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/cpp/include)
     target_link_libraries(_engine PRIVATE
         "$<TARGET_OBJECTS:ion_engine>"
         pybind11::module
@@ -254,15 +254,15 @@ if(IONO_WITH_TESTS AND IONO_WITH_CUDA)
     FetchContent_MakeAvailable(googletest)
 
     add_executable(test_engine
-        tests/test_research_engine.cpp
-        tests/test_processing_stage.cpp
-        tests/test_cuda_wrappers.cpp
-        tests/test_nvtx_profiling.cpp
+        cpp/tests/test_research_engine.cpp
+        cpp/tests/test_processing_stage.cpp
+        cpp/tests/test_cuda_wrappers.cpp
+        cpp/tests/test_nvtx_profiling.cpp
     )
     set_target_properties(test_engine PROPERTIES CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 
     # Add include dirs and set CUDA properties for the test executable - Important!
-    target_include_directories(test_engine PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    target_include_directories(test_engine PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/cpp/include)
 
     # Link against the object files from ion_engine directly + GTest + CUDA
     target_link_libraries(test_engine PRIVATE

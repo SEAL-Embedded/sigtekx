@@ -92,9 +92,9 @@ packages = ["python/src/ionosense_hpc"]
 include = [
   "CMakeLists.txt",
   "CMakePresets.json",
-  "src/**",
-  "include/**",
-  "bindings/**",
+  "cpp/src/**",
+  "cpp/include/**",
+  "cpp/bindings/**",
   "python/**",
   "README.md",
   "LICENSE*",
