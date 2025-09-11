@@ -390,11 +390,13 @@ Function Invoke-Format {
     param(
         [string[]]$Paths = @('src','include','bindings','tests'),
         [switch]$Check,
+        [switch]$Staged,
         [switch]$Verbose
     )
 
     Write-ResearchLog -Level Info -Message "Formatting C/C++ sources" -Component "Format" -Metadata @{
         check = $Check.IsPresent
+        staged = $Staged.IsPresent
         paths = ($Paths -join ',')
     }
 
@@ -411,43 +413,65 @@ Function Invoke-Format {
         throw "clang-format is required to format sources"
     }
 
-    # Expand provided paths relative to project root
     $root = $script:ProjectRoot
-    $targets = @()
-    foreach ($p in $Paths) {
-        if (-not $p) { continue }
-        $full = if ([IO.Path]::IsPathRooted($p)) { $p } else { Join-Path $root $p }
-        if (Test-Path -LiteralPath $full) { $targets += $full }
-        else { Write-ResearchLog -Level Warning -Message "Path not found: $p" -Component "Format" }
-    }
-
-    if ($targets.Count -eq 0) {
-        Write-ResearchLog -Level Error -Message "No valid paths to format" -Component "Format"
-        throw "No valid paths to format"
-    }
-
-    # Collect source files (avoid build/output dirs even if user passed '.')
-    $excludeNames = @('build','out','dist','_skbuild','.venv','.tox','.mypy_cache','_deps')
-    $patterns = @('*.c','*.cc','*.cpp','*.cxx','*.h','*.hpp','*.hxx','*.cu','*.cuh')
     $files = @()
-    foreach ($t in $targets) {
-        if ((Get-Item $t).PSIsContainer) {
-            $files += Get-ChildItem -LiteralPath $t -Recurse -File -Include $patterns |
-                Where-Object { $excludeNames -notcontains $_.Directory.Name }
-        } else {
-            # Single file provided
-            if ($patterns | ForEach-Object { $_.Replace('*','') } | Where-Object { $t.ToLower().EndsWith($_.Trim('.').ToLower()) }) {
-                $files += Get-Item -LiteralPath $t
+
+    if ($Staged) {
+        $git = Get-Command git -ErrorAction SilentlyContinue
+        if (-not $git) {
+            Write-ResearchLog -Level Error -Message "git not found; -Staged requires git" -Component "Format"
+            throw "git is required for -Staged"
+        }
+        $staged = & git -C $root diff --name-only --cached 2>$null
+        $exts = @('.c','.cc','.cpp','.cxx','.h','.hpp','.hxx','.cu','.cuh')
+        foreach ($rel in $staged) {
+            if (-not $rel) { continue }
+            $full = Join-Path $root $rel
+            $ext = [IO.Path]::GetExtension($full).ToLower()
+            if ((Test-Path -LiteralPath $full) -and ($exts -contains $ext)) {
+                $files += $full
             }
         }
+        $files = $files | Sort-Object -Unique
+    } else {
+        # Expand provided paths relative to project root
+        $targets = @()
+        foreach ($p in $Paths) {
+            if (-not $p) { continue }
+            $full = if ([IO.Path]::IsPathRooted($p)) { $p } else { Join-Path $root $p }
+            if (Test-Path -LiteralPath $full) { $targets += $full }
+            else { Write-ResearchLog -Level Warning -Message "Path not found: $p" -Component "Format" }
+        }
+
+        if ($targets.Count -eq 0) {
+            Write-ResearchLog -Level Error -Message "No valid paths to format" -Component "Format"
+            throw "No valid paths to format"
+        }
+
+        # Collect source files (avoid build/output dirs even if user passed '.')
+        $excludeNames = @('build','out','dist','_skbuild','.venv','.tox','.mypy_cache','_deps')
+        $patterns = @('*.c','*.cc','*.cpp','*.cxx','*.h','*.hpp','*.hxx','*.cu','*.cuh')
+        foreach ($t in $targets) {
+            if ((Get-Item $t).PSIsContainer) {
+                $files += Get-ChildItem -LiteralPath $t -Recurse -File -Include $patterns |
+                    Where-Object { $excludeNames -notcontains $_.Directory.Name } |
+                    ForEach-Object { $_.FullName }
+            } else {
+                # Single file provided
+                if ($patterns | ForEach-Object { $_.Replace('*','') } | Where-Object { $t.ToLower().EndsWith($_.Trim('.').ToLower()) }) {
+                    $files += (Get-Item -LiteralPath $t).FullName
+                }
+            }
+        }
+
+        # De-duplicate and ensure within repo
+        $files = $files | Sort-Object -Unique |
+            Where-Object { $_.StartsWith($root, [System.StringComparison]::OrdinalIgnoreCase) }
     }
 
-    # De-duplicate and ensure within repo
-    $files = $files | ForEach-Object { $_.FullName } | Sort-Object -Unique |
-        Where-Object { $_.StartsWith($root, [System.StringComparison]::OrdinalIgnoreCase) }
-
     if ($files.Count -eq 0) {
-        Write-ResearchLog -Level Warning -Message "No C/C++ files found to format" -Component "Format"
+        $msg = if ($Staged) { 'No staged C/C++ files to format' } else { 'No C/C++ files found to format' }
+        Write-ResearchLog -Level Info -Message $msg -Component "Format"
         return
     }
 
@@ -486,6 +510,7 @@ Function Invoke-Lint {
     param(
         [ValidateSet("all","python","py","cpp","c++")][string]$Target = "all",
         [switch]$Fix,
+        [switch]$Staged,
         [switch]$Verbose
     )
 
@@ -498,6 +523,7 @@ Function Invoke-Lint {
     Write-ResearchLog -Level Info -Message "Running lint" -Component "Lint" -Metadata @{
         target = $targetNorm
         fix = $Fix.IsPresent
+        staged = $Staged.IsPresent
     }
 
     $overallFailed = $false
@@ -516,25 +542,46 @@ Function Invoke-Lint {
             $useModule = $true
         } else { $useModule = $false }
 
-    $pyPaths = @(
-            (Join-Path $script:PythonDir 'src'),
-            (Join-Path $script:PythonDir 'tests')
-        )
-
-        $args = @()
-        if ($useModule) { $args += @('-m','ruff') }
-        $args += @('check')
-        if ($Fix) { $args += '--fix' }
-        if ($Verbose) { $args += '-v' }
-        $args += $pyPaths
-
-        Write-ResearchLog -Level Info -Message "Ruff check starting" -Component "Lint" -Metadata @{ fix = $Fix.IsPresent }
-        & $ruffExe @args
-        if ($LASTEXITCODE -ne 0) {
-            $overallFailed = $true
-            Write-ResearchLog -Level Error -Message "Python lint failed" -Component "Lint"
+        $targets = @()
+        if ($Staged) {
+            $git = Get-Command git -ErrorAction SilentlyContinue
+            if (-not $git) {
+                Write-ResearchLog -Level Error -Message "git not found; -Staged requires git" -Component "Lint"
+                $overallFailed = $true
+            } else {
+                $root = $script:ProjectRoot
+                $staged = & git -C $root diff --name-only --cached 2>$null
+                foreach ($rel in $staged) {
+                    if (-not $rel) { continue }
+                    $full = Join-Path $root $rel
+                    if ((Test-Path -LiteralPath $full) -and ($full.ToLower().EndsWith('.py'))) { $targets += $full }
+                }
+            }
         } else {
-            Write-ResearchLog -Level Info -Message "Python lint passed" -Component "Lint"
+            $targets = @(
+                (Join-Path $script:PythonDir 'src'),
+                (Join-Path $script:PythonDir 'tests')
+            )
+        }
+
+        if ($targets.Count -eq 0) {
+            Write-ResearchLog -Level Info -Message (if ($Staged) { 'No staged Python files to lint' } else { 'No Python targets found' }) -Component "Lint"
+        } else {
+            $args = @()
+            if ($useModule) { $args += @('-m','ruff') }
+            $args += @('check')
+            if ($Fix) { $args += '--fix' }
+            if ($Verbose) { $args += '-v' }
+            $args += $targets
+
+            Write-ResearchLog -Level Info -Message "Ruff check starting" -Component "Lint" -Metadata @{ fix = $Fix.IsPresent }
+            & $ruffExe @args
+            if ($LASTEXITCODE -ne 0) {
+                $overallFailed = $true
+                Write-ResearchLog -Level Error -Message "Python lint failed" -Component "Lint"
+            } else {
+                Write-ResearchLog -Level Info -Message "Python lint passed" -Component "Lint"
+            }
         }
     }
 
@@ -550,28 +597,49 @@ Function Invoke-Lint {
             Write-Host "Install with: 'conda install -c conda-forge clang-format' or 'winget install LLVM.LLVM'" -ForegroundColor Yellow
             $overallFailed = $true
         } else {
-            # Reuse the same file discovery logic as format
-            $root = $script:ProjectRoot
-            $targets = @(
-                (Join-Path $root 'src'),
-                (Join-Path $root 'include'),
-                (Join-Path $root 'bindings'),
-                (Join-Path $root 'tests')
-            )
-
-            $excludeNames = @('build','out','dist','_skbuild','.venv','.tox','.mypy_cache','_deps')
-            $patterns = @('*.c','*.cc','*.cpp','*.cxx','*.h','*.hpp','*.hxx','*.cu','*.cuh')
             $files = @()
-            foreach ($t in $targets) {
-                if (Test-Path -LiteralPath $t) {
-                    $files += Get-ChildItem -LiteralPath $t -Recurse -File -Include $patterns |
-                        Where-Object { $excludeNames -notcontains $_.Directory.Name }
+            if ($Staged) {
+                $git = Get-Command git -ErrorAction SilentlyContinue
+                if (-not $git) {
+                    Write-ResearchLog -Level Error -Message "git not found; -Staged requires git" -Component "Lint"
+                    $overallFailed = $true
+                } else {
+                    $root = $script:ProjectRoot
+                    $staged = & git -C $root diff --name-only --cached 2>$null
+                    $exts = @('.c','.cc','.cpp','.cxx','.h','.hpp','.hxx','.cu','.cuh')
+                    foreach ($rel in $staged) {
+                        if (-not $rel) { continue }
+                        $full = Join-Path $root $rel
+                        $ext = [IO.Path]::GetExtension($full).ToLower()
+                        if ((Test-Path -LiteralPath $full) -and ($exts -contains $ext)) { $files += $full }
+                    }
+                    $files = $files | Sort-Object -Unique
                 }
+            } else {
+                # Reuse the same file discovery logic as format
+                $root = $script:ProjectRoot
+                $targets = @(
+                    (Join-Path $root 'src'),
+                    (Join-Path $root 'include'),
+                    (Join-Path $root 'bindings'),
+                    (Join-Path $root 'tests')
+                )
+
+                $excludeNames = @('build','out','dist','_skbuild','.venv','.tox','.mypy_cache','_deps')
+                $patterns = @('*.c','*.cc','*.cpp','*.cxx','*.h','*.hpp','*.hxx','*.cu','*.cuh')
+                foreach ($t in $targets) {
+                    if (Test-Path -LiteralPath $t) {
+                        $files += Get-ChildItem -LiteralPath $t -Recurse -File -Include $patterns |
+                            Where-Object { $excludeNames -notcontains $_.Directory.Name } |
+                            ForEach-Object { $_.FullName }
+                    }
+                }
+                $files = $files | Sort-Object -Unique
             }
-            $files = $files | ForEach-Object { $_.FullName } | Sort-Object -Unique
 
             if ($files.Count -eq 0) {
-                Write-ResearchLog -Level Info -Message "No C/C++ files to lint" -Component "Lint"
+                $msg = if ($Staged) { 'No staged C/C++ files to lint' } else { 'No C/C++ files to lint' }
+                Write-ResearchLog -Level Info -Message $msg -Component "Lint"
             } else {
                 if ($Verbose) { $files | ForEach-Object { Write-Host "Lint (C++ format check): $_" -ForegroundColor DarkGray } }
                 & $clang -n -Werror -style=file @files
@@ -1432,7 +1500,9 @@ BUILD & DEVELOPMENT
                           Run tests (aliases: py/p for python, c++ for cpp)
   format [paths] [-Check] [-Verbose]
                           Format C/C++ code with .clang-format
-  lint [all|python|py|cpp] [-Fix] [-Verbose]
+  format [paths] [-Check] [-Staged] [-Verbose]
+                          Format only staged files with -Staged
+  lint [all|python|py|cpp] [-Staged] [-Fix] [-Verbose]
                           Lint Python (ruff) and/or C++ (format check)
   typecheck [-Strict] [-IncludeTests] [-Verbose]
                           Run mypy type checking (src only by default)
@@ -1559,6 +1629,7 @@ try {
         "format"   {
             $params = @{}
             if ($CommandArgs -contains "-Check")   { $params.Check   = $true }
+            if ($CommandArgs -contains "-Staged")  { $params.Staged  = $true }
             if ($CommandArgs -contains "-Verbose") { $params.Verbose = $true }
 
             # Any non-flag arguments are paths
@@ -1570,6 +1641,7 @@ try {
         "lint"     {
             $params = @{}
             if ($CommandArgs -contains "-Fix")     { $params.Fix     = $true }
+            if ($CommandArgs -contains "-Staged")  { $params.Staged  = $true }
             if ($CommandArgs -contains "-Verbose") { $params.Verbose = $true }
 
             $target = $CommandArgs | Where-Object { $_ -notlike "-*" } | Select-Object -First 1
