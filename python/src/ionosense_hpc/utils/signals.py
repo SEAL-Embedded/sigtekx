@@ -7,9 +7,10 @@ the generated signals are reliable and suitable for validating the signal
 processing engine.
 """
 
+from typing import cast
+
 import numpy as np
 from numpy.typing import DTypeLike
-from typing import Any, cast
 from scipy import signal as sp_signal
 
 

@@ -5,9 +5,9 @@ Generates publication-quality plots and comprehensive statistical reports.
 
 import json
 from collections import defaultdict
-from typing import Any
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 try:
     import matplotlib.pyplot as plt

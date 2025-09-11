@@ -17,7 +17,7 @@ from typing import Any
 
 import yaml  # type: ignore[import-untyped]
 
-from ionosense_hpc.benchmarks.base import BenchmarkContext, BenchmarkResult
+from ionosense_hpc.benchmarks.base import BenchmarkContext
 from ionosense_hpc.benchmarks.suite import BenchmarkSuite, SuiteConfig
 from ionosense_hpc.benchmarks.sweep import ParameterSweep
 from ionosense_hpc.config.schemas import ExperimentMetadata, ResearchConfig

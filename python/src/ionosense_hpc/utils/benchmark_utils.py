@@ -9,9 +9,9 @@ import hashlib
 import json
 from pathlib import Path
 from typing import Any, cast
-from numpy.typing import DTypeLike
 
 import numpy as np
+from numpy.typing import DTypeLike
 
 
 class DeterministicGenerator:

@@ -8,12 +8,12 @@ for reproducible performance evaluation.
 """
 
 import contextlib
-from typing import TYPE_CHECKING, Any, Type
 import os
 import platform
 import sys
 import warnings
 from pathlib import Path
+from typing import TYPE_CHECKING, Any, Type
 
 # ============================================================================
 # Version Info & Metadata
@@ -100,9 +100,13 @@ Engine: Any
 Processor: Any
 RawEngine: Any
 if TYPE_CHECKING:
-    from .core import Engine as EngineType, Processor as ProcessorType, RawEngine as RawEngineType
+    from .core import Engine as EngineType
+    from .core import Processor as ProcessorType
+    from .core import RawEngine as RawEngineType
 try:
-    from .core import Engine as _Engine, Processor as _Processor, RawEngine as _RawEngine
+    from .core import Engine as _Engine
+    from .core import Processor as _Processor
+    from .core import RawEngine as _RawEngine
     Engine = _Engine  # runtime name
     Processor = _Processor
     RawEngine = _RawEngine
