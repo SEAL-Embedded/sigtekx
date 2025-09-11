@@ -578,7 +578,7 @@ def create_research_workflow(
     }, dependencies=["setup"])
     workflow.add_stage("analysis", "analysis", {}, dependencies=["benchmarks"])
     workflow.add_stage("report", "report", {
-        "format": "pdf",
+        "output_format": "pdf",
         "title": name
     }, dependencies=["analysis"])
 
