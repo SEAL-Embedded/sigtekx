@@ -14,6 +14,7 @@ Comprehensive guide to the ionosense-hpc benchmarking suite for performance eval
 - [Reporting and Visualization](#reporting-and-visualization)
 - [Best Practices](#best-practices)
 - [Interpreting Results](#interpreting-results)
+ - [Output Locations](#output-locations)
 
 ## Overview
 
@@ -828,3 +829,19 @@ ibench scaling                                  # Windows (dev shell)
 - [NVIDIA Nsight Systems User Guide](https://docs.nvidia.com/nsight-systems/)
 - [CUDA Best Practices Guide](https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/)
 - [IEEE Standard for Floating-Point Arithmetic](https://ieeexplore.ieee.org/document/8766229)
+## Output Locations
+
+By default, all benchmark artifacts are written under the repository `build/` tree to keep the workspace clean and aligned with RSE/RE standards:
+
+- Benchmarks: `build/benchmark_results/<suite_or_name>_<timestamp>/`
+- Research workflows and sweeps: `build/experiments/<workflow_or_experiment_id>/`
+- Reports and test outputs: `build/reports/`
+
+You can override these locations with environment variables (useful for CI or custom storage):
+
+- `IONO_OUTPUT_ROOT`: root directory for all outputs
+- `IONO_BENCH_DIR`: benchmark results root
+- `IONO_EXPERIMENTS_DIR`: experiments root
+- `IONO_REPORTS_DIR`: reports root
+
+The CLI initializes these variables automatically to point to `build/` so Python tools and the CLI are consistent.

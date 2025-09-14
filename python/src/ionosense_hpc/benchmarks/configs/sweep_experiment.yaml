@@ -1,6 +1,6 @@
 name: optimal_config_search
 description: Search for optimal FFT and batch size configuration
-benchmark_class: ionosense_hpc.benchmarks.latency_enhanced.EnhancedLatencyBenchmark
+benchmark_class: ionosense_hpc.benchmarks.latency.LatencyBenchmark
 
 # Parameters to sweep
 parameters:

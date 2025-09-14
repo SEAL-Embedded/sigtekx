@@ -1,7 +1,7 @@
 """
 python/src/ionosense_hpc/benchmarks/latency.py
 --------------------------------------------------------------------------------
-Enhanced latency benchmark with IEEE-compliant statistical analysis and
+Latency benchmark with IEEE-compliant statistical analysis and
 GPU-accurate timing using CUDA events.
 """
 
@@ -14,6 +14,7 @@ from ionosense_hpc.benchmarks.base import BaseBenchmark, BenchmarkConfig, Benchm
 from ionosense_hpc.config import EngineConfig, Presets
 from ionosense_hpc.core import Processor
 from ionosense_hpc.utils import logger, make_test_batch
+from ionosense_hpc.utils.paths import get_benchmarks_root
 from ionosense_hpc.utils.profiling import (
     ProfileColor,
     ProfilingDomain,
@@ -55,7 +56,7 @@ class LatencyBenchmark(BaseBenchmark):
         """Initialize with latency-specific configuration."""
         if isinstance(config, dict):
             config = LatencyBenchmarkConfig(**config)
-        super().__init__(config or LatencyBenchmarkConfig(name="EnhancedLatency"))
+        super().__init__(config or LatencyBenchmarkConfig(name="Latency"))
         self.config: LatencyBenchmarkConfig = self.config  # Type hint
 
         self.processor: Processor | None = None
@@ -387,7 +388,7 @@ class StreamingLatencyBenchmark(LatencyBenchmark):
 
 def run_latency_benchmark_suite(
     config_path: str | None = None,
-    output_dir: str = './benchmark_results'
+    output_dir: str | None = None
 ) -> dict[str, BenchmarkResult]:
     """
     Run comprehensive latency benchmark suite.
@@ -434,7 +435,7 @@ def run_latency_benchmark_suite(
     ]
 
     results = {}
-    output_path = Path(output_dir)
+    output_path = Path(output_dir) if output_dir else get_benchmarks_root()
     output_path.mkdir(parents=True, exist_ok=True)
 
     for name, config in variants:
@@ -495,9 +496,9 @@ def run_latency_benchmark_suite(
 if __name__ == '__main__':
     import argparse
 
-    parser = argparse.ArgumentParser(description='Enhanced latency benchmark')
+    parser = argparse.ArgumentParser(description='Latency benchmark')
     parser.add_argument('--config', help='Configuration file path')
-    parser.add_argument('--output', default='./results', help='Output directory')
+    parser.add_argument('--output', default=None, help='Output directory (defaults to build/benchmark_results)')
     parser.add_argument('--variant', choices=['baseline', 'streaming', 'stress', 'all'],
                        default='all', help='Benchmark variant to run')
 
@@ -514,5 +515,9 @@ if __name__ == '__main__':
             benchmark = LatencyBenchmark(config)
 
         result = benchmark.run()
+        from pathlib import Path
         from ionosense_hpc.benchmarks.base import save_benchmark_results
-        save_benchmark_results(result, f"{args.output}/{result.name}.json")
+        from ionosense_hpc.utils.paths import get_benchmarks_root
+        out_dir = Path(args.output) if args.output else get_benchmarks_root()
+        out_dir.mkdir(parents=True, exist_ok=True)
+        save_benchmark_results(result, out_dir / f"{result.name}.json")

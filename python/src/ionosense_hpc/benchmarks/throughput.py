@@ -1,5 +1,5 @@
 """
-python/src/ionosense_hpc/benchmarks/throughput_enhanced.py
+python/src/ionosense_hpc/benchmarks/throughput.py
 --------------------------------------------------------------------------------
 Enhanced throughput benchmark with memory bandwidth analysis and
 scaling characterization following HPC benchmarking standards.
@@ -63,7 +63,7 @@ class ThroughputBenchmark(BaseBenchmark):
         """Initialize throughput benchmark."""
         if isinstance(config, dict):
             config = ThroughputBenchmarkConfig(**config)
-        super().__init__(config or ThroughputBenchmarkConfig(name="EnhancedThroughput"))
+        super().__init__(config or ThroughputBenchmarkConfig(name="Throughput"))
         self.config: ThroughputBenchmarkConfig = self.config
 
         self.processor: Processor | None = None
@@ -483,13 +483,13 @@ class MemoryStressBenchmark(ThroughputBenchmark):
 if __name__ == '__main__':
     import argparse
 
-    parser = argparse.ArgumentParser(description='Enhanced throughput benchmark')
+    parser = argparse.ArgumentParser(description='Throughput benchmark')
     parser.add_argument('--mode', choices=['throughput', 'scaling', 'memory'],
                        default='throughput', help='Benchmark mode')
     parser.add_argument('--duration', type=float, default=10.0,
                        help='Test duration in seconds')
-    parser.add_argument('--output', default='throughput_results.json',
-                       help='Output file')
+    parser.add_argument('--output', default=None,
+                       help='Output file (defaults under build/benchmark_results)')
 
     args = parser.parse_args()
 
@@ -513,7 +513,16 @@ if __name__ == '__main__':
 
     # Save results
     from ionosense_hpc.benchmarks.base import save_benchmark_results
-    save_benchmark_results(result, args.output)
+    if args.output:
+        save_benchmark_results(result, args.output)
+    else:
+        from datetime import datetime
+        from ionosense_hpc.utils.paths import get_benchmarks_root
+        ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+        name_part = 'throughput' if args.mode == 'throughput' else f"throughput_{args.mode}"
+        out = get_benchmarks_root() / f"{name_part}_{ts}.json"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        save_benchmark_results(result, out)
 
     # Print summary
     def _mean_of(stats: dict, key: str, default: float = 0.0) -> float:

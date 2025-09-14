@@ -151,6 +151,18 @@ Function Initialize-ResearchEnvironment {
         }
     }
     
+    # Align Python outputs with build/ tree via environment overrides
+    $env:IONO_OUTPUT_ROOT     = $script:BuildDir
+    $env:IONO_BENCH_DIR       = $script:BenchResultsDir
+    $env:IONO_EXPERIMENTS_DIR = $script:ExperimentsDir
+    $env:IONO_REPORTS_DIR     = $script:ReportsDir
+    Write-ResearchLog -Level Info -Message "Bound Python outputs to build/ via env (IONO_*_DIR)" -Component "Init" -Metadata @{
+        output_root = $env:IONO_OUTPUT_ROOT
+        benches     = $env:IONO_BENCH_DIR
+        experiments = $env:IONO_EXPERIMENTS_DIR
+        reports     = $env:IONO_REPORTS_DIR
+    }
+    
     # Initialize research log
     $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
     $script:LogFile = Join-Path $script:LogRoot "research_log_$timestamp.jsonl"

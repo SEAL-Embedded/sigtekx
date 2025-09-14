@@ -378,8 +378,13 @@ if __name__ == '__main__':
     result.metadata['analysis'] = analysis
 
     # Output results
+    from ionosense_hpc.benchmarks.base import save_benchmark_results
     if args.output:
-        from ionosense_hpc.benchmarks.base import save_benchmark_results
         save_benchmark_results(result, args.output)
     else:
-        print(json.dumps(result.to_dict(), indent=2, default=str))
+        from datetime import datetime
+        from ionosense_hpc.utils.paths import get_benchmarks_root
+        ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+        out = get_benchmarks_root() / f"realtime_{ts}.json"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        save_benchmark_results(result, out)

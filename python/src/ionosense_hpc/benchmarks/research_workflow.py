@@ -23,6 +23,7 @@ from ionosense_hpc.benchmarks.sweep import ParameterSweep
 from ionosense_hpc.config.schemas import ExperimentMetadata, ResearchConfig
 from ionosense_hpc.exceptions import DependencyError, ReproducibilityError, WorkflowError
 from ionosense_hpc.utils import logger
+from ionosense_hpc.utils.paths import get_experiments_root
 
 
 @dataclass
@@ -105,7 +106,9 @@ class ResearchWorkflow:
         self.workflow_id = f"{self.metadata.experiment_id}_{datetime.now():%Y%m%d_%H%M%S}"
 
         # Setup directories (honor configured output root if provided)
-        output_root = Path(self.config.output_settings.get('output_dir', './experiments'))
+        output_root = Path(
+            self.config.output_settings.get('output_dir')
+        ) if self.config.output_settings.get('output_dir') else get_experiments_root()
         self.base_dir = output_root / self.workflow_id
         self.setup_directories()
 

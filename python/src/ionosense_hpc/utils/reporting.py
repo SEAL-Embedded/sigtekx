@@ -75,7 +75,7 @@ class ReportConfig:
 class BenchmarkReport:
     """
     Generates comprehensive reports from benchmark results.
-    
+
     This class produces publication-quality visualizations and statistical
     summaries following IEEE standards for performance evaluation.
     """
@@ -83,7 +83,7 @@ class BenchmarkReport:
     def __init__(self, results: list[BenchmarkResult] | BenchmarkResult, config: ReportConfig | None = None):
         """
         Initialize report generator.
-        
+
         Args:
             results: Single result or list of results
             config: Report configuration
@@ -103,7 +103,7 @@ class BenchmarkReport:
     def generate(self, output_path: str | Path) -> None:
         """
         Generate complete report in specified format.
-        
+
         Args:
             output_path: Path for output file
         """
@@ -732,7 +732,7 @@ def generate_comparative_report(
 ) -> None:
     """
     Generate comparative report from multiple benchmark runs.
-    
+
     Args:
         results_dir: Directory containing result JSON files
         output_path: Output file path

@@ -24,6 +24,7 @@ from ionosense_hpc.benchmarks.base import (
     BenchmarkResult,
 )
 from ionosense_hpc.utils import logger
+from ionosense_hpc.utils.paths import get_experiments_root
 from ionosense_hpc.utils.profiling import (
     ProfileColor,
     ProfilingDomain,
@@ -156,8 +157,13 @@ class ParameterSweep:
         self.runs: list[ExperimentRun] = []
         self.results: list[ExperimentRun] = []
 
-        # Create output directory
-        self.output_dir = Path(self.config.output_dir) / self.config.name
+        # Create output directory (centralized policy)
+        exp_root = (
+            Path(self.config.output_dir)
+            if self.config.output_dir and self.config.output_dir != './experiments'
+            else get_experiments_root()
+        )
+        self.output_dir = exp_root / self.config.name
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         # Save experiment configuration
@@ -587,7 +593,7 @@ class ParameterSweep:
 EXAMPLE_CONFIG = """
 name: nfft_batch_sweep
 description: Explore FFT size and batch size impact on latency
-benchmark_class: ionosense_hpc.benchmarks.latency_enhanced.EnhancedLatencyBenchmark
+benchmark_class: ionosense_hpc.benchmarks.latency.LatencyBenchmark
 
 parameters:
   - name: engine_config.nfft
