@@ -11,9 +11,9 @@ import numpy as np
 from scipy import signal as scipy_signal
 from scipy.fft import rfft
 
+from ionosense_hpc import Engine
 from ionosense_hpc.benchmarks.base import BaseBenchmark, BenchmarkConfig, BenchmarkResult
 from ionosense_hpc.config import EngineConfig, Presets
-from ionosense_hpc.core import Processor
 from ionosense_hpc.utils import logger, make_chirp, make_multitone, make_noise, make_sine
 from ionosense_hpc.utils.profiling import (
     ProfileColor,
@@ -78,13 +78,13 @@ class AccuracyBenchmark(BaseBenchmark):
         super().__init__(config or AccuracyBenchmarkConfig(name="Accuracy"))
         self.config: AccuracyBenchmarkConfig = self.config
 
-        self.processor: Processor | None = None
+        self.engine: Engine | None = None
         self.engine_config: EngineConfig | None = None
         self.test_results: list[dict[str, Any]] = []
         self.validation_errors: list[str] = []
 
     def setup(self) -> None:
-        """Initialize processor and prepare test signals (NVTX-instrumented)."""
+        """Initialize engine and prepare test signals (NVTX-instrumented)."""
         with setup_range("AccuracyBenchmark.setup"):
             # Get engine configuration
             if self.config.engine_config:
@@ -92,10 +92,9 @@ class AccuracyBenchmark(BaseBenchmark):
             else:
                 self.engine_config = Presets.validation()
 
-            # Initialize processor
-            with nvtx_range("InitializeProcessor", color=ProfileColor.DARK_GRAY):
-                self.processor = Processor(self.engine_config)
-                self.processor.initialize()
+            # Initialize engine
+            with nvtx_range("InitializeEngine", color=ProfileColor.DARK_GRAY):
+                self.engine = Engine(self.engine_config)
 
             logger.info("Accuracy benchmark initialized:")
             logger.info(f"  Engine config: {self.engine_config}")
@@ -106,8 +105,8 @@ class AccuracyBenchmark(BaseBenchmark):
 
     def execute_iteration(self) -> dict[str, float]:
         """Execute one complete accuracy validation suite."""
-        # Ensure processor available
-        assert self.processor is not None
+        # Ensure engine available
+        assert self.engine is not None
         metrics: dict[str, float] = {
             'total_tests': 0.0,
             'passed_tests': 0.0,
@@ -133,7 +132,7 @@ class AccuracyBenchmark(BaseBenchmark):
 
                 # Process with engine
                 with nvtx_range("ProcessGPU", color=ProfileColor.PURPLE):
-                    gpu_output = self.processor.process(test_data)
+                    gpu_output = self.engine.process(test_data)
 
                 # Compute reference
                 with nvtx_range("ComputeReference", color=ProfileColor.GREEN):
@@ -205,9 +204,9 @@ class AccuracyBenchmark(BaseBenchmark):
     def teardown(self) -> None:
         """Clean up resources (NVTX-instrumented)."""
         with teardown_range("AccuracyBenchmark.teardown"):
-            if self.processor:
-                self.processor.reset()
-                self.processor = None
+            if self.engine:
+                self.engine.close()
+                self.engine = None
 
     def _generate_test_signal(self, spec: dict[str, Any]) -> np.ndarray:
         """Generate test signal based on specification."""
@@ -321,7 +320,7 @@ class AccuracyBenchmark(BaseBenchmark):
     def _test_parseval_theorem(self) -> dict[str, bool | float]:
         """Test Parseval's theorem (energy conservation)."""
         assert self.engine_config is not None
-        assert self.processor is not None
+        assert self.engine is not None
         # Generate test signal
         test_signal = make_noise(
             self.engine_config.nfft / self.engine_config.sample_rate_hz,
@@ -334,7 +333,7 @@ class AccuracyBenchmark(BaseBenchmark):
 
         # Process and get frequency domain
         test_batch = np.tile(test_signal, self.engine_config.batch)
-        freq_output = self.processor.process(test_batch)
+        freq_output = self.engine.process(test_batch)
 
         # Compute frequency-domain energy (accounting for one-sided spectrum)
         freq_energy = np.sum(freq_output[0]**2)
@@ -359,7 +358,7 @@ class AccuracyBenchmark(BaseBenchmark):
     def _test_linearity(self) -> dict[str, bool | float]:
         """Test linearity (superposition principle)."""
         assert self.engine_config is not None
-        assert self.processor is not None
+        assert self.engine is not None
         # Generate two signals
         duration = self.engine_config.nfft / self.engine_config.sample_rate_hz
         signal1 = make_sine(1000, duration, self.engine_config.sample_rate_hz, 0.5)
@@ -369,13 +368,13 @@ class AccuracyBenchmark(BaseBenchmark):
         batch1 = np.tile(signal1, self.engine_config.batch)
         batch2 = np.tile(signal2, self.engine_config.batch)
 
-        output1 = self.processor.process(batch1)
-        output2 = self.processor.process(batch2)
+        output1 = self.engine.process(batch1)
+        output2 = self.engine.process(batch2)
 
         # Process sum
         sum_signal = signal1 + signal2
         sum_batch = np.tile(sum_signal, self.engine_config.batch)
-        sum_output = self.processor.process(sum_batch)
+        sum_output = self.engine.process(sum_batch)
 
         # Check linearity
         expected_sum = output1 + output2
@@ -390,13 +389,13 @@ class AccuracyBenchmark(BaseBenchmark):
     def _test_window_function(self) -> dict[str, bool | float]:
         """Validate window function implementation."""
         assert self.engine_config is not None
-        assert self.processor is not None
+        assert self.engine is not None
         # Test with DC signal (all ones)
         test_signal = np.ones(self.engine_config.nfft, dtype=np.float32)
         test_batch = np.tile(test_signal, self.engine_config.batch)
 
         # Process
-        output = self.processor.process(test_batch)
+        output = self.engine.process(test_batch)
 
         # Expected: DC component should equal sum of window
         window = scipy_signal.windows.hann(self.engine_config.nfft, sym=False)
@@ -510,6 +509,7 @@ if __name__ == '__main__':
         save_benchmark_results(result, args.output)
     else:
         from datetime import datetime
+
         from ionosense_hpc.utils.paths import get_benchmarks_root
         ts = datetime.now().strftime('%Y%m%d_%H%M%S')
         out = get_benchmarks_root() / f"accuracy_{ts}.json"

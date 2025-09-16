@@ -11,9 +11,9 @@ from typing import Any
 
 import numpy as np
 
+from ionosense_hpc import Engine
 from ionosense_hpc.benchmarks.base import BaseBenchmark, BenchmarkConfig
 from ionosense_hpc.config import EngineConfig, Presets
-from ionosense_hpc.core import Processor
 from ionosense_hpc.utils import get_memory_usage, logger, make_test_batch
 from ionosense_hpc.utils.profiling import (
     ProfileColor,
@@ -66,13 +66,13 @@ class ThroughputBenchmark(BaseBenchmark):
         super().__init__(config or ThroughputBenchmarkConfig(name="Throughput"))
         self.config: ThroughputBenchmarkConfig = self.config
 
-        self.processor: Processor | None = None
+        self.engine: Engine | None = None
         self.engine_config: EngineConfig | None = None
         self.test_data: np.ndarray | None = None
         self.resource_samples: list[dict[str, Any]] = []
 
     def setup(self) -> None:
-        """Initialize processor for throughput testing (NVTX-instrumented)."""
+        """Initialize engine for throughput testing (NVTX-instrumented)."""
         with setup_range("ThroughputBenchmark.setup"):
             # Use throughput-optimized preset
             if self.config.engine_config:
@@ -80,9 +80,8 @@ class ThroughputBenchmark(BaseBenchmark):
             else:
                 self.engine_config = Presets.throughput()
 
-            with nvtx_range("InitializeProcessor", color=ProfileColor.DARK_GRAY):
-                self.processor = Processor(self.engine_config)
-                self.processor.initialize()
+            with nvtx_range("InitializeEngine", color=ProfileColor.DARK_GRAY):
+                self.engine = Engine(self.engine_config)
 
             # Pre-generate test data
             with nvtx_range("GenerateTestData", color=ProfileColor.ORANGE):
@@ -101,7 +100,7 @@ class ThroughputBenchmark(BaseBenchmark):
 
     def execute_iteration(self) -> dict[str, float]:
         """Execute throughput measurement (NVTX-instrumented)."""
-        assert self.processor is not None
+        assert self.engine is not None
         assert self.engine_config is not None
         assert self.test_data is not None
         with nvtx_range("ThroughputMeasurement", color=ProfileColor.NVIDIA_BLUE, domain=ProfilingDomain.BENCHMARK):
@@ -132,7 +131,7 @@ class ThroughputBenchmark(BaseBenchmark):
                 if test_mode == 'data_size':
                     for batch_idx in range(n_batches):
                         with nvtx_range(f"Batch_{batch_idx}", color=ProfileColor.PURPLE, payload=batch_idx):
-                            _ = self.processor.process(self.test_data)
+                            _ = self.engine.process(self.test_data)
                             bytes_processed += bytes_per_batch
                             frames_processed += 1
                             if self.config.monitor_gpu_utilization and frames_processed % 100 == 0:
@@ -141,7 +140,7 @@ class ThroughputBenchmark(BaseBenchmark):
                 else:
                     while (time.perf_counter() - start_time) < self.config.test_duration_s:
                         with nvtx_range(f"Frame_{frames_processed}", color=ProfileColor.PURPLE):
-                            _ = self.processor.process(self.test_data)
+                            _ = self.engine.process(self.test_data)
                             bytes_processed += bytes_per_batch
                             frames_processed += 1
                             if self.config.monitor_gpu_utilization and frames_processed % 100 == 0:
@@ -172,9 +171,9 @@ class ThroughputBenchmark(BaseBenchmark):
     def teardown(self) -> None:
         """Clean up resources (NVTX-instrumented)."""
         with teardown_range("ThroughputBenchmark.teardown"):
-            if self.processor:
-                self.processor.reset()
-                self.processor = None
+            if self.engine:
+                self.engine.close()
+                self.engine = None
             self.test_data = None
             self.resource_samples = []
             gc.collect()
@@ -315,8 +314,7 @@ class ScalingBenchmark(ThroughputBenchmark):
             )
 
             # Run throughput test
-            processor = Processor(test_config)
-            processor.initialize()
+            engine = Engine(test_config)
 
             test_data = make_test_batch(base_nfft, batch_size, seed=self.config.seed)
 
@@ -324,7 +322,7 @@ class ScalingBenchmark(ThroughputBenchmark):
             start = time.perf_counter()
             n_iterations = 100
             for _ in range(n_iterations):
-                processor.process(test_data)
+                engine.process(test_data)
             elapsed = time.perf_counter() - start
 
             samples_per_second = (n_iterations * base_nfft * batch_size) / elapsed
@@ -335,7 +333,7 @@ class ScalingBenchmark(ThroughputBenchmark):
                 'time_per_batch_ms': (elapsed / n_iterations) * 1000
             })
 
-            processor.reset()
+            engine.close()
 
             logger.info(f"  Batch {batch_size}: {samples_per_second/1e6:.2f} MS/s")
 
@@ -360,8 +358,7 @@ class ScalingBenchmark(ThroughputBenchmark):
             )
 
             # Run throughput test
-            processor = Processor(test_config)
-            processor.initialize()
+            engine = Engine(test_config)
 
             test_data = make_test_batch(nfft_size, base_batch, seed=self.config.seed)
 
@@ -369,7 +366,7 @@ class ScalingBenchmark(ThroughputBenchmark):
             start = time.perf_counter()
             n_iterations = 100
             for _ in range(n_iterations):
-                processor.process(test_data)
+                engine.process(test_data)
             elapsed = time.perf_counter() - start
 
             samples_per_second = (n_iterations * nfft_size * base_batch) / elapsed
@@ -380,7 +377,7 @@ class ScalingBenchmark(ThroughputBenchmark):
                 'time_per_frame_ms': (elapsed / n_iterations) * 1000
             })
 
-            processor.reset()
+            engine.close()
 
             logger.info(f"  NFFT {nfft_size}: {samples_per_second/1e6:.2f} MS/s")
 
@@ -409,8 +406,7 @@ class ScalingBenchmark(ThroughputBenchmark):
                 warmup_iters=5
             )
 
-            processor = Processor(test_config)
-            processor.initialize()
+            engine = Engine(test_config)
 
             test_data = make_test_batch(nfft, batch, seed=self.config.seed)
 
@@ -418,7 +414,7 @@ class ScalingBenchmark(ThroughputBenchmark):
             start = time.perf_counter()
             n_iterations = 100
             for _ in range(n_iterations):
-                processor.process(test_data)
+                engine.process(test_data)
             elapsed = time.perf_counter() - start
 
             throughput = (n_iterations * nfft * batch) / elapsed / 1e6
@@ -429,7 +425,7 @@ class ScalingBenchmark(ThroughputBenchmark):
                 'throughput_msps': throughput
             })
 
-            processor.reset()
+            engine.close()
 
             logger.info(f"  NFFT={nfft}, Batch={batch}: {throughput:.2f} MS/s")
 
@@ -517,6 +513,7 @@ if __name__ == '__main__':
         save_benchmark_results(result, args.output)
     else:
         from datetime import datetime
+
         from ionosense_hpc.utils.paths import get_benchmarks_root
         ts = datetime.now().strftime('%Y%m%d_%H%M%S')
         name_part = 'throughput' if args.mode == 'throughput' else f"throughput_{args.mode}"

@@ -337,6 +337,7 @@ class BaseBenchmark(abc.ABC):
                     for i in range(self.config.iterations):
                         try:
                             start_time = time.perf_counter()
+                            start_wall = time.time()
                             with nvtx_range(
                                 f"Iteration_{i}",
                                 color=ProfileColor.PURPLE,
@@ -344,12 +345,12 @@ class BaseBenchmark(abc.ABC):
                                 payload=i,
                             ):
                                 iter_result = self.execute_iteration()
-                            elapsed = time.perf_counter() - start_time
-
-                            if elapsed > self.config.timeout_seconds:
-                                raise TimeoutError(
-                                    f"Iteration {i} exceeded timeout"
-                                )
+                            end_time = time.perf_counter()
+                            elapsed = end_time - start_time
+                            elapsed_wall = time.time() - start_wall
+                            if self.config.timeout_seconds > 0 and (elapsed > self.config.timeout_seconds or elapsed_wall > self.config.timeout_seconds):
+                                msg = f"Iteration {i} exceeded timeout"
+                                raise TimeoutError(msg)
 
                             if isinstance(iter_result, dict):
                                 measurements.append(iter_result)

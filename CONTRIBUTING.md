@@ -432,16 +432,16 @@ ibench suite                  # Comprehensive benchmarks
 ```python
 import pytest
 import numpy as np
-from ionosense_hpc import Processor, EngineConfig
+from ionosense_hpc import Engine, EngineConfig
 
-class TestProcessor:
-    """Test the Processor class."""
+class TestEngine:
+    """Test the Engine class."""
     
     @pytest.fixture
     def processor(self):
         """Create a test processor."""
         config = EngineConfig(nfft=256, batch=1)
-        return Processor(config)
+        return Engine(config)
     
     def test_basic_processing(self, processor):
         """Test basic signal processing."""
@@ -449,7 +449,7 @@ class TestProcessor:
         input_data = np.random.randn(256).astype(np.float32)
         
         # Act
-        output = processor.process(input_data)
+        output = engine.process(input_data)
         
         # Assert
         assert output.shape == (1, 129)
@@ -460,10 +460,10 @@ class TestProcessor:
     def test_different_sizes(self, nfft):
         """Test processing with different FFT sizes."""
         config = EngineConfig(nfft=nfft)
-        processor = Processor(config)
+        engine = Engine(config)
         
         input_data = np.zeros(nfft, dtype=np.float32)
-        output = processor.process(input_data)
+        output = engine.process(input_data)
         
         assert output.shape == (1, nfft // 2 + 1)
 ```
@@ -474,18 +474,18 @@ class TestProcessor:
 def test_latency_requirement():
     """Ensure real-time latency requirement is met."""
     config = Presets.realtime()
-    processor = Processor(config)
+    engine = Engine(config)
     
     # Warm up
     data = np.random.randn(2048).astype(np.float32)
     for _ in range(100):
-        processor.process(data)
+        engine.process(data)
     
     # Measure
     latencies = []
     for _ in range(1000):
         start = time.perf_counter()
-        processor.process(data)
+        engine.process(data)
         latencies.append((time.perf_counter() - start) * 1e6)
     
     p99_latency = np.percentile(latencies, 99)

@@ -10,9 +10,9 @@ from typing import Any
 
 import numpy as np
 
+from ionosense_hpc import Engine
 from ionosense_hpc.benchmarks.base import BaseBenchmark, BenchmarkConfig, BenchmarkResult
 from ionosense_hpc.config import EngineConfig, Presets
-from ionosense_hpc.core import Processor
 from ionosense_hpc.utils import logger, make_test_batch
 from ionosense_hpc.utils.profiling import (
     ProfileColor,
@@ -55,7 +55,7 @@ class RealtimeBenchmark(BaseBenchmark):
         super().__init__(config or RealtimeBenchmarkConfig(name="Realtime"))
         self.config: RealtimeBenchmarkConfig = self.config
 
-        self.processor: Processor | None = None
+        self.engine: Engine | None = None
         self.engine_config: EngineConfig | None = None
         self.test_data: np.ndarray | None = None
         self.frame_times: list[float] = []
@@ -63,7 +63,7 @@ class RealtimeBenchmark(BaseBenchmark):
         self.dropped_frames: int = 0
 
     def setup(self) -> None:
-        """Initialize processor and prepare streaming infrastructure (NVTX-instrumented)."""
+        """Initialize engine and prepare streaming infrastructure (NVTX-instrumented)."""
         with setup_range("RealtimeBenchmark.setup"):
             # Get engine configuration
             if self.config.engine_config:
@@ -75,10 +75,9 @@ class RealtimeBenchmark(BaseBenchmark):
             if self.config.frame_deadline_ms is None:
                 self.config.frame_deadline_ms = self.engine_config.hop_duration_ms
 
-            # Initialize processor
-            with nvtx_range("InitializeProcessor", color=ProfileColor.DARK_GRAY):
-                self.processor = Processor(self.engine_config)
-                self.processor.initialize()
+            # Initialize engine
+            with nvtx_range("InitializeEngine", color=ProfileColor.DARK_GRAY):
+                self.engine = Engine(self.engine_config)
 
             # Pre-generate test data for consistent frames
             with nvtx_range("GenerateTestData", color=ProfileColor.ORANGE):
@@ -105,7 +104,7 @@ class RealtimeBenchmark(BaseBenchmark):
     def execute_iteration(self) -> dict[str, float]:
         """Execute one complete streaming session."""
         # Ensure required components are initialized
-        assert self.processor is not None
+        assert self.engine is not None
         assert self.test_data is not None
         assert self.config.frame_deadline_ms is not None
         metrics: dict[str, float] = {
@@ -168,11 +167,11 @@ class RealtimeBenchmark(BaseBenchmark):
 
                 # Process the frame
                 with compute_range(f"Frame_{frame_idx}"):
-                    output = self.processor.process(self.test_data)
+                    output = self.engine.process(self.test_data)
 
                 # Ensure GPU sync for accurate timing
                 with nvtx_range("Sync", color=ProfileColor.YELLOW):
-                    self.processor._engine.synchronize()
+                    self.engine.synchronize()
 
             except Exception as e:
                 logger.error(f"Frame {frame_idx} processing failed: {e}")
@@ -229,9 +228,9 @@ class RealtimeBenchmark(BaseBenchmark):
     def teardown(self) -> None:
         """Clean up resources (NVTX-instrumented)."""
         with teardown_range("RealtimeBenchmark.teardown"):
-            if self.processor:
-                self.processor.reset()
-                self.processor = None
+            if self.engine:
+                self.engine.close()
+                self.engine = None
             self.test_data = None
 
     def analyze_results(self, result: 'BenchmarkResult') -> dict[str, Any]:
@@ -345,7 +344,6 @@ class RealtimeBenchmark(BaseBenchmark):
 
 if __name__ == '__main__':
     import argparse
-    import json
 
     parser = argparse.ArgumentParser(description='Real-time streaming benchmark')
     parser.add_argument('--duration', type=float, default=10.0,
@@ -383,6 +381,7 @@ if __name__ == '__main__':
         save_benchmark_results(result, args.output)
     else:
         from datetime import datetime
+
         from ionosense_hpc.utils.paths import get_benchmarks_root
         ts = datetime.now().strftime('%Y%m%d_%H%M%S')
         out = get_benchmarks_root() / f"realtime_{ts}.json"

@@ -1193,7 +1193,7 @@ Function Invoke-BenchmarkReport {
     $reportPath = Join-Path $script:ReportsDir $reportName
     
     Invoke-WithPythonPath {
-        $reportCmd = "from ionosense_hpc.benchmarks.reporting import generate_comparative_report, ReportConfig; "
+        $reportCmd = "from ionosense_hpc.utils.reporting import generate_comparative_report, ReportConfig; "
         $reportCmd += "config = ReportConfig("
         $reportCmd += "output_format='$Format', "
         

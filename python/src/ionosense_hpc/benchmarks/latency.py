@@ -10,9 +10,9 @@ from typing import Any
 
 import numpy as np
 
+from ionosense_hpc import Engine
 from ionosense_hpc.benchmarks.base import BaseBenchmark, BenchmarkConfig, BenchmarkResult
 from ionosense_hpc.config import EngineConfig, Presets
-from ionosense_hpc.core import Processor
 from ionosense_hpc.utils import logger, make_test_batch
 from ionosense_hpc.utils.paths import get_benchmarks_root
 from ionosense_hpc.utils.profiling import (
@@ -59,14 +59,14 @@ class LatencyBenchmark(BaseBenchmark):
         super().__init__(config or LatencyBenchmarkConfig(name="Latency"))
         self.config: LatencyBenchmarkConfig = self.config  # Type hint
 
-        self.processor: Processor | None = None
+        self.engine: Engine | None = None
         self.test_data: np.ndarray | None = None
         self.gpu_events = None
         self.interval_times: list[float] = []  # For jitter analysis
         self.last_timestamp: float | None = None
 
     def setup(self) -> None:
-        """Initialize processor and prepare test data (NVTX-instrumented)."""
+        """Initialize engine and prepare test data (NVTX-instrumented)."""
         with setup_range("LatencyBenchmark.setup"):
             # Get engine config from preset or override
             if self.config.engine_config:
@@ -74,10 +74,9 @@ class LatencyBenchmark(BaseBenchmark):
             else:
                 engine_config = Presets.realtime()
 
-            # Initialize processor
-            with nvtx_range("InitializeProcessor", color=ProfileColor.DARK_GRAY):
-                self.processor = Processor(engine_config)
-                self.processor.initialize()
+            # Initialize engine
+            with nvtx_range("InitializeEngine", color=ProfileColor.DARK_GRAY):
+                self.engine = Engine(engine_config)
 
             # Prepare deterministic test data
             with nvtx_range("PrepareTestData", color=ProfileColor.ORANGE):
@@ -107,11 +106,11 @@ class LatencyBenchmark(BaseBenchmark):
 
     def execute_iteration(self) -> dict[str, float]:
         """Execute single iteration with comprehensive timing and NVTX markers."""
-        assert self.processor is not None
+        assert self.engine is not None
         assert self.test_data is not None
         # Pre-iteration synchronization for accurate timing
         with nvtx_range("PreIterationSync", color=ProfileColor.YELLOW):
-            self.processor._engine.synchronize()
+            self.engine.synchronize()
 
         # Start timing
         t_start_cpu = time.perf_counter()
@@ -121,11 +120,11 @@ class LatencyBenchmark(BaseBenchmark):
         with nvtx_range(
             "ProcessIteration", color=ProfileColor.PURPLE, domain=ProfilingDomain.BENCHMARK
         ):
-            output = self.processor.process(self.test_data)
+            output = self.engine.process(self.test_data)
 
         # Post-processing synchronization
         with nvtx_range("PostIterationSync", color=ProfileColor.YELLOW):
-            self.processor._engine.synchronize()
+            self.engine.synchronize()
 
         # End timing
         t_end_cpu = time.perf_counter()
@@ -136,7 +135,7 @@ class LatencyBenchmark(BaseBenchmark):
         latency_us = (t_end_ns - t_start_ns) / 1000.0
 
         # Get engine-reported stats
-        engine_stats = self.processor.get_stats()
+        engine_stats = self.engine.stats
 
         # Jitter analysis
         current_time = time.perf_counter()
@@ -166,9 +165,9 @@ class LatencyBenchmark(BaseBenchmark):
     def teardown(self) -> None:
         """Clean up resources (NVTX-instrumented)."""
         with teardown_range("LatencyBenchmark.teardown"):
-            if self.processor:
-                self.processor.reset()
-                self.processor = None
+            if self.engine:
+                self.engine.close()
+                self.engine = None
             self.test_data = None
             self.gpu_events = None
 
@@ -327,8 +326,8 @@ class StreamingLatencyBenchmark(LatencyBenchmark):
         super().setup()
 
         # Create larger buffer for streaming simulation
-        assert self.processor is not None
-        cfg = self.processor.config
+        assert self.engine is not None
+        cfg = self.engine.config
         assert cfg is not None
         engine_config: EngineConfig = cfg
         stream_duration_s = max(10.0, self.config.iterations * 0.001)
@@ -347,8 +346,8 @@ class StreamingLatencyBenchmark(LatencyBenchmark):
 
     def execute_iteration(self) -> dict[str, float]:
         """Process next chunk from stream."""
-        assert self.processor is not None
-        cfg2 = self.processor.config
+        assert self.engine is not None
+        cfg2 = self.engine.config
         assert cfg2 is not None
         engine_config: EngineConfig = cfg2
         chunk_size = engine_config.nfft * engine_config.batch
@@ -516,6 +515,7 @@ if __name__ == '__main__':
 
         result = benchmark.run()
         from pathlib import Path
+
         from ionosense_hpc.benchmarks.base import save_benchmark_results
         from ionosense_hpc.utils.paths import get_benchmarks_root
         out_dir = Path(args.output) if args.output else get_benchmarks_root()

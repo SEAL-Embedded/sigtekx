@@ -4,6 +4,8 @@ import contextlib
 import warnings
 from typing import Any
 
+from ionosense_hpc.core.engine import _import_cpp_engine
+
 try:
     import pynvml
     NVML_AVAILABLE = True
@@ -30,9 +32,13 @@ def gpu_count() -> int:
 
     # Fallback to C++ module
     try:
-        from ionosense_hpc.core.raw_engine import RawEngine
-        devices = RawEngine.get_available_devices()
-        return len(devices)
+        cpp_module = _import_cpp_engine()
+    except Exception:
+        return 0
+
+    try:
+        devices = cpp_module.get_available_devices()
+        return len(list(devices))
     except Exception:
         return 0
 
@@ -44,8 +50,8 @@ def current_device() -> int:
         Current device ID (0-based)
     """
     try:
-        from ionosense_hpc.core.raw_engine import RawEngine
-        return RawEngine.select_best_device()
+        cpp_module = _import_cpp_engine()
+        return int(cpp_module.select_best_device())
     except Exception:
         return 0
 
@@ -113,15 +119,22 @@ def device_info(device_id: int | None = None) -> dict[str, Any]:
     # Try to get basic info from C++ module as fallback
     if info['name'] == 'Unknown':
         try:
-            from ionosense_hpc.core.raw_engine import RawEngine
-            devices = RawEngine.get_available_devices()
+            cpp_module = _import_cpp_engine()
+            devices = list(cpp_module.get_available_devices())
             if device_id < len(devices):
-                # Parse device string like "[0] NVIDIA RTX 4000 Ada (CC 8.9)"
                 device_str = devices[device_id]
-                if '] ' in device_str:
-                    name_part = device_str.split('] ', 1)[1]
-                    if ' (CC ' in name_part:
-                        info['name'] = name_part.split(' (CC ')[0]
+                name_part = device_str.split('] ', 1)[1] if '] ' in device_str else device_str
+                if ' (CC ' in name_part:
+                    name, cc_part = name_part.split(' (CC ', 1)
+                    info['name'] = name
+                    cc_tokens = cc_part.split(')', 1)[0].split('.')
+                    if len(cc_tokens) == 2:
+                        try:
+                            info['compute_capability'] = (int(cc_tokens[0]), int(cc_tokens[1]))
+                        except ValueError:
+                            pass
+                else:
+                    info['name'] = name_part
         except Exception:
             pass
 

@@ -106,9 +106,11 @@ class ResearchWorkflow:
         self.workflow_id = f"{self.metadata.experiment_id}_{datetime.now():%Y%m%d_%H%M%S}"
 
         # Setup directories (honor configured output root if provided)
-        output_root = Path(
-            self.config.output_settings.get('output_dir')
-        ) if self.config.output_settings.get('output_dir') else get_experiments_root()
+        output_dir_value = self.config.output_settings.get('output_dir')
+        if output_dir_value:
+            output_root = Path(str(output_dir_value))
+        else:
+            output_root = get_experiments_root()
         self.base_dir = output_root / self.workflow_id
         self.setup_directories()
 
@@ -420,7 +422,7 @@ class ResearchWorkflow:
 
     def _run_report_stage(self, stage: WorkflowStage) -> Path:
         """Generate final report."""
-        from ionosense_hpc.benchmarks.reporting import ReportConfig, generate_comparative_report
+        from ionosense_hpc.utils.reporting import ReportConfig, generate_comparative_report
 
         report_config = ReportConfig(**stage.config)
 

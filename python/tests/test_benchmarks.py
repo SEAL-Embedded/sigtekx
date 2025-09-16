@@ -421,7 +421,7 @@ class TestReporting:
     @pytest.mark.skipif(not pytest.importorskip("matplotlib"), reason="matplotlib not installed")
     def test_report_generation(self, mock_benchmark_results, temp_benchmark_dir):
         """Test PDF report generation."""
-        from ionosense_hpc.benchmarks.reporting import BenchmarkReport, ReportConfig
+        from ionosense_hpc.utils.reporting import BenchmarkReport, ReportConfig
 
         # Load mock results
         results = []
@@ -456,7 +456,7 @@ class TestReporting:
 
     def test_comparative_report_generation(self, mock_benchmark_results, temp_benchmark_dir):
         """Test comparative report generation from directory."""
-        from ionosense_hpc.benchmarks.reporting import ReportConfig, generate_comparative_report
+        from ionosense_hpc.utils.reporting import ReportConfig, generate_comparative_report
 
         config = ReportConfig(
             title="Comparative Report",
@@ -466,7 +466,7 @@ class TestReporting:
         output_path = temp_benchmark_dir / "report.md"
 
         # This should handle the directory of results
-        with patch('ionosense_hpc.benchmarks.reporting.BenchmarkReport.generate'):
+        with patch('ionosense_hpc.utils.reporting.BenchmarkReport.generate'):
             generate_comparative_report(
                 temp_benchmark_dir / "results",
                 output_path,

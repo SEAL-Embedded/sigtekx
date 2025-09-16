@@ -256,16 +256,16 @@ After following this plan:
 # quick_validate.py
 import numpy as np
 from scipy import signal
-from ionosense_hpc.core import Processor
+from ionosense_hpc import Engine
 from ionosense_hpc.config import Presets
 
 config = Presets.validation()
-proc = Processor(config)
-proc.initialize()
+engine = Engine(config)
+
 
 # Test DC signal
 test = np.ones(config.nfft * config.batch, dtype=np.float32)
-gpu_out = proc.process(test)
+gpu_out = engine.process(test)
 
 # Reference
 window = signal.windows.hann(config.nfft, sym=False)

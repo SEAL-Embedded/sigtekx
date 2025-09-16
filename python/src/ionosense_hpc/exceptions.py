@@ -93,7 +93,7 @@ class EngineStateError(IonosenseError):
     def __init__(self, message: str, current_state: str | None = None):
         hint = None
         if current_state == "uninitialized":
-            hint = "Call initialize() or use the Processor context manager"
+            hint = "Call initialize() or use the Engine context manager"
         elif current_state == "processing":
             hint = "Wait for current operation to complete"
         super().__init__(message, hint, current_state=current_state)

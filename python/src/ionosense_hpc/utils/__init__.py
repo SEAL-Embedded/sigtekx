@@ -102,5 +102,5 @@ __all__ = [
     'ProfileCategory',
     'initialize_profiling',
     'NVTX_AVAILABLE',
-    # Reporting (import from ionosense_hpc.benchmarks.reporting when needed)
+    # Reporting utilities (see ionosense_hpc.utils.reporting)
 ]

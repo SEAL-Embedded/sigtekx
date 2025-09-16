@@ -215,32 +215,29 @@ ionosense-hpc-lib/
 
 ## Architecture Overview
 
-### Layer Architecture
+### Runtime Architecture
 
 ```
-┌─────────────────────────────────────┐
-│         Python API Layer            │  <- User Interface
-├─────────────────────────────────────┤
-│         Processor Class             │  <- High-level Context Manager
-├─────────────────────────────────────┤
-│          Engine Class               │  <- Mid-level Validation
-├─────────────────────────────────────┤
-│         RawEngine Class             │  <- Low-level C++ Wrapper
-├─────────────────────────────────────┤
-│      C++ ResearchEngine             │  <- Core Implementation
-├─────────────────────────────────────┤
-│         CUDA Kernels                │  <- GPU Acceleration
-└─────────────────────────────────────┘
+┌──────────────────────────────┐
+│        Python API Layer       │  <- Engine class
+└──────────────┬───────────────┘
+               │ FFI bridge
+┌──────────────▼───────────────┐
+│     C++ ResearchEngine        │  <- CUDA orchestration
+└──────────────┬───────────────┘
+               │ CUDA kernels
+┌──────────────▼───────────────┐
+│         NVIDIA GPU            │
+└──────────────────────────────┘
 ```
 
 ### Key Components
 
-1. **Processor**: High-level interface with context management
-2. **Engine**: Mid-level wrapper with validation and buffer management
-3. **RawEngine**: Thin Python wrapper around C++ extension
-4. **ResearchEngine**: C++ implementation with CUDA kernels
-5. **Benchmarks**: Comprehensive performance evaluation framework
-6. **Config**: Pydantic-based configuration with validation
+1. **Engine** – unified Python interface, lifecycle management, validation
+2. **ResearchEngine** – C++ implementation that schedules CUDA work
+3. **Config** – Pydantic models describing FFT, batching, and profiling options
+4. **Benchmarks** – reusable benchmarking infrastructure built on top of `Engine`
+5. **Utilities** – signal generators, device helpers, reporting helpers
 
 ## Building from Source
 
@@ -437,20 +434,20 @@ it --verbose
 ```python
 import pytest
 import numpy as np
-from ionosense_hpc import Processor, Presets
+from ionosense_hpc import Engine, Presets
 
 @pytest.mark.gpu
-class TestProcessor:
-    """Test processor functionality."""
-    
+class TestEngine:
+    """Test Engine functionality."""
+
     def test_basic_processing(self):
         """Test basic signal processing."""
         config = Presets.validation()
         test_data = np.random.randn(config.nfft * config.batch).astype(np.float32)
-        
-        with Processor(config) as proc:
-            output = proc.process(test_data)
-            
+
+        with Engine(config) as engine:
+            output = engine.process(test_data)
+
             assert output.shape == (config.batch, config.num_output_bins)
             assert not np.any(np.isnan(output))
 ```

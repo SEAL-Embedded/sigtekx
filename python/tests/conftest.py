@@ -38,14 +38,16 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "gpu: marks tests as requiring a GPU to run")
 
 def pytest_collection_modifyitems(config, items):
-    """
-    Skips tests marked with 'gpu' if the --no-gpu flag is provided.
-    """
+    """Reorder collection so engine tests run first and apply GPU skips."""
+    engine_prefix = "python/tests/test_engine.py"
+    engine_items = [item for item in items if item.nodeid.startswith(engine_prefix)]
+    if engine_items:
+        remaining_items = [item for item in items if item not in engine_items]
+        items[:] = engine_items + remaining_items
+
     if not config.getoption("--no-gpu"):
-        # --no-gpu flag is NOT set, so run all tests.
         return
 
-    # --no-gpu flag IS set, so skip all tests marked with 'gpu'.
     skip_gpu = pytest.mark.skip(reason="--no-gpu option used to skip GPU-dependent tests")
     for item in items:
         if "gpu" in item.keywords:

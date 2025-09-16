@@ -5,8 +5,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from ionosense_hpc import Engine
 from ionosense_hpc.config import EngineConfig
-from ionosense_hpc.core import Processor
 
 
 def test_temp_data_dir(temp_data_dir):
@@ -27,10 +27,10 @@ def test_config_fixtures(validation_config, realtime_config, benchmark_config):
     assert benchmark_config.enable_profiling is True
 
 @pytest.mark.gpu
-def test_test_processor(test_processor):
-    """Test the test_processor fixture."""
-    assert isinstance(test_processor, Processor)
-    assert test_processor.is_initialized is True
+def test_test_engine(test_engine):
+    """Test the test_engine fixture."""
+    assert isinstance(test_engine, Engine)
+    assert test_engine.is_initialized is True
 
 def test_seeded_rng(seeded_rng):
     """Test the seeded_rng fixture."""

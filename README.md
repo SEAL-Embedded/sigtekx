@@ -106,16 +106,16 @@ Ionosense-HPC includes a comprehensive CLI for all development and research work
 ### Basic Processing
 
 ```python
-from ionosense_hpc import Processor, Presets
+from ionosense_hpc import Engine, Presets
 import numpy as np
 
 # Create processor with real-time preset
-with Processor(Presets.realtime()) as proc:
+with Engine(Presets.realtime()) as engine:
     # Generate test signal
     signal = np.random.randn(2048).astype(np.float32)
     
     # Process signal
-    spectrum = proc.process(signal)
+    spectrum = engine.process(signal)
     
     print(f"Output shape: {spectrum.shape}")
     print(f"Processing latency: {proc.get_stats()['latency_us']:.1f} μs")

@@ -1,229 +1,591 @@
+"""Tests for the unified Engine API.
+
+This module tests the v2.0 unified Engine class, ensuring it maintains
+all functionality from the previous three-layer architecture while
+providing a simpler, more obvious interface.
 """
-Tests for the mid-level Engine wrapper.
-"""
-import gc
-from unittest.mock import ANY, MagicMock, patch
+
+import warnings
+from collections.abc import Generator
 
 import numpy as np
 import pytest
+from numpy.testing import assert_array_equal
 
-from ionosense_hpc.config import EngineConfig
-from ionosense_hpc.core.engine import Engine
-from ionosense_hpc.core.raw_engine import RawEngine  # Import RawEngine for spec
-from ionosense_hpc.exceptions import EngineStateError, ValidationError
+from ionosense_hpc import (
+    Engine,
+    EngineConfig,
+    benchmark_latency,
+    process_signal,
+)
+from ionosense_hpc.exceptions import (
+    EngineStateError,
+    ValidationError,
+)
+
+# -----------------------------------------------------------------------------
+# Fixtures
+# -----------------------------------------------------------------------------
+
+@pytest.fixture
+def test_config() -> EngineConfig:
+    """Small configuration for fast testing."""
+    return EngineConfig(
+        nfft=256,
+        batch=1,
+        overlap=0.0,
+        sample_rate_hz=1000,
+        warmup_iters=0,
+        enable_profiling=True
+    )
 
 
 @pytest.fixture
-def mock_raw_engine_instance():
-    """Provides a mocked instance of RawEngine."""
-    # Use RawEngine as the spec for an accurate mock
-    mock_instance = MagicMock(spec=RawEngine)
-    mock_instance.is_initialized = False
-
-    mock_instance.get_stats.return_value = {
-        'latency_us': 10.0,
-        'throughput_gbps': 1.0,
-        'frames_processed': 1
-    }
-    # Add the missing get_runtime_info method to the mock's spec
-    mock_instance.get_runtime_info.return_value = {
-        'device_name': 'MockDevice',
-        'cuda_version': '12.0',
-        'device_memory_mb': 8192,
-        'device_memory_free_mb': 4096
-    }
-    return mock_instance
+def test_data() -> np.ndarray:
+    """Generate test signal data."""
+    return np.random.randn(256).astype(np.float32)
 
 
 @pytest.fixture
-def engine_config():
-    """Provides a basic EngineConfig instance."""
-    return EngineConfig(nfft=1024, batch=2, overlap=0, warmup_iters=0)
+def dual_channel_data() -> np.ndarray:
+    """Generate dual-channel test data."""
+    return np.random.randn(512).astype(np.float32)  # 256 * 2
 
 
-@pytest.fixture
-def engine(mock_raw_engine_instance):
-    """Provides an uninitialized Engine instance with a mocked RawEngine."""
-    with patch('ionosense_hpc.core.engine.RawEngine', return_value=mock_raw_engine_instance):
-        e = Engine()
-        yield e
-        # Ensure cleanup for __del__ testing
-        if 'e' in locals():
-            del e
-        gc.collect()
+# -----------------------------------------------------------------------------
+# Basic Functionality Tests
+# -----------------------------------------------------------------------------
+
+class TestEngineBasics:
+    """Test basic Engine functionality."""
+
+    def test_creation_with_preset(self):
+        """Test engine creation with string preset."""
+        engine = Engine("realtime")
+        assert engine.config.nfft == 1024
+        assert engine.config.batch == 2
+        assert engine.is_initialized
+        engine.close()
+
+    def test_creation_with_config(self, test_config: EngineConfig):
+        """Test engine creation with EngineConfig object."""
+        engine = Engine(test_config)
+        assert engine.config == test_config
+        assert engine.is_initialized
+        engine.close()
+
+    def test_creation_with_none(self):
+        """Test engine creation with default config."""
+        engine = Engine(None)
+        assert engine.config.nfft == 1024  # Default realtime preset
+        assert engine.is_initialized
+        engine.close()
+
+    def test_invalid_preset(self):
+        """Test error on invalid preset name."""
+        with pytest.raises(ValueError, match="Unknown preset"):
+            Engine("invalid_preset")
+
+    def test_process(self, test_config: EngineConfig, test_data: np.ndarray):
+        """Test basic processing."""
+        engine = Engine(test_config)
+        output = engine.process(test_data)
+
+        assert output.shape == (1, 129)  # (batch, nfft//2 + 1)
+        assert output.dtype == np.float32
+        assert np.all(output >= 0)  # Magnitude is non-negative
+
+        engine.close()
+
+    def test_multiple_process_calls(
+        self,
+        test_config: EngineConfig,
+        test_data: np.ndarray
+    ):
+        """Test multiple process calls maintain consistency."""
+        engine = Engine(test_config)
+
+        outputs = []
+        for _ in range(3):
+            output = engine.process(test_data)
+            outputs.append(output)
+
+        # All outputs should be identical for same input
+        assert_array_equal(outputs[0], outputs[1])
+        assert_array_equal(outputs[1], outputs[2])
+
+        engine.close()
 
 
-@pytest.fixture
-def initialized_engine(engine, engine_config):
-    """Provides an initialized Engine instance."""
-    def side_effect(*args, **kwargs):
-        engine._raw_engine.is_initialized = True
+# -----------------------------------------------------------------------------
+# Context Manager Tests
+# -----------------------------------------------------------------------------
 
-    engine._raw_engine.initialize.side_effect = side_effect
+class TestEngineContextManager:
+    """Test Engine as context manager."""
 
-    output_shape = (engine_config.batch, engine_config.num_output_bins)
-    engine._raw_engine.process.return_value = np.zeros(output_shape, dtype=np.float32)
+    def test_context_manager(self, test_config: EngineConfig, test_data: np.ndarray):
+        """Test basic context manager usage."""
+        with Engine(test_config) as engine:
+            assert engine.is_initialized
+            output = engine.process(test_data)
+            assert output.shape == (1, 129)
 
-    engine.initialize(engine_config)
-    return engine
-
-
-class TestEngineLifecycle:
-    """Tests for the lifecycle and properties of the Engine."""
-
-    def test_init_with_config(self, engine_config):
-        """Test that __init__ with a config calls initialize."""
-        with patch('ionosense_hpc.core.engine.RawEngine'):
-            e = Engine(config=engine_config)
-            e._raw_engine.initialize.assert_called_once_with(engine_config.model_dump())
-
-    def test_repr_uninitialized(self, engine):
-        """Test the __repr__ string for an uninitialized engine."""
-        assert "uninitialized" in repr(engine)
-
-    def test_repr_initialized(self, initialized_engine):
-        """Test the __repr__ string for an initialized engine."""
-        assert "initialized" in repr(initialized_engine)
-        # Check for config content, which is more robust than a class name
-        assert "nfft=1024" in repr(initialized_engine)
-
-    def test_del_calls_reset(self, engine_config):
-        """Test that the destructor calls reset on an initialized engine."""
-        with patch('ionosense_hpc.core.engine.RawEngine') as mock_cls:
-            mock_cls.return_value.is_initialized = True
-            e = Engine(config=engine_config)
-            mock_reset = e._raw_engine.reset
-
-            del e
-            gc.collect()
-
-            mock_reset.assert_called_once()
-
-    def test_del_suppresses_errors(self, engine_config):
-        """Test that __del__ does not raise exceptions if reset fails."""
-        with patch('ionosense_hpc.core.engine.RawEngine') as mock_cls:
-            mock_instance = mock_cls.return_value
-            mock_instance.is_initialized = True
-            mock_instance.reset.side_effect = RuntimeError("Cleanup failed")
-
-            try:
-                # This scope is to ensure __del__ is called
-                e = Engine(config=engine_config)
-                del e
-                gc.collect()
-            except Exception as e:
-                pytest.fail(f"__del__ raised an unexpected exception: {e}")
-
-    def test_properties_uninitialized(self, engine):
-        """Test properties on an uninitialized engine."""
+        # Engine should be closed after context
         assert not engine.is_initialized
-        assert engine.config is None
 
-    def test_properties_initialized(self, initialized_engine, engine_config):
-        """Test properties on an initialized engine."""
-        assert initialized_engine.is_initialized
-        assert initialized_engine.config == engine_config
-        initialized_engine.device_info
-        initialized_engine._raw_engine.get_runtime_info.assert_called_once()
+    def test_context_manager_exception(
+        self,
+        test_config: EngineConfig,
+        test_data: np.ndarray
+    ):
+        """Test context manager with exception."""
+        try:
+            with Engine(test_config) as engine:
+                engine.process(test_data)
+                raise ValueError("Test exception")
+        except ValueError:
+            pass
+
+        # Engine should still be closed
+        assert not engine.is_initialized
+
+    def test_nested_context_error(self, test_config: EngineConfig):
+        """Test that closed engine cannot be re-entered."""
+        engine = Engine(test_config)
+        engine.close()
+
+        with pytest.raises(EngineStateError, match="closed"):
+            with engine:
+                pass
 
 
-class TestEngineProcessing:
-    """Tests for the data processing methods."""
+# -----------------------------------------------------------------------------
+# Advanced Options Tests
+# -----------------------------------------------------------------------------
 
-    def test_process_list_input(self, initialized_engine, engine_config):
-        """Test processing a plain list of floats."""
-        input_data = [0.0] * (engine_config.nfft * engine_config.batch)
-        initialized_engine.process(input_data)
-        initialized_engine._raw_engine.process.assert_called_once()
-        call_args = initialized_engine._raw_engine.process.call_args[0]
-        assert isinstance(call_args[0], np.ndarray)
+class TestEngineAdvancedOptions:
+    """Test advanced Engine options for research workflows."""
 
-    def test_process_with_output_buffer(self, initialized_engine, engine_config):
-        """Test processing with a pre-allocated output buffer."""
-        input_data = np.zeros(engine_config.nfft * engine_config.batch, dtype=np.float32)
-        output_buffer = np.zeros((engine_config.batch, engine_config.num_output_bins), dtype=np.float32)
+    def test_validate_inputs_false(self, test_config: EngineConfig):
+        """Test skipping input validation."""
+        engine = Engine(test_config, validate_inputs=False)
 
-        mock_result = np.ones_like(output_buffer)
-        initialized_engine._raw_engine.process.return_value = mock_result
+        # Should not validate - would normally fail
+        bad_data = np.array([1, 2, 3], dtype=np.float32)  # Wrong size
 
-        result = initialized_engine.process(input_data, output=output_buffer)
+        with pytest.raises(RuntimeError):  # C++ error, not Python validation
+            engine.process(bad_data)
 
-        assert np.array_equal(result, mock_result)
-        assert result is output_buffer
-        assert np.all(output_buffer == 1.0)
+        engine.close()
 
-    def test_process_frames_basic(self, initialized_engine, engine_config):
-        """Test basic frame processing functionality."""
-        frame_size = engine_config.nfft * engine_config.batch
-        hop_size = engine_config.hop_size
-        num_frames = 3
+    def test_profile_mode(self, test_config: EngineConfig, test_data: np.ndarray):
+        """Test profile mode enables detailed metrics."""
+        engine = Engine(test_config, profile_mode=True)
 
-        input_data = np.zeros((num_frames - 1) * hop_size * engine_config.batch + frame_size, dtype=np.float32)
+        # Process some data
+        for _ in range(5):
+            engine.process(test_data)
 
-        result = initialized_engine.process_frames(input_data)
+        # Check detailed metrics
+        metrics = engine.detailed_metrics
+        assert "avg_latency_us" in metrics
+        assert "total_frames" in metrics
+        assert metrics["total_frames"] == 5
 
-        assert result.shape == (num_frames, engine_config.batch, engine_config.num_output_bins)
-        assert initialized_engine._raw_engine.process.call_count == num_frames
+        engine.close()
 
-    def test_initialize_runs_warmup(self):
-        """Test that warmup iterations are run during initialization."""
-        config = EngineConfig(warmup_iters=5)
-        with patch('ionosense_hpc.core.engine.RawEngine') as mock_raw_cls:
-            mock_raw_cls.return_value.get_stats.return_value = {'latency_us': 1.0}
-            engine = Engine(config=config)
-            assert engine._raw_engine.process.call_count == config.warmup_iters
+    def test_debug_mode(
+        self,
+        test_config: EngineConfig,
+        test_data: np.ndarray,
+        capsys
+    ):
+        """Test debug mode output."""
+        engine = Engine(test_config, debug_mode=True)
 
+        # Should print debug info
+        captured = capsys.readouterr()
+        assert "[DEBUG]" in captured.out
+
+        engine.close()
+
+    def test_stream_count_override(self, test_config: EngineConfig):
+        """Test overriding stream count."""
+        engine = Engine(test_config, stream_count=5)
+        assert engine.config.stream_count == 5
+        engine.close()
+
+    def test_deterministic_mode(
+        self,
+        test_config: EngineConfig,
+        test_data: np.ndarray
+    ):
+        """Test deterministic mode (placeholder for future)."""
+        engine = Engine(test_config, deterministic=True)
+        output = engine.process(test_data)
+        assert output is not None
+        engine.close()
+
+
+# -----------------------------------------------------------------------------
+# Property Tests
+# -----------------------------------------------------------------------------
+
+class TestEngineProperties:
+    """Test Engine properties."""
+
+    def test_config_property(self, test_config: EngineConfig):
+        """Test config property is read-only."""
+        engine = Engine(test_config)
+
+        assert engine.config == test_config
+
+        # Should not be able to modify
+        with pytest.raises(AttributeError):
+            engine.config = EngineConfig()  # type: ignore[misc]
+
+        engine.close()
+
+    def test_is_initialized_property(self, test_config: EngineConfig):
+        """Test is_initialized property."""
+        engine = Engine(test_config)
+        assert engine.is_initialized is True
+
+        engine.close()
+        assert engine.is_initialized is False
+
+    def test_stats_property(
+        self,
+        test_config: EngineConfig,
+        test_data: np.ndarray
+    ):
+        """Test stats property."""
+        engine = Engine(test_config)
+
+        # Initial stats
+        stats = engine.stats
+        assert stats["frames_processed"] == 0
+
+        # After processing
+        engine.process(test_data)
+        stats = engine.stats
+        assert stats["frames_processed"] > 0
+        assert stats["latency_us"] > 0
+
+        engine.close()
+
+    def test_device_info_property(self, test_config: EngineConfig):
+        """Test device_info property."""
+        engine = Engine(test_config)
+
+        info = engine.device_info
+        assert "device_name" in info
+        assert "cuda_version" in info
+        assert "device_memory_mb" in info
+
+        engine.close()
+
+
+# -----------------------------------------------------------------------------
+# Error Handling Tests
+# -----------------------------------------------------------------------------
 
 class TestEngineErrorHandling:
-    """Tests for various error conditions."""
+    """Test Engine error handling."""
 
-    def test_process_not_initialized(self, engine):
-        """Test that calling process before init raises an error."""
-        with pytest.raises(EngineStateError, match="not initialized"):
-            engine.process(np.zeros(10))
+    def test_process_wrong_size(self, test_config: EngineConfig):
+        """Test error on wrong input size."""
+        engine = Engine(test_config)
+        wrong_size_data = np.zeros(100, dtype=np.float32)
 
-    def test_process_frames_not_initialized(self, engine):
-        """Test that calling process_frames before init raises an error."""
-        with pytest.raises(EngineStateError, match="not initialized"):
-            engine.process_frames(np.zeros(10))
+        with pytest.raises(ValidationError, match="size mismatch"):
+            engine.process(wrong_size_data)
 
-    def test_process_invalid_output_buffer_shape(self, initialized_engine):
-        """Test providing an output buffer with the wrong shape."""
-        input_data = np.zeros(1024 * 2, dtype=np.float32)
-        bad_output_buffer = np.zeros((1, 1))
-        with pytest.raises(ValidationError, match="Output buffer shape mismatch"):
-            initialized_engine.process(input_data, output=bad_output_buffer)
+        engine.close()
 
-    def test_process_frames_input_too_short(self, initialized_engine, engine_config):
-        """Test process_frames with an input signal that is too short."""
-        short_input = np.zeros(engine_config.nfft - 1, dtype=np.float32)
-        with pytest.raises(ValidationError, match="Input too short"):
-            initialized_engine.process_frames(short_input)
+    def test_process_wrong_dtype(self, test_config: EngineConfig):
+        """Test automatic dtype conversion."""
+        engine = Engine(test_config)
+
+        # Should convert these
+        int_data = np.zeros(256, dtype=np.int32)
+        output = engine.process(int_data)
+        assert output is not None
+
+        # Should fail on these
+        complex_data = np.zeros(256, dtype=np.complex64)
+        with pytest.raises(ValidationError, match="Unsupported data type"):
+            engine.process(complex_data)
+
+        engine.close()
+
+    def test_process_with_nan(self, test_config: EngineConfig):
+        """Test warning on NaN values."""
+        engine = Engine(test_config)
+
+        nan_data = np.full(256, np.nan, dtype=np.float32)
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            engine.process(nan_data)
+            assert len(w) == 1
+            assert "NaN or Inf" in str(w[0].message)
+
+        engine.close()
+
+    def test_closed_engine_error(self, test_config: EngineConfig):
+        """Test error when using closed engine."""
+        engine = Engine(test_config)
+        engine.close()
+
+        with pytest.raises(EngineStateError, match="closed"):
+            engine.process(np.zeros(256, dtype=np.float32))
+
+        with pytest.raises(EngineStateError, match="closed"):
+            engine.reset()
 
 
-class TestEngineStats:
-    """Tests for statistics and logging."""
+# -----------------------------------------------------------------------------
+# Research Features Tests
+# -----------------------------------------------------------------------------
 
-    def test_get_stats_averaging(self, initialized_engine):
-        """Test that get_stats correctly calculates average latency."""
-        latencies = [100.0, 150.0, 200.0, 200.0]
-        stats_list = [{'latency_us': lat} for lat in latencies]
+class TestEngineResearchFeatures:
+    """Test research-specific features."""
 
-        initialized_engine._raw_engine.get_stats.side_effect = stats_list
+    def test_detailed_metrics(
+        self,
+        test_config: EngineConfig,
+        test_data: np.ndarray
+    ):
+        """Test detailed metrics with profiling enabled."""
+        config = test_config
+        config.enable_profiling = True
 
-        input_data = np.zeros(1024 * 2, dtype=np.float32)
-        for _ in range(3):
-            initialized_engine.process(input_data)
+        engine = Engine(config, profile_mode=True)
 
-        stats = initialized_engine.get_stats()
+        # Process multiple frames
+        for _ in range(10):
+            engine.process(test_data)
 
-        assert stats['total_frames'] == 3
-        assert stats['avg_latency_us'] == pytest.approx(150.0)
+        metrics = engine.detailed_metrics
+        assert "avg_latency_us" in metrics
+        assert "bytes_per_frame" in metrics
+        assert metrics["total_frames"] == 10
 
-    def test_log_performance(self, initialized_engine):
-        """Test that log_performance calls get_stats and the logger."""
-        with patch('ionosense_hpc.core.engine.log_performance') as mock_log:
-            initialized_engine.log_performance()
-            mock_log.assert_called_once_with(ANY)
-            assert initialized_engine._raw_engine.get_stats.called
+        engine.close()
 
+    def test_experimental_features(self, test_config: EngineConfig):
+        """Test enabling experimental features."""
+        engine = Engine(test_config)
+
+        # Enable unsafe mode
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            engine.enable_experimental_feature("unsafe_mode")
+            assert len(w) == 1
+            assert "Unsafe mode" in str(w[0].message)
+
+        # Unknown feature
+        with pytest.raises(ValueError, match="Unknown experimental feature"):
+            engine.enable_experimental_feature("unknown_feature")
+
+        engine.close()
+
+    def test_cuda_stream_access(self, test_config: EngineConfig):
+        """Test CUDA stream access (currently not implemented)."""
+        engine = Engine(test_config)
+
+        with pytest.raises(NotImplementedError):
+            engine.get_cuda_stream(0)
+
+        engine.close()
+
+    def test_device_ptr_access(self, test_config: EngineConfig):
+        """Test device pointer access (currently not implemented)."""
+        engine = Engine(test_config)
+
+        with pytest.raises(NotImplementedError):
+            engine.get_device_ptr()
+
+        engine.close()
+
+
+# -----------------------------------------------------------------------------
+# Class Method Tests
+# -----------------------------------------------------------------------------
+
+class TestEngineClassMethods:
+    """Test Engine class methods."""
+
+    def test_get_available_devices(self):
+        """Test getting available CUDA devices."""
+        devices = Engine.get_available_devices()
+        assert isinstance(devices, list)
+        # Should have at least one device in test environment
+        # (or empty list if no CUDA)
+
+    def test_select_best_device(self):
+        """Test selecting best device."""
+        device_id = Engine.select_best_device()
+        assert isinstance(device_id, int)
+        assert device_id >= 0
+
+
+# -----------------------------------------------------------------------------
+# Convenience Function Tests
+# -----------------------------------------------------------------------------
+
+class TestConvenienceFunctions:
+    """Test module-level convenience functions."""
+
+    def test_process_signal(self, test_data: np.ndarray):
+        """Test one-shot processing function."""
+        # With preset
+        output = process_signal(test_data, "validation")
+        assert output.shape == (1, 129)
+
+        # With config
+        config = EngineConfig(nfft=256, batch=1)
+        output = process_signal(test_data, config)
+        assert output.shape == (1, 129)
+
+    def test_benchmark_latency(self):
+        """Test benchmarking function."""
+        results = benchmark_latency(
+            "validation",
+            iterations=10,
+            data_size=256
+        )
+
+        assert "mean" in results
+        assert "min" in results
+        assert "max" in results
+        assert "p99" in results
+        assert results["mean"] > 0
+
+
+# -----------------------------------------------------------------------------
+# Lifecycle Tests
+# -----------------------------------------------------------------------------
+
+class TestEngineLifecycle:
+    """Test Engine lifecycle management."""
+
+    def test_reset(
+        self,
+        test_config: EngineConfig,
+        test_data: np.ndarray
+    ):
+        """Test engine reset."""
+        engine = Engine(test_config)
+
+        # Process some data
+        engine.process(test_data)
+        stats1 = engine.stats
+
+        # Reset
+        engine.reset()
+        assert engine.is_initialized  # Should auto-reinitialize
+
+        # Stats should be reset
+        stats2 = engine.stats
+        assert stats2["frames_processed"] == 0
+
+        # Should still work
+        output = engine.process(test_data)
+        assert output is not None
+
+        engine.close()
+
+    def test_close_idempotent(self, test_config: EngineConfig):
+        """Test that close() can be called multiple times."""
+        engine = Engine(test_config)
+
+        engine.close()
+        engine.close()  # Should not error
+        engine.close()  # Still safe
+
+        assert not engine.is_initialized
+
+    def test_del_warning(self, test_config: EngineConfig):
+        """Test warning on __del__ without close."""
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+
+            engine = Engine(test_config)
+            # Simulate deletion without close
+            del engine
+
+            # Should have warned about not closing
+            assert any("not properly closed" in str(warning.message) for warning in w)
+
+
+# -----------------------------------------------------------------------------
+# Integration Tests
+# -----------------------------------------------------------------------------
+
+class TestEngineIntegration:
+    """Integration tests for complete workflows."""
+
+    def test_full_research_workflow(self):
+        """Test complete research workflow."""
+        # Custom config for research
+        config = EngineConfig(
+            nfft=2048,
+            batch=4,
+            overlap=0.5,
+            sample_rate_hz=48000,
+            enable_profiling=True
+        )
+
+        # Create research engine
+        engine = Engine(
+            config=config,
+            validate_inputs=False,
+            profile_mode=True,
+            debug_mode=False
+        )
+
+        # Generate test signals
+        test_size = config.nfft * config.batch
+        signals = [
+            np.random.randn(test_size).astype(np.float32)
+            for _ in range(10)
+        ]
+
+        # Process signals
+        outputs = []
+        for signal in signals:
+            output = engine.process(signal)
+            outputs.append(output)
+
+        # Verify outputs
+        assert len(outputs) == 10
+        assert all(o.shape == (4, 1025) for o in outputs)
+
+        # Check metrics
+        metrics = engine.detailed_metrics
+        assert metrics["total_frames"] == 10
+        assert metrics["avg_latency_us"] > 0
+
+        engine.close()
+
+    def test_streaming_workflow(
+        self,
+        test_config: EngineConfig
+    ):
+        """Test streaming data processing."""
+        def data_generator() -> Generator[np.ndarray, None, None]:
+            """Generate stream of data."""
+            for i in range(5):
+                yield np.random.randn(256).astype(np.float32)
+
+        with Engine(test_config) as engine:
+            results = []
+            for data in data_generator():
+                output = engine.process(data)
+                results.append(output)
+
+            assert len(results) == 5
+            assert all(r.shape == (1, 129) for r in results)

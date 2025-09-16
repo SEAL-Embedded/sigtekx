@@ -394,15 +394,15 @@ ibench latency     # or 'iono bench latency'
 python -c "import ionosense_hpc; print('✓ Import successful')"
 
 # Interactive test
-python
->>> from ionosense_hpc import FFTProcessor, generate_test_signal
->>> processor = FFTProcessor(fft_size=4096, batch_size=2)
+```python
+>>> from ionosense_hpc import Engine, Presets, generate_test_signal
+>>> engine = Engine(Presets.throughput())
 >>> signals = generate_test_signal(sample_rate=100_000, duration=0.1)
->>> result = processor.process(signals['ch1'][:4096], signals['ch2'][:4096])
->>> print(f"Output shape: {result.shape}")
+>>> frame = signals['ch1'][: engine.config.nfft * engine.config.batch]
+>>> output = engine.process(frame)
+>>> print(f"Output shape: {output.shape}")
+>>> engine.close()
 ```
-
-## Troubleshooting
 
 ### Common Issues
 

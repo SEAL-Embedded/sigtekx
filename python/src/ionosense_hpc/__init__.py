@@ -81,6 +81,7 @@ _bootstrap_windows_dlls()
 # Import exceptions first (no dependencies)
 # Import configuration (minimal dependencies)
 from .config import EngineConfig, Presets
+from .core.engine import benchmark_latency, process_signal
 from .exceptions import (
     ConfigError,
     DeviceNotFoundError,
@@ -96,43 +97,36 @@ from .utils.device import current_device, device_info, gpu_count
 
 # Import core engine classes (requires _engine module)
 # Provide type-only imports for mypy and graceful runtime fallback.
+_ENGINE_AVAILABLE = False
+_ENGINE_ERROR = ""
+
 Engine: Any
-Processor: Any
-RawEngine: Any
 if TYPE_CHECKING:
     from .core import Engine as EngineType
-    from .core import Processor as ProcessorType
-    from .core import RawEngine as RawEngineType
+
 try:
     from .core import Engine as _Engine
-    from .core import Processor as _Processor
-    from .core import RawEngine as _RawEngine
-    Engine = _Engine  # runtime name
-    Processor = _Processor
-    RawEngine = _RawEngine
+    Engine = _Engine
     _ENGINE_AVAILABLE = True
 except (ImportError, DllLoadError) as e:
-    _ENGINE_AVAILABLE = False
     _ENGINE_ERROR = str(e)
 
     class _UnavailableEngineProxy:
-        def __init__(self, *args: Any, **kwargs: Any):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
             raise RuntimeError(
                 f"Engine not available: {_ENGINE_ERROR}\n"
-                f"Please ensure the package was built correctly:\n"
-                f"  Linux/WSL: ./scripts/cli.sh build\n"
-                f"  Windows: .\\scripts\\cli.ps1 build"
+                "Please ensure the package was built correctly:\n"
+                "  Linux/WSL: ./scripts/cli.sh build\n"
+                "  Windows: .\\scripts\\cli.ps1 build"
             )
 
     Engine = _UnavailableEngineProxy
-    Processor = _UnavailableEngineProxy
-    RawEngine = _UnavailableEngineProxy
-
     warnings.warn(
         f"C++ engine module could not be loaded: {_ENGINE_ERROR}",
         UserWarning,
         stacklevel=2,
     )
+
 
 
 """
@@ -156,9 +150,11 @@ __all__ = [
     "__standards__",
 
     # -- Core Engine --
-    "Processor",
     "Engine",
-    "RawEngine",
+
+    # -- Convenience --
+    "process_signal",
+    "benchmark_latency",
 
     # -- Config --
     "EngineConfig",
@@ -210,12 +206,13 @@ def show_versions(verbose: bool = True) -> dict:
     # Try to get CUDA version
     if _ENGINE_AVAILABLE:
         try:
-            # Re-import locally to avoid circular dependency issues if called before main import finishes
-            from .core import RawEngine
-            engine = RawEngine()
-            info = engine.get_runtime_info()
-            versions['cuda'] = info.get('cuda_version', 'Unknown')
-            versions['device'] = info.get('device_name', 'Unknown')
+            engine = Engine(Presets.validation())
+            try:
+                info = engine.device_info
+                versions['cuda'] = info.get('cuda_version', 'Unknown')
+                versions['device'] = info.get('device_name', 'Unknown')
+            finally:
+                engine.close()
         except Exception:
             versions['cuda'] = 'Error detecting'
             versions['device'] = 'Error detecting'
@@ -282,14 +279,14 @@ def self_test(verbose: bool = True) -> bool:
             print(f"   FAIL: {e}")
         all_passed = False
 
-    # Test 3: Try to create and initialize processor
+    # Test 3: Try to create and initialize engine
     if verbose:
-        print("3. Testing processor initialization...")
+        print("3. Testing engine initialization...")
+    engine = None
     try:
-        proc = Processor(Presets.validation())
-        proc.initialize()
+        engine = Engine(Presets.validation())
         if verbose:
-            print("   OK: Processor initialized")
+            print("   OK: Engine initialized")
     except Exception as e:
         if verbose:
             print(f"   FAIL: {e}")
@@ -301,10 +298,11 @@ def self_test(verbose: bool = True) -> bool:
         print("4. Testing signal processing...")
     try:
         import numpy as np
-        test_data = np.zeros(256, dtype=np.float32)  # Validation preset uses nfft=256, batch=1
-        output = proc.process(test_data)
+        test_data = np.zeros(engine.config.nfft * engine.config.batch, dtype=np.float32)
+        output = engine.process(test_data)
 
-        if output.shape != (1, 129):  # batch=1, bins=nfft/2+1
+        expected_shape = (engine.config.batch, engine.config.num_output_bins)
+        if output.shape != expected_shape:
             if verbose:
                 print(f"   FAIL: Unexpected output shape {output.shape}")
             all_passed = False
@@ -316,9 +314,8 @@ def self_test(verbose: bool = True) -> bool:
             print(f"   FAIL: {e}")
         all_passed = False
     finally:
-        # Ensure processor is cleaned up even if tests fail
-        if 'proc' in locals() and proc.is_initialized:
-            proc.reset()
+        if engine is not None:
+            engine.close()
 
     # Test 5: Check for NaN/Inf in output
     if 'output' in locals():

@@ -15,14 +15,14 @@ import numpy as np
 import pytest
 import yaml  # type: ignore[import-untyped]
 
+from ionosense_hpc import Engine
 from ionosense_hpc.benchmarks.base import (
     BenchmarkConfig,
     BenchmarkContext,
     BenchmarkResult,
 )
 from ionosense_hpc.config import EngineConfig, Presets
-from ionosense_hpc.core import Processor
-from ionosense_hpc.utils import make_test_batch
+from ionosense_hpc.utils import make_noise, make_test_batch
 
 # ============================================================================
 # Directory Management
@@ -79,6 +79,13 @@ def benchmark_base_config() -> BenchmarkConfig:
         verbose=False
     )
 
+
+@pytest.fixture
+def benchmark_config() -> EngineConfig:
+    """Provides an EngineConfig tailored for benchmarking."""
+    config = Presets.profiling()
+    config.enable_profiling = True
+    return config
 
 @pytest.fixture
 def benchmark_context() -> BenchmarkContext:
@@ -171,46 +178,41 @@ def yaml_sweep_config(temp_data_dir: Path) -> Path:
 
 
 # ============================================================================
-# Processor and Engine Fixtures
+# Engine Fixtures
 # ============================================================================
 
 @pytest.fixture
-def test_processor(validation_config: EngineConfig) -> Generator[Processor, None, None]:
-    """Yields an initialized Processor instance with automatic resource cleanup."""
-    proc = Processor(validation_config, auto_init=True)
+def test_engine(validation_config: EngineConfig) -> Generator[Engine, None, None]:
+    """Yields an initialized Engine instance with automatic resource cleanup."""
+    engine = Engine(validation_config)
     try:
-        yield proc
+        yield engine
     finally:
-        proc.reset()
+        engine.close()
 
 
 @pytest.fixture
-def mock_processor(monkeypatch) -> Processor:
-    """Provides a mock processor that doesn't require GPU."""
+def mock_engine(monkeypatch) -> Engine:
+    """Provides a mock Engine that doesn't require GPU."""
 
-    class MockProcessor:
-        def __init__(self, config=None):
+    class MockEngine:
+        def __init__(self, config=None, **_):
             self.config = config or Presets.validation()
-            self._initialized = False
-
-        def initialize(self):
-            self._initialized = True
+            self.is_initialized = True
 
         def process(self, data):
-            # Return mock FFT output
             batch = self.config.batch
             bins = self.config.num_output_bins
             return np.random.randn(batch, bins).astype(np.float32)
 
+        def close(self):
+            self.is_initialized = False
+
         def reset(self):
-            self._initialized = False
+            self.is_initialized = False
 
-        @property
-        def is_initialized(self):
-            return self._initialized
-
-    monkeypatch.setattr("ionosense_hpc.core.Processor", MockProcessor)
-    return cast(Processor, MockProcessor())
+    monkeypatch.setattr("ionosense_hpc.Engine", MockEngine)
+    return cast(Engine, MockEngine())
 
 
 # ============================================================================
@@ -241,6 +243,11 @@ def test_batch_data() -> np.ndarray:
     """Generates standard dual-channel batch data for testing."""
     return cast(np.ndarray, make_test_batch(nfft=1024, batch=2, signal_type='sine', frequency=1000, seed=42))
 
+
+@pytest.fixture
+def test_noise_data() -> np.ndarray:
+    """Generates white noise data for validation."""
+    return cast(np.ndarray, make_noise(duration=0.1, sample_rate=48000, amplitude=1.0, seed=42, dtype=np.float32))
 
 @pytest.fixture
 def test_signal_suite(seeded_rng: np.random.Generator) -> dict[str, np.ndarray]:

@@ -296,7 +296,7 @@ class BenchmarkSuite:
     def _generate_report(self):
         """Generate comprehensive report using the reporting module."""
         try:
-            from ionosense_hpc.benchmarks.reporting import BenchmarkReport, ReportConfig
+            from ionosense_hpc.utils.reporting import BenchmarkReport, ReportConfig
 
             report_config = ReportConfig(
                 title=f"{self.config.name} - Benchmark Report",

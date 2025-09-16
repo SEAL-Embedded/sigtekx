@@ -570,7 +570,7 @@ iono report results/ --type comparative
 ### Programmatic Reporting
 
 ```python
-from ionosense_hpc.benchmarks.reporting import BenchmarkReport, ReportConfig
+from ionosense_hpc.utils.reporting import BenchmarkReport, ReportConfig
 
 config = ReportConfig(
     title="Performance Evaluation Report",
