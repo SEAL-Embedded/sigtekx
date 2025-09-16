@@ -333,12 +333,12 @@ class ValidationHelper:
     ) -> dict[str, Any]:
         """
         Compare two distributions for statistical difference.
-        
+
         Args:
             data1: First dataset
             data2: Second dataset
             test: Statistical test ('ks', 'mw', 'ttest')
-            
+
         Returns:
             Test results dictionary
         """

@@ -1,217 +1,122 @@
 # Project Structure
 
-Complete layout of the ionosense-hpc-lib codebase with documentation links.
+Complete layout of the ionosense-hpc-lib codebase with documentation links tailored to the current repository state.
 
 ## Directory Tree
 
 ```
 ionosense-hpc-lib/
-│
-├── bindings/                   # C++/Python binding configurations
-│   └── bindings.cpp              # pybind11 entrypoint, exposes C++ research engine to Python
-│
-├── include/                    # C++ public headers
-│   └── ionosense/                # Main library header directory
-│       ├── cuda_wrappers.hpp     # RAII wrappers for CUDA/cuFFT resources (streams, events, handles)
-│       ├── processing_stage.hpp  # Abstract interface for processing stages
-│       └── research_engine.hpp   # Public C++ API for the research engine
-│
-├── src/                        # C++ source code implementations
-│   ├── ops_fft.cu                # CUDA kernels for windowing and magnitude calculations
-│   ├── processing_stage.cpp      # Implementations for concrete processing stages
-│   └── research_engine.cpp       # ResearchEngine implementation details
-│
-├── tests/                        # C++ unit tests
-│
-│
-│
-├── python/                   # Python package source and tests
-│   ├── src/                    # Source code for the Python package
-│   │   └── ionosense_hpc/        # The main Python package
-│   │       ├── __init__.py       # Initializes the Python package
-│   │       ├── __version__.py    # Defines the package version
-│   │       ├── exceptions.py     # Custom exception types for the library
-│   │       │
-│   │       ├── benchmarks/       # Performance benchmarking tools
-│   │       │   ├── __init__.py     # Makes benchmarks a sub-package
-│   │       │   ├── accuracy.py     # Accuracy benchmark scripts
-│   │       │   ├── latency.py      # Latency measurement scripts
-│   │       │   ├── realtime.py     # Real-time performance tests
-│   │       │   ├── suite.py        # Main benchmarking suite runner
-│   │       │   └── throughput.py   # Throughput measurement scripts
-│   │       │
-│   │       ├── config/           # Configuration management
-│   │       │   ├── __init__.py     # Makes config a sub-package
-│   │       │   ├── presets.py      # Pre-defined configuration presets
-│   │       │   ├── schemas.py      # Validation schemas for configurations
-│   │       │   └── validation.py   # Configuration validation logic
-│   │       │
-│   │       ├── core/             # Core Python logic wrapping the C++ library
-│   │       │   ├── __init__.py     # Makes core a sub-package
-│   │       │   ├── engine.py       # High-level Python engine interface
-│   │       │   ├── processor.py    # Main processor class for data handling
-│   │       │   └── raw_engine.py   # Low-level wrapper around the C++ engine
-│   │       │
-│   │       ├── stages/           # Python representations of processing stages
-│   │       │   ├── __init__.py     # Makes stages a sub-package
-│   │       │   ├── definitions.py  # Definitions of available stages
-│   │       │   └── registry.py     # Registry for managing stages
-│   │       │
-│   │       ├── testing/          # Utilities for testing the Python code
-│   │       │   ├── __init__.py     # Makes testing a sub-package
-│   │       │   ├── fixtures.py     # Pytest fixtures for tests
-│   │       │   └── validators.py   # Data validation helpers for tests
-│   │       │
-│   │       └── utils/            # Utility functions
-│   │           ├── __init__.py     # Makes utils a sub-package
-│   │           ├── device.py       # GPU device management utilities
-│   │           ├── logging.py      # Logging configuration
-│   │           ├── profiling.py    # Performance profiling tools
-│   │           ├── reporting.py    # Result reporting utilities
-│   │           └── signals.py      # Signal generation and processing tools
-│   │       
-│   │
-│   └── tests/                    # Python unit and integration tests
-│       ├── conftest.py             # Pytest configuration and shared fixtures
-│       ├── ...
-│       └── test_*.py               # Tests for python
-│
-│
-│
-├── research/              # Experiments, analysis, and reports
-│   ├── notebooks/           # Exploratory notebooks and visualizations
-│   ├── data/                # Datasets for experiments
-│   │   ├── raw/               # Original, immutable data sources
-│   │   └── processed/         # Cleaned, transformed, or feature-engineered data
-│   │
-│   ├── experiments/         # Reproducible experiment scripts
-│   ├── results/             # Output from experiments (plots, tables, models)
-│   │   ├── figures/           # Generated plots and visualizations
-│   │   ├── tables/            # Tabular data and summary statistics
-│   │   └── models/            # Saved, trained model artifacts
-│   │
-│   ├── reports/             # Project reports, papers, and presentations
-│   └── configs/             # Configuration files for experiments & benchmarks
-│
-│
-│
-├── scripts/                    # Command-line interface and utility scripts
-│   ├── cli.ps1                   # PowerShell CLI script for Windows
-│   ├── cli.sh                    # Bash CLI script for Linux/macOS
-│   └── start-devshell-x64.ps1    # Script to initialize the development environment on Windows
-│
-├── .github/                  # GitHub-specific files
-│   └── workflows/              # Continuous integration workflows
-│       └── ci.yml                # CI pipeline for building and testing
-│
-├── docs/                       # Project documentation
-│   ├── BENCHMARKS.md             # Documentation on performance benchmarks
-│   └── DEVELOPMENT.md            # Guide for developers contributing to the project
-│
-├── environments/                 # Conda environment configuration files
-│   └── environment.*.yml
-│
-├── .dockerignore                 # Specifies files to ignore in Docker builds
-├── .gitignore                    # Specifies files for Git to ignore
-├── CMakeLists.txt                # Root CMake build script
-├── CMakePresets.json             # Presets for CMake configuration
-├── Dockerfile                    # Docker configuration for containerization
-├── PROJECT_STRUCTURE.md          # This file, the project structure overview
-├── README.md                     # Main project README with overview and setup instructions
-└── pyproject.toml                # Python project configuration (PEP 518)
+|-- .github/                # CI workflows, composite actions, issue templates
+|-- .guide/                 # Reference PDFs and legacy CUDA samples for context
+|-- .ionosense/             # Tooling state (ruff reports, session logs)
+|-- build/                  # Generated artefacts (benchmarks, reports, build presets)
+|-- cpp/                    # C++17/CUDA sources, bindings, and tests
+|   |-- bindings/           # pybind11 bridge exposing the research engine
+|   |-- include/ionosense/  # Public headers and CUDA resource wrappers
+|   |-- src/                # Engine implementation, CUDA kernels, helpers
+|   `-- tests/              # C++ test suite (gtest/CTest presets)
+|-- docs/                   # Project documentation (API, development, benchmarking)
+|-- environments/           # Conda environment definitions per workflow
+|-- python/                 # Python package and tests
+|   |-- src/ionosense_hpc/  # User facing package (benchmarks, config, core, utils)
+|   `-- tests/              # Pytest suite (unit, integration, gpu markers)
+|-- research/               # Reproducible experiments, notebooks, data management
+|-- scripts/                # Cross platform CLI wrappers and profiling helpers
+|-- AGENTS.md               # Agent operations guide
+|-- accuracy_debug_plan.md  # Investigation notes for current performance work
+|-- CMakeLists.txt          # Top level CMake configuration
+|-- CMakePresets.json       # Preset builds for host toolchains
+|-- CONTRIBUTING.md         # Contribution workflow and review expectations
+|-- Dockerfile              # Container recipe for CI/local parity
+|-- PROJECT_STRUCTURE.md    # This document
+|-- README.md               # High level introduction and quick start
+|-- pyproject.toml          # Python packaging, lint, and test configuration
 ```
 
-## Component Map
-
-<p align="center">
-  <img src="./docs/.components-map.svg" alt="Component Map" height="2000" width="2000"/>
-</p>
-
-### another diagram, just the code structure
-
-<p align="center">
-  <img src="./docs/.software-architecture.svg" alt="Component Map" height="1000" width="800"/>
-</p>
-
-### and now c++/cuda source architecture
-
-<p align="center">
-  <img src="./docs/.cuda-structure.svg" alt="Component Map" height="2000" width="2000"/>
-</p>
-
-
-## Key Files
-
-### Configuration Files
-
-| File | Purpose |
-|------|---------|
-| `CMakeLists.txt` | Main build configuration |
-| `CMakePresets.json` | Platform-specific build presets |
-| `environment.linux.yml` | Linux Conda environment |
-| `environment.win.yml` | Windows Conda environment |
-| `pyproject.toml` | Python package metadata |
-
-### Core Implementation
-
-| File | Lines | Purpose |
-|------|-------|---------|
-| `src/fft_engine.cpp` | ~400 | Stream management, memory, graphs |
-| `src/ops_fft.cu` | ~100 | CUDA kernel implementations |
-| `bindings/bindings.cpp` | ~120 | Python bindings |
-| `include/ionosense/fft_engine.hpp` | ~80 | Public C++ API |
-
-### Scripts
-
-| Script | Command Examples |
-|--------|------------------|
-| `cli.sh` | `./scripts/cli.sh build`<br/>`./scripts/cli.sh test`<br/>`./scripts/cli.sh bench raw_throughput` |
-| `cli.ps1` | `.\scripts\cli.ps1 setup`<br/>`.\scripts\cli.ps1 profile nsys realtime` |
-
-## Build Outputs
-
-### Linux Build (`build/linux-rel/`)
+### C++ Library (cpp/)
 ```
-build/linux-rel/
-├── compile_commands.json    # For IDE integration
-├── test_engine             # C++ test executable
-└── CMakeCache.txt          # CMake configuration cache
+cpp/
+|-- bindings/
+|   |-- bindings.cpp        # pybind11 module entrypoint
+|   `-- README.md           # Binding layer documentation
+|-- include/ionosense/
+|   |-- cuda_wrappers.hpp   # RAII wrappers for CUDA/cuFFT handles
+|   |-- processing_stage.hpp# Abstract interfaces for processing stages
+|   |-- research_engine.hpp # Public API surface for ResearchEngine
+|   `-- README.md           # Header level design notes
+|-- src/
+|   |-- ops_fft.cu          # CUDA kernels for FFT and spectral ops
+|   |-- processing_stage.cpp# Stage implementations
+|   |-- research_engine.cpp # Core engine logic
+|   `-- README.md           # Implementation details and module map
+|`-- tests/                 # C++ tests executed via CTest presets
 ```
 
-### Windows Build (`build/windows-rel/`)
+### Python Package (python/src/ionosense_hpc)
 ```
-build/windows-rel/
-├── test_engine.exe         # C++ test executable
-├── Release/
-└── CMakeCache.txt
+python/src/ionosense_hpc/
+|-- __init__.py             # Package exports
+|-- __version__.py          # Semantic version string (synced with CMake/Python)
+|-- exceptions.py           # Domain specific exception hierarchy
+|-- benchmarks/             # Benchmark orchestration and CLI entrypoints
+|-- config/                 # Presets, schema validation, config loaders
+|-- core/                   # High level engine wrappers around the C++ module
+|-- stages/                 # Stage registry and dynamic composition helpers
+|-- testing/                # Fixtures, validators, GPU markers for pytest
+|-- utils/                  # Device management, logging, profiling, reporting helpers
+|-- .libs/                  # Platform dependent shared libraries shipped with wheels
+`-- py.typed                # Marks package as PEP 561 typed
 ```
 
-### Python Module Location
+### Research Assets (research/)
 ```
-python/ionosense_hpc/core/
-├── _engine.so              # Linux
-└── _engine.pyd             # Windows
+research/
+|-- configs/                # Experiment YAML configurations
+|-- data/
+|   |-- raw/                # Immutable source datasets
+|   `-- processed/          # Derived data products committed to experiments
+|-- dsp_course/             # Reference material and courseware experiments
+|-- experiments/            # Reproducible scripts coordinating CLI + notebooks
+|-- notebooks/              # Exploratory analysis (Jupyter)
+`-- results/                # Generated figures, tables, and reports
 ```
+
+### Build Outputs
+```
+build/
+|-- benchmark_results/      # Summary CSV/JSON from CLI benchmark runs
+|-- experiments/            # Research experiment artefacts staged by CLI
+|-- nsight_reports/         # Nsight Systems/Compute traces
+|-- reports/                # Lint, coverage, and QA summaries
+`-- windows-rel/            # Latest Windows release build (CTest + binaries)
+```
+
+### Python Module Artefacts
+Shared objects produced by builds land in `python/src/ionosense_hpc/core/`. Expect `_engine.pyd` on Windows and `_engine.so` on Linux/WSL.
 
 ## Development Workflow
 
 ### 1. Environment Setup
 ```bash
-# Linux
+# Linux / WSL2
 ./scripts/cli.sh setup
 conda activate ionosense-hpc
 
-# Windows
-.\scripts\cli.ps1 setup
+# Windows (PowerShell)
+./scripts/cli.ps1 setup
 conda activate ionosense-hpc
+
+# Windows with enhanced shell
+./scripts/open_dev_pwsh.ps1
+iono setup
 ```
 
 ### 2. Build
 ```bash
-# Full build
+# Default release build
 ./scripts/cli.sh build
 
-# Debug build
+# Debug preset
 ./scripts/cli.sh build linux-debug
 
 # Clean rebuild
@@ -220,88 +125,127 @@ conda activate ionosense-hpc
 
 ### 3. Test
 ```bash
-# All tests
+# Full suite (Python + C++)
 ./scripts/cli.sh test
 
-# C++ only
-ctest --preset linux-tests
-
 # Python only
-pytest python/tests -v
+./scripts/cli.sh test py
+
+# C++ only (CTest preset)
+./scripts/cli.sh test cpp
 ```
 
-### 4. Benchmark
+### 4. Quality Gates
 ```bash
-# List benchmarks
-./scripts/cli.sh list benchmarks
+# Format C++ code (clang-format)
+./scripts/cli.sh format
 
-# Run benchmark
-./scripts/cli.sh bench raw_throughput -n 4096
+# Lint Python + C++
+./scripts/cli.sh lint
 
-# Profile
-./scripts/cli.sh profile nsys raw_throughput
+# Type-check Python (mypy)
+./scripts/cli.sh typecheck
+
+# Aggregate quality checks
+./scripts/cli.sh check
+```
+
+### 5. Benchmark & Profile
+```bash
+# Run benchmark suite
+./scripts/cli.sh bench suite
+
+# Launch Nsight Systems profile (example target)
+./scripts/cli.sh profile nsys latency
+
+# Parameter sweep experiment
+./scripts/cli.sh sweep research/configs/sweep_experiment.yaml
 ```
 
 ## Documentation Index
 
 | Document | Audience | Purpose |
 |----------|----------|---------|
-| [README.md](README.md) | Everyone | Project overview, quick start |
-| [src/README.md](src/README.md) | C++ Developers | Source code architecture |
-| [bindings/README.md](bindings/README.md) | Binding Developers | Python interface details |
-| [python/README.md](python/README.md) | Python Users | API usage guide |
-| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Contributors | Development guide |
-| [docs/BENCHMARKS.md](docs/BENCHMARKS.md) | Researchers | Performance methodology |
+| [README.md](README.md) | Everyone | Overview, requirements, quick start |
+| [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) | Contributors | Repository map (this file) |
+| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Contributors | Detailed development workflow |
+| [docs/BENCHMARKING.md](docs/BENCHMARKING.md) | Researchers | Benchmark methodology and KPIs |
+| [docs/API.md](docs/API.md) | Integrators | Python API reference |
+| [cpp/include/ionosense/README.md](cpp/include/ionosense/README.md) | C++ Developers | Public API design |
+| [cpp/src/README.md](cpp/src/README.md) | C++ Developers | Implementation notes |
+| [cpp/bindings/README.md](cpp/bindings/README.md) | Binding Engineers | Python bridge specifics |
+| [python/README.md](python/README.md) | Python Users | Package usage and tips |
 
 ## Git Workflow
 
 ### Branch Structure
 ```
 main            # Stable releases
-├── develop     # Integration branch
-├── feature/*   # New features
-├── fix/*       # Bug fixes
-└── perf/*      # Performance improvements
+`-- feature/*   # Feature, fix, perf, and docs branches (named with purpose)
 ```
 
 ### Commit Convention
 ```
 type(scope): description
 
-- feat: New feature
-- fix: Bug fix
-- perf: Performance improvement
-- docs: Documentation
-- test: Testing
-- build: Build system
+Accepted types: feat, fix, perf, docs, test, build, ci, chore
 ```
+
+Reference issues or research tickets in commit messages when applicable to maintain traceability.
 
 ## Dependencies
 
-### Build Dependencies
-- CMake ≥3.26
-- CUDA Toolkit ≥12.0
-- C++17 compiler (GCC 11+, MSVC 2022)
+### Build-Time
+- CMake >= 3.26
+- CUDA Toolkit >= 13.0 (matching driver support)
+- C++17 compiler (GCC 11+, Clang 15+, MSVC 2022)
 - Python 3.11
+- Conda/mamba for environment management (via CLI)
 
-### Runtime Dependencies
-- CUDA driver ≥525
-- cuFFT library
-- NumPy ≥1.24
+### Runtime
+- NVIDIA GPU with compute capability 6.0+
+- CUDA driver >= 550
+- cuFFT 13.x runtime libraries
+- NumPy 1.26.x
 
-### Python Dependencies
-```
-numpy           # Array operations
-pybind11        # C++ bindings
-pytest          # Testing
-tqdm            # Progress bars
-```
+### Python Package Core Dependencies
+- numpy==1.26.4
+- scipy==1.13.0
+- pydantic>=2.0
+- pynvml>=11.5
 
-## Performance Targets
+### Python Dev Extras
+- pytest>=8.0, pytest-xdist, pytest-timeout, pytest-cov
+- ruff>=0.4
+- mypy>=1.10
 
-| Metric | Target | Current |
-|--------|--------|---------|
-| Latency (dual FFT) | <110 μs | ~180 μs |
-| Throughput (4K FFT) | >1M/s | 1.2M/s |
-| Memory Transfer | <40% time | 38% |
-| RMS Error | <1e-5 | 8.3e-6 |
+## Performance Targets (Current)
+
+| Metric | Target | Notes |
+|--------|--------|-------|
+| Dual FFT latency | < 110 us | Measured with research preset on RTX 6000 Ada |
+| 4K FFT throughput | > 1.0 M FFT/s | Bench suite `throughput` scenario |
+| Memory transfer ratio | < 40% total time | Maintain overlap with compute |
+| RMS error | < 1e-5 | Compared against double precision reference |
+
+## Output Artefacts
+- Generated content remains under `build/` (configurable via `IONO_OUTPUT_ROOT`).
+- Benchmark CSVs/plots: `build/benchmark_results/`
+- Experiment dumps: `build/experiments/`
+- QA reports (lint, coverage): `build/reports/`
+- Profiling traces: `build/nsight_reports/`
+
+## Tooling Notes
+- Use `./scripts/cli.sh doctor` or `iono doctor` to validate environments.
+- GPU heavy pytest marked with `gpu`; enable via `./scripts/cli.sh test py -- --gpu`.
+- Clear caches with CLI helpers: `./scripts/cli.sh clean --caches`.
+- CTest presets defined in `CMakePresets.json` (`linux-debug`, `linux-rel`, `windows-rel`).
+
+## Related Standards & Practices
+- Research Software Engineering (RSE) guidelines govern documentation, testing, and reproducibility.
+- Requirements Engineering principles applied via issue templates and CONTRIBUTING checklist.
+- IEEE 1074 guides lifecycle activities (planning, verification, maintenance) enforced in docs and CI gates.
+- IEEE 754 considerations documented in benchmarking + validation routines; avoid precision regressions without review.
+
+## Update History
+- 2025-09-15: Synchronized structure with `cpp/`, refreshed dependency constraints, and aligned workflow commands with CLI scripts.
