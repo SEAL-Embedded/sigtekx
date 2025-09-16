@@ -73,15 +73,6 @@
 - **Core Python deps**: `numpy==1.26.4`, `scipy==1.13.0`, `pydantic>=2.0`, `pynvml>=11.5` (see `pyproject.toml`).
 - **Conda channels**: `nvidia`, `conda-forge` with strict priority; environment specs live in `environments/`.
 
-## Non-Interactive Environment Bootstrap
-- Run PowerShell commands in a single invocation so the conda activation persists for the task.
-- Load conda into the session: `& 'C:/Users/kevin/miniconda3/shell/condabin/conda-hook.ps1'`.
-- Activate the research env: `conda activate ionosense-hpc` (brings cmake/ninja/python onto PATH).
-- Chain the desired command after activation, e.g.:
-  - `pwsh -Command "& 'C:/Users/kevin/miniconda3/shell/condabin/conda-hook.ps1'; conda activate ionosense-hpc; .\scripts\cli.ps1 doctor"`
-  - `pwsh -Command "& 'C:/Users/kevin/miniconda3/shell/condabin/conda-hook.ps1'; conda activate ionosense-hpc; pytest python/tests -k smoke"`
-- Prefer `scripts/cli.ps1` targets (`build`, `test`, `lint`, `check`, `bench`, `profile`) once activated; raw tools like `ruff`, `mypy`, `pytest`, `cmake`, or `ninja` also work within the same call.
-- Use this recipe whenever an agent needs to run cleanup (`cli.ps1 clean`), builds, benches, or profiling without launching the interactive `open_dev_pwsh.ps1` shell.
 ## Data, Artefacts, and Environment
 - Outputs belong under `build/` (default via `IONO_OUTPUT_ROOT`); do not commit generated results.
 - Research artefacts live in `research/` with raw versus processed data separation; respect immutability of `research/data/raw/` inputs.
