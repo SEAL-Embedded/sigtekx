@@ -6,7 +6,7 @@ Deliver an ordered walkthrough that links to concrete files, explains why each s
 ---
 
 ## 1. Orientation Docs
-- [README.md](README.md), [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md), [pyproject.toml](pyproject.toml)  
+- [README.md](README.md), [PROJECT_STRUCTURE.md](../PROJECT_STRUCTURE.md), [pyproject.toml](../pyproject.toml)  
   Skim these first to anchor terminology, CLI workflows, and dependency expectations before diving into modules.
 
 ---
@@ -224,6 +224,6 @@ Reading this taxonomy early helps you quickly interpret validation failures, run
 ---
 
 ## 10. Usage Examples
-- Explore [tests/](tests/) and referenced notebooks in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)  
+- Explore [tests/](tests/) and referenced notebooks in [~/docs/DEVELOPMENT.md](../docs/DEVELOPMENT.md)  
   These provide idiomatic usage, parameter combinations, and expected behaviours once the library is understood.
 
