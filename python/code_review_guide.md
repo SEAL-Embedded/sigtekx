@@ -12,7 +12,7 @@ Deliver an ordered walkthrough that links to concrete files, explains why each s
 ---
 
 ## 2. Package Entry Point
-- [python/src/ionosense_hpc/__init__.py](python/src/ionosense_hpc/__init__.py)  
+- [src/ionosense_hpc/__init__.py](src/ionosense_hpc/__init__.py)  
   This file sets the foundation for the whole package:
   - **DLL bootstrapping**: Ensures required Windows DLLs and CUDA toolkit libraries are discoverable before the C++ engine loads.
   - **Engine handling**: Wraps the import of the C++ extension (`_engine`) in a resilient way—falling back to a proxy class with clear error messages if the build or DLLs are missing.
@@ -24,7 +24,7 @@ These helpers provide crucial early checks and context—make sure to run them w
 ---
 
 ## 3. Error Surface
-- [python/src/ionosense_hpc/exceptions.py](python/src/ionosense_hpc/exceptions.py)  
+- [src/ionosense_hpc/exceptions.py](src/ionosense_hpc/exceptions.py)  
   Establishes a rich hierarchy of domain-specific exceptions that surface errors consistently across the stack:
   - **Base class**: `IonosenseError` unifies all error types with optional `hint` and structured context.
   - **Configuration & validation**: `ConfigError`, `ValidationError` guide misconfigurations or schema mismatches.
@@ -37,20 +37,20 @@ Reading this taxonomy early helps you quickly interpret validation failures, run
 ---
 
 ## 4. Configuration Backbone
-- [python/src/ionosense_hpc/config/schemas.py](python/src/ionosense_hpc/config/schemas.py)  
+- [src/ionosense_hpc/config/schemas.py](src/ionosense_hpc/config/schemas.py)  
   **What it defines:** The canonical `EngineConfig` (Pydantic v2) with strict types, assignment-time validation, and computed properties used throughout the stack.  
   **Key validators & props:** power-of-two `nfft`; model-level memory guard; computed `hop_size`, `num_output_bins`, `frame_duration_ms`, `hop_duration_ms`, `effective_fps`, `memory_estimate_mb`; and research metadata (`experiment_id`, `tags`, `notes`).
 
-- [python/src/ionosense_hpc/config/validation.py](python/src/ionosense_hpc/config/validation.py)  
+- [src/ionosense_hpc/config/validation.py](src/ionosense_hpc/config/validation.py)  
   **What it enforces:** NumPy-first checks to catch config/data issues before CUDA does.  
   **Read in this order & why:** (1) `validate_config_device_compatibility` (headroom/compute-capability), (2) `estimate_memory_usage_mb` (buffer/workspace model), (3) `validate_input_array` (dtype/shape/contiguity/NaN-Inf), (4) `validate_batch_size` (buffers == `batch*nfft`).
 
-- [python/src/ionosense_hpc/config/presets.py](python/src/ionosense_hpc/config/presets.py)  
+- [src/ionosense_hpc/config/presets.py](src/ionosense_hpc/config/presets.py)  
   **Why it matters:** Shared mental model for benchmark modes.  
   **Presets:** `realtime()` (tight deadlines, profiling off), `throughput()` (big `nfft`/`batch`), `validation()` (deterministic, profiling on), `profiling()` (balanced to expose compute/memory).  
   **Tip:** `Presets.custom(**overrides)` for PR-specific experiments without drifting defaults.
 
-- [python/src/ionosense_hpc/config/__init__.py](python/src/ionosense_hpc/config/__init__.py)  
+- [src/ionosense_hpc/config/__init__.py](src/ionosense_hpc/config/__init__.py)  
   Collects the public surface (`EngineConfig`, `Presets`, validation helpers) so callers don’t import deep internals.
 
 **Reviewer checklist**  
@@ -64,28 +64,28 @@ Reading this taxonomy early helps you quickly interpret validation failures, run
 ## 5. Utility Layer
 **Why this matters:** these helpers are the glue—paths, logging, device detection, profiling, signals, benchmark/report utilities. If they’re misunderstood, reviewers waste cycles on boilerplate rather than core changes.
 
-- [python/src/ionosense_hpc/utils/paths.py](python/src/ionosense_hpc/utils/paths.py)  
+- [src/ionosense_hpc/utils/paths.py](src/ionosense_hpc/utils/paths.py)  
   *Manages output directories and file naming.* Defaults land under `build/` but can be overridden by env vars. Ensures reproducible run layouts, avoids cluttering repo root.
 
-- [python/src/ionosense_hpc/utils/logging.py](python/src/ionosense_hpc/utils/logging.py)  
+- [src/ionosense_hpc/utils/logging.py](src/ionosense_hpc/utils/logging.py)  
   *Centralized logging.* Provides `get_logger()` wrapper with levels controlled by `IONO_LOG_LEVEL`. Ensures consistent formatting across CLI, tests, and benchmarks.
 
-- [python/src/ionosense_hpc/utils/device.py](python/src/ionosense_hpc/utils/device.py)  
+- [src/ionosense_hpc/utils/device.py](src/ionosense_hpc/utils/device.py)  
   *CUDA/NVML info and fallbacks.* Wraps `pynvml` and CUDA APIs to query device count, memory, and capabilities. Falls back gracefully on CPU-only machines so tests and docs don’t crash.
 
-- [python/src/ionosense_hpc/utils/profiling.py](python/src/ionosense_hpc/utils/profiling.py)  
+- [src/ionosense_hpc/utils/profiling.py](src/ionosense_hpc/utils/profiling.py)  
   *NVTX decorators and ranges.* Annotates hot paths for Nsight Systems/Compute. Exports safe no-op fallbacks when NVTX isn’t available, so code runs in any env.
 
-- [python/src/ionosense_hpc/utils/benchmark_utils.py](python/src/ionosense_hpc/utils/benchmark_utils.py)  
+- [src/ionosense_hpc/utils/benchmark_utils.py](src/ionosense_hpc/utils/benchmark_utils.py)  
   *Benchmark helpers.* Standardizes seeding, deterministic data generation, result archiving. Key for reproducible RSE/RE‑aligned benchmarks.
 
-- [python/src/ionosense_hpc/utils/signals.py](python/src/ionosense_hpc/utils/signals.py)  
+- [src/ionosense_hpc/utils/signals.py](src/ionosense_hpc/utils/signals.py)  
   *Synthetic signal generators.* Provides sine, noise, and composite test vectors with seeded RNG. Used across fixtures, validation, and benchmarks.
 
-- [python/src/ionosense_hpc/utils/reporting.py](python/src/ionosense_hpc/utils/reporting.py)  
+- [src/ionosense_hpc/utils/reporting.py](src/ionosense_hpc/utils/reporting.py)  
   *Report generation.* Produces PDF/HTML/Markdown summaries of benchmarks. Integrates plots, stats, and metadata for publication or CI artifacts.
 
-- [python/src/ionosense_hpc/utils/__init__.py](python/src/ionosense_hpc/utils/__init__.py)  
+- [src/ionosense_hpc/utils/__init__.py](src/ionosense_hpc/utils/__init__.py)  
   *Namespace management.* Re-exports key helpers and implements lazy import wrappers to reduce startup overhead.
 
 **Reviewer checklist**  
@@ -100,7 +100,7 @@ Reading this taxonomy early helps you quickly interpret validation failures, run
 ------
 
 ## 6. Core Engine Wrapper
-- [python/src/ionosense_hpc/core/engine.py](python/src/ionosense_hpc/core/engine.py)  
+- [src/ionosense_hpc/core/engine.py](src/ionosense_hpc/core/engine.py)  
   **Purpose:** A thin, explicit Python wrapper around the C++ `ResearchEngine` with NumPy-friendly I/O and a strict lifecycle (Created → Initialized → Closed).
 
 **Key concepts to review**  
@@ -115,7 +115,7 @@ Reading this taxonomy early helps you quickly interpret validation failures, run
 - **Class helpers**: `get_available_devices()` / `select_best_device()` proxy C++ queries and degrade gracefully.  
 - **One-shot APIs**: `process_signal(data, config)`; `benchmark_latency(config, iterations, data_size)` for quick sanity checks.
 
-- [python/src/ionosense_hpc/core/__init__.py](python/src/ionosense_hpc/core/__init__.py) — re-exports `Engine` for stable imports.
+- [src/ionosense_hpc/core/__init__.py](src/ionosense_hpc/core/__init__.py) — re-exports `Engine` for stable imports.
 
 **Reviewer checklist**  
 - Do preset defaults still match their intent when routed through `_process_config`?  
@@ -127,9 +127,9 @@ Reading this taxonomy early helps you quickly interpret validation failures, run
 ---
 
 ## 7. Pipeline Metadata
-- **Stage definitions:** [python/src/ionosense_hpc/stages/definitions.py](python/src/ionosense_hpc/stages/definitions.py)  
-- **Stage registry:** [python/src/ionosense_hpc/stages/registry.py](python/src/ionosense_hpc/stages/registry.py)  
-- **Public surface:** [python/src/ionosense_hpc/stages/__init__.py](python/src/ionosense_hpc/stages/__init__.py)
+- **Stage definitions:** [src/ionosense_hpc/stages/definitions.py](src/ionosense_hpc/stages/definitions.py)  
+- **Stage registry:** [src/ionosense_hpc/stages/registry.py](src/ionosense_hpc/stages/registry.py)  
+- **Public surface:** [src/ionosense_hpc/stages/__init__.py](src/ionosense_hpc/stages/__init__.py)
 
 **Reviewer checklist**  
 - If a PR adds a new stage, is it named in `StageType` and documented in `STAGE_METADATA`?  
@@ -142,41 +142,41 @@ Reading this taxonomy early helps you quickly interpret validation failures, run
 ## 8. Benchmarking Stack
 **What this section gives you:** a unified, RSE/RE-friendly way to run reliable, repeatable benchmarks with NVTX traces, context capture, and standardized stats.
 
-**Core primitives —** [benchmarks/base.py](python/src/ionosense_hpc/benchmarks/base.py)  
+**Core primitives —** [benchmarks/base.py](src/ionosense_hpc/benchmarks/base.py)  
 - `BenchmarkContext` captures full environment (platform, CUDA devices, git state, package versions) and computes a deterministic `environment_hash` for traceability.  
 - `BenchmarkConfig` centralizes iterations/warmups, confidence/outlier controls, determinism (`seed`, `deterministic`), GPU requirements, and output toggles.  
 - `BaseBenchmark` lifecycle: `setup()` → repeated `execute_iteration()` → `teardown()` with `_setup_reproducibility()` (env vars like `CUBLAS_WORKSPACE_CONFIG`) and NVTX helpers (`setup_range`, `benchmark_range`, etc.).
 
-**Latency —** [benchmarks/latency.py](python/src/ionosense_hpc/benchmarks/latency.py)  
+**Latency —** [benchmarks/latency.py](src/ionosense_hpc/benchmarks/latency.py)  
 - End-to-end latency (µs) with pre/post GPU sync; CPU-timed fallback until GPU events are exposed.  
 - Tracks jitter and deadline compliance (`deadline_us`); placeholders for component timing.  
 - Deterministic test data via `make_test_batch`; engine from `Presets.realtime()`.
 
-**Realtime —** [benchmarks/realtime.py](python/src/ionosense_hpc/benchmarks/realtime.py)  
+**Realtime —** [benchmarks/realtime.py](src/ionosense_hpc/benchmarks/realtime.py)  
 - Simulates streaming with strict frame deadlines (defaults to `hop_duration_ms`), busy-wait or sleep timing, and drop-frame protection (`drop_frame_threshold`).  
 - Emits processed/dropped frames, deadline misses, mean/max latency, jitter, and compliance rate.
 
-**Throughput & scaling —** [benchmarks/throughput.py](python/src/ionosense_hpc/benchmarks/throughput.py)  
+**Throughput & scaling —** [benchmarks/throughput.py](src/ionosense_hpc/benchmarks/throughput.py)  
 - Sustained processing by **duration** or target **data size (GB)**; pre-generates deterministic noise batches.  
 - Reports frames/s, samples/s, GB/s; optional memory and PCIe bandwidth estimates; periodic GPU resource sampling (utilization, temp, power).
 
-**Accuracy —** [benchmarks/accuracy.py](python/src/ionosense_hpc/benchmarks/accuracy.py)  
+**Accuracy —** [benchmarks/accuracy.py](src/ionosense_hpc/benchmarks/accuracy.py)  
 - Validates GPU output vs reference (SciPy/Numpy) and checks fundamentals (Parseval, linearity, window accuracy) with configurable tolerances and SNR thresholds.  
 - Produces pass/fail summary plus mean/max error and SNR stats.
 
-**Parameter sweeps —** [benchmarks/sweep.py](python/src/ionosense_hpc/benchmarks/sweep.py)  
+**Parameter sweeps —** [benchmarks/sweep.py](src/ionosense_hpc/benchmarks/sweep.py)  
 - `ParameterSpec` supports explicit `values` or generated ranges (int/float, lin/log spacing); optional Latin Hypercube via SciPy with graceful fallback.  
 - Nested param paths (e.g., `engine_config.nfft`) let you mutate deep configs; saves full experiment config + context to disk under a centralized experiments root.
 
-**Suite orchestration —** [benchmarks/suite.py](python/src/ionosense_hpc/benchmarks/suite.py)  
+**Suite orchestration —** [benchmarks/suite.py](src/ionosense_hpc/benchmarks/suite.py)  
 - `SuiteConfig` selects/excludes benchmarks, sets global iterations/warmup, and configures output/reporting.  
 - `BenchmarkSuite.run()` wires NVTX spans, resolves presets per benchmark type, saves suite config + environment, and streams results to an output directory under the benchmarks root.  
 - Registry includes: `latency`, `latency_streaming`, `throughput`, `scaling`, `realtime`, `accuracy`.
 
-**Research workflows —** [benchmarks/research_workflow.py](python/src/ionosense_hpc/benchmarks/research_workflow.py)  
+**Research workflows —** [benchmarks/research_workflow.py](src/ionosense_hpc/benchmarks/research_workflow.py)  
 - Chains setups, individual benchmarks, sweeps, analyses, and report generation under a single `workflow_id`, with robust config and environment capture for reproducibility.
 
-**Public API —** [benchmarks/__init__.py](python/src/ionosense_hpc/benchmarks/__init__.py)
+**Public API —** [benchmarks/__init__.py](src/ionosense_hpc/benchmarks/__init__.py)
 
 **Reviewer checklist**  
 - Are NVTX ranges present around setup/compute/teardown hot paths?  
@@ -191,7 +191,7 @@ Reading this taxonomy early helps you quickly interpret validation failures, run
 ## 9. Testing Support
 **Why it matters:** pytest fixtures + numerical validators underpin confidence in reproducibility, GPU correctness, and scientific validity.
 
-**Fixtures —** [testing/fixtures.py](python/src/ionosense_hpc/testing/fixtures.py)  
+**Fixtures —** [testing/fixtures.py](src/ionosense_hpc/testing/fixtures.py)  
 - **Dirs**: `temp_data_dir`, `temp_benchmark_dir` for ephemeral data/results/reports.  
 - **Configs**: `validation_config`, `realtime_config`, `benchmark_base_config`, `benchmark_config`.  
 - **Contexts/results**: `benchmark_context`, `sample_benchmark_result` for deterministic metadata & fake results.  
@@ -204,14 +204,14 @@ Reading this taxonomy early helps you quickly interpret validation failures, run
 - **Research metadata**: `research_metadata`, `experiment_config` embed RSE/RE/IEEE fields.  
 - **Parametrized**: `test_signal_type`, `test_nfft_size`, `test_batch_size`, `sweep_type` expand coverage.
 
-**Validators —** [testing/validators.py](python/src/ionosense_hpc/testing/validators.py)  
+**Validators —** [testing/validators.py](src/ionosense_hpc/testing/validators.py)  
 - **Numerical closeness**: `assert_allclose` wraps NumPy with tuned rtol/atol.  
 - **Spectral checks**: `assert_spectral_peak` (peak freq), `assert_parseval` (energy), `validate_fft_symmetry` (Hermitian).  
 - **Signal quality**: `assert_snr` (SNR thresholds), `calculate_thd` (harmonic distortion).  
 - **Comparisons**: `compare_with_reference` (rmse/mae/max/correlation) with sane dtype-aware thresholds.  
 - **Range & stability**: `validate_output_range`, `check_numerical_stability` (per-element variance across runs).
 
-**Init —** [testing/__init__.py](python/src/ionosense_hpc/testing/__init__.py)  
+**Init —** [testing/__init__.py](src/ionosense_hpc/testing/__init__.py)  
 - Empty `__all__` keeps imports explicit and avoids pytest plugin side-effects.
 
 **Reviewer checklist**  
@@ -224,6 +224,6 @@ Reading this taxonomy early helps you quickly interpret validation failures, run
 ---
 
 ## 10. Usage Examples
-- Explore [python/tests/](python/tests/) and referenced notebooks in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)  
+- Explore [tests/](tests/) and referenced notebooks in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)  
   These provide idiomatic usage, parameter combinations, and expected behaviours once the library is understood.
 
