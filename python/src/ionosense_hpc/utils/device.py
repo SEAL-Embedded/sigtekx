@@ -33,12 +33,7 @@ def gpu_count() -> int:
     # Fallback to C++ module
     try:
         cpp_module = _import_cpp_engine()
-    except Exception:
-        return 0
-
-    try:
-        devices = cpp_module.get_available_devices()
-        return len(list(devices))
+        return len(list(cpp_module.get_available_devices()))
     except Exception:
         return 0
 
@@ -140,6 +135,10 @@ def device_info(device_id: int | None = None) -> dict[str, Any]:
 
     return info
 
+
+# =================================================================
+#  High-level utility functions (device_info() wrappers)
+# =================================================================
 
 def get_memory_usage() -> tuple[int, int]:
     """Get current GPU memory usage.
