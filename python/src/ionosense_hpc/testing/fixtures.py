@@ -22,7 +22,21 @@ from ionosense_hpc.benchmarks.base import (
     BenchmarkResult,
 )
 from ionosense_hpc.config import EngineConfig, Presets
-from ionosense_hpc.utils import make_noise, make_test_batch
+from ionosense_hpc.utils import (
+    make_chirp,
+    make_multitone,
+    make_noise,
+    make_sine,
+    make_test_batch,
+)
+from ionosense_hpc.utils.signals import (
+    make_brown_noise,
+    make_dc_signal,
+    make_impulse,
+    make_pink_noise,
+    make_pulse_train,
+    make_white_noise,
+)
 
 # ============================================================================
 # Directory Management
@@ -229,33 +243,67 @@ def seeded_rng() -> np.random.Generator:
 def test_sine_data() -> np.ndarray:
     """Generates a standard 1 kHz sine wave for spectral validation."""
     from ionosense_hpc.utils import make_sine
-    return cast(np.ndarray, make_sine(
-        frequency=1000,
-        duration=0.1,
-        sample_rate=48000,
-        amplitude=1.0,
-        dtype=np.float32
-    ))
+    return cast(
+        np.ndarray,
+        make_sine(
+            sample_rate=48000,
+            n_samples=int(0.1 * 48000),
+            frequency=1000.0,
+            amplitude=1.0,
+            dtype=np.float32,
+        ),
+    )
 
 
 @pytest.fixture
-def test_batch_data() -> np.ndarray:
+def test_batch_data(seeded_rng: np.random.Generator) -> np.ndarray:
     """Generates standard dual-channel batch data for testing."""
-    return cast(np.ndarray, make_test_batch(nfft=1024, batch=2, signal_type='sine', frequency=1000, seed=42))
+    config = EngineConfig(nfft=1024, batch=2, sample_rate_hz=48000)
+    return cast(
+        np.ndarray,
+        make_test_batch(
+            "sine",
+            config,
+            rng=seeded_rng,
+            frequency=1000.0,
+        ),
+    )
 
 
 @pytest.fixture
 def test_noise_data() -> np.ndarray:
     """Generates white noise data for validation."""
-    return cast(np.ndarray, make_noise(duration=0.1, sample_rate=48000, amplitude=1.0, seed=42, dtype=np.float32))
+    rng = np.random.default_rng(seed=42)
+    n_samples = int(0.1 * 48000)
+    return cast(
+        np.ndarray,
+        make_noise(
+            n_samples=n_samples,
+            rng=rng,
+            amplitude=1.0,
+            dtype=np.float32,
+        ),
+    )
 
 @pytest.fixture
 def test_signal_suite(seeded_rng: np.random.Generator) -> dict[str, np.ndarray]:
     """Provides a comprehensive suite of test signals."""
-    from ionosense_hpc.utils.benchmark_utils import SignalGenerator
-
-    gen = SignalGenerator(seed=42)
-    return gen.generate_test_suite(nfft=1024, sample_rate=48000)
+    sample_rate = 48000
+    n_samples = 1024
+    suite: dict[str, np.ndarray] = {
+        "sine_100Hz": cast(np.ndarray, make_sine(sample_rate, n_samples, 100.0)),
+        "sine_1kHz": cast(np.ndarray, make_sine(sample_rate, n_samples, 1000.0)),
+        "dc": cast(np.ndarray, make_dc_signal(n_samples, value=1.0)),
+        "impulse": cast(np.ndarray, make_impulse(n_samples)),
+        "chirp_linear": cast(np.ndarray, make_chirp(sample_rate, n_samples, f_start=100.0, f_end=sample_rate / 3.0)),
+        "chirp_log": cast(np.ndarray, make_chirp(sample_rate, n_samples, f_start=100.0, f_end=sample_rate / 3.0, method="logarithmic")),
+        "multitone": cast(np.ndarray, make_multitone(sample_rate, n_samples, frequencies=(100.0, 1000.0, 5000.0))),
+        "pulse_train": cast(np.ndarray, make_pulse_train(sample_rate, n_samples)),
+        "white_noise": cast(np.ndarray, make_white_noise(n_samples, rng=seeded_rng)),
+        "pink_noise": cast(np.ndarray, make_pink_noise(n_samples, rng=seeded_rng)),
+        "brown_noise": cast(np.ndarray, make_brown_noise(n_samples, rng=seeded_rng)),
+    }
+    return suite
 
 
 # ============================================================================
@@ -423,14 +471,14 @@ def reference_fft_output() -> np.ndarray:
 @pytest.fixture
 def validation_helper():
     """Provides a ValidationHelper instance for testing."""
-    from ionosense_hpc.utils.benchmark_utils import ValidationHelper
+    from ionosense_hpc.utils.validation import ValidationHelper
     return ValidationHelper()
 
 
 @pytest.fixture
 def data_archiver(temp_benchmark_dir: Path):
     """Provides a DataArchiver instance for testing."""
-    from ionosense_hpc.utils.benchmark_utils import DataArchiver
+    from ionosense_hpc.utils.archiving import DataArchiver
     return DataArchiver(temp_benchmark_dir / "archive")
 
 

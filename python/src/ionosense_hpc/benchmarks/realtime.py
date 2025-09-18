@@ -14,6 +14,7 @@ from ionosense_hpc import Engine
 from ionosense_hpc.benchmarks.base import BaseBenchmark, BenchmarkConfig, BenchmarkResult
 from ionosense_hpc.config import EngineConfig, Presets
 from ionosense_hpc.utils import logger, make_test_batch
+from ionosense_hpc.utils.paths import get_benchmark_run_dir, normalize_benchmark_name
 from ionosense_hpc.utils.profiling import (
     ProfileColor,
     compute_range,
@@ -82,10 +83,9 @@ class RealtimeBenchmark(BaseBenchmark):
             # Pre-generate test data for consistent frames
             with nvtx_range("GenerateTestData", color=ProfileColor.ORANGE):
                 self.test_data = make_test_batch(
-                    self.engine_config.nfft,
-                    self.engine_config.batch,
-                    signal_type='noise',
-                    seed=self.config.seed
+                    'noise',
+                    self.engine_config,
+                    rng=np.random.default_rng(self.config.seed),
                 )
 
             # Calculate total frames
@@ -350,7 +350,7 @@ if __name__ == '__main__':
                        help='Stream duration in seconds')
     parser.add_argument('--preset', default='realtime',
                        help='Engine configuration preset')
-    parser.add_argument('--output', help='Output file for results')
+    parser.add_argument('--output', help='Output file (defaults under benchmark_results/realtime)')
     parser.add_argument('--strict', action='store_true',
                        help='Use strict timing (busy-wait)')
 
@@ -382,8 +382,7 @@ if __name__ == '__main__':
     else:
         from datetime import datetime
 
-        from ionosense_hpc.utils.paths import get_benchmarks_root
-        ts = datetime.now().strftime('%Y%m%d_%H%M%S')
-        out = get_benchmarks_root() / f"realtime_{ts}.json"
-        out.parent.mkdir(parents=True, exist_ok=True)
-        save_benchmark_results(result, out)
+        base_dir = get_benchmark_run_dir('realtime')
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"{normalize_benchmark_name(result.name)}_{timestamp}.json"
+        save_benchmark_results(result, base_dir / filename)

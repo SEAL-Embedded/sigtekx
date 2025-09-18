@@ -436,9 +436,9 @@ iono doctor --verbose >> environment_snapshot.txt
 
 **Result Archiving:**
 ```python
-from ionosense_hpc.utils.benchmark_utils import DataArchiver
+from ionosense_hpc.utils.archiving import DataArchiver
 
-archiver = DataArchiver("./benchmark_archive")
+archiver = DataArchiver()  # defaults to standardized benchmark_results/<name> paths
 archiver.archive_results(
     results,
     experiment_name="optimization_study",

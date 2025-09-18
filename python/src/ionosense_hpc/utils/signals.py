@@ -1,274 +1,431 @@
 """
 Signal generation utilities for testing and validation.
 
-This module provides functions for creating various test signals. It leverages
-the robust, industry-standard implementations from NumPy and SciPy to ensure
-the generated signals are reliable and suitable for validating the signal
-processing engine.
+This module centralizes signal generation routines used throughout the
+benchmarking and testing stack. Implementations favour pure NumPy/SciPy
+vectorization where possible and require callers to provide NumPy
+Generators for any stochastic behaviour to keep reproducibility under
+caller control.
 """
 
-from typing import cast
+from __future__ import annotations
+
+from collections.abc import Sequence
+from typing import Literal, cast
 
 import numpy as np
 from numpy.typing import DTypeLike
 from scipy import signal as sp_signal
 
+from ionosense_hpc.config import EngineConfig
+
+NoiseKind = Literal["white", "pink", "brown"]
+
+
+def _time_vector(sample_rate: int, n_samples: int) -> np.ndarray:
+    """Return a float64 time base with bounds checking."""
+    if sample_rate <= 0:
+        raise ValueError("sample_rate must be positive")
+    if n_samples <= 0:
+        raise ValueError("n_samples must be positive")
+    return np.arange(n_samples, dtype=np.float64) / float(sample_rate)
+
+
+def _cast_dtype(array: np.ndarray, dtype: DTypeLike) -> np.ndarray:
+    """Convert to requested dtype without unnecessary copies."""
+    return cast(np.ndarray, array.astype(dtype, copy=False))
+
+
+def _scale_to_rms(signal: np.ndarray, target_rms: float) -> np.ndarray:
+    """Scale signal to the requested RMS amplitude."""
+    if target_rms < 0:
+        raise ValueError("amplitude must be non-negative")
+    if target_rms == 0:
+        return np.zeros_like(signal)
+
+    rms = float(np.sqrt(np.mean(np.square(signal))))
+    if rms == 0:
+        return np.zeros_like(signal)
+    return signal * (target_rms / rms)
+
+
+def _resolve_sample_count(
+    sample_rate: int,
+    samples: int | None,
+    seconds: float | None,
+    name: str,
+) -> int:
+    """Resolve sample counts from either explicit samples or seconds."""
+    if samples is not None and seconds is not None:
+        raise ValueError(f"Specify either {name}_samples or {name}_seconds, not both")
+
+    if samples is not None:
+        value = int(samples)
+    elif seconds is not None:
+        if seconds <= 0:
+            raise ValueError(f"{name}_seconds must be positive")
+        value = int(round(seconds * sample_rate))
+    else:
+        raise ValueError(f"Provide {name}_samples or {name}_seconds")
+
+    if value <= 0:
+        raise ValueError(f"{name} must be positive")
+    return value
+
+
+# --- Core Signal Functions -------------------------------------------------
 
 def make_sine(
+    sample_rate: int,
+    n_samples: int,
     frequency: float,
-    duration: float,
-    sample_rate: int = 48000,
+    *,
     amplitude: float = 1.0,
     phase: float = 0.0,
     dtype: DTypeLike = np.float32,
 ) -> np.ndarray:
-    """
-    Generate a sine wave signal.
-
-    Args:
-        frequency: Frequency in Hz.
-        duration: Duration in seconds.
-        sample_rate: Sample rate in Hz.
-        amplitude: Peak amplitude.
-        phase: Initial phase in radians.
-        dtype: Output data type.
-
-    Returns:
-        A 1D array containing the sine wave.
-    """
-    num_samples = int(duration * sample_rate)
-    t = np.linspace(0.0, duration, num_samples, endpoint=False, dtype=np.float64)
-    signal = amplitude * np.sin(2 * np.pi * frequency * t + phase)
-    return cast(np.ndarray, signal.astype(dtype))
+    """Generate a sine wave with the requested parameters."""
+    if frequency < 0:
+        raise ValueError("frequency must be non-negative")
+    t = _time_vector(sample_rate, n_samples)
+    waveform = amplitude * np.sin(2.0 * np.pi * frequency * t + phase)
+    return _cast_dtype(waveform, dtype)
 
 
 def make_chirp(
+    sample_rate: int,
+    n_samples: int,
     f_start: float,
     f_end: float,
-    duration: float,
-    sample_rate: int = 48000,
+    *,
     method: str = "linear",
     amplitude: float = 1.0,
     dtype: DTypeLike = np.float32,
 ) -> np.ndarray:
-    """
-    Generate a chirp (frequency sweep) signal using SciPy.
-
-    Args:
-        f_start: Starting frequency in Hz.
-        f_end: Ending frequency in Hz.
-        duration: Duration in seconds.
-        sample_rate: Sample rate in Hz.
-        method: Sweep method ('linear', 'quadratic', 'logarithmic', 'hyperbolic').
-        amplitude: Peak amplitude.
-        dtype: Output data type.
-
-    Returns:
-        A 1D array containing the chirp signal.
-    """
-    num_samples = int(duration * sample_rate)
-    t = np.linspace(0.0, duration, num_samples, endpoint=False, dtype=np.float64)
-    # SciPy's chirp is defined from -1 to 1, so we scale it by amplitude
-    sig = amplitude * sp_signal.chirp(
-        t, f0=f_start, f1=f_end, t1=duration, method=method
-    )
-    # Ensure concrete ndarray type for typing
-    arr = np.asarray(sig)
-    return cast(np.ndarray, arr.astype(dtype))
-
-
-def make_noise(
-    duration: float,
-    sample_rate: int = 48000,
-    noise_type: str = "white",
-    amplitude: float = 1.0,
-    seed: int | None = None,
-    dtype: DTypeLike = np.float32,
-) -> np.ndarray:
-    """
-    Generate a noise signal.
-
-    Args:
-        duration: Duration in seconds.
-        sample_rate: Sample rate in Hz.
-        noise_type: Type of noise ('white', 'pink', 'brown').
-        amplitude: RMS amplitude.
-        seed: Random seed for reproducibility.
-        dtype: Output data type.
-
-    Returns:
-        A 1D array containing the noise signal.
-    """
-    num_samples = int(duration * sample_rate)
-    rng = np.random.default_rng(seed)
-
-    if noise_type == "white":
-        # White noise has a flat power spectrum.
-        signal = rng.standard_normal(num_samples)
-    elif noise_type in ("pink", "brown"):
-        # Generate white noise and color it in the frequency domain.
-        white_noise = rng.standard_normal(num_samples)
-        fft_white = np.fft.rfft(white_noise)
-
-        # Calculate frequencies for the FFT bins.
-        frequencies = np.fft.rfftfreq(num_samples, d=1.0 / sample_rate)
-        # Avoid division by zero at the DC component.
-        frequencies[0] = 1.0
-
-        if noise_type == "pink":
-            # Pink noise power is proportional to 1/f. Amplitude is 1/sqrt(f).
-            fft_colored = fft_white / np.sqrt(frequencies)
-        else:  # brown
-            # Brown noise power is proportional to 1/f^2. Amplitude is 1/f.
-            fft_colored = fft_white / frequencies
-
-        # The DC component should not be scaled.
-        fft_colored[0] = 0
-        signal = np.fft.irfft(fft_colored, n=num_samples)
-    else:
-        raise ValueError(f"Unknown noise type: {noise_type}")
-
-    # Normalize to the desired RMS amplitude and convert type.
-    signal_rms = np.sqrt(np.mean(signal**2))
-    if signal_rms > 1e-9:
-        signal = (signal / signal_rms) * amplitude
-
-    return cast(np.ndarray, signal.astype(dtype))
+    """Generate a frequency sweep using scipy.signal.chirp."""
+    if f_start < 0 or f_end < 0:
+        raise ValueError("chirp frequencies must be non-negative")
+    duration = n_samples / float(sample_rate)
+    t = np.linspace(0.0, duration, n_samples, endpoint=False, dtype=np.float64)
+    chirp = amplitude * sp_signal.chirp(t, f0=f_start, f1=f_end, t1=duration, method=method)
+    return _cast_dtype(np.asarray(chirp), dtype)
 
 
 def make_multitone(
-    frequencies: list[float] | np.ndarray,
-    duration: float,
-    sample_rate: int = 48000,
-    amplitudes: list[float] | np.ndarray | None = None,
-    phases: list[float] | np.ndarray | None = None,
+    sample_rate: int,
+    n_samples: int,
+    frequencies: Sequence[float],
+    *,
+    amplitudes: Sequence[float] | None = None,
+    phases: Sequence[float] | None = None,
     dtype: DTypeLike = np.float32,
 ) -> np.ndarray:
-    """
-    Generate a multi-tone signal.
-
-    Args:
-        frequencies: A list or array of frequencies in Hz.
-        duration: Duration in seconds.
-        sample_rate: Sample rate in Hz.
-        amplitudes: Amplitude for each frequency. If None, equal amplitudes
-                    are used.
-        phases: Phase for each frequency in radians. If None, all phases are 0.
-        dtype: Output data type.
-
-    Returns:
-        A 1D array containing the multi-tone signal.
-    """
-    frequencies = np.asarray(frequencies)
-    num_tones = len(frequencies)
+    """Generate a multitone waveform from frequency, amplitude, and phase sets."""
+    freq_arr = np.asarray(frequencies, dtype=np.float64)
+    if freq_arr.ndim != 1 or freq_arr.size == 0:
+        raise ValueError("frequencies must be a 1D sequence with at least one entry")
+    if np.any(freq_arr < 0):
+        raise ValueError("frequencies must be non-negative")
 
     if amplitudes is None:
-        amplitudes = np.ones(num_tones)
-    amplitudes = np.asarray(amplitudes)
+        amp_arr = np.ones_like(freq_arr)
+    else:
+        amp_arr = np.asarray(amplitudes, dtype=np.float64)
 
     if phases is None:
-        phases = np.zeros(num_tones)
-    phases = np.asarray(phases)
+        phase_arr = np.zeros_like(freq_arr)
+    else:
+        phase_arr = np.asarray(phases, dtype=np.float64)
 
-    if not (len(frequencies) == len(amplitudes) == len(phases)):
-        msg = "Frequencies, amplitudes, and phases must have the same length."
-        raise ValueError(msg)
+    if not (len(freq_arr) == len(amp_arr) == len(phase_arr)):
+        raise ValueError("frequencies, amplitudes, and phases must have matching lengths")
 
-    num_samples = int(duration * sample_rate)
-    t = np.linspace(0.0, duration, num_samples, endpoint=False, dtype=np.float64)
-    signal = np.zeros_like(t)
+    t = _time_vector(sample_rate, n_samples)
+    angular = 2.0 * np.pi * freq_arr[:, None] * t
+    waveform = np.sum(amp_arr[:, None] * np.sin(angular + phase_arr[:, None]), axis=0)
+    return _cast_dtype(waveform, dtype)
 
-    for freq, amp, phase in zip(frequencies, amplitudes, phases, strict=True):
-        signal += amp * np.sin(2 * np.pi * freq * t + phase)
 
-    return cast(np.ndarray, signal.astype(dtype))
+# --- Noise Generators ------------------------------------------------------
 
+def make_white_noise(
+    n_samples: int,
+    *,
+    amplitude: float = 1.0,
+    rng: np.random.Generator,
+    dtype: DTypeLike = np.float32,
+) -> np.ndarray:
+    """Generate white noise scaled to the requested RMS amplitude."""
+    if n_samples <= 0:
+        raise ValueError("n_samples must be positive")
+    white = rng.standard_normal(n_samples)
+    scaled = _scale_to_rms(white, amplitude)
+    return _cast_dtype(scaled, dtype)
+
+
+def make_pink_noise(
+    n_samples: int,
+    *,
+    amplitude: float = 1.0,
+    rng: np.random.Generator,
+    dtype: DTypeLike = np.float32,
+) -> np.ndarray:
+    """Generate pink (1/f) noise via frequency domain filtering."""
+    if n_samples <= 0:
+        raise ValueError("n_samples must be positive")
+    white = rng.standard_normal(n_samples)
+    spectrum = np.fft.rfft(white)
+    freqs = np.fft.rfftfreq(n_samples)
+    freqs[0] = 1.0
+    spectrum /= np.sqrt(freqs)
+    spectrum[0] = 0.0
+    pink = np.fft.irfft(spectrum, n_samples)
+    scaled = _scale_to_rms(pink, amplitude)
+    return _cast_dtype(scaled, dtype)
+
+
+def make_brown_noise(
+    n_samples: int,
+    *,
+    amplitude: float = 1.0,
+    rng: np.random.Generator,
+    dtype: DTypeLike = np.float32,
+) -> np.ndarray:
+    """Generate brown (1/f²) noise by integrating white noise."""
+    if n_samples <= 0:
+        raise ValueError("n_samples must be positive")
+    white = rng.standard_normal(n_samples)
+    brown = np.cumsum(white)
+    brown -= np.mean(brown)
+    scaled = _scale_to_rms(brown, amplitude)
+    return _cast_dtype(scaled, dtype)
+
+
+def make_noise(
+    n_samples: int,
+    *,
+    noise_type: NoiseKind = "white",
+    amplitude: float = 1.0,
+    rng: np.random.Generator,
+    dtype: DTypeLike = np.float32,
+) -> np.ndarray:
+    """Convenience wrapper for noise generation by type."""
+    noise_key = noise_type.lower()
+    if noise_key == "white":
+        return make_white_noise(n_samples, amplitude=amplitude, rng=rng, dtype=dtype)
+    if noise_key == "pink":
+        return make_pink_noise(n_samples, amplitude=amplitude, rng=rng, dtype=dtype)
+    if noise_key == "brown":
+        return make_brown_noise(n_samples, amplitude=amplitude, rng=rng, dtype=dtype)
+    raise ValueError(f"Unsupported noise_type: {noise_type}")
+
+
+# --- Deterministic Waveforms -----------------------------------------------
+
+def make_pulse_train(
+    sample_rate: int,
+    n_samples: int,
+    *,
+    period_samples: int | None = None,
+    period_seconds: float | None = None,
+    pulse_width_samples: int | None = None,
+    pulse_width_seconds: float | None = None,
+    amplitude: float = 1.0,
+    dtype: DTypeLike = np.float32,
+) -> np.ndarray:
+    """Generate a periodic pulse train using vectorized tiling."""
+    if sample_rate <= 0:
+        raise ValueError("sample_rate must be positive")
+    if n_samples <= 0:
+        raise ValueError("n_samples must be positive")
+
+    if period_samples is None and period_seconds is None:
+        period_samples = max(1, n_samples // 10)
+
+    period = _resolve_sample_count(sample_rate, period_samples, period_seconds, "period")
+
+    if pulse_width_samples is None and pulse_width_seconds is None:
+        pulse_width_samples = min(5, period)
+
+    width = _resolve_sample_count(sample_rate, pulse_width_samples, pulse_width_seconds, "pulse_width")
+    if width > period:
+        raise ValueError("pulse width cannot exceed the period")
+
+    on_segment = np.full(width, amplitude, dtype=np.float64)
+    off_segment = np.zeros(period - width, dtype=np.float64)
+    pattern = np.concatenate((on_segment, off_segment))
+    repeats = int(np.ceil(n_samples / period))
+    train = np.tile(pattern, repeats)[:n_samples]
+    return _cast_dtype(train, dtype)
+
+
+def make_impulse(
+    n_samples: int,
+    *,
+    amplitude: float = 1.0,
+    index: int = 0,
+    dtype: DTypeLike = np.float32,
+) -> np.ndarray:
+    """Generate an impulse with a single non-zero sample."""
+    if n_samples <= 0:
+        raise ValueError("n_samples must be positive")
+    if not 0 <= index < n_samples:
+        raise ValueError("index must be within the signal length")
+    impulse = np.zeros(n_samples, dtype=np.float64)
+    impulse[index] = amplitude
+    return _cast_dtype(impulse, dtype)
+
+
+def make_dc_signal(
+    n_samples: int,
+    *,
+    value: float = 1.0,
+    dtype: DTypeLike = np.float32,
+) -> np.ndarray:
+    """Generate a constant (DC) signal."""
+    if n_samples <= 0:
+        raise ValueError("n_samples must be positive")
+    dc = np.full(n_samples, value, dtype=np.float64)
+    return _cast_dtype(dc, dtype)
+
+
+# --- High-Level Batch Creation --------------------------------------------
 
 def make_test_batch(
-    nfft: int,
-    batch: int,
-    signal_type: str = "sine",
-    sample_rate: int = 48000,
-    seed: int | None = None,
+    signal_type: str,
+    config: EngineConfig,
+    *,
+    rng: np.random.Generator,
+    n_samples: int | None = None,
+    batch: int | None = None,
+    dtype: DTypeLike = np.float32,
+    channel_variation: float = 0.01,
     **kwargs,
 ) -> np.ndarray:
-    """
-    Generate a batch of test signals for engine processing.
+    """Create a batched signal array tailored to the engine configuration."""
+    n_samples = int(n_samples or config.nfft)
+    batch = int(batch or config.batch)
+    sample_rate = int(kwargs.pop("sample_rate", config.sample_rate_hz))
 
-    Args:
-        nfft: FFT size (number of samples per channel).
-        batch: Number of channels.
-        signal_type: Type of signal ('sine', 'chirp', 'noise', 'zeros', 'multitone').
-        sample_rate: Sample rate in Hz.
-        seed: Random seed for reproducibility.
-        **kwargs: Additional arguments for the underlying signal generators.
+    if n_samples <= 0:
+        raise ValueError("n_samples must be positive")
+    if batch <= 0:
+        raise ValueError("batch must be positive")
 
-    Returns:
-        A 1D array of size (nfft * batch) containing the batched signals.
-    """
-    rng = np.random.default_rng(seed)
-    duration = nfft / sample_rate
+    signal_key = signal_type.lower()
+    base_signal: np.ndarray | None = None
 
-    # Generate the base signal which might be used by multiple channels.
-    if signal_type == "sine":
-        kwargs.setdefault("frequency", 1000.0)
-        base_signal = make_sine(duration=duration, sample_rate=sample_rate, **kwargs)
-    elif signal_type == "chirp":
-        kwargs.setdefault("f_start", 100.0)
-        kwargs.setdefault("f_end", 5000.0)
-        base_signal = make_chirp(duration=duration, sample_rate=sample_rate, **kwargs)
-    elif signal_type == "noise":
-        # Noise will be generated per-channel to ensure channels are uncorrelated.
-        base_signal = None
-    elif signal_type == "multitone":
-        kwargs.setdefault("frequencies", [1000.0, 2000.0, 5000.0])
-        base_signal = make_multitone(duration=duration, sample_rate=sample_rate, **kwargs)
-    elif signal_type == "zeros":
-        base_signal = np.zeros(nfft, dtype=np.float32)
-    else:
-        raise ValueError(f"Unknown signal type: {signal_type}")
-
-    # For signals that aren't noise, ensure they have the correct length.
-    if base_signal is not None:
-        if len(base_signal) > nfft:
-            base_signal = base_signal[:nfft]
-        elif len(base_signal) < nfft:
-            base_signal = np.pad(base_signal, (0, nfft - len(base_signal)))
-
-    if batch == 1 and base_signal is not None:
-        return cast(np.ndarray, base_signal)
-    if batch == 1 and signal_type == "noise":
-        return make_noise(
-            duration=duration, sample_rate=sample_rate, seed=seed, **kwargs
+    if signal_key == "sine":
+        base_signal = make_sine(
+            sample_rate=sample_rate,
+            n_samples=n_samples,
+            frequency=float(kwargs.pop("frequency", 1000.0)),
+            amplitude=float(kwargs.pop("amplitude", 1.0)),
+            phase=float(kwargs.pop("phase", 0.0)),
+            dtype=np.float64,
         )
+    elif signal_key == "chirp":
+        base_signal = make_chirp(
+            sample_rate=sample_rate,
+            n_samples=n_samples,
+            f_start=float(kwargs.pop("f_start", 100.0)),
+            f_end=float(kwargs.pop("f_end", sample_rate / 3.0)),
+            method=str(kwargs.pop("method", "linear")),
+            amplitude=float(kwargs.pop("amplitude", 1.0)),
+            dtype=np.float64,
+        )
+    elif signal_key == "multitone":
+        base_signal = make_multitone(
+            sample_rate=sample_rate,
+            n_samples=n_samples,
+            frequencies=kwargs.pop("frequencies", (1000.0, 2000.0, 5000.0)),
+            amplitudes=kwargs.pop("amplitudes", None),
+            phases=kwargs.pop("phases", None),
+            dtype=np.float64,
+        )
+    elif signal_key == "pulse_train":
+        period_samples = kwargs.pop("period_samples", None)
+        period_seconds = kwargs.pop("period_seconds", None)
+        width_samples = kwargs.pop("pulse_width_samples", None)
+        width_seconds = kwargs.pop("pulse_width_seconds", None)
+        base_signal = make_pulse_train(
+            sample_rate=sample_rate,
+            n_samples=n_samples,
+            period_samples=period_samples,
+            period_seconds=period_seconds,
+            pulse_width_samples=width_samples,
+            pulse_width_seconds=width_seconds,
+            amplitude=float(kwargs.pop("amplitude", 1.0)),
+            dtype=np.float64,
+        )
+    elif signal_key == "impulse":
+        base_signal = make_impulse(
+            n_samples=n_samples,
+            amplitude=float(kwargs.pop("amplitude", 1.0)),
+            index=int(kwargs.pop("index", 0)),
+            dtype=np.float64,
+        )
+    elif signal_key == "dc":
+        base_signal = make_dc_signal(
+            n_samples=n_samples,
+            value=float(kwargs.pop("value", 1.0)),
+            dtype=np.float64,
+        )
+    elif signal_key == "nyquist":
+        t = np.arange(n_samples, dtype=np.float64)
+        base_signal = np.cos(np.pi * t)
+    elif signal_key == "zeros":
+        base_signal = np.zeros(n_samples, dtype=np.float64)
 
-    # Create batch with variations for each channel.
-    batch_data = np.zeros(nfft * batch, dtype=np.float32)
-    for i in range(batch):
-        channel_seed = rng.integers(2**32)  # Get a new seed for each channel
-        if signal_type == "noise":
-            channel_signal = make_noise(
-                duration=duration, sample_rate=sample_rate, seed=channel_seed, **kwargs
-            )
-        elif signal_type == "zeros":
-            assert base_signal is not None
-            channel_signal = base_signal.copy()
+    batch_data: np.ndarray
+    if base_signal is not None:
+        base_signal = np.asarray(base_signal, dtype=np.float64)
+        batch_data = np.empty((batch, n_samples), dtype=np.float64)
+        variation_scale = float(max(channel_variation, 0.0))
+        for idx in range(batch):
+            channel = base_signal.copy()
+            if variation_scale > 0 and not np.allclose(base_signal, 0.0):
+                ref_level = float(np.mean(np.abs(base_signal)))
+                if ref_level > 0:
+                    jitter_rms = variation_scale * ref_level
+                    channel += make_white_noise(
+                        n_samples,
+                        amplitude=jitter_rms,
+                        rng=rng,
+                        dtype=np.float64,
+                    )
+            batch_data[idx] = channel
+    else:
+        noise_kind: NoiseKind
+        if signal_key == "noise":
+            noise_kind = cast(NoiseKind, kwargs.pop("noise_type", "white"))
         else:
-            # Add a small amount of noise to each channel to make them unique.
-            assert base_signal is not None
-            noise_amp = float(0.01 * np.mean(np.abs(base_signal)))
-            noise = make_noise(
-                duration=duration,
-                sample_rate=sample_rate,
-                amplitude=noise_amp,
-                seed=channel_seed,
+            noise_kind = cast(NoiseKind, signal_key.replace("_noise", ""))
+        amplitude = float(kwargs.pop("amplitude", 1.0))
+        batch_data = np.empty((batch, n_samples), dtype=np.float64)
+        for idx in range(batch):
+            batch_data[idx] = make_noise(
+                n_samples,
+                noise_type=noise_kind,
+                amplitude=amplitude,
+                rng=rng,
+                dtype=np.float64,
             )
-            channel_signal = base_signal + noise
 
-        # Final length check for the generated channel signal
-        if len(channel_signal) > nfft:
-            channel_signal = channel_signal[:nfft]
+    array = _cast_dtype(batch_data.reshape(-1), dtype)
+    return array
 
-        batch_data[i * nfft : (i + 1) * nfft] = channel_signal
 
-    return batch_data
+__all__ = [
+    "make_sine",
+    "make_chirp",
+    "make_multitone",
+    "make_white_noise",
+    "make_pink_noise",
+    "make_brown_noise",
+    "make_noise",
+    "make_pulse_train",
+    "make_impulse",
+    "make_dc_signal",
+    "make_test_batch",
+]

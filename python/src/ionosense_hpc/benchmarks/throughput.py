@@ -15,6 +15,7 @@ from ionosense_hpc import Engine
 from ionosense_hpc.benchmarks.base import BaseBenchmark, BenchmarkConfig
 from ionosense_hpc.config import EngineConfig, Presets
 from ionosense_hpc.utils import get_memory_usage, logger, make_test_batch
+from ionosense_hpc.utils.paths import get_benchmark_run_dir, normalize_benchmark_name
 from ionosense_hpc.utils.profiling import (
     ProfileColor,
     ProfilingDomain,
@@ -86,10 +87,9 @@ class ThroughputBenchmark(BaseBenchmark):
             # Pre-generate test data
             with nvtx_range("GenerateTestData", color=ProfileColor.ORANGE):
                 self.test_data = make_test_batch(
-                    self.engine_config.nfft,
-                    self.engine_config.batch,
-                    signal_type='noise',
-                    seed=self.config.seed
+                    'noise',
+                    self.engine_config,
+                    rng=np.random.default_rng(self.config.seed),
                 )
 
             # Force garbage collection before measurement
@@ -276,7 +276,7 @@ class ThroughputBenchmark(BaseBenchmark):
 class ScalingBenchmark(ThroughputBenchmark):
     """
     Benchmark for analyzing throughput scaling characteristics.
-    
+
     Tests how throughput scales with batch size, FFT size, and other parameters
     to identify optimal configurations and bottlenecks.
     """
@@ -316,7 +316,11 @@ class ScalingBenchmark(ThroughputBenchmark):
             # Run throughput test
             engine = Engine(test_config)
 
-            test_data = make_test_batch(base_nfft, batch_size, seed=self.config.seed)
+            test_data = make_test_batch(
+                'noise',
+                test_config,
+                rng=np.random.default_rng(self.config.seed),
+            )
 
             # Measure throughput
             start = time.perf_counter()
@@ -360,7 +364,11 @@ class ScalingBenchmark(ThroughputBenchmark):
             # Run throughput test
             engine = Engine(test_config)
 
-            test_data = make_test_batch(nfft_size, base_batch, seed=self.config.seed)
+            test_data = make_test_batch(
+                'noise',
+                test_config,
+                rng=np.random.default_rng(self.config.seed),
+            )
 
             # Measure throughput
             start = time.perf_counter()
@@ -408,7 +416,11 @@ class ScalingBenchmark(ThroughputBenchmark):
 
             engine = Engine(test_config)
 
-            test_data = make_test_batch(nfft, batch, seed=self.config.seed)
+            test_data = make_test_batch(
+                'noise',
+                test_config,
+                rng=np.random.default_rng(self.config.seed),
+            )
 
             # Measure
             start = time.perf_counter()
@@ -447,7 +459,7 @@ class ScalingBenchmark(ThroughputBenchmark):
 class MemoryStressBenchmark(ThroughputBenchmark):
     """
     Benchmark for stress-testing memory subsystem.
-    
+
     Tests maximum achievable memory bandwidth and identifies memory bottlenecks.
     """
 
@@ -485,7 +497,7 @@ if __name__ == '__main__':
     parser.add_argument('--duration', type=float, default=10.0,
                        help='Test duration in seconds')
     parser.add_argument('--output', default=None,
-                       help='Output file (defaults under build/benchmark_results)')
+                       help='Output file (defaults under benchmark_results/throughput)')
 
     args = parser.parse_args()
 
@@ -514,12 +526,11 @@ if __name__ == '__main__':
     else:
         from datetime import datetime
 
-        from ionosense_hpc.utils.paths import get_benchmarks_root
-        ts = datetime.now().strftime('%Y%m%d_%H%M%S')
-        name_part = 'throughput' if args.mode == 'throughput' else f"throughput_{args.mode}"
-        out = get_benchmarks_root() / f"{name_part}_{ts}.json"
-        out.parent.mkdir(parents=True, exist_ok=True)
-        save_benchmark_results(result, out)
+        base_dir = get_benchmark_run_dir('throughput')
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        mode_label = 'throughput' if args.mode == 'throughput' else f"throughput_{args.mode}"
+        filename = f"{normalize_benchmark_name(mode_label)}_{timestamp}.json"
+        save_benchmark_results(result, base_dir / filename)
 
     # Print summary
     def _mean_of(stats: dict, key: str, default: float = 0.0) -> float:

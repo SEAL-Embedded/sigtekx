@@ -212,7 +212,7 @@ From `ionosense_hpc/utils/signals.py` (GOLD STANDARD):
 3. **Impulse**: `signal[0] = 1.0` - Tests all frequencies equally
 4. **Nyquist**: `np.cos(np.pi * np.arange(nfft))` - Tests edge cases
 
-**DO NOT USE** `ionosense_hpc/utils/benchmark_utils.py` generators for truth.
+**Use** the canonical generators in `ionosense_hpc/utils/signals.py`; legacy `benchmark_utils.py` has been retired.
 
 ## Key cuFFT Details
 

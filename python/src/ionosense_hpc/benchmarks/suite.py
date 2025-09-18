@@ -25,7 +25,7 @@ from ionosense_hpc.benchmarks.realtime import RealtimeBenchmark
 from ionosense_hpc.benchmarks.throughput import ScalingBenchmark, ThroughputBenchmark
 from ionosense_hpc.config import Presets
 from ionosense_hpc.utils import logger
-from ionosense_hpc.utils.paths import get_benchmarks_root
+from ionosense_hpc.utils.paths import get_benchmark_run_dir
 from ionosense_hpc.utils.profiling import (
     ProfileColor,
     ProfilingDomain,
@@ -114,7 +114,7 @@ class BenchmarkSuite:
         out_root = (
             Path(self.config.output_dir)
             if self.config.output_dir and self.config.output_dir != "./benchmark_results"
-            else get_benchmarks_root()
+            else get_benchmark_run_dir('suite')
         )
 
         self.output_dir = out_root / f"{self.config.name}_{datetime.now():%Y%m%d_%H%M%S}"
@@ -386,7 +386,7 @@ def run_default_suite(preset: str = 'realtime', output_dir: str | None = None) -
     config = SuiteConfig(
         name=f"default_suite_{preset}",
         description=f"Default benchmark suite with {preset} preset",
-        output_dir=output_dir or str(get_benchmarks_root())
+        output_dir=output_dir or str(get_benchmark_run_dir('suite'))
     )
 
     suite = BenchmarkSuite(config)
@@ -418,7 +418,7 @@ def main(argv: list[str] | None = None) -> int:
         config = SuiteConfig(
             benchmarks=args.benchmarks,
             exclude=args.exclude,
-            output_dir=args.output or str(get_benchmarks_root()),
+            output_dir=args.output or str(get_benchmark_run_dir('suite')),
             generate_report=not args.no_report
         )
         suite = BenchmarkSuite(config)

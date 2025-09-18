@@ -14,7 +14,7 @@ from ionosense_hpc import Engine
 from ionosense_hpc.benchmarks.base import BaseBenchmark, BenchmarkConfig, BenchmarkResult
 from ionosense_hpc.config import EngineConfig, Presets
 from ionosense_hpc.utils import logger, make_test_batch
-from ionosense_hpc.utils.paths import get_benchmarks_root
+from ionosense_hpc.utils.paths import get_benchmark_run_dir, normalize_benchmark_name
 from ionosense_hpc.utils.profiling import (
     ProfileColor,
     ProfilingDomain,
@@ -81,11 +81,10 @@ class LatencyBenchmark(BaseBenchmark):
             # Prepare deterministic test data
             with nvtx_range("PrepareTestData", color=ProfileColor.ORANGE):
                 self.test_data = make_test_batch(
-                    nfft=engine_config.nfft,
-                    batch=engine_config.batch,
-                    signal_type=self.config.test_signal_type,
+                    self.config.test_signal_type,
+                    engine_config,
+                    rng=np.random.default_rng(self.config.seed),
                     frequency=self.config.test_frequency,
-                    seed=self.config.seed,
                 )
 
             # Setup GPU timing if requested
@@ -434,8 +433,8 @@ def run_latency_benchmark_suite(
     ]
 
     results = {}
-    output_path = Path(output_dir) if output_dir else get_benchmarks_root()
-    output_path.mkdir(parents=True, exist_ok=True)
+    base_dir = Path(output_dir) if output_dir else get_benchmark_run_dir('latency')
+    base_dir.mkdir(parents=True, exist_ok=True)
 
     for name, config in variants:
         with nvtx_range(
@@ -460,17 +459,10 @@ def run_latency_benchmark_suite(
             results[name] = result
 
             # Save individual result with a filesystem-safe timestamp
-            def _safe_filename(s: str) -> str:
-                # Allow alnum, dash, underscore, dot; replace others with '-'
-                return ''.join(
-                    ch if (ch.isalnum() or ch in ('-', '_', '.')) else '-' for ch in s
-                )
-
-            safe_ts = _safe_filename(result.context.timestamp)
-            save_benchmark_results(
-                result,
-                output_path / f"{name}_{safe_ts}.json",
-            )
+            safe_name = normalize_benchmark_name(result.name)
+            safe_ts = normalize_benchmark_name(result.context.timestamp)
+            filename = f"{safe_name}_{safe_ts}.json"
+            save_benchmark_results(result, base_dir / filename)
 
             # Print summary using latency metric stats
             lat_stats = (
@@ -497,7 +489,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Latency benchmark')
     parser.add_argument('--config', help='Configuration file path')
-    parser.add_argument('--output', default=None, help='Output directory (defaults to build/benchmark_results)')
+    parser.add_argument('--output', default=None, help='Output directory (defaults to benchmark_results/latency)')
     parser.add_argument('--variant', choices=['baseline', 'streaming', 'stress', 'all'],
                        default='all', help='Benchmark variant to run')
 
@@ -517,7 +509,10 @@ if __name__ == '__main__':
         from pathlib import Path
 
         from ionosense_hpc.benchmarks.base import save_benchmark_results
-        from ionosense_hpc.utils.paths import get_benchmarks_root
-        out_dir = Path(args.output) if args.output else get_benchmarks_root()
-        out_dir.mkdir(parents=True, exist_ok=True)
-        save_benchmark_results(result, out_dir / f"{result.name}.json")
+        base_dir = Path(args.output) if args.output else get_benchmark_run_dir('latency')
+        base_dir.mkdir(parents=True, exist_ok=True)
+        safe_name = normalize_benchmark_name(result.name)
+        from datetime import datetime
+
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        save_benchmark_results(result, base_dir / f"{safe_name}_{timestamp}.json")

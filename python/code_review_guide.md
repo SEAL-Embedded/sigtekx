@@ -76,8 +76,15 @@ Reading this taxonomy early helps you quickly interpret validation failures, run
 - [src/ionosense_hpc/utils/profiling.py](src/ionosense_hpc/utils/profiling.py)  
   *NVTX decorators and ranges.* Annotates hot paths for Nsight Systems/Compute. Exports safe no-op fallbacks when NVTX isn’t available, so code runs in any env.
 
-- [src/ionosense_hpc/utils/benchmark_utils.py](src/ionosense_hpc/utils/benchmark_utils.py)  
-  *Benchmark helpers.* Standardizes seeding, deterministic data generation, result archiving. Key for reproducible RSE/RE‑aligned benchmarks.
+- [src/ionosense_hpc/utils/reproducibility.py](src/ionosense_hpc/utils/reproducibility.py)  
+  *Deterministic RNG management.* Provides `DeterministicGenerator` for reproducible multi-stream seeds across fixtures and benchmarks.
+
+- [src/ionosense_hpc/utils/archiving.py](src/ionosense_hpc/utils/archiving.py)  
+  *Result archiving.* Handles JSON snapshots, manifests, and standardized `benchmark_results/<name>/<timestamp>` paths via `DataArchiver`.
+
+- [src/ionosense_hpc/utils/validation.py](src/ionosense_hpc/utils/validation.py)  
+  *Statistical validation.* Exposes `ValidationHelper` for measurement QA, distribution checks, and tolerance enforcement.
+
 
 - [src/ionosense_hpc/utils/signals.py](src/ionosense_hpc/utils/signals.py)  
   *Synthetic signal generators.* Provides sine, noise, and composite test vectors with seeded RNG. Used across fixtures, validation, and benchmarks.

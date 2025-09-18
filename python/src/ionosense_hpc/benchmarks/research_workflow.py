@@ -385,7 +385,7 @@ class ResearchWorkflow:
 
     def _run_analysis_stage(self, stage: WorkflowStage) -> dict[str, Any]:
         """Run analysis stage on collected results."""
-        from ionosense_hpc.utils.benchmark_utils import ValidationHelper
+        from ionosense_hpc.utils.validation import ValidationHelper
 
         validator = ValidationHelper()
         analysis_results = {}

@@ -52,14 +52,14 @@ Engine(
 )
 ```
 
-* `config` – pass an `EngineConfig`, a preset name ("realtime", "throughput", "validation", "profiling"), or leave `None` for the realtime preset.
-* `validate_inputs` – verify shapes and dtypes in Python. Disable for maximum throughput once inputs are trusted.
-* `profile_mode` – collects extended metrics that feed `Engine.detailed_metrics`.
+* `config` - pass an `EngineConfig`, a preset name ("realtime", "throughput", "validation", "profiling"), or leave `None` for the realtime preset.
+* `validate_inputs` - verify shapes and dtypes in Python. Disable for maximum throughput once inputs are trusted.
+* `profile_mode` - collects extended metrics that feed `Engine.detailed_metrics`.
 * `cuda_graphs`, `stream_count`, `deterministic`, `debug_mode` map directly to the underlying CUDA implementation.
 
 #### Lifecycle
 
-`Engine` follows a simple lifecycle – constructed, used, reset or closed. Creation immediately allocates GPU resources; use the context manager to guarantee cleanup.
+`Engine` follows a simple lifecycle - constructed, used, reset or closed. Creation immediately allocates GPU resources; use the context manager to guarantee cleanup.
 
 ```python
 engine = Engine("validation")
@@ -73,10 +73,10 @@ finally:
 
 #### Processing API
 
-* `process(data: ArrayLike) -> np.ndarray` – window, FFT and magnitude for a single frame (`nfft * batch` samples). The return value is shaped `(batch, nfft // 2 + 1)`.
-* `synchronize() -> None` – flush CUDA work queues. Normally only required when integrating with other GPU libraries.
-* `stats -> dict[str, Any]` – latest runtime statistics (`latency_us`, `throughput_gbps`, `frames_processed`, plus averages when profiling is enabled).
-* `detailed_metrics -> dict[str, Any]` – derived metrics that include computed bandwidth and utilisation (requires `profile_mode=True`).
+* `process(data: ArrayLike) -> np.ndarray` - window, FFT and magnitude for a single frame (`nfft * batch` samples). The return value is shaped `(batch, nfft // 2 + 1)`.
+* `synchronize() -> None` - flush CUDA work queues. Normally only required when integrating with other GPU libraries.
+* `stats -> dict[str, Any]` - latest runtime statistics (`latency_us`, `throughput_gbps`, `frames_processed`, plus averages when profiling is enabled).
+* `detailed_metrics -> dict[str, Any]` - derived metrics that include computed bandwidth and utilisation (requires `profile_mode=True`).
 
 All validation errors are raised as `ionosense_hpc.exceptions.ValidationError`. Runtime faults in the C++ layer are surfaced as `EngineRuntimeError`.
 
@@ -101,11 +101,11 @@ Both helpers are thin wrappers that create a short-lived `Engine` internally.
 
 Important fields:
 
-* `nfft` – FFT size (power of two)
-* `batch` – number of channels processed per call
-* `overlap` – fractional overlap between consecutive frames
-* `stream_count`, `pinned_buffer_count`, `warmup_iters` – pipeline parameters
-* `enable_profiling`, `use_cuda_graphs` – advanced options
+* `nfft` - FFT size (power of two)
+* `batch` - number of channels processed per call
+* `overlap` - fractional overlap between consecutive frames
+* `stream_count`, `pinned_buffer_count`, `warmup_iters` - pipeline parameters
+* `enable_profiling`, `use_cuda_graphs` - advanced options
 
 Computed properties (`hop_size`, `num_output_bins`, `effective_fps`, `memory_estimate_mb`) make it easy to reason about downstream behaviour.
 
@@ -113,10 +113,10 @@ Computed properties (`hop_size`, `num_output_bins`, `effective_fps`, `memory_est
 
 `ionosense_hpc.config.Presets` returns pre-tuned `EngineConfig` instances:
 
-* `Presets.realtime()` – dual-channel, low-latency configuration
-* `Presets.throughput()` – large batch, offline throughput testing
-* `Presets.validation()` – small FFT for correctness checks
-* `Presets.profiling()` – balanced settings for metric collection
+* `Presets.realtime()` - dual-channel, low-latency configuration
+* `Presets.throughput()` - large batch, offline throughput testing
+* `Presets.validation()` - small FFT for correctness checks
+* `Presets.profiling()` - balanced settings for metric collection
 
 Use `Presets.custom(**overrides)` to clone the realtime preset and adjust specific fields.
 
@@ -124,9 +124,14 @@ Use `Presets.custom(**overrides)` to clone the realtime preset and adjust specif
 
 `ionosense_hpc.utils` hosts lightweight helpers:
 
-* `ionosense_hpc.utils.device` – GPU discovery (`gpu_count`, `device_info`, `check_cuda_available`, `monitor_device`).
-* `ionosense_hpc.utils.signals` – deterministic signal generators (`make_sine`, `make_chirp`, `make_noise`, `make_test_batch`).
-* `ionosense_hpc.utils.benchmark_utils` – helpers for structured benchmark output, archiving and validation.
+* `ionosense_hpc.utils.device` - GPU discovery (`gpu_count`, `device_info`, `check_cuda_available`, `monitor_device`).
+* `ionosense_hpc.utils.signals` - deterministic signal generators (`make_sine`, `make_chirp`, `make_multitone`, `make_noise`, `make_test_batch`).
+* `ionosense_hpc.utils.archiving` - structured benchmark result storage (`DataArchiver`).
+* `ionosense_hpc.utils.validation` - statistical validation helpers (`ValidationHelper`).
+* `ionosense_hpc.utils.reproducibility` - deterministic RNG streams (`DeterministicGenerator`).
+* `ionosense_hpc.utils.paths` - canonical output locations (`get_benchmarks_root`, `get_benchmark_result_path`).
+
+
 
 These utilities are pure Python and safe to import in environments without CUDA.
 
@@ -147,9 +152,9 @@ ok = self_test(verbose=True)  # Create an Engine and run a validation FFT
 
 `Engine` instances are **not** thread-safe. Create one engine per thread or process. Configuration objects are immutable and can be shared freely.
 
-For streaming workloads prefer long-lived engines instead of recreating them for every frame – construction performs memory allocation and FFT plan creation.
+For streaming workloads prefer long-lived engines instead of recreating them for every frame - construction performs memory allocation and FFT plan creation.
 
 ## Further Reading
 
-* `docs/DEVELOPMENT.md` – contribution workflow and debugging tips.
-* `docs/INSTALL.md` – environment bootstrapping on Windows and Linux.
+* `docs/DEVELOPMENT.md` - contribution workflow and debugging tips.
+* `docs/INSTALL.md` - environment bootstrapping on Windows and Linux.

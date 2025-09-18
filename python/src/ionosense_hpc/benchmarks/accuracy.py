@@ -15,6 +15,9 @@ from ionosense_hpc import Engine
 from ionosense_hpc.benchmarks.base import BaseBenchmark, BenchmarkConfig, BenchmarkResult
 from ionosense_hpc.config import EngineConfig, Presets
 from ionosense_hpc.utils import logger, make_chirp, make_multitone, make_noise, make_sine
+from ionosense_hpc.utils.reproducibility import DeterministicGenerator
+from ionosense_hpc.utils.signals import make_dc_signal, make_impulse
+from ionosense_hpc.utils.paths import get_benchmark_run_dir, normalize_benchmark_name
 from ionosense_hpc.utils.profiling import (
     ProfileColor,
     nvtx_range,
@@ -82,6 +85,7 @@ class AccuracyBenchmark(BaseBenchmark):
         self.engine_config: EngineConfig | None = None
         self.test_results: list[dict[str, Any]] = []
         self.validation_errors: list[str] = []
+        self._signal_rng = DeterministicGenerator(self.config.seed, "accuracy_signals")
 
     def setup(self) -> None:
         """Initialize engine and prepare test signals (NVTX-instrumented)."""
@@ -95,6 +99,8 @@ class AccuracyBenchmark(BaseBenchmark):
             # Initialize engine
             with nvtx_range("InitializeEngine", color=ProfileColor.DARK_GRAY):
                 self.engine = Engine(self.engine_config)
+
+            self._signal_rng.reset()
 
             logger.info("Accuracy benchmark initialized:")
             logger.info(f"  Engine config: {self.engine_config}")
@@ -214,44 +220,71 @@ class AccuracyBenchmark(BaseBenchmark):
         nfft = self.engine_config.nfft
         batch = self.engine_config.batch
         sample_rate = self.engine_config.sample_rate_hz
-        duration = nfft / sample_rate
+        n_samples = nfft
 
         signal_type = spec['type']
 
         if signal_type == 'sine':
             signal = make_sine(
-                spec['frequency'], duration, sample_rate,
-                spec.get('amplitude', 1.0), dtype=np.float32
+                sample_rate=sample_rate,
+                n_samples=n_samples,
+                frequency=float(spec['frequency']),
+                amplitude=float(spec.get('amplitude', 1.0)),
+                phase=float(spec.get('phase', 0.0)),
+                dtype=np.float32,
             )
         elif signal_type == 'multitone':
             signal = make_multitone(
-                spec['frequencies'], duration, sample_rate,
-                dtype=np.float32
+                sample_rate=sample_rate,
+                n_samples=n_samples,
+                frequencies=spec['frequencies'],
+                amplitudes=spec.get('amplitudes'),
+                phases=spec.get('phases'),
+                dtype=np.float32,
             )
         elif signal_type == 'chirp':
             signal = make_chirp(
-                spec['f_start'], spec['f_end'], duration, sample_rate,
-                dtype=np.float32
+                sample_rate=sample_rate,
+                n_samples=n_samples,
+                f_start=float(spec['f_start']),
+                f_end=float(spec['f_end']),
+                method=str(spec.get('method', 'linear')),
+                amplitude=float(spec.get('amplitude', 1.0)),
+                dtype=np.float32,
             )
         elif signal_type == 'noise':
+            noise_type = spec.get('noise_type', 'white')
+            amplitude = float(spec.get('amplitude', 1.0))
+            rng = self._signal_rng.get_rng(f"noise_{noise_type}")
             signal = make_noise(
-                duration, sample_rate, spec.get('noise_type', 'white'),
-                dtype=np.float32
+                n_samples=n_samples,
+                noise_type=noise_type,
+                amplitude=amplitude,
+                rng=rng,
+                dtype=np.float32,
             )
         elif signal_type == 'dc':
-            signal = np.full(nfft, spec['value'], dtype=np.float32)
+            signal = make_dc_signal(
+                n_samples,
+                value=float(spec.get('value', 1.0)),
+                dtype=np.float32,
+            )
         elif signal_type == 'impulse':
-            signal = np.zeros(nfft, dtype=np.float32)
-            signal[spec.get('position', 0)] = spec.get('amplitude', 1.0)
+            signal = make_impulse(
+                n_samples,
+                amplitude=float(spec.get('amplitude', 1.0)),
+                index=int(spec.get('position', 0)),
+                dtype=np.float32,
+            )
         elif signal_type == 'nyquist':
-            # Alternating +1, -1 pattern (Nyquist frequency)
-            signal = spec.get('amplitude', 1.0) * np.cos(np.pi * np.arange(nfft))
-            signal = signal.astype(np.float32)
+            amplitude = float(spec.get('amplitude', 1.0))
+            signal = amplitude * np.cos(np.pi * np.arange(n_samples, dtype=np.float32))
         else:
-            signal = np.zeros(nfft, dtype=np.float32)
+            signal = np.zeros(n_samples, dtype=np.float32)
 
-        # Tile for batch processing
         return np.tile(signal, batch)
+
+
 
     def _compute_reference_fft(self, data: np.ndarray) -> np.ndarray:
         """Compute reference FFT using scipy."""
@@ -322,10 +355,11 @@ class AccuracyBenchmark(BaseBenchmark):
         assert self.engine_config is not None
         assert self.engine is not None
         # Generate test signal
+        noise_rng = self._signal_rng.get_rng('parseval')
         test_signal = make_noise(
-            self.engine_config.nfft / self.engine_config.sample_rate_hz,
-            self.engine_config.sample_rate_hz,
-            dtype=np.float32
+            n_samples=self.engine_config.nfft,
+            rng=noise_rng,
+            dtype=np.float32,
         )
 
         # Compute time-domain energy
@@ -360,9 +394,22 @@ class AccuracyBenchmark(BaseBenchmark):
         assert self.engine_config is not None
         assert self.engine is not None
         # Generate two signals
-        duration = self.engine_config.nfft / self.engine_config.sample_rate_hz
-        signal1 = make_sine(1000, duration, self.engine_config.sample_rate_hz, 0.5)
-        signal2 = make_sine(2000, duration, self.engine_config.sample_rate_hz, 0.3)
+        n_samples = self.engine_config.nfft
+        sample_rate = self.engine_config.sample_rate_hz
+        signal1 = make_sine(
+            sample_rate=sample_rate,
+            n_samples=n_samples,
+            frequency=1000.0,
+            amplitude=0.5,
+            dtype=np.float32,
+        )
+        signal2 = make_sine(
+            sample_rate=sample_rate,
+            n_samples=n_samples,
+            frequency=2000.0,
+            amplitude=0.3,
+            dtype=np.float32,
+        )
 
         # Process individually
         batch1 = np.tile(signal1, self.engine_config.batch)
@@ -476,7 +523,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Accuracy validation benchmark')
     parser.add_argument('--config', help='Configuration YAML file')
     parser.add_argument('--tolerance', type=float, help='Error tolerance')
-    parser.add_argument('--output', help='Output file for results')
+    parser.add_argument('--output', help='Output file (defaults under benchmark_results/accuracy)')
     parser.add_argument('--validate-stability', action='store_true',
                        help='Run numerical stability tests')
 
@@ -510,8 +557,7 @@ if __name__ == '__main__':
     else:
         from datetime import datetime
 
-        from ionosense_hpc.utils.paths import get_benchmarks_root
-        ts = datetime.now().strftime('%Y%m%d_%H%M%S')
-        out = get_benchmarks_root() / f"accuracy_{ts}.json"
-        out.parent.mkdir(parents=True, exist_ok=True)
-        save_benchmark_results(result, out)
+        base_dir = get_benchmark_run_dir('accuracy')
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"{normalize_benchmark_name(result.name)}_{timestamp}.json"
+        save_benchmark_results(result, base_dir / filename)

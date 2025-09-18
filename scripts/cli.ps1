@@ -1,4 +1,4 @@
-﻿# ============================================================================
+# ============================================================================
 # ionosense-hpc • Research Platform CLI (Windows)
 # - Professional research-grade build, test, and benchmark orchestration
 # - Compliant with RSE/RE/IEEE standards for reproducible research
@@ -23,7 +23,7 @@ $script:ConfigDir        = Join-Path $PythonDir "src\ionosense_hpc\benchmarks\co
 $script:BuildPreset      = if ($env:BUILD_PRESET) { $env:BUILD_PRESET } else { "windows-rel" }
 $script:CondaEnvName     = "ionosense-hpc"
 $script:EnvironmentFile  = Join-Path $ProjectRoot "environments\environment.win.yml"
-$script:BenchResultsDir  = Join-Path $BuildDir "benchmark_results"
+$script:BenchResultsDir  = Join-Path $ProjectRoot "benchmark_results"
 $script:ReportsDir       = Join-Path $BuildDir "reports"
 $script:ExperimentsDir   = Join-Path $BuildDir "experiments"
 $script:ProfileDir       = Join-Path $BuildDir "nsight_reports"
@@ -156,7 +156,7 @@ Function Initialize-ResearchEnvironment {
     $env:IONO_BENCH_DIR       = $script:BenchResultsDir
     $env:IONO_EXPERIMENTS_DIR = $script:ExperimentsDir
     $env:IONO_REPORTS_DIR     = $script:ReportsDir
-    Write-ResearchLog -Level Info -Message "Bound Python outputs to build/ via env (IONO_*_DIR)" -Component "Init" -Metadata @{
+    Write-ResearchLog -Level Info -Message "Bound Python outputs via env overrides (IONO_*_DIR)" -Component "Init" -Metadata @{
         output_root = $env:IONO_OUTPUT_ROOT
         benches     = $env:IONO_BENCH_DIR
         experiments = $env:IONO_EXPERIMENTS_DIR
@@ -1052,7 +1052,13 @@ Function Invoke-Benchmark {
         Write-ResearchLog -Level Info -Message "Running benchmark suite" -Component "Benchmark"
         
         $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-        $outputDir = if ($Output) { $Output } else { Join-Path $script:BenchResultsDir "suite_$timestamp" }
+        if ($Output) {
+            $outputDir = $Output
+        } else {
+            $suiteRoot = Join-Path $script:BenchResultsDir "suite"
+            if (-not (Test-Path $suiteRoot)) { New-Item -ItemType Directory -Path $suiteRoot -Force | Out-Null }
+            $outputDir = Join-Path $suiteRoot "suite_$timestamp"
+        }
         
         $configFile = if ($Config) {
             if (Test-Path $Config) { $Config }
@@ -1859,3 +1865,4 @@ catch {
     
     exit 1
 }
+
