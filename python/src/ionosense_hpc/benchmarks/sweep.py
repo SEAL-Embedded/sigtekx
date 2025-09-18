@@ -135,7 +135,7 @@ class ExperimentRun:
 class ParameterSweep:
     """
     Orchestrates parameter sweep experiments with full reproducibility.
-    
+
     This class manages the execution of benchmarks across a parameter space,
     handling result aggregation, failure recovery, and reporting.
     """
@@ -143,7 +143,7 @@ class ParameterSweep:
     def __init__(self, config: ExperimentConfig | dict | str):
         """
         Initialize sweep from configuration.
-        
+
         Args:
             config: ExperimentConfig, dict, or path to config file
         """
@@ -226,7 +226,7 @@ class ParameterSweep:
             # Scale samples to parameter ranges
             for point in sample:
                 combo_lhs: list[Any] = []
-                for i, (name, values) in enumerate(zip(param_names, param_values, strict=False)):
+                for i, (_name, values) in enumerate(zip(param_names, param_values, strict=False)):
                     idx = int(point[i] * len(values))
                     idx = min(idx, len(values) - 1)
                     combo_lhs.append(values[idx])
@@ -511,8 +511,8 @@ class ParameterSweep:
         param1, param2 = param_names[0], param_names[1]
 
         # Collect unique values
-        p1_values = sorted(set(r.parameter_values[param1] for r in runs))
-        p2_values = sorted(set(r.parameter_values[param2] for r in runs))
+        p1_values = sorted({r.parameter_values[param1] for r in runs})
+        p2_values = sorted({r.parameter_values[param2] for r in runs})
 
         # Create performance matrix
         perf_matrix = np.full((len(p2_values), len(p1_values)), np.nan)
@@ -599,7 +599,7 @@ parameters:
   - name: engine_config.nfft
     type: int
     values: [256, 512, 1024, 2048, 4096]
-  
+
   - name: engine_config.batch
     type: int
     range:

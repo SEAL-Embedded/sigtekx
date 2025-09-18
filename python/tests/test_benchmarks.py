@@ -31,6 +31,7 @@ from ionosense_hpc.config.schemas import ExperimentMetadata, ResearchConfig
 from ionosense_hpc.exceptions import (
     BenchmarkValidationError,
     ReproducibilityError,
+    WorkflowError,
 )
 
 # ============================================================================

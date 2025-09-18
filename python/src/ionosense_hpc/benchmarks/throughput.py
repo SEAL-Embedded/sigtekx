@@ -55,7 +55,7 @@ class ThroughputBenchmarkConfig(BenchmarkConfig):
 class ThroughputBenchmark(BaseBenchmark):
     """
     Comprehensive throughput benchmark with resource utilization analysis.
-    
+
     This benchmark measures sustained processing throughput, memory bandwidth
     utilization, and scaling characteristics across different configurations.
     """

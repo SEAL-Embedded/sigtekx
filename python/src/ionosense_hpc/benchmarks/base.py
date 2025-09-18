@@ -184,7 +184,7 @@ class BenchmarkConfig(BaseModel):
 class BaseBenchmark(abc.ABC):
     """
     Abstract base class for all benchmarks following RSE/RE standards.
-    
+
     This class enforces a standardized structure and provides common
     functionality for reproducibility, statistics, and reporting.
     """
@@ -217,7 +217,7 @@ class BaseBenchmark(abc.ABC):
     def execute_iteration(self) -> float | dict:
         """
         Execute a single benchmark iteration.
-        
+
         Returns:
             Either a single metric value (float) or dict of metrics
         """
@@ -231,7 +231,7 @@ class BaseBenchmark(abc.ABC):
     def validate_environment(self) -> tuple[bool, list[str]]:
         """
         Validate that the environment meets benchmark requirements.
-        
+
         Returns:
             Tuple of (is_valid, list_of_issues)
         """
@@ -260,7 +260,6 @@ class BaseBenchmark(abc.ABC):
             try:
                 def _vtuple(s: str) -> tuple[int, ...]:
                     parts: list[str] = []
-                    num = ''
                     for ch in s:
                         if ch.isdigit() or ch == '.':
                             parts.append(ch)
@@ -278,7 +277,7 @@ class BaseBenchmark(abc.ABC):
     def run(self) -> BenchmarkResult:
         """
         Main benchmark execution following standardized phases.
-        
+
         Returns:
             BenchmarkResult containing all measurements and statistics
         """
@@ -368,7 +367,7 @@ class BaseBenchmark(abc.ABC):
                             logger.warning(f"Iteration {i} failed: {e}")
                             errors.append(f"Iteration {i}: {str(e)}")
                             if len(errors) > self.config.iterations * 0.1:
-                                raise RuntimeError("Too many iteration failures")
+                                raise RuntimeError("Too many iteration failures") from e
 
             except Exception as e:
                 logger.error(f"Benchmark failed: {e}")
@@ -399,7 +398,7 @@ class BaseBenchmark(abc.ABC):
             # Multi-metric case
             md = cast(list[dict[str, Any]], measurements)
             metrics_dict: dict[str, np.ndarray] = {}
-            for key in md[0].keys():
+            for key in md[0]:
                 metrics_dict[key] = np.array([d[key] for d in md])
             measurements_array = metrics_dict
         else:
@@ -431,11 +430,11 @@ def calculate_statistics(
 ) -> dict[str, Any]:
     """
     Calculate comprehensive statistics with outlier detection.
-    
+
     Args:
         data: Array of measurements
         config: Benchmark configuration for statistical parameters
-        
+
     Returns:
         Dictionary of statistical metrics
     """

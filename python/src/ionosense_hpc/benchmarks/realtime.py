@@ -43,7 +43,7 @@ class RealtimeBenchmarkConfig(BenchmarkConfig):
 class RealtimeBenchmark(BaseBenchmark):
     """
     Real-time streaming benchmark with deadline compliance.
-    
+
     Simulates a real-world streaming scenario where frames must be
     processed within strict deadlines, measuring both latency and
     timing jitter.
@@ -167,7 +167,7 @@ class RealtimeBenchmark(BaseBenchmark):
 
                 # Process the frame
                 with compute_range(f"Frame_{frame_idx}"):
-                    output = self.engine.process(self.test_data)
+                    self.engine.process(self.test_data)
 
                 # Ensure GPU sync for accurate timing
                 with nvtx_range("Sync", color=ProfileColor.YELLOW):
@@ -236,7 +236,7 @@ class RealtimeBenchmark(BaseBenchmark):
     def analyze_results(self, result: 'BenchmarkResult') -> dict[str, Any]:
         """
         Analyze real-time performance characteristics.
-        
+
         Returns:
             Dictionary with real-time specific analysis
         """

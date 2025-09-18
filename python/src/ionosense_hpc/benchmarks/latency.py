@@ -46,7 +46,7 @@ class LatencyBenchmarkConfig(BenchmarkConfig):
 class LatencyBenchmark(BaseBenchmark):
     """
     Production-grade latency benchmark with comprehensive timing analysis.
-    
+
     This benchmark measures end-to-end processing latency with microsecond
     precision, including GPU kernel execution time, memory transfers, and
     synchronization overhead.
@@ -112,7 +112,6 @@ class LatencyBenchmark(BaseBenchmark):
             self.engine.synchronize()
 
         # Start timing
-        t_start_cpu = time.perf_counter()
         t_start_ns = time.perf_counter_ns()
 
         # Process data
@@ -126,11 +125,9 @@ class LatencyBenchmark(BaseBenchmark):
             self.engine.synchronize()
 
         # End timing
-        t_end_cpu = time.perf_counter()
         t_end_ns = time.perf_counter_ns()
 
         # Calculate latencies
-        latency_s = t_end_cpu - t_start_cpu
         latency_us = (t_end_ns - t_start_ns) / 1000.0
 
         # Get engine-reported stats
@@ -173,7 +170,7 @@ class LatencyBenchmark(BaseBenchmark):
     def analyze_results(self, result: BenchmarkResult) -> dict[str, Any]:
         """
         Perform advanced analysis on collected measurements.
-        
+
         Returns:
             Dictionary of analysis results
         """
@@ -310,7 +307,7 @@ class LatencyBenchmark(BaseBenchmark):
 class StreamingLatencyBenchmark(LatencyBenchmark):
     """
     Variant that simulates continuous streaming workload.
-    
+
     This benchmark measures latency under sustained load conditions,
     simulating real-world streaming scenarios.
     """
@@ -390,11 +387,11 @@ def run_latency_benchmark_suite(
 ) -> dict[str, BenchmarkResult]:
     """
     Run comprehensive latency benchmark suite.
-    
+
     Args:
         config_path: Path to YAML/JSON configuration file
         output_dir: Directory for saving results
-        
+
     Returns:
         Dictionary of benchmark results
     """
@@ -403,10 +400,7 @@ def run_latency_benchmark_suite(
     from ionosense_hpc.benchmarks.base import load_benchmark_config, save_benchmark_results
 
     # Load configuration
-    if config_path:
-        base_config = load_benchmark_config(config_path)
-    else:
-        base_config = {}
+    base_config = load_benchmark_config(config_path) if config_path else {}
 
     # Define benchmark variants
     variants = [

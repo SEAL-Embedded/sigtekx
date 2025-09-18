@@ -102,7 +102,7 @@ def nvtx_range(
     if category:
         attrs["category"] = category
     if payload is not None:
-        attrs["payload"] = payload if isinstance(payload, (int, float)) else str(payload)
+        attrs["payload"] = payload if isinstance(payload, int | float) else str(payload)
 
     with nvtx.annotate(**attrs):  # type: ignore[attr-defined]
         yield
@@ -256,7 +256,7 @@ def mark_event(
     if category:
         attrs["category"] = category
     if payload is not None:
-        attrs["payload"] = payload if isinstance(payload, (int, float)) else str(payload)
+        attrs["payload"] = payload if isinstance(payload, int | float) else str(payload)
 
     # Implement as zero-duration range for compatibility
     with nvtx.annotate(**attrs):  # type: ignore[attr-defined]

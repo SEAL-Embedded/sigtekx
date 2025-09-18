@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, cast
+from typing import Any, cast
 
 from ionosense_hpc.utils.paths import (
     get_benchmark_result_path,
@@ -27,15 +27,15 @@ class DataArchiver:
 
     def archive_results(
         self,
-        results: Dict[str, Any],
+        results: dict[str, Any],
         experiment_name: str,
-        metadata: Dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> Path:
         """Archive benchmark results with metadata."""
         timestamp = datetime.now()
         archive_path = self._build_target_path(experiment_name, timestamp)
 
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "experiment": experiment_name,
             "timestamp": timestamp.isoformat(timespec="seconds"),
             "results": results,
@@ -50,7 +50,7 @@ class DataArchiver:
         self._update_manifest(experiment_name, archive_path.name, timestamp)
         return archive_path
 
-    def load_results(self, experiment_name: str, version: str | None = None) -> Dict[str, Any]:
+    def load_results(self, experiment_name: str, version: str | None = None) -> dict[str, Any]:
         """Load archived results for an experiment."""
         exp_dir = self._resolve_experiment_dir(experiment_name)
         if not exp_dir.exists():
@@ -68,19 +68,19 @@ class DataArchiver:
                 raise FileNotFoundError(f"Version not found: {version}")
 
         with archive_path.open(encoding="utf-8") as handle:
-            return cast(Dict[str, Any], json.load(handle))
+            return cast(dict[str, Any], json.load(handle))
 
     def compare_versions(
         self,
         experiment_name: str,
         version1: str,
         version2: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Compare two archived versions of a benchmark result."""
         results1 = self.load_results(experiment_name, version1)
         results2 = self.load_results(experiment_name, version2)
 
-        comparison: Dict[str, Any] = {
+        comparison: dict[str, Any] = {
             "experiment": experiment_name,
             "version1": version1,
             "version2": version2,
@@ -94,11 +94,11 @@ class DataArchiver:
             flat2 = self._flatten_dict(r2)
             common_keys = flat1.keys() & flat2.keys()
 
-            differences: Dict[str, Dict[str, float]] = {}
+            differences: dict[str, dict[str, float]] = {}
             for key in common_keys:
                 v1 = flat1[key]
                 v2 = flat2[key]
-                if isinstance(v1, (int, float)) and isinstance(v2, (int, float)):
+                if isinstance(v1, int | float) and isinstance(v2, int | float):
                     diff = v2 - v1
                     pct_change = (diff / v1 * 100) if v1 != 0 else 0.0
                     differences[key] = {
@@ -125,7 +125,7 @@ class DataArchiver:
             return self.base_dir / normalize_benchmark_name(experiment_name)
         return get_benchmark_run_dir(experiment_name)
 
-    def _capture_environment(self) -> Dict[str, Any]:
+    def _capture_environment(self) -> dict[str, Any]:
         import platform
         import sys
 
@@ -153,8 +153,8 @@ class DataArchiver:
         with manifest_path.open("w", encoding="utf-8") as handle:
             json.dump(manifest, handle, indent=2)
 
-    def _flatten_dict(self, data: Dict[str, Any], parent_key: str = "") -> Dict[str, Any]:
-        items: Dict[str, Any] = {}
+    def _flatten_dict(self, data: dict[str, Any], parent_key: str = "") -> dict[str, Any]:
+        items: dict[str, Any] = {}
         for key, value in data.items():
             new_key = f"{parent_key}.{key}" if parent_key else key
             if isinstance(value, dict):

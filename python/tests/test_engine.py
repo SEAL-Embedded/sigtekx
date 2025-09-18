@@ -482,7 +482,6 @@ class TestEngineLifecycle:
 
         # Process some data
         engine.process(test_data)
-        stats1 = engine.stats
 
         # Reset
         engine.reset()

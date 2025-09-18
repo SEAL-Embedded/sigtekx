@@ -15,8 +15,6 @@ from ionosense_hpc import Engine
 from ionosense_hpc.benchmarks.base import BaseBenchmark, BenchmarkConfig, BenchmarkResult
 from ionosense_hpc.config import EngineConfig, Presets
 from ionosense_hpc.utils import logger, make_chirp, make_multitone, make_noise, make_sine
-from ionosense_hpc.utils.reproducibility import DeterministicGenerator
-from ionosense_hpc.utils.signals import make_dc_signal, make_impulse
 from ionosense_hpc.utils.paths import get_benchmark_run_dir, normalize_benchmark_name
 from ionosense_hpc.utils.profiling import (
     ProfileColor,
@@ -24,6 +22,8 @@ from ionosense_hpc.utils.profiling import (
     setup_range,
     teardown_range,
 )
+from ionosense_hpc.utils.reproducibility import DeterministicGenerator
+from ionosense_hpc.utils.signals import make_dc_signal, make_impulse
 
 
 class AccuracyBenchmarkConfig(BenchmarkConfig):
@@ -68,7 +68,7 @@ class AccuracyBenchmarkConfig(BenchmarkConfig):
 class AccuracyBenchmark(BaseBenchmark):
     """
     Comprehensive accuracy validation against reference implementations.
-    
+
     This benchmark validates the numerical accuracy of the FFT engine
     against known reference implementations, tests fundamental signal
     processing properties, and ensures IEEE-754 compliance.
@@ -461,7 +461,7 @@ class AccuracyBenchmark(BaseBenchmark):
     def analyze_results(self, result: BenchmarkResult) -> dict[str, Any]:
         """
         Analyze accuracy validation results.
-        
+
         Returns:
             Dictionary with detailed accuracy analysis
         """

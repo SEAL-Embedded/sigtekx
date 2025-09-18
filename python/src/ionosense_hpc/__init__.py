@@ -13,7 +13,7 @@ import platform
 import sys
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Type
+from typing import TYPE_CHECKING, Any
 
 # ============================================================================
 # Version Info & Metadata

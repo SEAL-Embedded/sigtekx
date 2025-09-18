@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-from typing import Dict
 
 import numpy as np
 
@@ -17,7 +16,7 @@ class DeterministicGenerator:
         """Initialize generator with a base seed and context string."""
         self.base_seed = base_seed
         self.context = context
-        self._rng_cache: Dict[str, np.random.Generator] = {}
+        self._rng_cache: dict[str, np.random.Generator] = {}
 
     def get_rng(self, stream_id: str = "main") -> np.random.Generator:
         """Return a cached generator for the requested stream."""

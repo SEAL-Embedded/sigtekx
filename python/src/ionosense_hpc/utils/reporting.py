@@ -24,6 +24,8 @@ try:
     import seaborn as sns
 except Exception:  # optional styling
     sns = None  # type: ignore
+import contextlib
+
 from scipy import stats
 
 from ionosense_hpc.benchmarks.base import BenchmarkContext, BenchmarkResult
@@ -31,12 +33,10 @@ from ionosense_hpc.utils import logger
 
 # Set publication-quality defaults (guard if matplotlib/seaborn present)
 if sns is not None:
-    try:
+    with contextlib.suppress(Exception):
         sns.set_style("whitegrid")
-    except Exception:
-        pass
 if MATPLOTLIB_AVAILABLE:
-    try:
+    with contextlib.suppress(Exception):
         plt.rcParams.update({
             'font.size': 10,
             'axes.labelsize': 11,
@@ -50,8 +50,6 @@ if MATPLOTLIB_AVAILABLE:
             'savefig.bbox': 'tight',
             'figure.constrained_layout.use': True
         })
-    except Exception:
-        pass
 
 
 @dataclass
@@ -145,7 +143,7 @@ class BenchmarkReport:
                     return self
                 def __exit__(self, exc_type, exc, tb):
                     return False
-                def savefig(self, *args, **kwargs):
+                def savefig(self, *_args, **_kwargs):
                     # No-op to avoid backend interactions during tests
                     return None
             _pp = _DummyPdf  # type: ignore
@@ -248,7 +246,7 @@ class BenchmarkReport:
         for result in self.results:
             if isinstance(result.measurements, dict):
                 # Multi-metric case
-                for metric, values in result.measurements.items():
+                for metric, _values in result.measurements.items():
                     stats = result.statistics.get(metric, {})
                     row = [
                         f"{result.name}:{metric}",
@@ -314,10 +312,7 @@ class BenchmarkReport:
         rows = (n_results + cols - 1) // cols
 
         fig, axes = plt.subplots(rows, cols, figsize=(5*cols, 4*rows))
-        if n_results == 1:
-            axes = [axes]
-        else:
-            axes = axes.flatten() if rows > 1 else axes
+        axes = [axes] if n_results == 1 else axes.flatten() if rows > 1 else axes
 
         for idx, result in enumerate(self.results):
             ax = axes[idx] if n_results > 1 else axes[0]
@@ -332,13 +327,13 @@ class BenchmarkReport:
                         labels.append(metric)
 
                 if data:
-                    parts = ax.violinplot(data, showmeans=True, showmedians=True)
+                    ax.violinplot(data, showmeans=True, showmedians=True)
                     ax.set_xticks(range(1, len(labels) + 1))
                     ax.set_xticklabels(labels, rotation=45)
             else:
                 # Single metric
                 if len(result.measurements) > 0:
-                    parts = ax.violinplot([result.measurements], showmeans=True, showmedians=True)
+                    ax.violinplot([result.measurements], showmeans=True, showmedians=True)
 
             ax.set_title(result.name, fontsize=10)
             ax.set_ylabel('Value')
@@ -381,8 +376,8 @@ class BenchmarkReport:
             notch=True,
             patch_artist=True,
             showmeans=True,
-            meanprops=dict(marker='D', markeredgecolor='black', markerfacecolor='red'),
-            flierprops=dict(marker='o', markersize=4, alpha=0.5)
+            meanprops={"marker": 'D', "markeredgecolor": 'black', "markerfacecolor": 'red'},
+            flierprops={"marker": 'o', "markersize": 4, "alpha": 0.5}
         )
 
         # Color boxes
@@ -410,10 +405,7 @@ class BenchmarkReport:
         rows = (n_results + cols - 1) // cols
 
         fig, axes = plt.subplots(rows, cols, figsize=(5*cols, 4*rows))
-        if n_results == 1:
-            axes = [axes]
-        else:
-            axes = axes.flatten() if rows > 1 else axes
+        axes = [axes] if n_results == 1 else axes.flatten() if rows > 1 else axes
 
         for idx, result in enumerate(self.results):
             ax = axes[idx] if n_results > 1 else axes[0]

@@ -132,10 +132,7 @@ def make_multitone(
     else:
         amp_arr = np.asarray(amplitudes, dtype=np.float64)
 
-    if phases is None:
-        phase_arr = np.zeros_like(freq_arr)
-    else:
-        phase_arr = np.asarray(phases, dtype=np.float64)
+    phase_arr = np.zeros_like(freq_arr) if phases is None else np.asarray(phases, dtype=np.float64)
 
     if not (len(freq_arr) == len(amp_arr) == len(phase_arr)):
         raise ValueError("frequencies, amplitudes, and phases must have matching lengths")

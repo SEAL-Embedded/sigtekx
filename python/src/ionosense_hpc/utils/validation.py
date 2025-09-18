@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any
 
 import numpy as np
 
@@ -19,9 +19,9 @@ class ValidationHelper:
         min_samples: int = 30,
         max_cv: float = 0.5,
         check_outliers: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Validate a set of measurements and return diagnostics."""
-        results: Dict[str, Any] = {
+        results: dict[str, Any] = {
             "name": name,
             "valid": True,
             "warnings": [],
@@ -91,10 +91,10 @@ class ValidationHelper:
         return results
 
     @staticmethod
-    def _find_peaks(data: np.ndarray, min_height: float = 0.1) -> List[int]:
+    def _find_peaks(data: np.ndarray, min_height: float = 0.1) -> list[int]:
         """Detect peaks above a threshold in a histogram array."""
         threshold = float(np.max(data)) * min_height
-        peaks: List[int] = []
+        peaks: list[int] = []
         for idx in range(1, len(data) - 1):
             if data[idx] > threshold and data[idx] > data[idx - 1] and data[idx] > data[idx + 1]:
                 peaks.append(idx)
@@ -105,7 +105,7 @@ class ValidationHelper:
         data1: np.ndarray,
         data2: np.ndarray,
         test: str = "ks",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Compare two datasets using statistical hypothesis tests."""
         try:
             from scipy import stats

@@ -124,10 +124,8 @@ def device_info(device_id: int | None = None) -> dict[str, Any]:
                     info['name'] = name
                     cc_tokens = cc_part.split(')', 1)[0].split('.')
                     if len(cc_tokens) == 2:
-                        try:
+                        with contextlib.suppress(ValueError):
                             info['compute_capability'] = (int(cc_tokens[0]), int(cc_tokens[1]))
-                        except ValueError:
-                            pass
                 else:
                     info['name'] = name_part
         except Exception:

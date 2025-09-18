@@ -15,6 +15,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import yaml  # type: ignore[import-untyped]
 
 from ionosense_hpc.benchmarks.base import BenchmarkContext
@@ -80,7 +81,7 @@ class WorkflowResult:
 class ResearchWorkflow:
     """
     Orchestrates complete research experiments with reproducibility.
-    
+
     This class manages the full lifecycle of research experiments, from
     environment setup through benchmarking, analysis, and reporting,
     ensuring full reproducibility and traceability.
@@ -89,7 +90,7 @@ class ResearchWorkflow:
     def __init__(self, config: ResearchConfig | dict[str, Any] | str):
         """
         Initialize research workflow.
-        
+
         Args:
             config: ResearchConfig, dict, or path to config file
         """
@@ -107,10 +108,7 @@ class ResearchWorkflow:
 
         # Setup directories (honor configured output root if provided)
         output_dir_value = self.config.output_settings.get('output_dir')
-        if output_dir_value:
-            output_root = Path(str(output_dir_value))
-        else:
-            output_root = get_experiments_root()
+        output_root = Path(str(output_dir_value)) if output_dir_value else get_experiments_root()
         self.base_dir = output_root / self.workflow_id
         self.setup_directories()
 
@@ -329,7 +327,7 @@ class ResearchWorkflow:
 
             return None
 
-    def _run_setup_stage(self, stage: WorkflowStage) -> dict[str, Any]:
+    def _run_setup_stage(self, _stage: WorkflowStage) -> dict[str, Any]:
         """Run environment setup stage."""
         # Capture environment
         env = self.capture_environment()
@@ -383,7 +381,7 @@ class ResearchWorkflow:
 
         return results
 
-    def _run_analysis_stage(self, stage: WorkflowStage) -> dict[str, Any]:
+    def _run_analysis_stage(self, _stage: WorkflowStage) -> dict[str, Any]:
         """Run analysis stage on collected results."""
         from ionosense_hpc.utils.validation import ValidationHelper
 
@@ -391,7 +389,7 @@ class ResearchWorkflow:
         analysis_results = {}
 
         # Analyze each result set
-        for name, results in self.results.items():
+        for _name, results in self.results.items():
             if isinstance(results, dict) and 'results' in results:
                 # Suite results
                 benchmark_results = results['results']
@@ -459,10 +457,10 @@ class ResearchWorkflow:
     def run(self, stages: list[str] | None = None) -> WorkflowResult:
         """
         Execute the complete research workflow.
-        
+
         Args:
             stages: Specific stages to run (None for all)
-            
+
         Returns:
             WorkflowResult with all outputs
         """
@@ -556,12 +554,12 @@ def create_research_workflow(
 ) -> ResearchWorkflow:
     """
     Convenience function to create a standard research workflow.
-    
+
     Args:
         name: Experiment name
         researcher: Researcher name
         description: Experiment description
-        
+
     Returns:
         Configured ResearchWorkflow instance
     """
@@ -590,8 +588,6 @@ def create_research_workflow(
     return workflow
 
 
-
-import numpy as np
 
 if __name__ == '__main__':
     # Example usage

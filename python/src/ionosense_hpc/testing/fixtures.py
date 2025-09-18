@@ -215,6 +215,7 @@ def mock_engine(monkeypatch) -> Engine:
             self.is_initialized = True
 
         def process(self, data):
+            _ = data  # ensure interface compatibility while keeping mock lightweight
             batch = self.config.batch
             bins = self.config.num_output_bins
             return np.random.randn(batch, bins).astype(np.float32)
@@ -419,6 +420,7 @@ def require_nsight() -> None:
 @pytest.fixture
 def benchmark_runner(temp_benchmark_dir: Path):
     """Provides a configured benchmark runner for testing."""
+    _ = temp_benchmark_dir  # trigger fixture side effects (workspace setup)
     from ionosense_hpc.benchmarks.base import BaseBenchmark
 
     class TestBenchmark(BaseBenchmark):

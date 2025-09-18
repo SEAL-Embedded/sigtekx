@@ -6,11 +6,13 @@ Manages sequential execution of multiple benchmarks with unified reporting.
 """
 
 import json
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 
+import numpy as np
 import yaml  # type: ignore[import-untyped]
 
 from ionosense_hpc.benchmarks.accuracy import AccuracyBenchmark
@@ -68,7 +70,7 @@ class SuiteConfig:
 class BenchmarkSuite:
     """
     Orchestrates execution of multiple benchmarks with unified reporting.
-    
+
     This class manages the sequential execution of benchmarks, handles
     failures gracefully, and produces comprehensive reports suitable
     for publication or analysis.
@@ -87,7 +89,7 @@ class BenchmarkSuite:
     def __init__(self, config: SuiteConfig | dict | str | None = None):
         """
         Initialize suite with configuration.
-        
+
         Args:
             config: SuiteConfig, dict, YAML file path, or None for defaults
         """
@@ -182,7 +184,7 @@ class BenchmarkSuite:
     def run(self) -> dict[str, Any]:
         """
         Execute the benchmark suite.
-        
+
         Returns:
             Dictionary containing all results and metadata
         """
@@ -334,9 +336,11 @@ class BenchmarkSuite:
             if 'latency' in result.name.lower():
                 if 'mean' in result.statistics:
                     latencies.append(result.statistics['mean'])
-            elif 'throughput' in result.name.lower():
-                if 'frames_per_second' in result.statistics:
-                    throughputs.append(result.statistics['frames_per_second'])
+            elif (
+                'throughput' in result.name.lower()
+                and 'frames_per_second' in result.statistics
+            ):
+                throughputs.append(result.statistics['frames_per_second'])
 
         if latencies:
             summary['avg_latency_us'] = np.mean(latencies)
@@ -375,11 +379,11 @@ class BenchmarkSuite:
 def run_default_suite(preset: str = 'realtime', output_dir: str | None = None) -> dict[str, Any]:
     """
     Convenience function to run the default benchmark suite.
-    
+
     Args:
         preset: Engine configuration preset name
         output_dir: Custom output directory
-        
+
     Returns:
         Suite results dictionary
     """
@@ -392,10 +396,6 @@ def run_default_suite(preset: str = 'realtime', output_dir: str | None = None) -
     suite = BenchmarkSuite(config)
     return suite.run()
 
-
-import time
-
-import numpy as np
 
 
 def main(argv: list[str] | None = None) -> int:

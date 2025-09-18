@@ -16,6 +16,7 @@ with minimal overhead while providing a Pythonic, NumPy-compatible interface.
 
 from __future__ import annotations
 
+import contextlib
 import warnings
 from typing import TYPE_CHECKING, Any, Literal, cast, overload
 
@@ -424,10 +425,8 @@ class Engine:
             return
 
         if self._cpp_engine is not None:
-            try:
+            with contextlib.suppress(Exception):
                 self._cpp_engine.reset()
-            except Exception:
-                pass  # Suppress errors during cleanup
 
         self._cpp_engine = None
         self._initialized = False
@@ -528,10 +527,8 @@ class Engine:
 
         # Synchronize on exit
         if self._initialized and self._cpp_engine is not None:
-            try:
+            with contextlib.suppress(Exception):
                 self._cpp_engine.synchronize()
-            except Exception:
-                pass
 
         if exc_type is not None:
             warnings.warn(
@@ -702,10 +699,8 @@ class Engine:
                 ResourceWarning,
                 stacklevel=2
             )
-            try:
+            with contextlib.suppress(Exception):
                 self.close()
-            except Exception:
-                pass
 
 
 # -----------------------------------------------------------------------------
