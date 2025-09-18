@@ -356,8 +356,13 @@ try:
             RuntimeWarning,
             stacklevel=2,
         )
-except Exception:
-    pass  # Suppress errors during import
+except DeviceNotFoundError as exc:
+    warnings.warn(
+        f"CUDA device query failed during module import: {exc}",
+        RuntimeWarning,
+        stacklevel=2,
+    )
+    raise
 
 # Print brief info when imported interactively
 if hasattr(sys, 'ps1'):  # Interactive mode

@@ -1,18 +1,27 @@
 """CUDA device query and management utilities."""
 
 import contextlib
-import warnings
 from typing import Any
 
 from ionosense_hpc.core.engine import _import_cpp_engine
+from ionosense_hpc.exceptions import DeviceNotFoundError, DllLoadError
+from ionosense_hpc.utils.logging import logger
 
 try:
     import pynvml
+
     NVML_AVAILABLE = True
 except ImportError:
-    # Optional dependency: silently degrade without emitting import-time warnings.
-    # Tests treat ImportWarning as errors; runtime gracefully falls back to C++ queries.
+    # Optional dependency: gracefully fall back to the C++ engine queries.
     NVML_AVAILABLE = False
+
+
+def _shutdown_nvml_safely() -> None:
+    """Best-effort NVML shutdown without propagating errors."""
+    if not NVML_AVAILABLE:
+        return
+    with contextlib.suppress(pynvml.NVMLError):
+        pynvml.nvmlShutdown()
 
 
 def gpu_count() -> int:
@@ -24,18 +33,25 @@ def gpu_count() -> int:
     if NVML_AVAILABLE:
         try:
             pynvml.nvmlInit()
-            count = pynvml.nvmlDeviceGetCount()
-            pynvml.nvmlShutdown()
-            return int(count)
-        except Exception:
-            pass
+            try:
+                return int(pynvml.nvmlDeviceGetCount())
+            finally:
+                _shutdown_nvml_safely()
+        except pynvml.NVMLError as exc:
+            logger.warning("NVML query failed: %s", exc)
+        except Exception as exc:  # pragma: no cover - defensive safeguard
+            _shutdown_nvml_safely()
+            raise DeviceNotFoundError("Failed to query CUDA devices via NVML") from exc
 
-    # Fallback to C++ module
     try:
         cpp_module = _import_cpp_engine()
+    except Exception as exc:  # pragma: no cover - propagate load failures
+        raise DllLoadError("_engine", exc) from exc
+
+    try:
         return len(list(cpp_module.get_available_devices()))
-    except Exception:
-        return 0
+    except Exception as exc:  # pragma: no cover - propagate enumeration errors
+        raise DeviceNotFoundError("Failed to enumerate CUDA devices via C++ engine") from exc
 
 
 def current_device() -> int:
@@ -46,9 +62,13 @@ def current_device() -> int:
     """
     try:
         cpp_module = _import_cpp_engine()
+    except Exception as exc:  # pragma: no cover - propagate load failures
+        raise DllLoadError("_engine", exc) from exc
+
+    try:
         return int(cpp_module.select_best_device())
-    except Exception:
-        return 0
+    except Exception as exc:
+        raise DeviceNotFoundError("Failed to select CUDA device") from exc
 
 
 def device_info(device_id: int | None = None) -> dict[str, Any]:
@@ -78,58 +98,68 @@ def device_info(device_id: int | None = None) -> dict[str, Any]:
     if NVML_AVAILABLE:
         try:
             pynvml.nvmlInit()
-            handle = pynvml.nvmlDeviceGetHandleByIndex(device_id)
+            try:
+                handle = pynvml.nvmlDeviceGetHandleByIndex(device_id)
 
-            # Basic info
-            info['name'] = pynvml.nvmlDeviceGetName(handle)
+                info['name'] = pynvml.nvmlDeviceGetName(handle)
 
-            # Memory info
-            mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
-            info['memory_total_mb'] = mem_info.total // (1024 * 1024)
-            info['memory_free_mb'] = mem_info.free // (1024 * 1024)
+                mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+                info['memory_total_mb'] = mem_info.total // (1024 * 1024)
+                info['memory_free_mb'] = mem_info.free // (1024 * 1024)
 
-            # Compute capability
-            major = pynvml.nvmlDeviceGetCudaComputeCapability(handle)[0]
-            minor = pynvml.nvmlDeviceGetCudaComputeCapability(handle)[1]
-            info['compute_capability'] = (major, minor)
+                major, minor = pynvml.nvmlDeviceGetCudaComputeCapability(handle)
+                info['compute_capability'] = (major, minor)
 
-            # Optional monitoring (may fail on some GPUs)
-            with contextlib.suppress(pynvml.NVMLError):
-                info['temperature_c'] = pynvml.nvmlDeviceGetTemperature(
-                    handle, pynvml.NVML_TEMPERATURE_GPU
-                )
+                with contextlib.suppress(pynvml.NVMLError):
+                    info['temperature_c'] = pynvml.nvmlDeviceGetTemperature(
+                        handle, pynvml.NVML_TEMPERATURE_GPU
+                    )
 
-            with contextlib.suppress(pynvml.NVMLError):
-                info['power_w'] = pynvml.nvmlDeviceGetPowerUsage(handle) / 1000.0
+                with contextlib.suppress(pynvml.NVMLError):
+                    info['power_w'] = pynvml.nvmlDeviceGetPowerUsage(handle) / 1000.0
 
-            with contextlib.suppress(pynvml.NVMLError):
-                util = pynvml.nvmlDeviceGetUtilizationRates(handle)
-                info['utilization_gpu'] = util.gpu
-                info['utilization_memory'] = util.memory
+                with contextlib.suppress(pynvml.NVMLError):
+                    util = pynvml.nvmlDeviceGetUtilizationRates(handle)
+                    info['utilization_gpu'] = util.gpu
+                    info['utilization_memory'] = util.memory
+            finally:
+                _shutdown_nvml_safely()
+        except pynvml.NVMLError as exc:
+            logger.warning("NVML device query failed: %s", exc)
+        except Exception as exc:
+            _shutdown_nvml_safely()
+            raise DeviceNotFoundError("Failed to query CUDA device via NVML") from exc
 
-            pynvml.nvmlShutdown()
-        except Exception as e:
-            warnings.warn(f"NVML query failed: {e}", stacklevel=2)
-
-    # Try to get basic info from C++ module as fallback
     if info['name'] == 'Unknown':
         try:
             cpp_module = _import_cpp_engine()
+        except Exception as exc:  # pragma: no cover - propagate load failures
+            raise DllLoadError("_engine", exc) from exc
+
+        try:
             devices = list(cpp_module.get_available_devices())
-            if device_id < len(devices):
-                device_str = devices[device_id]
-                name_part = device_str.split('] ', 1)[1] if '] ' in device_str else device_str
-                if ' (CC ' in name_part:
-                    name, cc_part = name_part.split(' (CC ', 1)
-                    info['name'] = name
-                    cc_tokens = cc_part.split(')', 1)[0].split('.')
-                    if len(cc_tokens) == 2:
-                        with contextlib.suppress(ValueError):
-                            info['compute_capability'] = (int(cc_tokens[0]), int(cc_tokens[1]))
-                else:
-                    info['name'] = name_part
-        except Exception:
-            pass
+        except Exception as exc:
+            raise DeviceNotFoundError("Failed to enumerate CUDA devices") from exc
+
+        if not devices:
+            raise DeviceNotFoundError("No CUDA-capable devices detected")
+
+        if device_id >= len(devices) or device_id < 0:
+            raise DeviceNotFoundError(
+                f"Requested device index {device_id} outside available device range"
+            )
+
+        device_str = devices[device_id]
+        name_part = device_str.split('] ', 1)[1] if '] ' in device_str else device_str
+        if ' (CC ' in name_part:
+            name, cc_part = name_part.split(' (CC ', 1)
+            info['name'] = name
+            cc_tokens = cc_part.split(')', 1)[0].split('.')
+            if len(cc_tokens) == 2:
+                with contextlib.suppress(ValueError):
+                    info['compute_capability'] = (int(cc_tokens[0]), int(cc_tokens[1]))
+        else:
+            info['name'] = name_part
 
     return info
 
@@ -137,6 +167,7 @@ def device_info(device_id: int | None = None) -> dict[str, Any]:
 # =================================================================
 #  High-level utility functions (device_info() wrappers)
 # =================================================================
+
 
 def get_memory_usage() -> tuple[int, int]:
     """Get current GPU memory usage.
@@ -157,7 +188,10 @@ def check_cuda_available() -> bool:
     Returns:
         True if CUDA can be used
     """
-    return gpu_count() > 0
+    try:
+        return gpu_count() > 0
+    except DeviceNotFoundError:
+        return False
 
 
 def get_compute_capability(device_id: int | None = None) -> tuple[int, int]:
@@ -172,11 +206,8 @@ def get_compute_capability(device_id: int | None = None) -> tuple[int, int]:
     info = device_info(device_id)
     cc = info.get('compute_capability', (0, 0))
     if isinstance(cc, tuple) and len(cc) == 2:
-        try:
-            return int(cc[0]), int(cc[1])
-        except Exception:
-            return (0, 0)
-    return (0, 0)
+        return int(cc[0]), int(cc[1])
+    raise DeviceNotFoundError("Compute capability unavailable for requested device")
 
 
 def monitor_device(device_id: int | None = None) -> str:

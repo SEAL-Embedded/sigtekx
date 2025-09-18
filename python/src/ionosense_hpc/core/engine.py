@@ -221,19 +221,29 @@ class Engine:
     def _validate_device_requirements(self) -> None:
         try:
             from ionosense_hpc.utils.device import device_info
-        except Exception:
-            return
+        except Exception as exc:
+            raise DeviceNotFoundError(
+                "Unable to import CUDA device utilities for validation"
+            ) from exc
 
-        info = device_info()
+        try:
+            info = device_info()
+        except DeviceNotFoundError:
+            raise
+        except Exception as exc:
+            raise DeviceNotFoundError(
+                "Unable to query CUDA device information"
+            ) from exc
+
         total_mb = int(info.get("memory_total_mb", 0) or 0)
         compute_capability = info.get("compute_capability", (0, 0))
         if not isinstance(compute_capability, tuple) or len(compute_capability) != 2:
-            compute_capability = (0, 0)
-
-        if total_mb <= 0 and compute_capability == (0, 0):
-            return
+            raise DeviceNotFoundError("Invalid CUDA compute capability reported")
 
         major, minor = compute_capability
+        if total_mb <= 0:
+            raise DeviceNotFoundError("CUDA device reports zero available memory")
+
         validate_config_device_compatibility(
             self._config,
             total_mb,
