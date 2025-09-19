@@ -8,6 +8,8 @@
 # Root build trees
 /build/                  # CMake/Ninja build tree at repo root
 /dist/                   # Packaging output at repo root
+/artifacts/              # Persisted benchmark/profiling results
+artifacts/
 cmake-build-*/           # CLion out-of-source builds
 /build/**
 /out/

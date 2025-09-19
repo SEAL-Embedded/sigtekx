@@ -81,14 +81,23 @@ research/
 `-- results/                # Generated figures, tables, and reports
 ```
 
-### Build Outputs
+### Artifacts (artifacts/)
+```
+artifacts/
+|-- benchmarks/             # JSON/CSV suites plus generated reports
+|-- experiments/            # Research workflow runs and sweep outputs
+|-- profiling/
+|   |-- ncu_reports/        # Nsight Compute traces (.ncu-rep)
+|   `-- nsys_reports/       # Nsight Systems traces (.nsys-rep)
+|-- reports/                # Lint/coverage/test summaries + validation logs
+`-- logs/                   # Research CLI JSONL logs for traceability
+```
+
+### Build Outputs (build/)
 ```
 build/
-|-- benchmark_results/      # Summary CSV/JSON from CLI benchmark runs
-|-- experiments/            # Research experiment artefacts staged by CLI
-|-- nsight_reports/         # Nsight Systems/Compute traces
-|-- reports/                # Lint, coverage, and QA summaries
-`-- windows-rel/            # Latest Windows release build (CTest + binaries)
+|-- windows-rel/            # Latest Windows release build (CTest + binaries)
+`-- <preset>/               # Any additional CMake presets generated locally
 ```
 
 ### Python Module Artefacts
@@ -229,11 +238,12 @@ Reference issues or research tickets in commit messages when applicable to maint
 | RMS error | < 1e-5 | Compared against double precision reference |
 
 ## Output Artefacts
-- Generated content remains under `build/` (configurable via `IONO_OUTPUT_ROOT`).
-- Benchmark CSVs/plots: `build/benchmark_results/`
-- Experiment dumps: `build/experiments/`
-- QA reports (lint, coverage): `build/reports/`
-- Profiling traces: `build/nsight_reports/`
+- Generated content persists under `artifacts/` (configurable via `IONO_OUTPUT_ROOT`).
+- Benchmark CSVs/plots: `artifacts/benchmarks/`
+- Experiment dumps: `artifacts/experiments/`
+- QA reports (lint, coverage, validation): `artifacts/reports/`
+- Profiling traces: `artifacts/profiling/nsys_reports/` & `artifacts/profiling/ncu_reports/`
+- CLI research logs: `artifacts/logs/`
 
 ## Tooling Notes
 - Use `./scripts/cli.sh doctor` or `iono doctor` to validate environments.

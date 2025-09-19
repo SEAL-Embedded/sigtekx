@@ -23,11 +23,12 @@ $script:ConfigDir        = Join-Path $PythonDir "src\ionosense_hpc\benchmarks\co
 $script:BuildPreset      = if ($env:BUILD_PRESET) { $env:BUILD_PRESET } else { "windows-rel" }
 $script:CondaEnvName     = "ionosense-hpc"
 $script:EnvironmentFile  = Join-Path $ProjectRoot "environments\environment.win.yml"
-$script:BenchResultsDir  = Join-Path $ProjectRoot "benchmark_results"
-$script:ReportsDir       = Join-Path $BuildDir "reports"
-$script:ExperimentsDir   = Join-Path $BuildDir "experiments"
-$script:ProfileDir       = Join-Path $BuildDir "nsight_reports"
-$script:LogRoot          = Join-Path $ProjectRoot ".ionosense\logs"
+$script:ArtifactsDir     = Join-Path $ProjectRoot "artifacts"
+$script:BenchResultsDir  = Join-Path $script:ArtifactsDir "benchmarks"
+$script:ReportsDir       = Join-Path $script:ArtifactsDir "reports"
+$script:ExperimentsDir   = Join-Path $script:ArtifactsDir "experiments"
+$script:ProfileDir       = Join-Path $script:ArtifactsDir "profiling"
+$script:LogRoot          = Join-Path $script:ArtifactsDir "logs"
 
 # Research metadata
 $script:ResearchVersion   = "0.9.0"
@@ -144,20 +145,27 @@ Function Write-ResearchLog {
 
 Function Initialize-ResearchEnvironment {
     # Create necessary directories
-    @($script:BenchResultsDir, $script:ReportsDir, $script:ExperimentsDir, $script:ProfileDir) | ForEach-Object {
+    @(
+        $script:ArtifactsDir,
+        $script:BenchResultsDir,
+        $script:ReportsDir,
+        $script:ExperimentsDir,
+        $script:ProfileDir,
+        $script:LogRoot
+    ) | ForEach-Object {
         if (-not (Test-Path $_)) {
             New-Item -ItemType Directory -Path $_ -Force | Out-Null
             Write-ResearchLog -Level Info -Message "Created directory: $_" -Component "Init"
         }
     }
-    
-    # Align Python outputs with build/ tree via environment overrides
-    $env:IONO_OUTPUT_ROOT     = $script:BuildDir
+
+    # Align Python outputs with artifacts tree via environment overrides
+    $env:IONO_OUTPUT_ROOT     = $script:ArtifactsDir
     $env:IONO_BENCH_DIR       = $script:BenchResultsDir
     $env:IONO_EXPERIMENTS_DIR = $script:ExperimentsDir
     $env:IONO_REPORTS_DIR     = $script:ReportsDir
     Write-ResearchLog -Level Info -Message "Bound Python outputs via env overrides (IONO_*_DIR)" -Component "Init" -Metadata @{
-        output_root = $env:IONO_OUTPUT_ROOT
+        artifacts   = $env:IONO_OUTPUT_ROOT
         benches     = $env:IONO_BENCH_DIR
         experiments = $env:IONO_EXPERIMENTS_DIR
         reports     = $env:IONO_REPORTS_DIR
@@ -732,6 +740,7 @@ Function Invoke-Clean {
     if ($All) {
         # Research artifacts and extra caches
         $allDirs = @(
+            $script:ArtifactsDir,
             (Join-Path $root 'results'),
             (Join-Path $root 'benchmark_results'),
             (Join-Path $root 'experiments'),
@@ -739,6 +748,7 @@ Function Invoke-Clean {
             $script:ExperimentsDir,
             $script:ProfileDir,
             $script:LogRoot,
+            (Join-Path $root '.ionosense'),
             (Join-Path $root 'dist'),
             (Join-Path $root '.mypy_cache'),
             (Join-Path $root '.ruff_cache')

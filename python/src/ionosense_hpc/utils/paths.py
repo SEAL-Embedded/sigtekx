@@ -2,7 +2,7 @@
 Centralized paths for outputs and artifacts.
 
 Policy:
-- Default all volatile artifacts under the project build/ tree to align with RSE/RE norms.
+- Default derived artifacts under <repo>/artifacts so routine cleans preserve results.
 - Allow overrides via env vars for research workflows and CI.
 """
 
@@ -43,15 +43,22 @@ def normalize_benchmark_name(name: str) -> str:
     return _sanitize_component(name)
 
 
-def get_output_root() -> Path:
-    """Root for all outputs. Defaults to <repo>/build or <repo> if build/ missing."""
+ARTIFACTS_ROOT_NAME = "artifacts"
+
+
+def get_artifacts_root() -> Path:
+    """Root directory for long-lived artifacts."""
     env_root = os.environ.get("IONO_OUTPUT_ROOT")
     if env_root:
-        return Path(env_root)
+        return _ensure(Path(env_root))
 
     root = _repo_root()
-    build = root / "build"
-    return build if build.exists() else root
+    return _ensure(root / ARTIFACTS_ROOT_NAME)
+
+
+def get_output_root() -> Path:
+    """Alias for artifact root for backwards compatibility."""
+    return get_artifacts_root()
 
 
 def get_benchmarks_root() -> Path:
@@ -59,8 +66,7 @@ def get_benchmarks_root() -> Path:
     env = os.environ.get("IONO_BENCH_DIR")
     if env:
         return _ensure(Path(env))
-    root = _repo_root() / "benchmark_results"
-    return _ensure(root)
+    return _ensure(get_artifacts_root() / "benchmarks")
 
 
 def get_benchmark_run_dir(name: str) -> Path:
@@ -87,13 +93,13 @@ def get_experiments_root() -> Path:
     """Root for research workflow experiment directories."""
     env = os.environ.get("IONO_EXPERIMENTS_DIR")
     if env:
-        return Path(env)
-    return get_output_root() / "experiments"
+        return _ensure(Path(env))
+    return _ensure(get_artifacts_root() / "experiments")
 
 
 def get_reports_root() -> Path:
     """Root for top-level reports (test, lint, etc.)."""
     env = os.environ.get("IONO_REPORTS_DIR")
     if env:
-        return Path(env)
-    return get_output_root() / "reports"
+        return _ensure(Path(env))
+    return _ensure(get_artifacts_root() / "reports")

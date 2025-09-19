@@ -606,15 +606,17 @@ it                             # Verify build
 
 ## Outputs & Artifacts
 
-To keep the repo clean and follow RSE/RE practices, all generated artifacts default to the `build/` tree:
+To keep the repo clean and follow RSE/RE practices, all generated artifacts default to the top-level `artifacts/` tree:
 
-- `build/benchmark_results/` – benchmark runs and suite outputs
-- `build/experiments/` – research workflows and parameter sweeps
-- `build/reports/` – reports, coverage, lint/test summaries
+- `artifacts/benchmarks/` – benchmark runs, suite outputs, generated reports
+- `artifacts/experiments/` – research workflows and parameter sweeps
+- `artifacts/profiling/` – Nsight Systems/Compute traces grouped by tool
+- `artifacts/reports/` – coverage, lint/test summaries, validation logs
+- `artifacts/logs/` – JSONL research logs emitted by the CLI
 
 The CLI initializes environment variables so Python code writes to these locations:
 
-- `IONO_OUTPUT_ROOT` – root for all outputs (defaults to `build/`)
+- `IONO_OUTPUT_ROOT` – root for all artifacts (defaults to `artifacts/`)
 - `IONO_BENCH_DIR`, `IONO_EXPERIMENTS_DIR`, `IONO_REPORTS_DIR` – per-area overrides
 
 Override them in CI or custom setups if you need different paths.

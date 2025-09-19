@@ -831,11 +831,11 @@ ibench scaling                                  # Windows (dev shell)
 - [IEEE Standard for Floating-Point Arithmetic](https://ieeexplore.ieee.org/document/8766229)
 ## Output Locations
 
-By default, all benchmark artifacts are written under the repository `build/` tree to keep the workspace clean and aligned with RSE/RE standards:
+By default, all benchmark artifacts are written under the repository `artifacts/` tree to keep the workspace clean and aligned with RSE/RE standards:
 
-- Benchmarks: `build/benchmark_results/<suite_or_name>_<timestamp>/`
-- Research workflows and sweeps: `build/experiments/<workflow_or_experiment_id>/`
-- Reports and test outputs: `build/reports/`
+- Benchmarks: `artifacts/benchmarks/<suite_or_name>_<timestamp>/`
+- Research workflows and sweeps: `artifacts/experiments/<workflow_or_experiment_id>/`
+- Reports and test outputs: `artifacts/reports/`
 
 You can override these locations with environment variables (useful for CI or custom storage):
 
@@ -844,4 +844,4 @@ You can override these locations with environment variables (useful for CI or cu
 - `IONO_EXPERIMENTS_DIR`: experiments root
 - `IONO_REPORTS_DIR`: reports root
 
-The CLI initializes these variables automatically to point to `build/` so Python tools and the CLI are consistent.
+The CLI initializes these variables automatically to point to `artifacts/` so Python tools and the CLI are consistent.
