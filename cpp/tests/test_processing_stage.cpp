@@ -268,6 +268,7 @@ TEST_F(ProcessingStageTest, MagnitudeStageInitialization) {
  * @brief Tests the magnitude calculation for a known complex input.
  */
 TEST_F(ProcessingStageTest, MagnitudeStageProcess) {
+  config_.scale_policy = StageConfig::ScalePolicy::NONE;
   MagnitudeStage stage;
   stage.initialize(config_, stream_->get());
 
@@ -445,6 +446,6 @@ TEST_F(ProcessingStageTest, FullPipelineIntegration) {
     }
 
     EXPECT_EQ(peak_bin, test_freq_bin);
-    EXPECT_GT(max_mag, 10.0f);
+    EXPECT_GT(max_mag, 0.1f);  // Expect a noticeable peak with normalized scaling
   }
 }

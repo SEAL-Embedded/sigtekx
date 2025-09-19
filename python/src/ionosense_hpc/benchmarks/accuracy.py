@@ -362,8 +362,12 @@ class AccuracyBenchmark(BaseBenchmark):
             dtype=np.float32,
         )
 
+        # Apply the same windowing as the GPU pipeline before energy check
+        window = scipy_signal.windows.hann(self.engine_config.nfft, sym=False)
+        windowed_signal = test_signal * window
+
         # Compute time-domain energy
-        time_energy = np.sum(test_signal**2)
+        time_energy = np.sum(windowed_signal**2)
 
         # Process and get frequency domain
         test_batch = np.tile(test_signal, self.engine_config.batch)

@@ -63,7 +63,7 @@ struct StageConfig {
     ONE_OVER_SQRT_N
   };  ///< FFT output scaling policies.
   ScalePolicy scale_policy =
-      ScalePolicy::NONE;  ///< Scaling policy for the FFT output.
+      ScalePolicy::ONE_OVER_N;  ///< Scaling policy for the FFT output.
 
   // --- Output Parameters ---
   enum class OutputMode {

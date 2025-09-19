@@ -260,7 +260,7 @@ TEST_F(ResearchEngineTest, SinusoidProcessing) {
 
     EXPECT_EQ(peak_bin, freq_bin);
     EXPECT_GT(max_magnitude,
-              10.0f);  // Arbitrary threshold to ensure significant energy.
+              0.1f);  // Expect a noticeable peak with normalized scaling.
   }
 }
 
