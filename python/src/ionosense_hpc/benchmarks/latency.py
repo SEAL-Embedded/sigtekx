@@ -332,10 +332,10 @@ class StreamingLatencyBenchmark(LatencyBenchmark):
         # Generate continuous stream data
         from ionosense_hpc.utils import make_chirp
         self.stream_buffer = make_chirp(
+            sample_rate=engine_config.sample_rate_hz,
+            n_samples=stream_samples,
             f_start=100,
             f_end=10000,
-            duration=stream_duration_s,
-            sample_rate=engine_config.sample_rate_hz
         )
 
         logger.info(f"Streaming buffer prepared: {stream_samples} samples")
