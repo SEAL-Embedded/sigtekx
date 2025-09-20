@@ -22,6 +22,7 @@
 
 #include "ionosense/cuda_wrappers.hpp"
 #include "ionosense/processing_stage.hpp"
+#include "ionosense/window_functions.hpp"
 
 // IEEE Std 1003.1-2001 compliance for mathematical constants
 #ifndef M_PI
@@ -29,6 +30,40 @@
 #endif
 
 using namespace ionosense;
+
+namespace {
+
+window_functions::WindowKind ToWindowKind(StageConfig::WindowType type) {
+    switch (type) {
+        case StageConfig::WindowType::RECTANGULAR:
+            return window_functions::WindowKind::RECTANGULAR;
+        case StageConfig::WindowType::HANN:
+            return window_functions::WindowKind::HANN;
+        case StageConfig::WindowType::BLACKMAN:
+            return window_functions::WindowKind::BLACKMAN;
+    }
+    return window_functions::WindowKind::RECTANGULAR;
+}
+
+void ExpectWindowParity(StageConfig::WindowType type, bool sqrt_norm, int size) {
+    std::vector<float> generated(size);
+    std::vector<float> reference(size);
+
+    if (size > 0) {
+        ionosense::window_utils::generate_window(generated.data(), size, type, sqrt_norm);
+        window_functions::fill_window(reference.data(), size, ToWindowKind(type), sqrt_norm);
+    }
+
+    for (int idx = 0; idx < size; ++idx) {
+        EXPECT_FLOAT_EQ(generated[idx], reference[idx])
+            << "type=" << static_cast<int>(type)
+            << ", size=" << size
+            << ", sqrt=" << sqrt_norm
+            << ", idx=" << idx;
+    }
+}
+
+}  // namespace
 
 /**
  * @class ProcessingStageTest
@@ -365,11 +400,26 @@ TEST_F(ProcessingStageTest, StageFactoryDefaultPipeline) {
  * @test ProcessingStageTest.WindowUtilsHannGeneration
  * @brief Validates the correctness of the Hann window generation utility.
  */
+TEST(WindowUtilsTest, WindowParityWithReference) {
+    const std::vector<int> sizes{0, 1, 2, 16, 1024};
+    const std::vector<StageConfig::WindowType> types{
+        StageConfig::WindowType::RECTANGULAR,
+        StageConfig::WindowType::HANN,
+        StageConfig::WindowType::BLACKMAN};
+
+    for (const auto type : types) {
+        for (const int size : sizes) {
+            ExpectWindowParity(type, false, size);
+            ExpectWindowParity(type, true, size);
+        }
+    }
+}
+
 TEST_F(ProcessingStageTest, WindowUtilsHannGeneration) {
   const int size = 64;
   std::vector<float> window(size);
 
-  window_utils::generate_hann_window(window.data(), size, false);
+  window_utils::generate_window(window.data(), size, StageConfig::WindowType::HANN, false);
 
   for (int i = 0; i < size; ++i) {
     float expected = 0.5f * (1.0f - std::cos(2.0f * M_PI * i / (size - 1)));

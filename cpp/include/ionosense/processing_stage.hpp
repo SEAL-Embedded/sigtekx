@@ -44,7 +44,11 @@ struct StageConfig {
   int sample_rate_hz = 48000;  ///< Sample rate of the input signal in Hz.
 
   // --- Windowing Parameters ---
-  enum class WindowType { HANN };  ///< Enumeration of supported window types.
+  enum class WindowType {
+    RECTANGULAR,  ///< No taper (rectangular window).
+    HANN,         ///< Hann window (raised cosine).
+    BLACKMAN      ///< Blackman window for higher sidelobe suppression.
+  };  ///< Enumeration of supported window types.
   WindowType window_type = WindowType::HANN;  ///< The window function to apply.
 
   enum class WindowNorm {
@@ -247,7 +251,8 @@ namespace window_utils {
  * @param size The size of the window (number of coefficients).
  * @param sqrt_norm If true, applies a square root normalization.
  */
-void generate_hann_window(float* window, int size, bool sqrt_norm = false);
+void generate_window(float* window, int size, StageConfig::WindowType type,
+                     bool sqrt_norm = false);
 
 /**
  * @brief Normalizes a window to have a specific property (e.g., unity gain).

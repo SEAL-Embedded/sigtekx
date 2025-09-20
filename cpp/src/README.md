@@ -81,9 +81,9 @@ class WindowStage::Impl {
     DeviceBuffer<float> d_window_;  // Pre-computed coefficients
     
     void initialize(const StageConfig& config, cudaStream_t stream) {
-        // Generate window on host
+        // Generate window on host using shared utility
         std::vector<float> host_window(config.nfft);
-        kernels::generate_hann_window_cpu(host_window.data(), config.nfft, sqrt_norm);
+        window_utils::generate_window(host_window.data(), config.nfft, config.window_type, sqrt_norm);
         
         // Upload to device
         d_window_.resize(config.nfft);

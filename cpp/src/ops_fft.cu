@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file ops_fft.cu
  * @version 1.0
  * @date 2025-09-01
@@ -27,7 +27,6 @@
 #include <cmath>
 
 #include "ionosense/profiling_macros.hpp"
-
 namespace ionosense {
 namespace kernels {
 
@@ -366,17 +365,6 @@ void launch_scale_fft(float2* data, int num_elements, float scale,
   const int blocks = (num_elements + threads - 1) / threads;
   scale_fft_output_kernel<<<blocks, threads, 0, stream>>>(data, num_elements,
                                                           scale);
-}
-
-// --- CPU Helper Functions ---
-
-void generate_hann_window_cpu(float* window, int size, bool sqrt_norm) {
-  IONO_NVTX_RANGE("generate_hann_window_cpu", profiling::colors::DARK_GRAY);
-  const float pi = 3.14159265358979323846f;
-  for (int i = 0; i < size; ++i) {
-    float val = 0.5f * (1.0f - cosf(2.0f * pi * i / size));
-    window[i] = sqrt_norm ? sqrtf(val) : val;
-  }
 }
 
 }  // namespace kernels

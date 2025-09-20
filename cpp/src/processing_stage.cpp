@@ -23,6 +23,7 @@
 
 #include "ionosense/cuda_wrappers.hpp"
 #include "ionosense/profiling_macros.hpp"
+#include "ionosense/window_functions.hpp"
 
 // --- External Kernel Launch Function Declarations (from ops_fft.cu) ---
 namespace ionosense {
@@ -36,7 +37,6 @@ extern void launch_magnitude(const float2* input, float* output, int num_bins,
                              int batch, int input_stride, float scale,
                              cudaStream_t stream);
 
-extern void generate_hann_window_cpu(float* window, int size, bool sqrt_norm);
 }  // namespace kernels
 }  // namespace ionosense
 
@@ -66,8 +66,8 @@ class WindowStage::Impl {
                       profiling::colors::DARK_GRAY);
       std::vector<float> host_window(config.nfft);
       bool sqrt_norm = (config.window_norm == StageConfig::WindowNorm::SQRT);
-      kernels::generate_hann_window_cpu(host_window.data(), config.nfft,
-                                        sqrt_norm);
+      window_utils::generate_window(
+          host_window.data(), config.nfft, config.window_type, sqrt_norm);
 
       // Allocate device memory and upload the window coefficients.
       d_window_.resize(config.nfft);
@@ -361,14 +361,23 @@ StageFactory::create_default_pipeline() {
 
 namespace window_utils {
 
-void generate_hann_window(float* window, int size, bool sqrt_norm) {
-  IONO_NVTX_RANGE("Generate Hann Window", profiling::colors::DARK_GRAY);
-  const float pi = 3.14159265358979323846f;
-  for (int i = 0; i < size; ++i) {
-    // Standard Hann window formula
-    float val = 0.5f * (1.0f - std::cos(2.0f * pi * i / (size - 1)));
-    window[i] = sqrt_norm ? std::sqrt(val) : val;
+window_functions::WindowKind to_window_kind(StageConfig::WindowType type) {
+  switch (type) {
+    case StageConfig::WindowType::RECTANGULAR:
+      return window_functions::WindowKind::RECTANGULAR;
+    case StageConfig::WindowType::HANN:
+      return window_functions::WindowKind::HANN;
+    case StageConfig::WindowType::BLACKMAN:
+      return window_functions::WindowKind::BLACKMAN;
   }
+  return window_functions::WindowKind::RECTANGULAR;
+}
+
+void generate_window(float* window, int size, StageConfig::WindowType type,
+                     bool sqrt_norm) {
+  IONO_NVTX_RANGE("Generate Window", profiling::colors::DARK_GRAY);
+  const auto kind = to_window_kind(type);
+  window_functions::fill_window(window, size, kind, sqrt_norm);
 }
 
 void normalize_window(float* window, int size, StageConfig::WindowNorm norm) {
@@ -385,7 +394,7 @@ void normalize_window(float* window, int size, StageConfig::WindowNorm norm) {
       }
     }
   }
-  // SQRT normalization is applied during generation in generate_hann_window.
+  // SQRT normalization is applied during generation in generate_window.
 }
 
 }  // namespace window_utils
