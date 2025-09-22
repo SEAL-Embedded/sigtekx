@@ -161,6 +161,14 @@ function Check-PromptDupes {
 }
 
 # ----- Run -----
+
+# Set a default for colored logging in the Python backend.
+# This allows the user to override it for the session if needed.
+if (-not $env:IONO_LOG_COLOR) {
+    $env:IONO_LOG_COLOR = "1"
+    Info "Defaulted IONO_LOG_COLOR=1 for rich Python logging."
+}
+
 Enter-VSDev
 Ensure-CondaOnPath
 Activate-CondaEnv -Name $EnvName

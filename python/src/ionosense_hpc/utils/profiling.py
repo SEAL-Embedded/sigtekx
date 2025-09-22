@@ -17,7 +17,7 @@ from typing import Any
 try:  # Optional dependency
     import nvtx  # type: ignore
     NVTX_AVAILABLE = True
-except Exception:  # pragma: no cover - optional dependency
+except ImportError:  # pragma: no cover
     NVTX_AVAILABLE = False
     nvtx = None  # type: ignore
 
