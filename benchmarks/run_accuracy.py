@@ -18,7 +18,7 @@ from ionosense_hpc.benchmarks.base import AccuracyBenchmarkConfig
 from ionosense_hpc.config import EngineConfig
 
 
-@hydra.main(version_base=None, config_path="../conf", config_name="config")
+@hydra.main(version_base=None, config_path="../experiments/conf", config_name="config")
 def run_accuracy_benchmark(cfg: DictConfig) -> float:
     """Run accuracy benchmark with MLflow tracking and save results.
     

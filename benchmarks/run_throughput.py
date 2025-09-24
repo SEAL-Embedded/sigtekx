@@ -18,7 +18,7 @@ from ionosense_hpc.benchmarks.base import ThroughputBenchmarkConfig
 from ionosense_hpc.config import EngineConfig
 
 
-@hydra.main(version_base=None, config_path="../conf", config_name="config")
+@hydra.main(version_base=None, config_path="../experiments/conf", config_name="config")
 def run_throughput_benchmark(cfg: DictConfig) -> float:
     """Run throughput benchmark with MLflow tracking and save results.
     

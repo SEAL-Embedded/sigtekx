@@ -3,13 +3,13 @@
 
 stages:
   run_workflow:
-    cmd: snakemake --cores 4
+    cmd: snakemake --cores 4 --snakefile experiments/Snakefile
     deps:
       - benchmarks/
-      - scripts/
+      - experiments/Snakefile
+      - experiments/conf/
+      - experiments/scripts/
       - src/ionosense_hpc/
-      - conf/
-      - Snakefile
     outs:
       - artifacts/data/:
           persist: true
@@ -27,10 +27,10 @@ stages:
     deps:
       - benchmarks/run_latency.py
       - src/ionosense_hpc/benchmarks/
-      - conf/engine/
-      - conf/benchmark/latency.yaml
+      - experiments/conf/engine/
+      - experiments/conf/benchmark/latency.yaml
     params:
-      - conf/config.yaml:
+      - experiments/conf/config.yaml:
           - seed
     outs:
       - artifacts/data/latency_summary_*.csv:
@@ -41,19 +41,19 @@ stages:
     deps:
       - benchmarks/run_throughput.py
       - src/ionosense_hpc/benchmarks/
-      - conf/engine/
-      - conf/benchmark/throughput.yaml
+      - experiments/conf/engine/
+      - experiments/conf/benchmark/throughput.yaml
     params:
-      - conf/config.yaml:
+      - experiments/conf/config.yaml:
           - seed
     outs:
       - artifacts/data/throughput_summary_*.csv:
           persist: true
 
   analyze:
-    cmd: python scripts/analyze.py
+    cmd: python experiments/scripts/analyze.py
     deps:
-      - scripts/analyze.py
+      - experiments/scripts/analyze.py
       - artifacts/data/
     outs:
       - artifacts/data/summary_statistics.csv:
@@ -62,9 +62,9 @@ stages:
           cache: false
 
   visualize:
-    cmd: python scripts/generate_figures.py
+    cmd: python experiments/scripts/generate_figures.py
     deps:
-      - scripts/generate_figures.py
+      - experiments/scripts/generate_figures.py
       - artifacts/data/summary_statistics.csv
     outs:
       - artifacts/figures/:

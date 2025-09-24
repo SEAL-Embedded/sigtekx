@@ -60,6 +60,7 @@ dist/
 coverage.xml
 htmlcov/
 .ipynb_checkpoints/
+.snakemake/
 
 # Python extension modules in core/ (Windows + Linux)
 python/src/ionosense_hpc/core/*.pyd
