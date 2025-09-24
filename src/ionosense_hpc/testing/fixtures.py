@@ -6,7 +6,6 @@ test data, handling hardware dependencies, and supporting the new
 benchmark infrastructure following RSE best practices.
 """
 
-import json
 from collections.abc import Generator
 from pathlib import Path
 from typing import Any, cast
@@ -158,39 +157,6 @@ def yaml_benchmark_config(temp_data_dir: Path) -> Path:
     return config_path
 
 
-@pytest.fixture
-def yaml_sweep_config(temp_data_dir: Path) -> Path:
-    """Creates a sample parameter sweep configuration file."""
-    config = {
-        "name": "test_sweep",
-        "description": "Test parameter sweep",
-        "benchmark_class": "ionosense_hpc.benchmarks.latency.LatencyBenchmark",
-        "parameters": [
-            {
-                "name": "engine_config.nfft",
-                "type": "int",
-                "values": [256, 512, 1024]
-            },
-            {
-                "name": "engine_config.batch",
-                "type": "int",
-                "range": {"start": 1, "stop": 4, "step": 1}
-            }
-        ],
-        "sweep_type": "grid",
-        "base_config": {
-            "iterations": 10,
-            "warmup_iterations": 2
-        }
-    }
-
-    config_path = temp_data_dir / "sweep_config.yaml"
-    with open(config_path, 'w') as f:
-        yaml.dump(config, f)
-
-    return config_path
-
-
 # ============================================================================
 # Engine Fixtures
 # ============================================================================
@@ -327,34 +293,6 @@ def mock_device_info() -> dict:
     }
 
 
-@pytest.fixture
-def mock_benchmark_results(temp_benchmark_dir: Path) -> list[Path]:
-    """Creates mock benchmark result files for testing reporting."""
-    results = []
-
-    for i in range(3):
-        result = {
-            "name": f"benchmark_{i}",
-            "config": {"iterations": 1000},
-            "context": {"hostname": "test-host"},
-            "measurements": np.random.randn(100).tolist(),
-            "statistics": {
-                "mean": 100 + i * 10,
-                "std": 5,
-                "p99": 120 + i * 10
-            },
-            "passed": True
-        }
-
-        result_path = temp_benchmark_dir / "results" / f"result_{i}.json"
-        with open(result_path, 'w') as f:
-            json.dump(result, f)
-
-        results.append(result_path)
-
-    return results
-
-
 # ============================================================================
 # Parametrized Fixtures
 # ============================================================================
@@ -445,16 +383,6 @@ def benchmark_runner(temp_benchmark_dir: Path):
     return TestBenchmark(config)
 
 
-@pytest.fixture
-def parameter_sweep_runner(yaml_sweep_config: Path, temp_benchmark_dir: Path):
-    """Provides a configured parameter sweep for testing."""
-    from ionosense_hpc.benchmarks.sweep import ParameterSweep
-
-    sweep = ParameterSweep(str(yaml_sweep_config))
-    sweep.config.output_dir = str(temp_benchmark_dir / "experiments")
-    return sweep
-
-
 # ============================================================================
 # Validation Fixtures
 # ============================================================================
@@ -487,38 +415,3 @@ def data_archiver(temp_benchmark_dir: Path):
 # ============================================================================
 # Research Workflow Fixtures
 # ============================================================================
-
-@pytest.fixture
-def research_metadata() -> dict[str, Any]:
-    """Provides standard research metadata for experiments."""
-    return {
-        "experiment_id": "exp_20250101_000000",
-        "researcher": "Test User",
-        "project": "ionosense-hpc",
-        "tags": ["test", "validation"],
-        "standards": ["RSE", "RE", "IEEE"],
-        "version": "2.0.0"
-    }
-
-
-@pytest.fixture
-def experiment_config(research_metadata: dict[str, Any], temp_benchmark_dir: Path):
-    """Provides a complete experiment configuration."""
-    return {
-        "metadata": research_metadata,
-        "output_dir": str(temp_benchmark_dir),
-        "benchmarks": ["latency", "throughput", "accuracy"],
-        "presets": ["realtime", "throughput"],
-        "parameter_sweeps": [
-            {
-                "parameter": "nfft",
-                "values": [512, 1024, 2048]
-            }
-        ],
-        "reporting": {
-            "format": "pdf",
-            "include_raw_data": False
-        }
-    }
-
-

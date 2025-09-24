@@ -134,21 +134,6 @@ ibench latency --config latency_config.yaml
 ```
 
 **Programmatic Usage:**
-```python
-from ionosense_hpc.benchmarks import LatencyBenchmark, BenchmarkConfig
-
-config = BenchmarkConfig(
-    name="latency_test",
-    iterations=1000,
-    warmup_iterations=100
-)
-
-benchmark = LatencyBenchmark(config)
-result = benchmark.run()
-
-print(f"Mean latency: {result.statistics['mean']:.2f} μs")
-print(f"P99 latency: {result.statistics['p99']:.2f} μs")
-```
 
 **Metrics**:
 - Mean, median, and percentile latencies
@@ -172,21 +157,6 @@ ibench throughput --config throughput_config.yaml
 ```
 
 **Programmatic Usage:**
-```python
-from ionosense_hpc.benchmarks import ThroughputBenchmark, ThroughputBenchmarkConfig
-
-config = ThroughputBenchmarkConfig(
-    name="throughput_test",
-    test_duration_s=30.0,
-    monitor_gpu_utilization=True
-)
-
-benchmark = ThroughputBenchmark(config)
-result = benchmark.run()
-
-print(f"Throughput: {result.statistics['frames_per_second']:.0f} FPS")
-print(f"Bandwidth: {result.statistics['gb_per_second']:.2f} GB/s")
-```
 
 **Metrics**:
 - Frames per second
@@ -210,22 +180,6 @@ ival                                    # Alias for accuracy benchmark
 ```
 
 **Programmatic Usage:**
-```python
-from ionosense_hpc.benchmarks import AccuracyBenchmark, AccuracyBenchmarkConfig
-
-config = AccuracyBenchmarkConfig(
-    name="accuracy_validation",
-    relative_tolerance=1e-5,
-    absolute_tolerance=1e-6,
-    validate_parseval=True
-)
-
-benchmark = AccuracyBenchmark(config)
-result = benchmark.run()
-
-print(f"Pass rate: {result.statistics['pass_rate']:.1%}")
-print(f"Mean SNR: {result.statistics['mean_snr_db']:.1f} dB")
-```
 
 **Validation Tests**:
 - Spectral accuracy
@@ -391,34 +345,16 @@ parameters:
 ./scripts/cli.sh report study_results/ --format pdf --title "Performance Study"
 
 # Windows (dev shell)
-ibench suite --config research.yaml --output study_results/
-iono sweep parameter_study.yaml --output sweep_results/
-iono report study_results/ --format pdf --title "Performance Study"
+ibench bench latency
+ibench sweep nfft_batch_sweep -Benchmark latency -Multirun
+ibench report
 ```
 
 **Programmatic Workflow:**
-```python
-from ionosense_hpc.benchmarks import ResearchWorkflow, create_research_workflow
-
-# Create workflow
-workflow = create_research_workflow(
-    name="Performance Optimization Study",
-    researcher="Your Name",
-    description="Comprehensive evaluation of FFT engine performance"
-)
-
-# Add stages using CLI internally
-workflow.add_stage("benchmarks", "benchmark", {
-    "benchmarks": ["latency", "throughput", "accuracy"]
-})
-workflow.add_stage("analysis", "analysis", {})
-workflow.add_stage("report", "report", {
-    "format": "pdf",
-    "title": "Performance Analysis Report"
-})
-
-# Run workflow
-result = workflow.run()
+```powershell
+python benchmarks/run_latency.py experiment=baseline
+python benchmarks/run_latency.py --multirun experiment=nfft_batch_sweep
+snakemake --cores 4 --snakefile experiments/Snakefile
 ```
 
 ### Reproducibility Features
@@ -845,3 +781,4 @@ You can override these locations with environment variables (useful for CI or cu
 - `IONO_REPORTS_DIR`: reports root
 
 The CLI initializes these variables automatically to point to `artifacts/` so Python tools and the CLI are consistent.
+

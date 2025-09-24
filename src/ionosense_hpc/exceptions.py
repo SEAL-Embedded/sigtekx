@@ -154,18 +154,6 @@ class ExperimentError(IonosenseError):
         self.experiment_id = experiment_id
 
 
-class ParameterSweepError(ExperimentError):
-    """Error during parameter sweep execution."""
-
-    def __init__(self, message: str, parameter: str | None = None, value: Any = None, **kwargs):
-        hint = None
-        if parameter:
-            hint = f"Check parameter '{parameter}'"
-            if value is not None:
-                hint += f" with value {value}"
-        super().__init__(message, parameter=parameter, value=value, hint=hint, **kwargs)
-        self.parameter = parameter
-        self.value = value
 
 
 class ReproducibilityError(IonosenseError):

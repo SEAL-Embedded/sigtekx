@@ -1,11 +1,11 @@
 """
-Ionosense-HPC Benchmarking Suite package.
+Ionosense-HPC Benchmarking package.
 
-Public API re-exports the core benchmarking primitives and convenience
-functions while keeping submodules importable directly.
+This module exposes the core benchmarking primitives and lazily loads
+individual benchmark implementations. Legacy suite/sweep orchestration has
+been removed in favour of the Hydra/Snakemake workflow introduced in 0.9.1.
 """
 
-# Core primitives and utilities
 from .base import (
     BaseBenchmark,
     BenchmarkConfig,
@@ -16,23 +16,7 @@ from .base import (
     save_benchmark_results,
 )
 
-# Suite orchestration
-from .suite import (
-    BenchmarkSuite,
-    SuiteConfig,
-    run_default_suite,
-)
 
-# Parameter sweeps
-from .sweep import (
-    ExperimentConfig,
-    ExperimentRun,
-    ParameterSpec,
-    ParameterSweep,
-)
-
-
-# Lazy loaders for benchmark classes (avoid heavy imports at module import time)
 def get_latency_benchmark():
     from .latency import LatencyBenchmark, StreamingLatencyBenchmark
     return LatencyBenchmark, StreamingLatencyBenchmark
@@ -52,8 +36,8 @@ def get_realtime_benchmark():
     from .realtime import RealtimeBenchmark
     return RealtimeBenchmark
 
+
 __all__ = [
-    # Core primitives
     "BaseBenchmark",
     "BenchmarkConfig",
     "BenchmarkContext",
@@ -61,16 +45,6 @@ __all__ = [
     "calculate_statistics",
     "load_benchmark_config",
     "save_benchmark_results",
-    # Suite
-    "BenchmarkSuite",
-    "SuiteConfig",
-    "run_default_suite",
-    # Sweep
-    "ExperimentConfig",
-    "ExperimentRun",
-    "ParameterSpec",
-    "ParameterSweep",
-    # Lazy loaders for benchmark classes
     "get_latency_benchmark",
     "get_throughput_benchmark",
     "get_accuracy_benchmark",

@@ -2,7 +2,7 @@
 # ionosense-hpc • Research Platform CLI (Windows)
 # - Professional research-grade build, test, and benchmark orchestration
 # - Compliant with RSE/RE/IEEE standards for reproducible research
-# - Version: 0.9.0
+# - Version: 0.9.1
 # ============================================================================
 
 #Requires -Version 7.0
@@ -18,8 +18,9 @@ param(
 # --- Configuration & Paths ---------------------------------------------------
 $script:ProjectRoot      = (Get-Item -Path (Join-Path $PSScriptRoot "..")).FullName
 $script:BuildDir         = Join-Path $ProjectRoot "build"
-$script:PythonDir        = Join-Path $ProjectRoot "python"
-$script:ConfigDir        = Join-Path $PythonDir "src\ionosense_hpc\benchmarks\configs"
+$script:SourceDir       = Join-Path $ProjectRoot "src"
+$script:TestsDir        = Join-Path $ProjectRoot "tests"
+$script:ConfigDir       = Join-Path $ProjectRoot "experiments\conf"
 $script:BuildPreset      = if ($env:BUILD_PRESET) { $env:BUILD_PRESET } else { "windows-rel" }
 $script:CondaEnvName     = "ionosense-hpc"
 $script:EnvironmentFile  = Join-Path $ProjectRoot "environments\environment.win.yml"
@@ -31,7 +32,7 @@ $script:ProfileDir       = Join-Path $script:ArtifactsDir "profiling"
 $script:LogRoot          = Join-Path $script:ArtifactsDir "logs"
 
 # Research metadata
-$script:ResearchVersion   = "0.9.0"
+$script:ResearchVersion   = "0.9.1"
 $script:ResearchStandards = @("RSE", "RE", "IEEE-1074", "IEEE-754")
 
 # --- Enhanced Logging with Research Standards -------------------------------
@@ -194,7 +195,7 @@ Function Invoke-WithPythonPath {
     param([scriptblock]$ScriptBlock)
     
     $oldPath = $env:PYTHONPATH
-    $env:PYTHONPATH = "$script:BuildDir\$script:BuildPreset;" + (Join-Path $script:PythonDir "src") + ";$env:PYTHONPATH"
+    $env:PYTHONPATH = "$script:BuildDir\$script:BuildPreset;" + ($script:SourceDir) + ";$env:PYTHONPATH"
     
     try {
         & $ScriptBlock
@@ -356,7 +357,7 @@ Function Invoke-Test {
     if ($runPy) {
         Write-ResearchLog -Level Info -Message "Running Python tests" -Component "Test"
         
-        $pytestArgs = @("-v", (Join-Path $script:PythonDir "tests"))
+        $pytestArgs = @("-v", ($script:TestsDir))
         
         if ($Verbose) { $pytestArgs += "-vv", "--tb=long" }
         else { $pytestArgs += "--tb=short" }
@@ -579,8 +580,8 @@ Function Invoke-Lint {
             }
         } else {
             $targets = @(
-                (Join-Path $script:PythonDir 'src'),
-                (Join-Path $script:PythonDir 'tests')
+                $script:SourceDir,
+                $script:TestsDir
             )
         }
 
@@ -724,7 +725,7 @@ Function Invoke-Clean {
         }
 
     # Remove compiled Python extension and staged libs
-    $pySrc = Join-Path $script:PythonDir 'src'
+    $pySrc = $script:SourceDir
     $ionDir = Join-Path $pySrc 'ionosense_hpc'
     $engineDir = Join-Path $ionDir 'core'
     if (Test-Path -LiteralPath $engineDir) {
@@ -788,8 +789,8 @@ Function Invoke-Typecheck {
         $useModule = $true
     } else { $useModule = $false }
 
-    $pySrc   = Join-Path $script:PythonDir 'src'
-    $pyTests = Join-Path $script:PythonDir 'tests'
+    $pySrc   = $script:SourceDir
+    $pyTests = $script:TestsDir
     $targets = @()
     if (Test-Path -LiteralPath $pySrc)   { $targets += $pySrc }
     if ($IncludeTests -and (Test-Path -LiteralPath $pyTests)) { $targets += $pyTests }
@@ -1045,195 +1046,121 @@ Function Invoke-Doctor {
 
 Function Invoke-Benchmark {
     param(
-        [string]$Benchmark,
-        [string]$Config,
+        [string]$Benchmark = "latency",
+        [string]$Experiment,
         [string]$Output,
-        [hashtable]$Parameters = @{},
-        [switch]$Suite,
+        [string[]]$Overrides = @(),
+        [switch]$Multirun,
         [switch]$Report
     )
-    
+
     if (-not (Test-CondaEnvironment)) {
         throw "Conda environment not activated"
     }
-    
-    # Handle suite execution
-    if ($Suite) {
-        Write-ResearchLog -Level Info -Message "Running benchmark suite" -Component "Benchmark"
-        
-        $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-        if ($Output) {
-            $outputDir = $Output
-        } else {
-            $suiteRoot = Join-Path $script:BenchResultsDir "suite"
-            if (-not (Test-Path $suiteRoot)) { New-Item -ItemType Directory -Path $suiteRoot -Force | Out-Null }
-            $outputDir = Join-Path $suiteRoot "suite_$timestamp"
-        }
-        
-        $configFile = if ($Config) {
-            if (Test-Path $Config) { $Config }
-            else { Join-Path $script:ConfigDir "$Config.yaml" }
-        } else {
-            Join-Path $script:ConfigDir "suite_config.yaml"
-        }
-        
-        Invoke-WithPythonPath {
-            python -m ionosense_hpc.benchmarks.suite --config $configFile --output $outputDir
-        }
-        
-        if ($Report) {
-            Invoke-BenchmarkReport -ResultsDir $outputDir
-        }
-        
-        return
-    }
-    
-    # Handle individual benchmark
+
     if (-not $Benchmark) {
-        throw "Benchmark name required"
+        $Benchmark = 'latency'
     }
-    
-    Write-ResearchLog -Level Info -Message "Running benchmark: $Benchmark" -Component "Benchmark"
-    
-    # Find config file
-    $configFile = $null
-    if ($Config) {
-        $configFile = if (Test-Path $Config) { $Config }
-        elseif (Test-Path (Join-Path $script:ConfigDir "$Config.yaml")) { 
-            Join-Path $script:ConfigDir "$Config.yaml" 
-        }
-        elseif (Test-Path (Join-Path $script:ConfigDir "${Benchmark}_config.yaml")) {
-            Join-Path $script:ConfigDir "${Benchmark}_config.yaml"
-        }
+
+    $scriptPath = Join-Path $script:ProjectRoot ("benchmarks/run_{0}.py" -f $Benchmark)
+    if (-not (Test-Path -LiteralPath $scriptPath)) {
+        throw "Benchmark script not found: $scriptPath"
     }
-    
-    # Build command
-    $pythonCmd = "python -m ionosense_hpc.benchmarks.$Benchmark"
-    
-    if ($configFile) {
-        $pythonCmd += " --config `"$configFile`""
+
+    $args = @()
+    if ($Multirun) { $args += '--multirun' }
+    if ($Experiment) { $args += "experiment=$Experiment" }
+    if ($Output) { $args += "paths.artifacts=`"$Output`"" }
+    if ($Overrides) { $args += $Overrides }
+
+    Write-ResearchLog -Level Info -Message ("Running {0} benchmark" -f $Benchmark) -Component "Benchmark" -Metadata @{
+        multirun = $Multirun.IsPresent
+        experiment = $Experiment
+        output = $Output
     }
-    
-    if ($Output) {
-        $pythonCmd += " --output `"$Output`""
-    }
-    
-    # Add parameters
-    foreach ($key in $Parameters.Keys) {
-        $pythonCmd += " --$key $($Parameters[$key])"
-    }
-    
+
     Invoke-WithPythonPath {
-        Invoke-Expression $pythonCmd
+        & python $scriptPath @args
+        if ($LASTEXITCODE -ne 0) {
+            throw "Benchmark execution failed"
+        }
     }
-    
-    if ($Report -and $Output) {
-        Invoke-BenchmarkReport -ResultsDir $Output
+
+    if ($Report) {
+        $reportParams = @{
+            ResultsDir = (if ($Output) { $Output } else { Join-Path $script:ArtifactsDir 'data' })
+        }
+        Invoke-BenchmarkReport @reportParams
     }
 }
+
 
 Function Invoke-ParameterSweep {
     param(
         [Parameter(Mandatory)]
-        [string]$Config,
+        [string]$Experiment,
+        [string]$Benchmark = "latency",
         [string]$Output,
+        [string[]]$Overrides = @(),
         [switch]$Parallel,
         [int]$Workers = 4
     )
-    
-    Write-ResearchLog -Level Info -Message "Starting parameter sweep" -Component "Sweep"
-    
-    if (-not (Test-CondaEnvironment)) {
-        throw "Conda environment not activated"
+
+    $overrideList = @()
+    if ($Parallel) {
+        $overrideList += "hydra/launcher=joblib"
+        $overrideList += "hydra.launcher.n_jobs=$Workers"
     }
-    
-    # Find config file
-    $configFile = if (Test-Path $Config) { $Config }
-    elseif (Test-Path (Join-Path $script:ConfigDir "$Config.yaml")) {
-        Join-Path $script:ConfigDir "$Config.yaml"
+    if ($Overrides) { $overrideList += $Overrides }
+
+    Write-ResearchLog -Level Info -Message ("Starting sweep for {0}" -f $Experiment) -Component "Sweep" -Metadata @{
+        benchmark = $Benchmark
+        parallel = $Parallel.IsPresent
+        workers = $Workers
+        output = $Output
     }
-    else {
-        throw "Configuration file not found: $Config"
-    }
-    
-    $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-    $outputDir = if ($Output) { $Output } else { Join-Path $script:ExperimentsDir "sweep_$timestamp" }
-    
-    Write-ResearchLog -Level Info -Message "Configuration: $configFile" -Component "Sweep"
-    Write-ResearchLog -Level Info -Message "Output: $outputDir" -Component "Sweep"
-    
-    Invoke-WithPythonPath {
-        $sweepCmd = "from ionosense_hpc.benchmarks.sweep import ParameterSweep; "
-        $sweepCmd += "sweep = ParameterSweep('$configFile'); "
-        
-        if ($Parallel) {
-            $sweepCmd += "sweep.config.parallel = True; "
-            $sweepCmd += "sweep.config.max_workers = $Workers; "
-        }
-        
-        if ($Output) {
-            $sweepCmd += "sweep.config.output_dir = '$outputDir'; "
-        }
-        
-        $sweepCmd += "results = sweep.run(); "
-        $sweepCmd += "print(f'Sweep complete: {len(results)} runs')"
-        
-        python -c $sweepCmd
-    }
-    
-    # Generate analysis report
-    Write-ResearchLog -Level Info -Message "Generating sweep analysis" -Component "Sweep"
-    Invoke-BenchmarkReport -ResultsDir $outputDir -Type "sweep"
+
+    Invoke-Benchmark -Benchmark $Benchmark -Experiment $Experiment -Output $Output -Overrides $overrideList -Multirun
 }
+
 
 Function Invoke-BenchmarkReport {
     param(
-        [Parameter(Mandatory)]
         [string]$ResultsDir,
-        [string]$Format = "pdf",
-        [string]$Type = "standard",
-        [string]$Title
+        [string]$FiguresDir,
+        [string]$Output,
+        [switch]$SkipAnalysis,
+        [switch]$SkipFigures
     )
-    
-    Write-ResearchLog -Level Info -Message "Generating report" -Component "Report" -Metadata @{
-        type = $Type
-        format = $Format
-    }
-    
-    if (-not (Test-CondaEnvironment)) {
-        throw "Conda environment not activated"
-    }
-    
-    $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-    $reportName = "report_${Type}_$timestamp.$Format"
-    $reportPath = Join-Path $script:ReportsDir $reportName
-    
-    Invoke-WithPythonPath {
-        $reportCmd = "from ionosense_hpc.utils.reporting import generate_comparative_report, ReportConfig; "
-        $reportCmd += "config = ReportConfig("
-        $reportCmd += "output_format='$Format', "
-        
-        if ($Title) {
-            $reportCmd += "title='$Title', "
+
+    $dataDir = if ($ResultsDir) { $ResultsDir } else { Join-Path $script:ArtifactsDir 'data' }
+    $figDir = if ($FiguresDir) { $FiguresDir } else { Join-Path $script:ArtifactsDir 'figures' }
+    $outputPath = if ($Output) { $Output } else { Join-Path $script:ReportsDir 'final_report.html' }
+    $summaryPath = Join-Path $dataDir 'summary_statistics.csv'
+
+    if (-not $SkipAnalysis) {
+        Write-ResearchLog -Level Info -Message "Generating summary statistics" -Component "Report" -Metadata @{ data = $dataDir }
+        Invoke-WithPythonPath {
+            & python (Join-Path $script:ProjectRoot 'experiments/scripts/analyze.py') '--data-dir' $dataDir '--output' $summaryPath
+            if ($LASTEXITCODE -ne 0) { throw "Analysis script failed" }
         }
-        
-        $reportCmd += "include_raw_data=False, "
-        $reportCmd += "include_violin_plots=True, "
-        $reportCmd += "include_heatmaps=True"
-        $reportCmd += "); "
-        
-        $reportCmd += "generate_comparative_report('$ResultsDir', '$reportPath', config)"
-        
-        python -c $reportCmd
     }
-    
-    Write-ResearchLog -Level Info -Message "Report saved to: $reportPath" -Component "Report"
-    
-    # Open report if PDF
-    if ($Format -eq "pdf" -and (Test-Path $reportPath)) {
-        Start-Process $reportPath
+
+    if (-not $SkipFigures) {
+        Write-ResearchLog -Level Info -Message "Rendering figures" -Component "Report" -Metadata @{ figures = $figDir }
+        Invoke-WithPythonPath {
+            & python (Join-Path $script:ProjectRoot 'experiments/scripts/generate_figures.py') '--input' $summaryPath '--output-dir' $figDir
+            if ($LASTEXITCODE -ne 0) { throw "Figure generation failed" }
+        }
+    }
+
+    Write-ResearchLog -Level Info -Message "Compiling HTML report" -Component "Report" -Metadata @{ output = $outputPath }
+    Invoke-WithPythonPath {
+        & python (Join-Path $script:ProjectRoot 'experiments/scripts/generate_report.py') '--input' $summaryPath '--figures-dir' $figDir '--output' $outputPath
+        if ($LASTEXITCODE -ne 0) { throw "Report generation failed" }
     }
 }
+
 
 Function Invoke-Profile {
     param(
@@ -1375,7 +1302,7 @@ Function Show-Info {
         Write-Host "`n🏃 AVAILABLE BENCHMARKS" -ForegroundColor Cyan
         Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor DarkGray
         
-        $benchDir = Join-Path $script:PythonDir "src\ionosense_hpc\benchmarks"
+        $benchDir = Join-Path $script:SourceDir "ionosense_hpc\\benchmarks"
         Get-ChildItem -Path $benchDir -Filter "*.py" -File | 
             Where-Object { $_.Name -ne "__init__.py" -and $_.Name -ne "base.py" } |
             ForEach-Object {
@@ -1692,28 +1619,45 @@ try {
             Invoke-Test @params
         }
         "bench"    {
-            $params = @{}
-            
-            if ($CommandArgs -contains "-Suite") {
-                $params.Suite = $true
-            } else {
-                $params.Benchmark = $CommandArgs | Where-Object { $_ -notlike "-*" } | Select-Object -First 1
-            }
-            
-            if ($CommandArgs -contains "-Report") { $params.Report = $true }
-            
-            # Parse named parameters
+            $params = @{ Overrides = @() }
+            $positional = @()
+
             for ($i = 0; $i -lt $CommandArgs.Count; $i++) {
-                if ($CommandArgs[$i] -eq "-Config" -and $i+1 -lt $CommandArgs.Count) {
-                    $params.Config = $CommandArgs[$i+1]
-                }
-                if ($CommandArgs[$i] -eq "-Output" -and $i+1 -lt $CommandArgs.Count) {
-                    $params.Output = $CommandArgs[$i+1]
+                $arg = $CommandArgs[$i]
+                switch ($arg) {
+                    '-Benchmark' {
+                        if ($i + 1 -lt $CommandArgs.Count) { $params.Benchmark = $CommandArgs[$i + 1]; $i++ }
+                    }
+                    '-Experiment' {
+                        if ($i + 1 -lt $CommandArgs.Count) { $params.Experiment = $CommandArgs[$i + 1]; $i++ }
+                    }
+                    '-Output' {
+                        if ($i + 1 -lt $CommandArgs.Count) { $params.Output = $CommandArgs[$i + 1]; $i++ }
+                    }
+                    '-Override' {
+                        if ($i + 1 -lt $CommandArgs.Count) { $params.Overrides += $CommandArgs[$i + 1]; $i++ }
+                    }
+                    '-Multirun' { $params.Multirun = $true }
+                    '-Report' { $params.Report = $true }
+                    default {
+                        if ($arg -and $arg -notlike '-*') { $positional += $arg }
+                    }
                 }
             }
-            
+
+            if (-not $params.ContainsKey('Benchmark') -and $positional.Count -gt 0) {
+                $params.Benchmark = $positional[0]
+                if ($positional.Count -gt 1) { $params.Overrides += $positional[1..($positional.Count-1)] }
+            } elseif ($positional.Count -gt 0) {
+                $params.Overrides += $positional
+            }
+
+            if (-not $params.Overrides) { $params.Remove('Overrides') }
+
             Invoke-Benchmark @params
         }
+
+
         "format"   {
             $params = @{}
             if ($CommandArgs -contains "-Check")   { $params.Check   = $true }
@@ -1745,24 +1689,51 @@ try {
             Invoke-Typecheck @params
         }
         "sweep"    {
-            $params = @{}
-            
+            $params = @{ Overrides = @() }
+            $positional = @()
+
             for ($i = 0; $i -lt $CommandArgs.Count; $i++) {
-                if ($CommandArgs[$i] -eq "-Config" -and $i+1 -lt $CommandArgs.Count) {
-                    $params.Config = $CommandArgs[$i+1]
-                }
-                if ($CommandArgs[$i] -eq "-Output" -and $i+1 -lt $CommandArgs.Count) {
-                    $params.Output = $CommandArgs[$i+1]
-                }
-                if ($CommandArgs[$i] -eq "-Workers" -and $i+1 -lt $CommandArgs.Count) {
-                    $params.Workers = [int]$CommandArgs[$i+1]
+                $arg = $CommandArgs[$i]
+                switch ($arg) {
+                    '-Benchmark' {
+                        if ($i + 1 -lt $CommandArgs.Count) { $params.Benchmark = $CommandArgs[$i + 1]; $i++ }
+                    }
+                    '-Experiment' {
+                        if ($i + 1 -lt $CommandArgs.Count) { $params.Experiment = $CommandArgs[$i + 1]; $i++ }
+                    }
+                    '-Output' {
+                        if ($i + 1 -lt $CommandArgs.Count) { $params.Output = $CommandArgs[$i + 1]; $i++ }
+                    }
+                    '-Override' {
+                        if ($i + 1 -lt $CommandArgs.Count) { $params.Overrides += $CommandArgs[$i + 1]; $i++ }
+                    }
+                    '-Parallel' { $params.Parallel = $true }
+                    '-Workers' {
+                        if ($i + 1 -lt $CommandArgs.Count) { $params.Workers = [int]$CommandArgs[$i + 1]; $i++ }
+                    }
+                    default {
+                        if ($arg -and $arg -notlike '-*') { $positional += $arg }
+                    }
                 }
             }
-            
-            if ($CommandArgs -contains "-Parallel") { $params.Parallel = $true }
-            
+
+            if (-not $params.ContainsKey('Experiment') -and $positional.Count -gt 0) {
+                $params.Experiment = $positional[0]
+                if ($positional.Count -gt 1) { $params.Overrides += $positional[1..($positional.Count-1)] }
+            } elseif ($positional.Count -gt 0) {
+                $params.Overrides += $positional
+            }
+
+            if (-not $params.Experiment) {
+                throw "Experiment name required"
+            }
+
+            if (-not $params.Overrides) { $params.Remove('Overrides') }
+
             Invoke-ParameterSweep @params
         }
+
+
         "profile"  {
             $params = @{}
             
@@ -1784,26 +1755,23 @@ try {
             
             Invoke-Profile @params
         }
-        "report"   {
+        "report"    {
             $params = @{}
-            
             for ($i = 0; $i -lt $CommandArgs.Count; $i++) {
-                if ($CommandArgs[$i] -eq "-ResultsDir" -and $i+1 -lt $CommandArgs.Count) {
-                    $params.ResultsDir = $CommandArgs[$i+1]
-                }
-                if ($CommandArgs[$i] -eq "-Format" -and $i+1 -lt $CommandArgs.Count) {
-                    $params.Format = $CommandArgs[$i+1]
-                }
-                if ($CommandArgs[$i] -eq "-Type" -and $i+1 -lt $CommandArgs.Count) {
-                    $params.Type = $CommandArgs[$i+1]
-                }
-                if ($CommandArgs[$i] -eq "-Title" -and $i+1 -lt $CommandArgs.Count) {
-                    $params.Title = $CommandArgs[$i+1]
+                switch ($CommandArgs[$i]) {
+                    '-ResultsDir' { if ($i + 1 -lt $CommandArgs.Count) { $params.ResultsDir = $CommandArgs[$i + 1]; $i++ } }
+                    '-FiguresDir' { if ($i + 1 -lt $CommandArgs.Count) { $params.FiguresDir = $CommandArgs[$i + 1]; $i++ } }
+                    '-Output' { if ($i + 1 -lt $CommandArgs.Count) { $params.Output = $CommandArgs[$i + 1]; $i++ } }
+                    '-SkipAnalysis' { $params.SkipAnalysis = $true }
+                    '-SkipFigures' { $params.SkipFigures = $true }
+                    default { }
                 }
             }
-            
+
             Invoke-BenchmarkReport @params
         }
+
+
         "info"     {
             $type = $CommandArgs | Select-Object -First 1
             Show-Info -Type $(if ($type) { $type } else { "all" })
@@ -1875,4 +1843,7 @@ catch {
     
     exit 1
 }
+
+
+
 
