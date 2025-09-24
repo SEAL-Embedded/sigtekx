@@ -47,6 +47,7 @@ dev = [
   "ruff>=0.4",
   "mypy>=1.10",
   "types-setuptools",
+  "types-colorama",
 ]
 export = [
   "h5py>=3.10",
@@ -63,6 +64,11 @@ benchmark = [
 ]
 full = [
   "ionosense-hpc[dev,export,benchmark]",
+]
+color = [
+  "rich>=13.7",
+  'colorama>=0.4.6; platform_system == "Windows"',
+  "types-colorama",
 ]
 
 [project.urls]
@@ -145,6 +151,7 @@ no_implicit_optional = true
 show_error_codes = true
 explicit_package_bases = true
 mypy_path = "python/src"
+ignore_missing_imports = false
 
 [[tool.mypy.overrides]]
 module = [
@@ -156,6 +163,7 @@ module = [
   "tabulate.*",
   "nvtx.*",
   "tqdm.*",
+  "colorama.*",
 ]
 ignore_missing_imports = true
 
