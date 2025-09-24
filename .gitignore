@@ -114,3 +114,5 @@ vgcore.*
 benchmark_results/
 experiments/
 results/
+
+.dsp_course/
