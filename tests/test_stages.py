@@ -84,3 +84,4 @@ class TestStageRegistry:
         assert "fft" in available_stages
         assert "magnitude" in available_stages
         assert "db" in available_stages
+

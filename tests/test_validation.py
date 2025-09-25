@@ -1,4 +1,4 @@
-# python/tests/test_validation.py
+# tests/test_validation.py
 
 import numpy as np
 import pytest
@@ -161,4 +161,5 @@ def test_check_numerical_stability():
         check_numerical_stability([])
     with pytest.raises(ValueError, match="must have the same shape"):
         check_numerical_stability([np.ones(2), np.ones(3)])
+
 

@@ -63,8 +63,8 @@ htmlcov/
 .snakemake/
 
 # Python extension modules in core/ (Windows + Linux)
-python/src/ionosense_hpc/core/*.pyd
-python/src/ionosense_hpc/core/*.so
+src/ionosense_hpc/core/*.pyd
+src/ionosense_hpc/core/*.so
 
 # --- Virtual Envs / Local Python ---
 .venv/
@@ -117,3 +117,4 @@ experiments/
 results/
 
 .dsp_course/
+

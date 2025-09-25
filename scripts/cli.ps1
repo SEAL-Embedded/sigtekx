@@ -35,6 +35,10 @@ $script:LogRoot          = Join-Path $script:ArtifactsDir "logs"
 $script:ResearchVersion   = "0.9.1"
 $script:ResearchStandards = @("RSE", "RE", "IEEE-1074", "IEEE-754")
 
+$script:PreferredCMakeGenerator = "Visual Studio 17 2022"
+$script:PreferredCMakePlatform = "x64"
+$script:PreferredCMakeToolset = "v143"
+
 # --- Enhanced Logging with Research Standards -------------------------------
 enum LogLevel {
     Debug    = 0
@@ -176,6 +180,8 @@ Function Initialize-ResearchEnvironment {
     $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
     $script:LogFile = Join-Path $script:LogRoot "research_log_$timestamp.jsonl"
     
+    Ensure-CMakeGeneratorPreference
+    
     Write-ResearchLog -Level Info -Message "Research environment initialized" -Component "Init" -Metadata @{
         version = $script:ResearchVersion
         standards = $script:ResearchStandards
@@ -204,22 +210,312 @@ Function Invoke-WithPythonPath {
     }
 }
 
+Function Clear-CMakeGeneratorEnv {
+    param([switch]$Generator)
+
+    $cleared = $false
+
+    if ($Generator -and (Test-Path Env:CMAKE_GENERATOR)) {
+        Remove-Item Env:CMAKE_GENERATOR -ErrorAction SilentlyContinue
+        $cleared = $true
+    }
+
+    foreach ($name in @('CMAKE_GENERATOR_PLATFORM','CMAKE_GENERATOR_TOOLSET')) {
+        if (Test-Path Env:$name) {
+            Remove-Item Env:$name -ErrorAction SilentlyContinue
+            $cleared = $true
+        }
+    }
+
+    return $cleared
+}
+
+Function Resolve-CMakePresetGenerator {
+    param(
+        [object[]]$Presets,
+        [string]$Name,
+        [hashtable]$Cache
+    )
+
+    if (-not $Name) { return $null }
+    if ($Cache.ContainsKey($Name)) { return $Cache[$Name] }
+
+    $preset = $Presets | Where-Object { $_.name -eq $Name } | Select-Object -First 1
+    if (-not $preset) { return $null }
+
+    if ($preset.generator) {
+        $Cache[$Name] = $preset.generator
+        return $preset.generator
+    }
+
+    $parents = @()
+    if ($preset.inherits) {
+        if ($preset.inherits -is [string]) {
+            $parents += $preset.inherits
+        } else {
+            $parents += $preset.inherits
+        }
+    }
+
+    foreach ($parent in $parents) {
+        $gen = Resolve-CMakePresetGenerator -Presets $Presets -Name $parent -Cache $Cache
+        if ($gen) {
+            $Cache[$Name] = $gen
+            return $gen
+        }
+    }
+
+    return $null
+}
+
+Function Get-CMakePresetGenerator {
+    param([string]$PresetName)
+
+    $presetsPath = Join-Path $script:ProjectRoot 'CMakePresets.json'
+    if (-not (Test-Path -LiteralPath $presetsPath)) {
+        return $null
+    }
+
+    try {
+        $json = Get-Content -LiteralPath $presetsPath -Raw | ConvertFrom-Json -ErrorAction Stop
+    }
+    catch {
+        return $null
+    }
+
+    $presets = $json.configurePresets
+    if (-not $presets) { return $null }
+
+    $cache = @{}
+    return Resolve-CMakePresetGenerator -Presets $presets -Name $PresetName -Cache $cache
+}
+
+
+Function Get-CondaEnvironmentPath {
+    try {
+        $json = conda env list --json
+    } catch {
+        return $null
+    }
+
+    if ($LASTEXITCODE -ne 0 -or -not $json) {
+        return $null
+    }
+
+    try {
+        $parsed = $json | ConvertFrom-Json
+    } catch {
+        return $null
+    }
+
+    foreach ($candidate in $parsed.envs) {
+        if ((Split-Path $candidate -Leaf) -eq $script:CondaEnvName) {
+            return $candidate
+        }
+    }
+
+    return $null
+}
+
+Function Ensure-CMakeGeneratorPreference {
+    param(
+        [string]$TargetGenerator,
+        [switch]$Force
+    )
+
+    $preferred = $script:PreferredCMakeGenerator
+    $platform  = $script:PreferredCMakePlatform
+    $toolset   = $script:PreferredCMakeToolset
+
+    $current = $env:CMAKE_GENERATOR
+    $changed = $false
+
+    if (-not $TargetGenerator) {
+        if ($Force.IsPresent) {
+            $TargetGenerator = $preferred
+        } elseif ($current -like 'Visual Studio 15*') {
+            $TargetGenerator = $preferred
+        } elseif (-not $current -or $current -notlike 'Visual Studio*') {
+            if (Clear-CMakeGeneratorEnv) {
+                Write-ResearchLog -Level Info -Message "Cleared conflicting CMake generator environment" -Component "Env"
+            }
+            return
+        } else {
+            if ($current -eq $preferred) {
+                if ($env:CMAKE_GENERATOR_PLATFORM -ne $platform) {
+                    $env:CMAKE_GENERATOR_PLATFORM = $platform
+                    $changed = $true
+                }
+                if ($env:CMAKE_GENERATOR_TOOLSET -ne $toolset) {
+                    $env:CMAKE_GENERATOR_TOOLSET = $toolset
+                    $changed = $true
+                }
+                if ($changed) {
+                    Write-ResearchLog -Level Info -Message "Aligned Visual Studio generator metadata" -Component "Env" -Metadata @{
+                        generator = $current
+                        platform  = $platform
+                        toolset   = $toolset
+                    }
+                }
+            }
+            return
+        }
+    }
+
+    if ($TargetGenerator -like 'Visual Studio*') {
+        $previous = $current
+        if ($current -ne $TargetGenerator) {
+            $env:CMAKE_GENERATOR = $TargetGenerator
+            $changed = $true
+        }
+        if ($env:CMAKE_GENERATOR_PLATFORM -ne $platform) {
+            $env:CMAKE_GENERATOR_PLATFORM = $platform
+            $changed = $true
+        }
+        if ($env:CMAKE_GENERATOR_TOOLSET -ne $toolset) {
+            $env:CMAKE_GENERATOR_TOOLSET = $toolset
+            $changed = $true
+        }
+        if ($changed) {
+            Write-ResearchLog -Level Info -Message "Pinned CMake generator to Visual Studio 2022" -Component "Env" -Metadata @{
+                generator = $TargetGenerator
+                platform  = $platform
+                toolset   = $toolset
+                previous  = $previous
+            }
+        }
+        return
+    }
+
+    if ($Force.IsPresent -and $TargetGenerator) {
+        if ($current -ne $TargetGenerator) {
+            $env:CMAKE_GENERATOR = $TargetGenerator
+            $changed = $true
+        }
+    } else {
+        if ($current -like 'Visual Studio*') {
+            if (Clear-CMakeGeneratorEnv -Generator) { $changed = $true }
+        }
+    }
+
+    if (Clear-CMakeGeneratorEnv) { $changed = $true }
+
+    if ($changed) {
+        Write-ResearchLog -Level Info -Message "Normalized CMake generator environment" -Component "Env" -Metadata @{
+            target = $TargetGenerator
+        }
+    }
+}
+
+Function Ensure-CMakeGeneratorActivateHooks {
+    param([string]$EnvPath)
+
+    if (-not $EnvPath) {
+        Write-ResearchLog -Level Warning -Message "Unable to locate conda environment path for generator override" -Component "Setup"
+        return
+    }
+
+    $activateDir = Join-Path $EnvPath 'etc\conda\activate.d'
+    $deactivateDir = Join-Path $EnvPath 'etc\conda\deactivate.d'
+
+    foreach ($dir in @($activateDir, $deactivateDir)) {
+        if (-not (Test-Path -LiteralPath $dir)) {
+            New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        }
+    }
+
+    $batActivation = @'
+@echo off
+REM Clear legacy CMake generator overrides for ionosense-hpc
+set "CMAKE_GENERATOR="
+set "CMAKE_GENERATOR_PLATFORM="
+set "CMAKE_GENERATOR_TOOLSET="
+'@
+
+    $psActivation = @"
+# Clear legacy CMake generator overrides for ionosense-hpc
+Remove-Item Env:CMAKE_GENERATOR -ErrorAction SilentlyContinue
+Remove-Item Env:CMAKE_GENERATOR_PLATFORM -ErrorAction SilentlyContinue
+Remove-Item Env:CMAKE_GENERATOR_TOOLSET -ErrorAction SilentlyContinue
+"@
+
+    $batDeactivate = @'
+@echo off
+set "CMAKE_GENERATOR="
+set "CMAKE_GENERATOR_PLATFORM="
+set "CMAKE_GENERATOR_TOOLSET="
+'@
+
+    $psDeactivate = @"
+Remove-Item Env:CMAKE_GENERATOR -ErrorAction SilentlyContinue
+Remove-Item Env:CMAKE_GENERATOR_PLATFORM -ErrorAction SilentlyContinue
+Remove-Item Env:CMAKE_GENERATOR_TOOLSET -ErrorAction SilentlyContinue
+"@
+
+    try {
+        Set-Content -Path (Join-Path $activateDir 'zzz_force_vs2022_generator.bat') -Value $batActivation -Encoding ASCII
+        Set-Content -Path (Join-Path $activateDir 'zzz_force_vs2022_generator.ps1') -Value $psActivation -Encoding ASCII
+        Set-Content -Path (Join-Path $deactivateDir 'zzz_force_vs2022_generator.bat') -Value $batDeactivate -Encoding ASCII
+        Set-Content -Path (Join-Path $deactivateDir 'zzz_force_vs2022_generator.ps1') -Value $psDeactivate -Encoding ASCII
+        Write-ResearchLog -Level Info -Message "Ensured CMake generator cleanup hooks" -Component "Setup" -Metadata @{
+            activate = $activateDir
+            deactivate = $deactivateDir
+        }
+    }
+    catch {
+        Write-ResearchLog -Level Warning -Message "Failed to write generator override hooks: $($_.Exception.Message)" -Component "Setup"
+    }
+}
+
+
 # --- Core Commands -----------------------------------------------------------
 Function Invoke-Setup {
-    Write-ResearchLog -Level Info -Message "Starting environment setup" -Component "Setup"
+    param(
+        [switch]$Clean
+    )
+
+    Write-ResearchLog -Level Info -Message "Starting environment setup" -Component "Setup" -Metadata @{ clean = $Clean.IsPresent }
     Set-Location $script:ProjectRoot
-    
-    # Detect package manager
+
+    # Detect package manager and ensure conda is available
     $solver = if (Get-Command mamba -ErrorAction SilentlyContinue) { "mamba" } else { "conda" }
-    
-    if (-not $solver -and -not (Get-Command conda -ErrorAction SilentlyContinue)) {
-        Write-ResearchLog -Level Critical -Message "No conda/mamba installation found" -Component "Setup"
+    $condaCmd = Get-Command conda -ErrorAction SilentlyContinue
+    if (-not $condaCmd) {
+        Write-ResearchLog -Level Critical -Message "No conda installation found" -Component "Setup"
         throw "Please install Miniforge3 or Miniconda"
     }
-    
-    # Create or update environment
+
     $envExists = conda env list | Select-String -Quiet -Pattern "\b$script:CondaEnvName\b"
-    
+    $reactivate = $false
+
+    if ($Clean) {
+        if ($env:CONDA_DEFAULT_ENV -eq $script:CondaEnvName) {
+            Write-ResearchLog -Level Info -Message "Deactivating active environment before clean reinstall" -Component "Setup"
+            try {
+                conda deactivate | Out-Null
+            } catch {
+                Write-ResearchLog -Level Error -Message "conda deactivate failed: $($_.Exception.Message)" -Component "Setup"
+                throw "Unable to deactivate active environment"
+            }
+            if ($env:CONDA_DEFAULT_ENV -eq $script:CondaEnvName) {
+                Write-ResearchLog -Level Error -Message "Environment still active after conda deactivate" -Component "Setup"
+                throw "Failed to deactivate environment"
+            }
+            $reactivate = $true
+        }
+
+        if ($envExists) {
+            Write-ResearchLog -Level Info -Message "Removing existing environment" -Component "Setup"
+            & $solver env remove --name $script:CondaEnvName --yes
+            if ($LASTEXITCODE -ne 0) {
+                throw "Failed to remove existing environment"
+            }
+            $envExists = $false
+        } else {
+            Write-ResearchLog -Level Info -Message "No existing environment found; nothing to clean" -Component "Setup"
+        }
+    }
+
     if ($envExists) {
         Write-ResearchLog -Level Info -Message "Updating existing environment" -Component "Setup"
         & $solver env update --name $script:CondaEnvName --file $script:EnvironmentFile --prune
@@ -227,35 +523,45 @@ Function Invoke-Setup {
         Write-ResearchLog -Level Info -Message "Creating new environment" -Component "Setup"
         & $solver env create --file $script:EnvironmentFile
     }
-    
+
     if ($LASTEXITCODE -ne 0) {
         throw "Environment setup failed"
     }
-    
-    # Install package in development mode (use current shell Python to preserve VS/CUDA env)
+
+    $envPath = Get-CondaEnvironmentPath
+    Ensure-CMakeGeneratorActivateHooks -EnvPath $envPath
+    Ensure-CMakeGeneratorPreference -TargetGenerator $script:PreferredCMakeGenerator -Force
+
     Write-ResearchLog -Level Info -Message "Installing ionosense-hpc in development mode" -Component "Setup"
     Push-Location $script:ProjectRoot
-    # Ensure a clean scikit-build cache so updated CMake args take effect
     $skbuildDir = Join-Path $script:ProjectRoot 'build/skbuild'
     if (Test-Path $skbuildDir) {
         Remove-Item -Recurse -Force $skbuildDir -ErrorAction SilentlyContinue
         Write-ResearchLog -Level Info -Message "Cleared scikit-build cache: $skbuildDir" -Component "Setup"
     }
-    $pythonExe = if ($env:CONDA_PREFIX) { Join-Path $env:CONDA_PREFIX 'python.exe' } else { 'python' }
-    # Default to CUDA OFF for editable installs to avoid toolset requirement
     $env:SKBUILD_CMAKE_ARGS = "-DIONO_WITH_CUDA=OFF"
-    & $pythonExe -m pip install -e ".[dev,benchmark,export]"
-    Remove-Item Env:SKBUILD_CMAKE_ARGS -ErrorAction SilentlyContinue
+    conda run --no-capture-output -n $script:CondaEnvName python -m pip install -e .[dev,benchmark,export]
     $installCode = $LASTEXITCODE
+    Remove-Item Env:SKBUILD_CMAKE_ARGS -ErrorAction SilentlyContinue
     Pop-Location
 
     if ($installCode -ne 0) {
-        Write-ResearchLog -Level Warning -Message "Editable install failed (pip exit $installCode). Continuing without package install; use 'build' to compile extension and set PYTHONPATH via CLI commands." -Component "Setup"
+        Write-ResearchLog -Level Warning -Message "Editable install failed (pip exit $installCode). Continuing without package install; use 'build' to compile the extension and set PYTHONPATH." -Component "Setup"
     } else {
+        if ($reactivate) {
+            Write-ResearchLog -Level Info -Message "Reactivating environment after clean setup" -Component "Setup"
+            try {
+                conda activate $script:CondaEnvName | Out-Null
+            } catch {
+                Write-ResearchLog -Level Warning -Message "Automatic reactivation failed: $($_.Exception.Message). Run 'conda activate $script:CondaEnvName' manually." -Component "Setup"
+            }
+            if ($env:CONDA_DEFAULT_ENV -ne $script:CondaEnvName) {
+                Write-ResearchLog -Level Warning -Message "Environment '$script:CondaEnvName' is not active after setup. Run 'conda activate $script:CondaEnvName'." -Component "Setup"
+            }
+        }
         Write-ResearchLog -Level Info -Message "Setup completed successfully" -Component "Setup"
     }
 }
-
 Function Invoke-Build {
     param(
         [string]$Preset = $script:BuildPreset,
@@ -268,6 +574,14 @@ Function Invoke-Build {
         preset = $Preset
         clean = $Clean.IsPresent
         no_nvtx = $NoNvtx.IsPresent
+    }
+    
+    $configurePreset = $Preset
+    $generator = Get-CMakePresetGenerator -PresetName $configurePreset
+    if ($generator) {
+        Ensure-CMakeGeneratorPreference -TargetGenerator $generator
+    } else {
+        Ensure-CMakeGeneratorPreference
     }
     
     if (-not (Test-CondaEnvironment)) {
@@ -1574,7 +1888,11 @@ try {
     # Execute command
     switch ($Command) {
         "help"     { Show-Help }
-        "setup"    { Invoke-Setup }
+        "setup"    {
+            $params = @{}
+            if ($CommandArgs -contains "-Clean") { $params.Clean = $true }
+            Invoke-Setup @params
+        }
         "build"    { 
             $params = @{}
             if ($CommandArgs -contains "-Clean")   { $params.Clean   = $true }
@@ -1843,6 +2161,7 @@ catch {
     
     exit 1
 }
+
 
 
 

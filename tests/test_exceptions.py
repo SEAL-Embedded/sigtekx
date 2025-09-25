@@ -1,4 +1,4 @@
-# python/tests/test_exceptions.py
+# tests/test_exceptions.py
 
 from ionosense_hpc.exceptions import (
     ConfigError,
@@ -88,3 +88,4 @@ def test_validation_error():
     # Without expected/got (no hint)
     err_plain = ValidationError("Bad input value")
     assert "Hint:" not in str(err_plain)
+

@@ -7,7 +7,7 @@
 
 ## Repository Snapshot
 - Domain: CUDA accelerated FFT and benchmarking suite exposed to Python.
-- Primary languages: C++17 and CUDA in `cpp/`, Python 3.11+ package under `python/src/`.
+- Primary languages: C++17 and CUDA in `cpp/`, Python 3.11+ package under `src/`.
 - Command interface: cross platform CLI wrappers in `scripts/cli.sh` and `scripts/cli.ps1`, plus enhanced PowerShell shell `scripts/open_dev_pwsh.ps1`.
 - Key docs: `README.md`, `PROJECT_STRUCTURE.md`, `docs/DEVELOPMENT.md`, `CONTRIBUTING.md`.
 
@@ -58,7 +58,7 @@
 - `./scripts/cli.sh build [preset]` or `iono build`: configure and build via CMake presets.
 - `./scripts/cli.sh format` or `iono format`: run clang-format checks (Google style).
 - `./scripts/cli.sh lint` or `iono lint`: run Python lint plus C++ static analysis.
-- `./scripts/cli.sh typecheck`: strict mypy across `python/src/` and `python/tests/`.
+- `./scripts/cli.sh typecheck`: strict mypy across `src/ionosense_hpc/` and `tests/`.
 - `./scripts/cli.sh test`, `./scripts/cli.sh test py`, `./scripts/cli.sh test cpp`: run unit and integration suites.
 - `./scripts/cli.sh bench suite`, `./scripts/cli.sh profile nsys <target>`: benchmarking and profiling flows.
 

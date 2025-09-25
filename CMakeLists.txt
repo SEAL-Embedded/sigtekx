@@ -1,4 +1,4 @@
-﻿cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 3.25)
 project(ionosense_hpc LANGUAGES CXX)
 
 # ============================================================================
@@ -173,17 +173,17 @@ if(IONO_WITH_PYTHON AND IONO_WITH_CUDA)
         )
 
         # If pre-staged runtime libs exist, include them in the wheel (optional)
-        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/python/src/ionosense_hpc/.libs/windows")
-            install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/python/src/ionosense_hpc/.libs/windows/
+        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/ionosense_hpc/.libs/windows")
+            install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/ionosense_hpc/.libs/windows/
                     DESTINATION ${SKBUILD_PLATLIB_DIR}/ionosense_hpc/.libs/windows)
         endif()
-        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/python/src/ionosense_hpc/.libs/linux")
-            install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/python/src/ionosense_hpc/.libs/linux/
+        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/ionosense_hpc/.libs/linux")
+            install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/ionosense_hpc/.libs/linux/
                     DESTINATION ${SKBUILD_PLATLIB_DIR}/ionosense_hpc/.libs/linux)
         endif()
     else()
         # Developer builds: drop beside the python package tree
-        set(_ION_PY_OUT "${CMAKE_CURRENT_SOURCE_DIR}/python/src/ionosense_hpc/core")
+        set(_ION_PY_OUT "${CMAKE_CURRENT_SOURCE_DIR}/src/ionosense_hpc/core")
         set_target_properties(_engine PROPERTIES
             LIBRARY_OUTPUT_DIRECTORY  "${_ION_PY_OUT}"
             RUNTIME_OUTPUT_DIRECTORY  "${_ION_PY_OUT}"
@@ -193,7 +193,7 @@ if(IONO_WITH_PYTHON AND IONO_WITH_CUDA)
 
         # ---------------- Windows: optionally stage NVIDIA runtime DLLs beside the .pyd ----------------
         if(WIN32)
-            set(_LIBS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/python/src/ionosense_hpc/.libs/windows")
+            set(_LIBS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/ionosense_hpc/.libs/windows")
             file(MAKE_DIRECTORY ${_LIBS_DIR})
 
             # Prefer Conda bin, else CUDA_PATH, else skip

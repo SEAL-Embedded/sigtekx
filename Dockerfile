@@ -32,24 +32,22 @@ RUN conda env create -f environment.build.yml && conda clean -afy
 SHELL ["conda", "run", "-n", "ionosense-hpc", "/bin/bash", "-c"]
 
 # Copy build configuration and all source code required for the C++ build.
-# This includes the python source directory, which cmake needs as a destination for shared libraries.
+# This includes the Python package directory, which CMake uses as the install destination for shared libraries.
 COPY pyproject.toml .
 COPY CMakeLists.txt CMakePresets.json ./
 COPY src/ ./src/
 COPY include/ ./include/
-COPY bindings/ ./bindings/
-COPY python/src/ ./python/src/
 
 # Build the C++/CUDA components.
 # This layer is cached as long as C++ or Python source doesn't change.
-# The compiled .so file will be placed inside the python/src directory.
-ENV PYTHONPATH="/app/python/src"
+# The compiled extension will be placed inside the src/ionosense_hpc directory.
+ENV PYTHONPATH="/app/src"
 RUN cmake --preset ci-linux && cmake --build --preset ci-linux-build
 
 # Copy the test files.
 # We copy this last because tests might change frequently, and we don't want
 # that to invalidate the C++ build cache.
-COPY python/tests/ ./python/tests/
+COPY tests/ ./tests/
 
 # Build the Python wheel
 # This packages the Python code and the compiled C++ extension (.so file)

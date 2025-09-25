@@ -1,4 +1,4 @@
-# python/tests/test_fixtures.py
+# tests/test_fixtures.py
 
 from pathlib import Path
 
@@ -54,3 +54,4 @@ def test_mock_device_info(mock_device_info):
     assert isinstance(mock_device_info, dict)
     assert mock_device_info['name'] == 'Mock GPU'
     assert 'memory_total_mb' in mock_device_info
+

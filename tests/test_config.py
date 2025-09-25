@@ -160,3 +160,4 @@ def test_memory_estimation(nfft, batch, expected_mb):
 
     # Should be within a reasonable range or both be small.
     assert np.isclose(estimated, expected_mb, atol=3) or (estimated < 1 and expected_mb < 1)
+

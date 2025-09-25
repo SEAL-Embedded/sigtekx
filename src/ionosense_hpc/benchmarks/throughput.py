@@ -1,5 +1,5 @@
 """
-python/src/ionosense_hpc/benchmarks/throughput.py
+src/ionosense_hpc/benchmarks/throughput.py
 --------------------------------------------------------------------------------
 Enhanced throughput benchmark with memory bandwidth analysis and
 scaling characterization following HPC benchmarking standards.
@@ -549,3 +549,4 @@ if __name__ == '__main__':
     print(f"  Frames/second: {fps:.1f}")
     print(f"  GB/second: {gbs:.2f}")
     print(f"  MS/second: {sps/1e6:.2f}")
+

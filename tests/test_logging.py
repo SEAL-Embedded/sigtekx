@@ -337,3 +337,4 @@ class TestColorFormatter:
         assert not ANSI_RE.search(formatted)
         assert "INFO    " in formatted  # Check for padding without color
 
+

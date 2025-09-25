@@ -175,3 +175,4 @@ class TestBatchGenerator:
         ch1 = zeros_batch[0:nfft]
         ch2 = zeros_batch[nfft : 2 * nfft]
         assert np.array_equal(ch1, ch2), "Zeros batch channels should be identical."
+

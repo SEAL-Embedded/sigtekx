@@ -11,7 +11,7 @@ Testing Strategy: GPU-First
 """
 
 # Ensure package is importable when running tests without the CLI/installer.
-# Insert `python/src` at the front of sys.path before importing test plugins.
+# Insert `src` at the front of sys.path before importing test plugins.
 import sys
 from pathlib import Path
 
@@ -39,7 +39,7 @@ def pytest_configure(config):
 
 def pytest_collection_modifyitems(config, items):
     """Reorder collection so engine tests run first and apply GPU skips."""
-    engine_prefix = "python/tests/test_engine.py"
+    engine_prefix = "tests/test_engine.py"
     engine_items = [item for item in items if item.nodeid.startswith(engine_prefix)]
     if engine_items:
         remaining_items = [item for item in items if item not in engine_items]
@@ -52,3 +52,4 @@ def pytest_collection_modifyitems(config, items):
     for item in items:
         if "gpu" in item.keywords:
             item.add_marker(skip_gpu)
+

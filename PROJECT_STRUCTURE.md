@@ -52,9 +52,9 @@ cpp/
 |`-- tests/                 # C++ tests executed via CTest presets
 ```
 
-### Python Package (python/src/ionosense_hpc)
+### Python Package (src/ionosense_hpc)
 ```
-python/src/ionosense_hpc/
+src/ionosense_hpc/
 |-- __init__.py             # Package exports
 |-- __version__.py          # Semantic version string (synced with CMake/Python)
 |-- exceptions.py           # Domain specific exception hierarchy
@@ -101,7 +101,7 @@ build/
 ```
 
 ### Python Module Artefacts
-Shared objects produced by builds land in `python/src/ionosense_hpc/core/`. Expect `_engine.pyd` on Windows and `_engine.so` on Linux/WSL.
+Shared objects produced by builds land in `src/ionosense_hpc/core/`. Expect `_engine.pyd` on Windows and `_engine.so` on Linux/WSL.
 
 ## Development Workflow
 

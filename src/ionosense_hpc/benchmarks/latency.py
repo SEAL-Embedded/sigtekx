@@ -1,5 +1,5 @@
 """
-python/src/ionosense_hpc/benchmarks/latency.py
+src/ionosense_hpc/benchmarks/latency.py
 --------------------------------------------------------------------------------
 Latency benchmark with IEEE-compliant statistical analysis and
 GPU-accurate timing using CUDA events.
@@ -510,3 +510,4 @@ if __name__ == '__main__':
 
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         save_benchmark_results(result, base_dir / f"{safe_name}_{timestamp}.json")
+

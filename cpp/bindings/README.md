@@ -157,7 +157,7 @@ pip install -e python/
 Python bindings are tested via pytest:
 
 ```bash
-pytest python/tests/test_bindings.py -v
+pytest tests/test_bindings.py -v
 ```
 
 Test coverage includes:

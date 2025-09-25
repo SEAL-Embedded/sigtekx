@@ -127,3 +127,4 @@ class TestBaseBenchmark:
         assert config_dict['name'] == "test_experiment"
         assert config_dict['iterations'] == 500
         assert 'engine_config' in config_dict
+
