@@ -82,30 +82,45 @@ function Activate-CondaEnv {
     if ($NoConda) { return }
     if ($env:CONDA_DEFAULT_ENV -eq $Name) { Info "Conda env '$Name' already active."; return }
 
-    $activated = $false
-
-    foreach ($runner in @('mamba','conda')) {
-        $cmd = Get-Command $runner -ErrorAction SilentlyContinue
-        if (-not $cmd) { continue }
-
-        try {
-            & $runner activate $Name 2>$null | Out-Null
-            if ($env:CONDA_DEFAULT_ENV -eq $Name) {
-                Ok "Activated '$Name' via $runner."
-                $activated = $true
-                break
-            }
-        } catch {
-            # ignore and try the next runner
-        }
+    $condaCmd = Get-Command conda -ErrorAction SilentlyContinue
+    if (-not $condaCmd) {
+        Warn "conda executable not found; cannot activate '$Name'."
+        return
     }
 
-    if (-not $activated) {
-        Warn "Tried to activate '$Name' via mamba/conda, but it didn’t stick."
+    $condaBatCandidates = @(
+        (Join-Path (Split-Path -Parent $condaCmd.Source) 'conda.bat'),
+        (Join-Path (Split-Path -Parent $condaCmd.Source) 'activate.bat'),
+        (Join-Path (Split-Path -Parent (Split-Path -Parent $condaCmd.Source)) 'Scripts\conda.bat'),
+        (Join-Path (Split-Path -Parent (Split-Path -Parent $condaCmd.Source)) 'condabin\conda.bat')
+    ) | Where-Object { Test-Path $_ }
+
+    $condaBat = $condaBatCandidates | Select-Object -First 1
+    if (-not $condaBat) {
+        Warn "Unable to locate conda.bat near $($condaCmd.Source)."
+        return
+    }
+
+    $envDump = cmd.exe /c "`"$condaBat`" activate $Name >nul 2>nul && set"
+    if ($LASTEXITCODE -ne 0) {
+        Warn "conda activation failed (exit $LASTEXITCODE) for '$Name'."
+        return
+    }
+
+    foreach ($line in $envDump) {
+        $kv = $line -split '=',2
+        if ($kv.Count -ne 2) { continue }
+        $key, $val = $kv
+        if (-not $key) { continue }
+        Set-Item -Path ("Env:{0}" -f $key) -Value $val
+    }
+
+    if ($env:CONDA_DEFAULT_ENV -eq $Name) {
+        Ok "Activated '$Name' via conda."
+    } else {
+        Warn "conda activation executed but CONDA_DEFAULT_ENV is '$($env:CONDA_DEFAULT_ENV)'."
     }
 }
-
-
 # ----- Ensure conda is available on PATH (robust for non-profile sessions) -----
 function Ensure-CondaOnPath {
     if (Get-Command conda -ErrorAction SilentlyContinue) { return }
@@ -256,3 +271,4 @@ Register-ArgumentCompleter -CommandName iono,ib,ir,it,ilint,ifmt,ibench,iprof,iv
         }
     }
 }
+

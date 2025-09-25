@@ -8,7 +8,7 @@ benchmark infrastructure following RSE best practices.
 
 from collections.abc import Generator
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
 import numpy as np
 import pytest

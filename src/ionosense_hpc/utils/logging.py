@@ -8,14 +8,14 @@ It is configurable via the `IONO_LOG_LEVEL` environment variable.
 import logging
 import os
 import sys
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ionosense_hpc.config.schemas import EngineConfig
 
 logger = logging.getLogger('ionosense_hpc')
 
-def _env_truthy(name:str, default:Optional[bool] = None) -> Optional[bool]:
+def _env_truthy(name:str, default:bool | None = None) -> bool | None:
     v = os.environ.get(name)
     if v is None:
         return default
@@ -37,7 +37,7 @@ class _ColorFormatter(logging.Formatter):
         logging.CRITICAL: "\x1b[1;31m",    # bold red
     }
 
-    def __init__(self, fmt : str, datefmt : Optional[str] = None, use_color:bool = True):
+    def __init__(self, fmt : str, datefmt : str | None = None, use_color:bool = True):
         super().__init__(fmt=fmt, datefmt=datefmt)
         self.use_color = use_color
 

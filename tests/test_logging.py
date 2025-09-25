@@ -7,11 +7,10 @@ and the correctness of the custom color formatter.
 """
 
 import logging
-import os
 import re
 import sys
+from collections.abc import Generator
 from pathlib import Path
-from typing import Generator
 
 import pytest
 
