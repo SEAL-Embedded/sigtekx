@@ -82,23 +82,28 @@ research/
 ```
 
 ### Artifacts (artifacts/)
+
 ```
 artifacts/
-|-- benchmarks/             # JSON/CSV suites plus generated reports
-|-- experiments/            # Research workflow runs and sweep outputs
+|-- data/                   # Derived benchmark outputs (CSV/Parquet) produced by Hydra runners
+|-- experiments/            # Hydra run directories for single runs and multirun sweeps
+|-- logs/                   # Research CLI JSONL logs for traceability
+|-- mlruns/                 # MLflow tracking store (local file backend)
 |-- profiling/
 |   |-- ncu_reports/        # Nsight Compute traces (.ncu-rep)
 |   `-- nsys_reports/       # Nsight Systems traces (.nsys-rep)
-|-- reports/                # Lint/coverage/test summaries + validation logs
-`-- logs/                   # Research CLI JSONL logs for traceability
+`-- reports/                # Generated analysis reports and summaries
 ```
 
+
 ### Build Outputs (build/)
+
 ```
 build/
 |-- windows-rel/            # Latest Windows release build (CTest + binaries)
 `-- <preset>/               # Any additional CMake presets generated locally
 ```
+
 
 ### Python Module Artefacts
 Shared objects produced by builds land in `src/ionosense_hpc/core/`. Expect `_engine.pyd` on Windows and `_engine.so` on Linux/WSL.
@@ -239,7 +244,7 @@ Reference issues or research tickets in commit messages when applicable to maint
 
 ## Output Artefacts
 - Generated content persists under `artifacts/` (configurable via `IONO_OUTPUT_ROOT`).
-- Benchmark CSVs/plots: `artifacts/benchmarks/`
+- Benchmark CSVs/plots: `artifacts/data/`
 - Experiment dumps: `artifacts/experiments/`
 - QA reports (lint, coverage, validation): `artifacts/reports/`
 - Profiling traces: `artifacts/profiling/nsys_reports/` & `artifacts/profiling/ncu_reports/`

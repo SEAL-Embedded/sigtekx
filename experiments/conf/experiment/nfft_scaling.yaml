@@ -1,0 +1,8 @@
+defaults:
+  - override /engine: throughput
+  
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      engine.nfft: 256,512,1024,2048,4096,8192

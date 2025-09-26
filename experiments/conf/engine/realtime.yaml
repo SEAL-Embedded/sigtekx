@@ -1,0 +1,11 @@
+name: realtime
+nfft: 1024
+batch: 2
+overlap: 0.5
+sample_rate_hz: 48000
+stream_count: 3
+pinned_buffer_count: 2
+warmup_iters: 10
+timeout_ms: 100
+use_cuda_graphs: false
+enable_profiling: false

@@ -13,8 +13,7 @@ from omegaconf import DictConfig
 from pathlib import Path
 
 from ionosense_hpc import Engine
-from ionosense_hpc.benchmarks import LatencyBenchmark
-from ionosense_hpc.benchmarks.base import LatencyBenchmarkConfig
+from ionosense_hpc.benchmarks import LatencyBenchmark, LatencyBenchmarkConfig
 from ionosense_hpc.config import EngineConfig
 
 
@@ -27,11 +26,8 @@ def run_latency_benchmark(cfg: DictConfig) -> float:
     """
     # Convert OmegaConf to Pydantic models for validation
     engine_config = EngineConfig(**cfg.engine)
-    benchmark_config = LatencyBenchmarkConfig(
-        name="latency",
-        **cfg.benchmark
-    )
-    
+    benchmark_config = LatencyBenchmarkConfig(**cfg.benchmark)
+
     # Setup MLflow
     mlflow.set_tracking_uri(cfg.mlflow.tracking_uri)
     mlflow.set_experiment(cfg.mlflow.experiment_name)
@@ -101,3 +97,4 @@ def run_latency_benchmark(cfg: DictConfig) -> float:
 
 if __name__ == "__main__":
     run_latency_benchmark()
+

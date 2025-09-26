@@ -1,0 +1,11 @@
+name: throughput
+nfft: 4096
+batch: 32
+overlap: 0.5
+sample_rate_hz: 48000
+stream_count: 4
+pinned_buffer_count: 4
+warmup_iters: 1
+timeout_ms: 5000
+use_cuda_graphs: false
+enable_profiling: false

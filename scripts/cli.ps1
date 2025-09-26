@@ -1058,7 +1058,6 @@ Function Invoke-Clean {
             $script:ArtifactsDir,
             (Join-Path $root 'results'),
             (Join-Path $root 'benchmark_results'),
-            (Join-Path $root 'experiments'),
             $script:ReportsDir,
             $script:ExperimentsDir,
             $script:ProfileDir,
@@ -2161,8 +2160,3 @@ catch {
     
     exit 1
 }
-
-
-
-
-

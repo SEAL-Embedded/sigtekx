@@ -1,0 +1,41 @@
+# Main Hydra configuration for ionosense-hpc
+# Simple, clean configuration following one-tool-one-job principle
+
+defaults:
+  - _self_
+  - engine: realtime
+  - benchmark: latency
+  - experiment: baseline
+
+# Project metadata
+project:
+  name: ionosense-hpc
+  version: 2.0.0
+
+# Output paths - all artifacts route through artifacts_root (overridable via IONO_OUTPUT_ROOT)
+paths:
+  artifacts_root: ${oc.env:IONO_OUTPUT_ROOT,artifacts}
+  artifacts: ${paths.artifacts_root}
+  experiments_dir: ${paths.artifacts_root}/experiments
+  data: ${paths.artifacts_root}/data
+  figures: ${paths.artifacts_root}/figures
+  reports: ${paths.artifacts_root}/reports
+  logs: ${paths.artifacts_root}/logs
+  profiling: ${paths.artifacts_root}/profiling
+
+# MLflow configuration (tracking only)
+mlflow:
+  tracking_uri: file:${paths.artifacts_root}/mlruns
+  experiment_name: ${experiment.name}
+
+# Reproducibility
+seed: 42
+deterministic: true
+
+# Hydra settings
+hydra:
+  run:
+    dir: ${paths.experiments_dir}/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: ${paths.experiments_dir}/sweeps/${now:%Y-%m-%d}
+    subdir: ${hydra.job.override_dirname}

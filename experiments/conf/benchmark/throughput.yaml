@@ -1,0 +1,13 @@
+name: throughput
+type: throughput
+iterations: 1
+warmup_iterations: 0
+test_duration_s: 30.0
+data_size_gb: null
+test_batch_sizes: [1, 2, 4, 8, 16, 32, 64, 128]
+test_nfft_sizes: [256, 512, 1024, 2048, 4096, 8192]
+measure_memory_bandwidth: true
+measure_pcie_bandwidth: true
+monitor_gpu_utilization: true
+monitor_temperature: true
+monitor_power: true

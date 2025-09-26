@@ -1,0 +1,36 @@
+name: accuracy
+type: accuracy
+iterations: 10
+warmup_iterations: 0
+absolute_tolerance: 1.0e-6
+relative_tolerance: 1.0e-5
+snr_threshold_db: 60.0
+phase_tolerance_deg: 1.0
+validate_parseval: true
+validate_linearity: true
+validate_time_invariance: true
+validate_numerical_stability: true
+validate_window_accuracy: true
+use_double_precision_reference: true
+reference_implementation: scipy
+test_signals:
+  - type: sine
+    frequency: 1000
+    amplitude: 1.0
+  - type: sine
+    frequency: 5000
+    amplitude: 0.5
+  - type: multitone
+    frequencies: [1000, 2000, 3000, 4000, 5000]
+  - type: chirp
+    f_start: 100
+    f_end: 20000
+  - type: noise
+    noise_type: white
+    amplitude: 0.1
+  - type: dc
+    value: 1.0
+  - type: impulse
+    position: 0
+  - type: nyquist
+    amplitude: 1.0

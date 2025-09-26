@@ -1,0 +1,11 @@
+name: stress_test
+description: Long-running stress test for stability
+tags: [stress, stability, reliability]
+benchmarks_to_run: [throughput, latency]
+test_duration_hours: 1.0
+monitoring:
+  alert_on_deadline_miss: true
+  alert_threshold_percent: 1.0
+  temperature_limit_c: 85
+  power_limit_w: 350
+  save_interval: 1000

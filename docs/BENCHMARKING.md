@@ -769,7 +769,7 @@ ibench scaling                                  # Windows (dev shell)
 
 By default, all benchmark artifacts are written under the repository `artifacts/` tree to keep the workspace clean and aligned with RSE/RE standards:
 
-- Benchmarks: `artifacts/benchmarks/<suite_or_name>_<timestamp>/`
+- Benchmarks: `artifacts/data/<benchmark_name>_<config>.{parquet,csv}`
 - Research workflows and sweeps: `artifacts/experiments/<workflow_or_experiment_id>/`
 - Reports and test outputs: `artifacts/reports/`
 

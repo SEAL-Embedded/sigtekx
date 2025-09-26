@@ -13,8 +13,7 @@ from omegaconf import DictConfig
 from pathlib import Path
 
 from ionosense_hpc import Engine
-from ionosense_hpc.benchmarks import AccuracyBenchmark
-from ionosense_hpc.benchmarks.base import AccuracyBenchmarkConfig
+from ionosense_hpc.benchmarks import AccuracyBenchmark, AccuracyBenchmarkConfig
 from ionosense_hpc.config import EngineConfig
 
 
@@ -27,12 +26,10 @@ def run_accuracy_benchmark(cfg: DictConfig) -> float:
     """
     # Convert OmegaConf to Pydantic models for validation
     engine_config = EngineConfig(**cfg.engine)
-    benchmark_config = AccuracyBenchmarkConfig(
-        name="accuracy",
-        **cfg.benchmark
-    )
-    
+    benchmark_config = AccuracyBenchmarkConfig(**cfg.benchmark)
+
     # Setup MLflow
+    
     mlflow.set_tracking_uri(cfg.mlflow.tracking_uri)
     mlflow.set_experiment(cfg.mlflow.experiment_name)
     

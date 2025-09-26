@@ -1,0 +1,11 @@
+name: validation
+nfft: 256
+batch: 1
+overlap: 0.0
+sample_rate_hz: 1000
+stream_count: 1
+pinned_buffer_count: 2
+warmup_iters: 0
+timeout_ms: 10000
+use_cuda_graphs: false
+enable_profiling: true
