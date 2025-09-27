@@ -80,13 +80,18 @@ Ionosense-HPC includes a focused CLI for essential setup and build tasks. For re
 .\scripts\cli.ps1 help                    # CLI help
 ```
 
-### Direct Research Tools (Recommended for daily use)
+### Native Research Tools (Primary Approach - Recommended)
 ```bash
 # Single experiments via Hydra
 python benchmarks/run_latency.py experiment=baseline
-python benchmarks/run_latency.py engine.nfft=8192 benchmark.iterations=100
+python benchmarks/run_latency.py experiment=ionosphere_multiscale
 
-# Parameter sweeps via Hydra multirun
+# Ionosphere research experiments (Ready-to-use configurations) 🔬
+python benchmarks/run_throughput.py --multirun experiment=ionosphere_resolution
+python benchmarks/run_throughput.py --multirun experiment=ionosphere_temporal
+python benchmarks/run_latency.py experiment=ionosphere_multiscale
+
+# General parameter sweeps via Hydra multirun
 python benchmarks/run_latency.py --multirun engine.nfft=1024,2048,4096,8192
 python benchmarks/run_latency.py --multirun experiment=nfft_scaling
 
@@ -125,7 +130,12 @@ Ionosense-HPC uses a modern, reproducible research stack:
 python benchmarks/run_latency.py experiment=baseline           # Baseline performance characterization
 python benchmarks/run_latency.py experiment=baseline engine.nfft=2048  # With parameter overrides
 
-# Parameter sweeps with Hydra multirun
+# 🔬 Ionosphere Research Configurations (Domain-specific)
+python benchmarks/run_throughput.py --multirun experiment=ionosphere_resolution  # NFFT resolution study (4K-32K)
+python benchmarks/run_throughput.py --multirun experiment=ionosphere_temporal    # Temporal analysis & overlap optimization
+python benchmarks/run_latency.py experiment=ionosphere_multiscale               # Comprehensive multi-scale analysis
+
+# General parameter sweeps with Hydra multirun
 python benchmarks/run_latency.py --multirun experiment=nfft_scaling      # Sweep over different NFFT sizes
 python benchmarks/run_latency.py --multirun experiment=batch_scaling     # Sweep over batch sizes
 python benchmarks/run_latency.py --multirun experiment=full_grid         # Comprehensive parameter grid
@@ -136,15 +146,32 @@ python benchmarks/run_throughput.py experiment=baseline
 python benchmarks/run_accuracy.py --multirun experiment=nfft_scaling
 ```
 
-### Modern Workflow Integration
+### System Reliability & Configuration Management
+
+The system has been optimized for reliability and ease of use:
+
+- **🔧 Robust CLI Parameter Parsing**: Supports both Hydra native syntax (`experiment=value`) and traditional flags
+- **🛡️ Stable GPU Monitoring**: Automatic timeouts prevent hanging during CUDA operations
+- **📝 Configuration Validation**: Built-in debugging and validation for experiment configurations
+- **🔬 Domain-Specific Configs**: Ready-to-use ionosphere research configurations with validated parameters
+- **💻 Environment Stability**: Streamlined conda activation with proper error handling
+
+For troubleshooting, use the `-Debug` flag with any CLI command to see detailed execution information.
+
+### Complete Native Toolchain Workflow
 
 ```bash
-# Complete reproducible workflow using direct tools
-python benchmarks/run_latency.py experiment=baseline                      # Run experiments
-python benchmarks/run_latency.py --multirun experiment=nfft_scaling       # Parameter exploration
-snakemake --cores 4 --snakefile experiments/Snakefile                     # Generate analysis and reports
-mlflow ui --backend-store-uri file://./artifacts/mlruns                   # View results in MLflow UI
-dvc status                                                                 # Check data versioning with DVC
+# 🔬 Ionosphere research workflow using industry-standard tools
+python benchmarks/run_throughput.py --multirun experiment=ionosphere_resolution  # Run parameter sweeps
+python benchmarks/run_latency.py experiment=ionosphere_multiscale                # Single experiments
+snakemake --cores 4 --snakefile experiments/Snakefile                           # Execute analysis pipeline
+mlflow ui --backend-store-uri file://./artifacts/mlruns                         # View experiment results
+dvc status && dvc repro                                                         # Data versioning and reproduction
+
+# General research workflow
+python benchmarks/run_latency.py experiment=baseline                            # Run experiments
+python benchmarks/run_latency.py --multirun experiment=nfft_scaling             # Parameter exploration
+snakemake --cores 4 generate_figures --snakefile experiments/Snakefile          # Generate specific outputs
 ```
 
 ## Quick Usage Examples
@@ -182,7 +209,7 @@ pytest tests/ -v                          # Verify functionality
 .\scripts\cli.ps1 check                   # Combined checks
 ```
 
-**Modern Research Workflows (Direct Tools):**
+**Native Research Toolchain (Primary Workflow):**
 ```bash
 # Single experiments with Hydra
 python benchmarks/run_latency.py experiment=baseline           # Run single experiment
@@ -205,4 +232,29 @@ mlflow experiments list --tracking-uri file://./artifacts/mlruns  # List experim
 
 # Custom scripts
 python custom_script.py                                       # Run any custom script
+```
+
+## Documentation
+
+### Quick References
+- **[CLAUDE.md](CLAUDE.md)** - Quick reference for reliable command patterns and ionosphere configurations
+- **[CLI Help](scripts/cli.ps1)** - Use `.\scripts\cli.ps1 help` for comprehensive CLI documentation
+- **[Learning Guides](scripts/cli.ps1)** - Use `.\scripts\cli.ps1 learn` for interactive tutorials
+
+### Detailed Documentation
+- **[Installation Guide](docs/INSTALL.md)** - Platform-specific installation instructions
+- **[API Documentation](docs/API.md)** - Python API reference and examples
+- **[Benchmarking Guide](docs/BENCHMARKING.md)** - Performance testing and analysis
+- **[Development Guide](docs/DEVELOPMENT.md)** - Contributing and development setup
+
+### Command Line Support
+```bash
+# Get help for any CLI command
+.\scripts\cli.ps1 help                    # Full CLI documentation
+.\scripts\cli.ps1 learn overview          # Modern research stack overview
+.\scripts\cli.ps1 learn hydra             # Hydra configuration guide
+.\scripts\cli.ps1 doctor                  # System health diagnostics
+
+# Debug any command with -Debug flag
+.\scripts\cli.ps1 sweep experiment=ionosphere_resolution benchmark=throughput -Debug
 ```

@@ -1,0 +1,13 @@
+# Real-time ionosphere monitoring engine
+# Optimized for low-latency ionosphere analysis and live monitoring
+name: ionosphere_realtime
+nfft: 4096                    # Balanced resolution for real-time constraints
+batch: 2                      # Small batch for low latency
+overlap: 0.625                # Good temporal resolution without excessive computation
+sample_rate_hz: 48000         # Standard ionosphere monitoring rate
+stream_count: 3               # Moderate streams for real-time processing
+pinned_buffer_count: 3        # Minimal buffers for low memory footprint
+warmup_iters: 5               # Fast warmup for quick startup
+timeout_ms: 500               # Short timeout for real-time requirements
+use_cuda_graphs: true         # Enable for consistent real-time performance
+enable_profiling: false       # Disabled for real-time operation

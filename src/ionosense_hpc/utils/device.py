@@ -97,8 +97,12 @@ def device_info(device_id: int | None = None) -> dict[str, Any]:
 
     if NVML_AVAILABLE:
         try:
-            pynvml.nvmlInit()
-            try:
+            # Add timeout for NVML operations to prevent hanging
+            import threading
+            import time
+
+            def nvml_with_timeout():
+                pynvml.nvmlInit()
                 handle = pynvml.nvmlDeviceGetHandleByIndex(device_id)
 
                 info['name'] = pynvml.nvmlDeviceGetName(handle)
@@ -122,13 +126,26 @@ def device_info(device_id: int | None = None) -> dict[str, Any]:
                     util = pynvml.nvmlDeviceGetUtilizationRates(handle)
                     info['utilization_gpu'] = util.gpu
                     info['utilization_memory'] = util.memory
-            finally:
-                _shutdown_nvml_safely()
+
+            # Run NVML operations in a thread with timeout
+            nvml_thread = threading.Thread(target=nvml_with_timeout)
+            nvml_thread.daemon = True
+            nvml_thread.start()
+            nvml_thread.join(timeout=5.0)  # 5 second timeout
+
+            if nvml_thread.is_alive():
+                logger.warning("NVML device query timed out after 5 seconds")
+                # Thread is still running, but we'll continue without GPU info
+            else:
+                # Thread completed successfully, info was populated
+                pass
+
+            _shutdown_nvml_safely()
         except pynvml.NVMLError as exc:
             logger.warning("NVML device query failed: %s", exc)
         except Exception as exc:
             _shutdown_nvml_safely()
-            raise DeviceNotFoundError("Failed to query CUDA device via NVML") from exc
+            logger.warning("Failed to query CUDA device via NVML: %s", exc)
 
     if info['name'] == 'Unknown':
         try:

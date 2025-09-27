@@ -1,0 +1,65 @@
+# @package _global_
+defaults:
+  - override /engine: ionosphere_hires
+
+experiment:
+  name: ionosphere_multiscale
+  description: Comprehensive multi-scale ionosphere analysis across different engine configurations and parameters
+  tags: [ionosphere, multiscale, comprehensive, performance]
+
+# Multirun configuration for comprehensive analysis
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      # Multi-engine analysis
+      engine: ionosphere_realtime,ionosphere_hires,ionosphere_longterm
+      # Cross-scale parameter sweeps
+      engine.nfft: 1024,2048,4096,8192
+      engine.overlap: 0.5,0.75,0.875
+      # Batch size optimization
+      engine.batch: 8,16,32,64
+
+# Analysis configuration for comprehensive study
+analysis:
+  statistical_tests: [shapiro, kruskal, anova, tukey]
+  confidence_level: 0.99
+  min_samples: 200
+  focus_metrics: [
+    frequency_resolution, temporal_resolution,
+    computational_efficiency, memory_usage,
+    scintillation_sensitivity, phase_accuracy
+  ]
+
+# Multi-scale ionosphere parameters
+ionosphere:
+  scales:
+    microscale:  # < 1 km
+      focus: amplitude_scintillation
+      time_resolution_ms: 50
+    mesoscale:   # 1-100 km
+      focus: phase_scintillation
+      time_resolution_s: 1
+    macroscale:  # > 100 km
+      focus: tec_variations
+      time_resolution_min: 1
+
+  phenomena:
+    - equatorial_spread_f
+    - polar_cap_patches
+    - mid_latitude_irregularities
+    - auroral_enhancements
+
+# Performance benchmarking
+benchmarking:
+  measure_latency: true
+  measure_throughput: true
+  measure_accuracy: true
+  resource_profiling: true
+
+# Extended analysis parameters
+output:
+  save_intermediate_results: true
+  generate_comparison_plots: true
+  export_performance_metrics: true
+  create_optimization_recommendations: true

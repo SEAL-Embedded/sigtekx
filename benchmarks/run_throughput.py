@@ -9,8 +9,9 @@ Communication with other scripts happens through artifact files.
 import hydra
 import mlflow
 import pandas as pd
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from pathlib import Path
+import warnings
 
 from ionosense_hpc import Engine
 from ionosense_hpc.benchmarks import ThroughputBenchmark, ThroughputBenchmarkConfig
@@ -20,10 +21,22 @@ from ionosense_hpc.config import EngineConfig
 @hydra.main(version_base=None, config_path="../experiments/conf", config_name="config")
 def run_throughput_benchmark(cfg: DictConfig) -> float:
     """Run throughput benchmark with MLflow tracking and save results.
-    
+
     Returns:
         Frames per second (negative for minimization in Hydra)
     """
+    # ===== ROBUSTNESS FIX: Auto-load default benchmark if missing =====
+    if 'benchmark' not in cfg:
+        warnings.warn("⚠️  Benchmark config not specified. Defaulting to '+benchmark=throughput'.")
+        # Get the original config directory to reliably find the default file
+        config_dir = f"{hydra.utils.get_original_cwd()}/experiments/conf/benchmark"
+        default_benchmark = OmegaConf.load(f"{config_dir}/throughput.yaml")
+        # Temporarily disable struct mode to allow adding benchmark key
+        OmegaConf.set_struct(cfg, False)
+        cfg.benchmark = default_benchmark
+        OmegaConf.set_struct(cfg, True)
+    # ===== END ROBUSTNESS FIX =====
+
     # Convert OmegaConf to Pydantic models for validation
     engine_config = EngineConfig(**cfg.engine)
     benchmark_config = ThroughputBenchmarkConfig(**cfg.benchmark)

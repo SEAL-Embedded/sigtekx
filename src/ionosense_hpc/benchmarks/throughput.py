@@ -180,6 +180,12 @@ class ThroughputBenchmark(BaseBenchmark):
 
     def _sample_resources(self) -> None:
         """Sample current resource usage."""
+        # Skip resource sampling if all monitoring is disabled
+        if not (self.config.monitor_gpu_utilization or
+                self.config.monitor_temperature or
+                self.config.monitor_power):
+            return
+
         try:
             from ionosense_hpc.utils import device_info
             info = device_info()

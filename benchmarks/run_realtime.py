@@ -9,8 +9,9 @@ It integrates with the modern artifacts layout (artifacts/experiments + artifact
 import hydra
 import mlflow
 import pandas as pd
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from pathlib import Path
+import warnings
 
 from ionosense_hpc import Engine
 from ionosense_hpc.benchmarks import RealtimeBenchmark, RealtimeBenchmarkConfig
@@ -24,6 +25,18 @@ def run_realtime_benchmark(cfg: DictConfig) -> float:
     Returns:
         Error surrogate (1 - compliance) for Hydra optimization
     """
+    # ===== ROBUSTNESS FIX: Auto-load default benchmark if missing =====
+    if 'benchmark' not in cfg:
+        warnings.warn("⚠️  Benchmark config not specified. Defaulting to '+benchmark=realtime'.")
+        # Get the original config directory to reliably find the default file
+        config_dir = f"{hydra.utils.get_original_cwd()}/experiments/conf/benchmark"
+        default_benchmark = OmegaConf.load(f"{config_dir}/realtime.yaml")
+        # Temporarily disable struct mode to allow adding benchmark key
+        OmegaConf.set_struct(cfg, False)
+        cfg.benchmark = default_benchmark
+        OmegaConf.set_struct(cfg, True)
+    # ===== END ROBUSTNESS FIX =====
+
     # Convert OmegaConf to Pydantic models for validation
     engine_config = EngineConfig(**cfg.engine)
     benchmark_config = RealtimeBenchmarkConfig(**cfg.benchmark)

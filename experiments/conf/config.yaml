@@ -4,8 +4,8 @@
 defaults:
   - _self_
   - engine: realtime
-  - benchmark: latency
   - experiment: baseline
+  # No default benchmark - must be explicitly specified to prevent config conflicts
 
 # Project metadata
 project:

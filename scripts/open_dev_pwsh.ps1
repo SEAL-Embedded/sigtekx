@@ -1,9 +1,10 @@
-<# 
+<#
  open_dev_pwsh.ps1 — pwsh7 → MSVC (x64) + optional conda/mamba activation
  - No hardcoded user paths
  - No conda/mamba hook dot-sourcing (prevents prompt duplication)
  - Uses VS DevShell first; vcvars fallback (safe Set-Item Env:)
  - Enforces 64-bit session (CUDA/MSVC need x64)
+ - Interactive mode prompts to setup conda environment if missing/corrupted
 #>
 
 param(
@@ -11,7 +12,8 @@ param(
     [ValidateSet('x64')][string]$VSArch = 'x64',   # lock to x64 for CUDA
     [string]$Repo = (Resolve-Path "$PSScriptRoot\.."),  # default: repo root (parent of /scripts)
     [switch]$NoConda,
-    [switch]$Quiet
+    [switch]$Quiet,
+    [switch]$Interactive
 )
 
 # ---- hard fail if not 64-bit pwsh ----
@@ -101,18 +103,42 @@ function Activate-CondaEnv {
         return
     }
 
-    $envDump = cmd.exe /c "`"$condaBat`" activate $Name >nul 2>nul && set"
+    # Try activation without suppressing output first to see any errors
+    $activationOutput = cmd.exe /c "`"$condaBat`" activate $Name 2>&1"
     if ($LASTEXITCODE -ne 0) {
         Warn "conda activation failed (exit $LASTEXITCODE) for '$Name'."
+        if (-not $Quiet) {
+            Write-Host "Activation output:" -ForegroundColor Yellow
+            $activationOutput | Write-Host
+        }
         return
     }
 
+    # Now get the environment dump
+    $envDump = cmd.exe /c "`"$condaBat`" activate $Name >nul 2>nul && set"
+    if ($LASTEXITCODE -ne 0) {
+        Warn "Failed to capture environment after conda activation."
+        return
+    }
+
+    $envVarsSet = 0
     foreach ($line in $envDump) {
         $kv = $line -split '=',2
         if ($kv.Count -ne 2) { continue }
         $key, $val = $kv
         if (-not $key) { continue }
-        Set-Item -Path ("Env:{0}" -f $key) -Value $val
+
+        # Only set environment variables that seem conda-related or important
+        # to avoid overwriting system variables unnecessarily
+        if ($key -match '^(CONDA_|PATH|PYTHONPATH|CMAKE_|VS_|INCLUDE|LIB)' -or
+            $key -in @('VIRTUAL_ENV', 'VIRTUAL_ENV_PROMPT')) {
+            Set-Item -Path ("Env:{0}" -f $key) -Value $val
+            $envVarsSet++
+        }
+    }
+
+    if (-not $Quiet) {
+        Info "Set $envVarsSet environment variables from conda activation."
     }
 
     if ($env:CONDA_DEFAULT_ENV -eq $Name) {
@@ -175,6 +201,81 @@ function Check-PromptDupes {
     } catch { }
 }
 
+# ----- Interactive conda environment setup -----
+function Test-CondaEnvironmentExists {
+    param([string]$Name)
+
+    if (-not (Get-Command conda -ErrorAction SilentlyContinue)) { return $false }
+
+    $envList = conda env list 2>$null
+    if ($LASTEXITCODE -ne 0) { return $false }
+
+    return ($envList | Select-String -Quiet -Pattern "\b$Name\b")
+}
+
+function Test-GhostEnvironment {
+    param([string]$Name)
+
+    # Check if we're in an environment that doesn't exist in conda's registry
+    return ($env:CONDA_DEFAULT_ENV -eq $Name) -and (-not (Test-CondaEnvironmentExists -Name $Name))
+}
+
+function Invoke-InteractiveEnvironmentSetup {
+    param([string]$Name)
+
+    if ($NoConda -or $Quiet) { return }
+
+    $envExists = Test-CondaEnvironmentExists -Name $Name
+    $isGhost = Test-GhostEnvironment -Name $Name
+
+    if ($isGhost) {
+        Warn "Detected ghost environment '$Name' - current session thinks it's active but conda doesn't recognize it."
+        Write-Host "This usually happens after removing an environment while it was active." -ForegroundColor Yellow
+        Write-Host ""
+    }
+
+    if (-not $envExists -or $isGhost) {
+        Write-Host "Conda environment '$Name' " -NoNewline
+        if ($isGhost) {
+            Write-Host "needs to be recreated." -ForegroundColor Yellow
+        } else {
+            Write-Host "does not exist." -ForegroundColor Yellow
+        }
+
+        $response = Read-Host "Initialize conda environment '$Name'? (Y/n)"
+        if ([string]::IsNullOrWhiteSpace($response) -or $response -match '^[Yy]') {
+            Write-Host ""
+            Info "Running environment setup..."
+
+            try {
+                # Force to base environment first if in ghost state
+                if ($isGhost) {
+                    $env:CONDA_DEFAULT_ENV = $null
+                    $env:CONDA_PREFIX = $null
+                    conda activate base 2>$null
+                }
+
+                # Run the setup command
+                & (Join-Path $Repo 'scripts\cli.ps1') setup
+                if ($LASTEXITCODE -eq 0) {
+                    Ok "Environment setup completed successfully!"
+                } else {
+                    Warn "Environment setup failed. Continuing without conda activation."
+                    return $false
+                }
+            } catch {
+                Warn "Environment setup failed: $($_.Exception.Message)"
+                return $false
+            }
+        } else {
+            Info "Skipping environment setup. Use 'iono setup' manually when ready."
+            return $false
+        }
+    }
+
+    return $true
+}
+
 # ----- Run -----
 
 # Set a default for colored logging in the Python backend.
@@ -186,7 +287,20 @@ if (-not $env:IONO_LOG_COLOR) {
 
 Enter-VSDev
 Ensure-CondaOnPath
-Activate-CondaEnv -Name $EnvName
+
+# Interactive environment setup (only if -Interactive flag is used)
+$skipCondaActivation = $false
+if ($Interactive) {
+    $setupSuccess = Invoke-InteractiveEnvironmentSetup -Name $EnvName
+    if (-not $setupSuccess) {
+        Info "Continuing without conda environment activation."
+        $skipCondaActivation = $true
+    }
+}
+
+if (-not $skipCondaActivation) {
+    Activate-CondaEnv -Name $EnvName
+}
 Check-PromptDupes
 
 # cd into repo root
@@ -227,69 +341,56 @@ function global:iono {
         Write-Error "cli.ps1 not found at $global:IONO_CLI"
         return
     }
+
+    # Only allow commands that actually exist in simplified CLI
+    $validCommands = @('setup','build','test','lint','format','clean','doctor','ui','run','help')
+    if ($Args.Count -gt 0 -and $Args[0] -notin $validCommands) {
+        Write-Warning "Command '$($Args[0])' not available. Use 'iono help' for available commands."
+        Write-Host "💡 For research workflows, use direct tools:" -ForegroundColor Cyan
+        Write-Host "   python benchmarks/run_latency.py experiment=baseline +benchmark=latency" -ForegroundColor Gray
+        Write-Host "   python benchmarks/run_throughput.py --multirun experiment=ionosphere_resolution +benchmark=throughput" -ForegroundColor Gray
+        Write-Host "   snakemake --cores 4 --snakefile experiments/Snakefile" -ForegroundColor Gray
+        Write-Host "   mlflow ui --backend-store-uri artifacts/mlruns" -ForegroundColor Gray
+        return
+    }
+
     & $global:IONO_CLI @Args
 }
 
-# Verb wrappers: prepend verb, then forward args (so ib → build, etc.)
-function global:ib     { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono build    @Args }
-function global:ir     { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono rebuild  @Args }
-function global:it     { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono test     @Args }
-function global:ilint  { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono lint     @Args }
-function global:ifmt   { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono format   @Args }
-function global:ibench { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono bench    @Args }
-function global:iprof  { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono profile  @Args }
-function global:ival   { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono validate @Args }
-function global:imon   { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono monitor  @Args }
-function global:iinfo  { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono info     @Args }
-function global:iclean { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono clean    @Args }
+# Essential CLI shortcuts (only for commands that actually exist)
+function global:ib     { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono build  @Args }
+function global:it     { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono test   @Args }
+function global:ilint  { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono lint   @Args }
+function global:ifmt   { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono format @Args }
+function global:iclean { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono clean  @Args }
 
-# Modern research stack shortcuts - Use direct tools instead:
+# Use direct research tools instead of custom wrappers:
 # python benchmarks/run_latency.py experiment=baseline
 # python benchmarks/run_latency.py --multirun experiment=nfft_scaling
 # snakemake --cores 4 --snakefile experiments/Snakefile
-# mlflow ui --backend-store-uri file://./artifacts/mlruns
+# mlflow ui --backend-store-uri artifacts/mlruns
 # dvc status
-function global:ilearn    {
-    param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
-    if ($Args.Count -eq 0) { iono learn } else { iono learn @Args }
-}
 
-# Optional tiny shorthands
-function global:ibr { ir }                # rebuild (no args)
-function global:itp { it py }             # python tests
+# Simple test shortcuts
+function global:itp { it python }         # python tests
 function global:itc { it cpp }            # c++ tests
-function global:ipq { iprof nsys quick }  # nsys quick
-function global:ipf { iprof nsys full }   # nsys full
 
-# Modern workflow shortcuts (use direct tools):
-# python benchmarks/run_latency.py experiment=baseline
-# python benchmarks/run_latency.py --multirun experiment=baseline engine.nfft=256,512,1024,2048,4096,8192
-# python benchmarks/run_latency.py --multirun experiment=baseline engine.batch=1,2,4,8,16,32,64,128
-# mlflow ui --backend-store-uri file://./artifacts/mlruns
-# mlflow experiments list --tracking-uri file://./artifacts/mlruns
-# dvc status
-# snakemake --delete-all-output --snakefile experiments/Snakefile
+# Recommended native research workflow:
+# python benchmarks/run_latency.py experiment=baseline +benchmark=latency
+# python benchmarks/run_latency.py --multirun experiment=nfft_scaling +benchmark=latency
+# python benchmarks/run_throughput.py --multirun experiment=ionosphere_resolution +benchmark=throughput
+# snakemake --cores 4 --snakefile experiments/Snakefile
+# mlflow ui --backend-store-uri artifacts/mlruns
+# dvc status && dvc repro
 
-# Learning and help shortcuts
-function global:ihelp       {
-    param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
-    if ($Args.Count -eq 0) {
-        iono learn overview
-    } else {
-        iono learn overview @Args
-    }
-}
-function global:ihelp-hydra{ iono learn hydra }
-function global:ihelp-snake{ iono learn snakemake }
-function global:ihelp-dvc  { iono learn dvc }
-function global:ihelp-mlflow{ iono learn mlflow }
-function global:ihelp-bench{ iono learn benchmarks }
+# Help shortcuts (use CLI help instead of removed learn commands)
+function global:ihelp { iono help }
 
-# Tab-completion (simple + resilient)
-$global:IonoVerbs   = @('setup','build','rebuild','lint','format','list','profile','monitor','info','clean','learn')
-$global:IonoTargets = @('cpp','py','suite','latency','throughput','spectrogram','nsys','ncu','quick','full','windows-rel','--ui','--help','baseline','nfft_scaling','batch_scaling','accuracy','realtime','profiling','ui','status','repro','push','pull','dag','overview','hydra','snakemake','dvc','mlflow','benchmarks')
+# Tab-completion (only for commands that actually exist)
+$global:IonoVerbs   = @('setup','build','test','lint','format','clean','doctor','ui','run','help')
+$global:IonoTargets = @('python','cpp','all','-Clean','-Verbose','-Fix','-Check','-Coverage','-Pattern','-All')
 
-Register-ArgumentCompleter -CommandName iono,ib,ir,it,ilint,ifmt,ibench,iprof,ival,imon,iinfo,iclean,ilearn -ScriptBlock {
+Register-ArgumentCompleter -CommandName iono,ib,it,ilint,ifmt,iclean,itp,itc,ihelp -ScriptBlock {
     param($commandName,$parameterName,$wordToComplete,$commandAst,$fakeBoundParameters)
     $tokens = @()
     foreach ($e in $commandAst.CommandElements) {
