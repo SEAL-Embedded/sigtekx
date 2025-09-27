@@ -47,58 +47,104 @@ cd ionosense-hpc
 .\scripts\cli.ps1 build
 
 # Verify installation
-./scripts/cli.sh test        # Linux/WSL2
-.\scripts\cli.ps1 test       # Windows
+pytest tests/ -v            # Direct testing
+.\scripts\cli.ps1 doctor    # Windows environment check
 ```
 
 ## CLI Interface
 
-Ionosense-HPC includes a comprehensive CLI for all development and research workflows:
+Ionosense-HPC includes a focused CLI for essential setup and build tasks. For research workflows, we recommend using the underlying tools directly for maximum flexibility and control.
 
-### Linux/WSL2
+### Essential CLI Commands (All Platforms)
 ```bash
-# Environment management
-./scripts/cli.sh setup                    # Create conda environment
-./scripts/cli.sh info                     # Show system information
-./scripts/cli.sh doctor                   # Verify environment
+# Environment setup and build (Essential CLI usage)
+.\scripts\cli.ps1 setup                   # Create conda environment & install
+.\scripts\cli.ps1 build                   # Build project with CMake
+.\scripts\cli.ps1 clean                   # Clean build artifacts
+.\scripts\cli.ps1 doctor                  # Verify environment health
 
-# Build and development
-./scripts/cli.sh build                    # Build project
-./scripts/cli.sh test                     # Run all tests
-./scripts/cli.sh clean                    # Clean build artifacts
+# Code quality and development
+.\scripts\cli.ps1 format                  # Format C++ code with clang-format
+.\scripts\cli.ps1 lint                    # Lint Python (ruff) and C++ code
+.\scripts\cli.ps1 typecheck               # Run mypy type checking
+.\scripts\cli.ps1 check                   # Combined format/lint/typecheck
 
-# Code quality
-./scripts/cli.sh format                   # Format C++ code
-./scripts/cli.sh lint                     # Lint Python and C++
-./scripts/cli.sh check                    # Run all checks
+# System information and profiling
+.\scripts\cli.ps1 info                    # Show system/benchmark/config info
+.\scripts\cli.ps1 status                  # Research environment status
+.\scripts\cli.ps1 profile nsys latency    # Profile with NVIDIA Nsight
+.\scripts\cli.ps1 monitor                 # Real-time GPU monitoring
 
-# Benchmarking and profiling
-./scripts/cli.sh bench suite              # Run benchmark suite
-./scripts/cli.sh profile nsys latency     # Profile with Nsight
-./scripts/cli.sh sweep experiment.yaml    # Parameter sweep
+# Learning and help
+.\scripts\cli.ps1 learn                   # Interactive learning guides
+.\scripts\cli.ps1 help                    # CLI help
 ```
 
-### Windows
-```powershell
-# Environment management
-.\scripts\cli.ps1 setup                   # Create conda environment
-.\scripts\cli.ps1 info                    # Show system information
-.\scripts\cli.ps1 doctor                  # Verify environment
+### Direct Research Tools (Recommended for daily use)
+```bash
+# Single experiments via Hydra
+python benchmarks/run_latency.py experiment=baseline
+python benchmarks/run_latency.py engine.nfft=8192 benchmark.iterations=100
 
-# Build and development
-.\scripts\cli.ps1 build                   # Build project
-.\scripts\cli.ps1 test                    # Run all tests
-.\scripts\cli.ps1 clean                   # Clean build artifacts
+# Parameter sweeps via Hydra multirun
+python benchmarks/run_latency.py --multirun engine.nfft=1024,2048,4096,8192
+python benchmarks/run_latency.py --multirun experiment=nfft_scaling
 
-# Code quality
-.\scripts\cli.ps1 format                  # Format C++ code
-.\scripts\cli.ps1 lint                    # Lint Python and C++
-.\scripts\cli.ps1 check                   # Run all checks
+# Analysis workflows via Snakemake
+snakemake --cores 4 --snakefile experiments/Snakefile
+snakemake --cores 4 generate_figures --snakefile experiments/Snakefile
 
-# Benchmarking and profiling
-.\scripts\cli.ps1 bench suite             # Run benchmark suite
-.\scripts\cli.ps1 profile nsys latency    # Profile with Nsight
-.\scripts\cli.ps1 sweep experiment.yaml   # Parameter sweep
+# Experiment tracking via MLflow
+mlflow ui --backend-store-uri file://./artifacts/mlruns
+mlflow experiments list --tracking-uri file://./artifacts/mlruns
+
+# Data versioning via DVC
+dvc status
+dvc repro
+dvc push
+
+# Testing via pytest
+pytest tests/ -v
+pytest tests/ --cov=ionosense_hpc
+```
+
+## Modern Research Toolchain
+
+Ionosense-HPC uses a modern, reproducible research stack:
+
+- **🔧 Hydra**: Configuration management and parameter sweeps
+- **🐍 Snakemake**: Workflow orchestration for analysis pipelines
+- **📊 DVC**: Data version control for reproducible experiments
+- **📈 MLflow**: Experiment tracking with metrics, parameters, and artifacts
+- **🚀 NVIDIA Nsight**: Performance profiling and optimization
+
+### Available Experiment Configurations
+
+```bash
+# Single experiments with Hydra
+python benchmarks/run_latency.py experiment=baseline           # Baseline performance characterization
+python benchmarks/run_latency.py experiment=baseline engine.nfft=2048  # With parameter overrides
+
+# Parameter sweeps with Hydra multirun
+python benchmarks/run_latency.py --multirun experiment=nfft_scaling      # Sweep over different NFFT sizes
+python benchmarks/run_latency.py --multirun experiment=batch_scaling     # Sweep over batch sizes
+python benchmarks/run_latency.py --multirun experiment=full_grid         # Comprehensive parameter grid
+python benchmarks/run_latency.py --multirun experiment=stress_test       # Stress testing configuration
+
+# Available benchmarks: latency, throughput, accuracy, realtime
+python benchmarks/run_throughput.py experiment=baseline
+python benchmarks/run_accuracy.py --multirun experiment=nfft_scaling
+```
+
+### Modern Workflow Integration
+
+```bash
+# Complete reproducible workflow using direct tools
+python benchmarks/run_latency.py experiment=baseline                      # Run experiments
+python benchmarks/run_latency.py --multirun experiment=nfft_scaling       # Parameter exploration
+snakemake --cores 4 --snakefile experiments/Snakefile                     # Generate analysis and reports
+mlflow ui --backend-store-uri file://./artifacts/mlruns                   # View results in MLflow UI
+dvc status                                                                 # Check data versioning with DVC
 ```
 
 ## Quick Usage Examples
@@ -121,35 +167,42 @@ with Engine(Presets.realtime()) as engine:
     print(f"Processing latency: {proc.get_stats()['latency_us']:.1f} μs")
 ```
 
-### CLI Workflow Examples
+### Workflow Examples
 
-**Linux/WSL2:**
+**Essential Setup (All Platforms):**
 ```bash
 # Complete development workflow
-./scripts/cli.sh setup                    # One-time setup
-./scripts/cli.sh build                    # Build project
-./scripts/cli.sh test                     # Verify functionality
+.\scripts\cli.ps1 setup                   # One-time environment setup
+.\scripts\cli.ps1 build                   # Build project
+pytest tests/ -v                          # Verify functionality
 
-# Research workflows
-./scripts/cli.sh bench suite              # Run benchmark suite
-./scripts/cli.sh profile nsys latency     # Profile performance
-./scripts/cli.sh sweep config.yaml        # Parameter sweep experiment
-./scripts/cli.sh report results/          # Generate research report
+# Code quality checks
+.\scripts\cli.ps1 format                  # Format code
+.\scripts\cli.ps1 lint                    # Lint code
+.\scripts\cli.ps1 check                   # Combined checks
 ```
 
-**Windows (Enhanced Development Shell):**
-```powershell
-# Start development shell with all tools configured
-.\scripts\open_dev_pwsh.ps1
+**Modern Research Workflows (Direct Tools):**
+```bash
+# Single experiments with Hydra
+python benchmarks/run_latency.py experiment=baseline           # Run single experiment
+python benchmarks/run_latency.py experiment=baseline engine.nfft=2048  # Override parameters
 
-# Now use convenient aliases
-iono setup                                # One-time setup
-ib                                        # Build project (iono build)
-it                                        # Test all (iono test)
+# Parameter sweeps with Hydra multirun
+python benchmarks/run_latency.py --multirun experiment=nfft_scaling    # Run parameter sweep
+python benchmarks/run_throughput.py --multirun experiment=baseline     # Different benchmark type
 
-# Research workflows with shortcuts
-ibench suite                              # Run benchmark suite
-iprof nsys latency                        # Profile performance
-iono sweep config.yaml                    # Parameter sweep experiment
-iono report results/                      # Generate research report
+# Analysis workflows with Snakemake
+snakemake --cores 4 --snakefile experiments/Snakefile         # Execute full analysis pipeline
+snakemake --cores 4 generate_figures --snakefile experiments/Snakefile  # Generate specific outputs
+
+# Experiment tracking with MLflow
+mlflow ui --backend-store-uri file://./artifacts/mlruns       # View results in MLflow UI
+mlflow experiments list --tracking-uri file://./artifacts/mlruns  # List experiments
+
+# Profiling with Nsight
+.\scripts\cli.ps1 profile nsys latency                        # Profile with Nsight Systems
+
+# Custom scripts
+python custom_script.py                                       # Run any custom script
 ```

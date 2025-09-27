@@ -623,102 +623,6 @@ Function Invoke-Build {
     Write-ResearchLog -Level Info -Message "Build completed" -Component "Build"
 }
 
-Function Invoke-Test {
-    param(
-        [ValidateSet("all","python","py","p","cpp","c++")][string]$Suite = "all",
-        [string]$Pattern = "",
-        [switch]$Verbose,
-        [switch]$Coverage
-    )
-    
-    Write-ResearchLog -Level Info -Message "Running tests" -Component "Test" -Metadata @{
-        suite = $Suite
-        pattern = $Pattern
-    }
-    
-    if (-not (Test-CondaEnvironment)) {
-        throw "Conda environment not activated"
-    }
-
-    # Normalize suite aliases -> canonical values
-    $suiteNorm = ($Suite.ToLower())
-    switch ($suiteNorm) {
-        'py' { $suiteNorm = 'python' }
-        'p'  { $suiteNorm = 'python' }
-        'c++'{ $suiteNorm = 'cpp' }
-    }
-
-    $runCpp = ($suiteNorm -eq 'all' -or $suiteNorm -eq 'cpp')
-    $runPy  = ($suiteNorm -eq 'all' -or $suiteNorm -eq 'python')
-    
-    $results = @{
-        cpp = $null
-        python = $null
-        total = 0
-        passed = 0
-        failed = 0
-    }
-    
-    if ($runCpp) {
-        Write-ResearchLog -Level Info -Message "Running C++ tests" -Component "Test"
-        $testPreset = $script:BuildPreset.Replace('rel','tests').Replace('debug','tests')
-        $ctestArgs = @('--preset', $testPreset, '--output-on-failure')
-        if ($Pattern) { $ctestArgs += @('-R', $Pattern) }
-        ctest @ctestArgs
-        $results.cpp = $LASTEXITCODE -eq 0
-    }
-    
-    if ($runPy) {
-        Write-ResearchLog -Level Info -Message "Running Python tests" -Component "Test"
-        
-        $pytestArgs = @("-v", ($script:TestsDir))
-        
-        if ($Verbose) { $pytestArgs += "-vv", "--tb=long" }
-        else { $pytestArgs += "--tb=short" }
-        
-        if ($Coverage) {
-            $pytestArgs += "--cov=ionosense_hpc", "--cov-report=term-missing", "--cov-report=html"
-        }
-        
-        if ($Pattern) {
-            $pytestArgs += "-k", $Pattern
-        }
-        
-        Invoke-WithPythonPath {
-            pytest @pytestArgs
-        }
-        $results.python = $LASTEXITCODE -eq 0
-    }
-    
-    # Validate that at least one suite ran
-    $ranAny = $runCpp -or $runPy
-    if (-not $ranAny) {
-        Write-ResearchLog -Level Error -Message "Unknown or empty suite '$Suite'" -Component "Test"
-        throw "Unknown test suite '$Suite'. Use: all | python (py,p) | cpp (c++)."
-    }
-
-    # Determine overall status for requested suites
-    $failed = $false
-    if ($runCpp  -and $results.cpp   -ne $true) { $failed = $true }
-    if ($runPy   -and $results.python -ne $true) { $failed = $true }
-
-    # Report results
-    $testReport = @{
-        timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-        suite = $suiteNorm
-        results = $results
-    }
-    
-    $reportPath = Join-Path $script:ReportsDir "test_results_$(Get-Date -Format 'yyyyMMdd_HHmmss').json"
-    $testReport | ConvertTo-Json -Depth 5 | Set-Content $reportPath
-    
-    Write-ResearchLog -Level Info -Message "Test results saved to: $reportPath" -Component "Test"
-
-    if ($failed) {
-        Write-ResearchLog -Level Error -Message "One or more requested test suites failed" -Component "Test"
-        throw "Tests failed. See report: $reportPath"
-    }
-}
 
 # --- Code Formatting ---------------------------------------------------------
 Function Invoke-Format {
@@ -1333,6 +1237,102 @@ Function Invoke-Doctor {
     if ($ncuUi) { $st='OK'; $dt=$ncuUi } else { $st='WARN'; $dt='not found' }
     Add-Check -Name 'Nsight Compute (UI)' -Status $st -Detail $dt
 
+    # Modern Research Stack Tools
+    foreach ($tool in @(
+        @{ name='Hydra'; module='hydra'; required=$true; desc='Configuration management' },
+        @{ name='MLflow'; module='mlflow'; required=$true; desc='Experiment tracking' },
+        @{ name='Snakemake'; exe=@('snakemake','snakemake.exe'); required=$true; desc='Workflow orchestration' },
+        @{ name='DVC'; exe=@('dvc','dvc.exe'); required=$false; desc='Data versioning' }
+    )) {
+        if ($tool.ContainsKey('module')) {
+            # Python module check
+            try {
+                $out = & $pyExe -c "import $($tool.module); print('✓')" 2>$null
+                if ($LASTEXITCODE -eq 0 -and $out -eq '✓') {
+                    Add-Check -Name $tool.name -Status 'OK' -Detail "$($tool.desc) - ready"
+                } else {
+                    $status = if ($tool.required) { 'FAIL' } else { 'WARN' }
+                    Add-Check -Name $tool.name -Status $status -Detail "module not found - install with pip/conda"
+                }
+            } catch {
+                $status = if ($tool.required) { 'FAIL' } else { 'WARN' }
+                Add-Check -Name $tool.name -Status $status -Detail "module not available"
+            }
+        } elseif ($tool.ContainsKey('exe')) {
+            # Executable check
+            $exe = Resolve-Exe $tool.exe
+            if ($exe) {
+                $ver = Get-VersionString -Exe $exe
+                $detail = if ($ver) { "$($tool.desc) - $ver" } else { "$($tool.desc) - ready" }
+                Add-Check -Name $tool.name -Status 'OK' -Detail $detail
+            } else {
+                $status = if ($tool.required) { 'FAIL' } else { 'WARN' }
+                Add-Check -Name $tool.name -Status $status -Detail "$($tool.desc) - not found in PATH"
+            }
+        }
+    }
+
+    # Check benchmark scripts availability
+    $benchmarkDir = Join-Path $script:ProjectRoot "benchmarks"
+    if (Test-Path $benchmarkDir) {
+        $scriptCount = (Get-ChildItem -Path $benchmarkDir -Filter "run_*.py" | Measure-Object).Count
+        if ($scriptCount -gt 0) {
+            Add-Check -Name 'Benchmark Scripts' -Status 'OK' -Detail "$scriptCount modern benchmark scripts found"
+        } else {
+            Add-Check -Name 'Benchmark Scripts' -Status 'WARN' -Detail "no run_*.py scripts found"
+        }
+    } else {
+        Add-Check -Name 'Benchmark Scripts' -Status 'FAIL' -Detail "benchmarks directory not found"
+    }
+
+    # Modern Research Stack Tools
+    foreach ($tool in @(
+        @{ name='Hydra'; module='hydra'; required=$true; desc='Configuration management' },
+        @{ name='MLflow'; module='mlflow'; required=$true; desc='Experiment tracking' },
+        @{ name='Snakemake'; exe=@('snakemake','snakemake.exe'); required=$true; desc='Workflow orchestration' },
+        @{ name='DVC'; exe=@('dvc','dvc.exe'); required=$false; desc='Data versioning' }
+    )) {
+        if ($tool.ContainsKey('module')) {
+            # Python module check
+            try {
+                $out = & $pyExe -c "import $($tool.module); print('✓')" 2>$null
+                if ($LASTEXITCODE -eq 0 -and $out -eq '✓') {
+                    Add-Check -Name $tool.name -Status 'OK' -Detail "$($tool.desc) - ready"
+                } else {
+                    $status = if ($tool.required) { 'FAIL' } else { 'WARN' }
+                    Add-Check -Name $tool.name -Status $status -Detail "module not found - install with pip/conda"
+                }
+            } catch {
+                $status = if ($tool.required) { 'FAIL' } else { 'WARN' }
+                Add-Check -Name $tool.name -Status $status -Detail "module not available"
+            }
+        } elseif ($tool.ContainsKey('exe')) {
+            # Executable check
+            $exe = Resolve-Exe $tool.exe
+            if ($exe) {
+                $ver = Get-VersionString -Exe $exe
+                $detail = if ($ver) { "$($tool.desc) - $ver" } else { "$($tool.desc) - ready" }
+                Add-Check -Name $tool.name -Status 'OK' -Detail $detail
+            } else {
+                $status = if ($tool.required) { 'FAIL' } else { 'WARN' }
+                Add-Check -Name $tool.name -Status $status -Detail "$($tool.desc) - not found in PATH"
+            }
+        }
+    }
+
+    # Check benchmark scripts availability
+    $benchmarkDir = Join-Path $script:ProjectRoot "benchmarks"
+    if (Test-Path $benchmarkDir) {
+        $scriptCount = (Get-ChildItem -Path $benchmarkDir -Filter "run_*.py" | Measure-Object).Count
+        if ($scriptCount -gt 0) {
+            Add-Check -Name 'Benchmark Scripts' -Status 'OK' -Detail "$scriptCount modern benchmark scripts found"
+        } else {
+            Add-Check -Name 'Benchmark Scripts' -Status 'WARN' -Detail "no run_*.py scripts found"
+        }
+    } else {
+        Add-Check -Name 'Benchmark Scripts' -Status 'FAIL' -Detail "benchmarks directory not found"
+    }
+
     # Print summary
     Write-Host "`n🩺 Environment Doctor Summary" -ForegroundColor Cyan
     Write-Host   "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor DarkGray
@@ -1356,6 +1356,556 @@ Function Invoke-Doctor {
         Write-ResearchLog -Level Info -Message "Doctor checks passed (no failures)" -Component "Doctor"
     }
 }
+
+# --- Modern Tool Integration Functions --------------------------------------
+
+Function Invoke-ModernExperiment {
+    param([string[]]$CommandArgs = @())
+
+    Write-ResearchLog -Level Info -Message "Running single experiment via Hydra" -Component "Experiment"
+
+    $params = @{ Overrides = @() }
+    $positional = @()
+
+    for ($i = 0; $i -lt $CommandArgs.Count; $i++) {
+        $arg = $CommandArgs[$i]
+        switch ($arg) {
+            '-Config' { if ($i + 1 -lt $CommandArgs.Count) { $params.Config = $CommandArgs[$i + 1]; $i++ } }
+            '-Benchmark' { if ($i + 1 -lt $CommandArgs.Count) { $params.Benchmark = $CommandArgs[$i + 1]; $i++ } }
+            '-Engine' { if ($i + 1 -lt $CommandArgs.Count) { $params.Engine = $CommandArgs[$i + 1]; $i++ } }
+            '-Override' { if ($i + 1 -lt $CommandArgs.Count) { $params.Overrides += $CommandArgs[$i + 1]; $i++ } }
+            default { if ($arg -and $arg -notlike '-*') { $positional += $arg } }
+        }
+    }
+
+    # Add positional args as overrides
+    $params.Overrides += $positional
+
+    # Default to latency benchmark if none specified
+    $benchmark = if ($params.Benchmark) { $params.Benchmark } else { "latency" }
+
+    # Build the command
+    $cmd = "python"
+    $args = @("benchmarks/run_$benchmark.py")
+
+    # Add configuration overrides
+    if ($params.Engine) { $args += "engine=$($params.Engine)" }
+    if ($params.Config) { $args += "experiment=$($params.Config)" }
+    $args += $params.Overrides
+
+    $oldPath = $env:PYTHONPATH
+    $env:PYTHONPATH = "$script:BuildDir\$script:BuildPreset;" + ($script:SourceDir) + ";$env:PYTHONPATH"
+
+    try {
+        & $cmd @args
+        if ($LASTEXITCODE -ne 0) { throw "Experiment execution failed" }
+    } finally {
+        $env:PYTHONPATH = $oldPath
+    }
+
+    Write-ResearchLog -Level Info -Message "Experiment completed successfully" -Component "Experiment"
+}
+
+Function Invoke-ModernRun {
+    param([string[]]$CommandArgs = @())
+
+    if ($CommandArgs.Count -eq 0) {
+        throw "Usage: run <script.py> [args...] - No script specified"
+    }
+
+    $scriptPath = $CommandArgs[0]
+    $scriptArgs = $CommandArgs[1..($CommandArgs.Count-1)]
+
+    # Resolve script path if relative
+    if (-not [System.IO.Path]::IsPathRooted($scriptPath)) {
+        $scriptPath = Join-Path (Get-Location) $scriptPath
+    }
+
+    if (-not (Test-Path $scriptPath)) {
+        throw "Script not found: $scriptPath"
+    }
+
+    Write-ResearchLog -Level Info -Message "Running Python script" -Component "Run" -Metadata @{
+        script = $scriptPath
+        args = ($scriptArgs -join ' ')
+    }
+
+    $oldPath = $env:PYTHONPATH
+    $env:PYTHONPATH = "$script:BuildDir\$script:BuildPreset;" + ($script:SourceDir) + ";$env:PYTHONPATH"
+
+    try {
+        if ($scriptArgs.Count -gt 0) {
+            & python $scriptPath @scriptArgs
+        } else {
+            & python $scriptPath
+        }
+        if ($LASTEXITCODE -ne 0) { throw "Script execution failed with exit code $LASTEXITCODE" }
+    } finally {
+        $env:PYTHONPATH = $oldPath
+    }
+
+    Write-ResearchLog -Level Info -Message "Script completed successfully" -Component "Run"
+}
+
+Function Invoke-ModernSweep {
+    param([string[]]$CommandArgs = @())
+
+    Write-ResearchLog -Level Info -Message "Running parameter sweep via Hydra multirun" -Component "Sweep"
+
+    $params = @{ Overrides = @() }
+    $positional = @()
+
+    for ($i = 0; $i -lt $CommandArgs.Count; $i++) {
+        $arg = $CommandArgs[$i]
+        switch ($arg) {
+            '-Config' { if ($i + 1 -lt $CommandArgs.Count) { $params.Config = $CommandArgs[$i + 1]; $i++ } }
+            '-Benchmark' { if ($i + 1 -lt $CommandArgs.Count) { $params.Benchmark = $CommandArgs[$i + 1]; $i++ } }
+            '-Parallel' { $params.Parallel = $true }
+            '-Workers' { if ($i + 1 -lt $CommandArgs.Count) { $params.Workers = [int]$CommandArgs[$i + 1]; $i++ } }
+            '-Override' { if ($i + 1 -lt $CommandArgs.Count) { $params.Overrides += $CommandArgs[$i + 1]; $i++ } }
+            default { if ($arg -and $arg -notlike '-*') { $positional += $arg } }
+        }
+    }
+
+    # First positional arg is the config/experiment
+    if ($positional.Count -gt 0 -and -not $params.Config) {
+        $params.Config = $positional[0]
+        $params.Overrides += $positional[1..($positional.Count-1)]
+    } else {
+        $params.Overrides += $positional
+    }
+
+    if (-not $params.Config) {
+        throw "Config/experiment name required for sweep"
+    }
+
+    # Default to latency benchmark if none specified
+    $benchmark = if ($params.Benchmark) { $params.Benchmark } else { "latency" }
+
+    # Build the command
+    $cmd = "python"
+    $args = @("benchmarks/run_$benchmark.py", "--multirun", "experiment=$($params.Config)")
+
+    # Add parallel execution if requested
+    if ($params.Parallel) {
+        $args += "hydra/launcher=joblib"
+        if ($params.Workers) { $args += "hydra.launcher.n_jobs=$($params.Workers)" }
+    }
+
+    # Add additional overrides
+    $args += $params.Overrides
+
+    Invoke-WithPythonPath {
+        & $cmd @args
+        if ($LASTEXITCODE -ne 0) { throw "Parameter sweep failed" }
+    }
+
+    Write-ResearchLog -Level Info -Message "Parameter sweep completed successfully" -Component "Sweep"
+}
+
+Function Invoke-ModernWorkflow {
+    param([string[]]$CommandArgs = @())
+
+    Write-ResearchLog -Level Info -Message "Running workflow via Snakemake" -Component "Workflow"
+
+    $params = @{}
+    $targets = @()
+
+    for ($i = 0; $i -lt $CommandArgs.Count; $i++) {
+        $arg = $CommandArgs[$i]
+        switch ($arg) {
+            '-Cores' { if ($i + 1 -lt $CommandArgs.Count) { $params.Cores = [int]$CommandArgs[$i + 1]; $i++ } }
+            '-DryRun' { $params.DryRun = $true }
+            '-Verbose' { $params.Verbose = $true }
+            '-Clean' { $params.Clean = $true }
+            '-Target' { if ($i + 1 -lt $CommandArgs.Count) { $targets += $CommandArgs[$i + 1]; $i++ } }
+            default { if ($arg -and $arg -notlike '-*') { $targets += $arg } }
+        }
+    }
+
+    # Default settings
+    $cores = if ($params.Cores) { $params.Cores } else { 4 }
+
+    # Handle clean first if requested
+    if ($params.Clean) {
+        $cleanArgs = @("--cores", $cores, "--snakefile", "experiments/Snakefile", "clean")
+        & snakemake @cleanArgs
+        if ($LASTEXITCODE -ne 0) { Write-ResearchLog -Level Warning -Message "Clean failed, continuing..." -Component "Workflow" }
+    }
+
+    # Build snakemake command
+    $args = @("--cores", $cores, "--snakefile", "experiments/Snakefile")
+
+    if ($params.DryRun) { $args += "--dry-run" }
+    if ($params.Verbose) { $args += "--verbose" }
+
+    # Add targets if specified, otherwise run default 'all' rule
+    if ($targets.Count -gt 0) {
+        $args += $targets
+    }
+
+    # Check if snakemake is available
+    $snakemake = Get-Command snakemake -ErrorAction SilentlyContinue
+    if (-not $snakemake) {
+        throw "snakemake not found. Install with: conda install snakemake"
+    }
+
+    & snakemake @args
+    if ($LASTEXITCODE -ne 0) { throw "Snakemake workflow failed" }
+
+    Write-ResearchLog -Level Info -Message "Workflow completed successfully" -Component "Workflow"
+}
+
+Function Invoke-ModernTrack {
+    param([string[]]$CommandArgs = @())
+
+    Write-ResearchLog -Level Info -Message "MLflow tracking operations" -Component "Track"
+
+    $subcommand = if ($CommandArgs.Count -gt 0) { $CommandArgs[0] } else { "ui" }
+    $remaining = $CommandArgs[1..($CommandArgs.Count-1)]
+
+    switch ($subcommand.ToLower()) {
+        "ui" {
+            $port = 5000
+            for ($i = 0; $i -lt $remaining.Count; $i++) {
+                if ($remaining[$i] -eq "-Port" -and $i+1 -lt $remaining.Count) {
+                    $port = [int]$remaining[$i+1]
+                }
+            }
+
+            Write-ResearchLog -Level Info -Message "Starting MLflow UI on port $port" -Component "Track"
+            & mlflow ui --backend-store-uri "file:///$($script:ArtifactsDir)/mlruns" --port $port
+        }
+        "list" {
+            Write-ResearchLog -Level Info -Message "Listing experiments" -Component "Track"
+            & mlflow experiments list --tracking-uri "file:///$($script:ArtifactsDir)/mlruns"
+        }
+        "search" {
+            $filter = $remaining -join " "
+            if ($filter) {
+                & mlflow runs search --tracking-uri "file:///$($script:ArtifactsDir)/mlruns" --filter "$filter"
+            } else {
+                & mlflow runs search --tracking-uri "file:///$($script:ArtifactsDir)/mlruns"
+            }
+        }
+        default {
+            throw "Unknown track subcommand: $subcommand. Available: ui, list, search"
+        }
+    }
+}
+
+Function Invoke-ModernData {
+    param([string[]]$CommandArgs = @())
+
+    Write-ResearchLog -Level Info -Message "DVC data operations" -Component "Data"
+
+    $subcommand = if ($CommandArgs.Count -gt 0) { $CommandArgs[0] } else { "status" }
+    $remaining = $CommandArgs[1..($CommandArgs.Count-1)]
+
+    # Check if dvc is available
+    $dvc = Get-Command dvc -ErrorAction SilentlyContinue
+    if (-not $dvc) {
+        throw "dvc not found. Install with: pip install dvc"
+    }
+
+    switch ($subcommand.ToLower()) {
+        "status" {
+            Write-ResearchLog -Level Info -Message "Checking DVC status" -Component "Data"
+            & dvc status
+        }
+        "repro" {
+            Write-ResearchLog -Level Info -Message "Reproducing DVC pipeline" -Component "Data"
+            $args = @("repro")
+            if ($remaining -contains "-Force") { $args += "--force" }
+            if ($remaining -contains "-DryRun") { $args += "--dry" }
+            & dvc @args
+        }
+        "push" {
+            Write-ResearchLog -Level Info -Message "Pushing data to remote" -Component "Data"
+            & dvc push
+        }
+        "pull" {
+            Write-ResearchLog -Level Info -Message "Pulling data from remote" -Component "Data"
+            & dvc pull
+        }
+        "dag" {
+            Write-ResearchLog -Level Info -Message "Showing DVC pipeline DAG" -Component "Data"
+            & dvc dag
+        }
+        default {
+            # Pass through to dvc directly
+            & dvc $subcommand @remaining
+        }
+    }
+}
+
+Function Invoke-ModernLearn {
+    param([string[]]$CommandArgs = @())
+
+    $tool = if ($CommandArgs.Count -gt 0) { $CommandArgs[0].ToLower() } else { "overview" }
+
+    Write-Host "`n🎓 Learning Guide: $tool" -ForegroundColor Cyan
+
+    switch ($tool) {
+        "overview" {
+            Write-Host @"
+
+📚 Modern Research Stack Overview
+================================
+
+Your project uses 5 modern tools for reproducible research:
+
+1. 🔧 Hydra - Configuration Management
+   • Manages experiment parameters and configs
+   • Usage: .\scripts\cli.ps1 experiment -Config baseline
+   • Learn more: .\scripts\cli.ps1 learn hydra
+
+2. 🐍 Snakemake - Workflow Orchestration
+   • Manages complex analysis pipelines
+   • Usage: .\scripts\cli.ps1 workflow
+   • Learn more: .\scripts\cli.ps1 learn snakemake
+
+3. 📊 DVC - Data Version Control
+   • Tracks data and model artifacts
+   • Usage: .\scripts\cli.ps1 data status
+   • Learn more: .\scripts\cli.ps1 learn dvc
+
+4. 📈 MLflow - Experiment Tracking
+   • Logs metrics, parameters, and artifacts
+   • Usage: .\scripts\cli.ps1 track ui
+   • Learn more: .\scripts\cli.ps1 learn mlflow
+
+5. ⚡ Benchmark Scripts - Modular Experiments
+   • Individual focused benchmark runners
+   • Usage: Direct python execution or via Hydra
+   • Learn more: .\scripts\cli.ps1 learn benchmarks
+
+Quick Start:
+  .\scripts\cli.ps1 experiment -Config baseline    # Run single experiment
+  .\scripts\cli.ps1 sweep -Config nfft_scaling     # Run parameter sweep
+  .\scripts\cli.ps1 workflow                       # Run full pipeline
+  .\scripts\cli.ps1 track ui                       # View results
+
+"@
+        }
+        "hydra" {
+            Write-Host @"
+
+🔧 Hydra Configuration Management
+================================
+
+Hydra manages all your experiment configurations through YAML files.
+
+📁 Configuration Structure:
+  experiments/conf/
+  ├── config.yaml              # Main config
+  ├── engine/                  # Engine configurations
+  │   ├── realtime.yaml
+  │   └── throughput.yaml
+  ├── benchmark/               # Benchmark settings
+  │   ├── latency.yaml
+  │   └── accuracy.yaml
+  └── experiment/              # Experiment templates
+      ├── baseline.yaml
+      └── nfft_scaling.yaml
+
+🚀 Usage Examples:
+  # Run with default config
+  .\scripts\cli.ps1 experiment
+
+  # Override parameters
+  .\scripts\cli.ps1 experiment engine.nfft=1024 benchmark.iterations=100
+
+  # Use different config groups
+  .\scripts\cli.ps1 experiment -Engine throughput -Benchmark accuracy
+
+  # Run parameter sweep
+  .\scripts\cli.ps1 sweep -Config nfft_scaling
+
+💡 Key Concepts:
+  • Config Groups: Organized sets of related configs (engine/, benchmark/)
+  • Overrides: Command-line parameter modifications
+  • Multirun: Hydra's built-in parameter sweeping
+  • Composition: Mix and match different config groups
+
+"@
+        }
+        "snakemake" {
+            Write-Host @"
+
+🐍 Snakemake Workflow Orchestration
+==================================
+
+Snakemake manages your analysis pipeline from benchmarks to final reports.
+
+📁 Workflow Files:
+  experiments/Snakefile         # Main workflow definition
+  experiments/scripts/          # Analysis scripts
+
+🎯 Workflow Targets:
+  all                          # Complete analysis pipeline
+  run_latency_sweep           # Run latency benchmarks
+  analyze_results             # Analyze benchmark data
+  generate_figures            # Create visualizations
+  generate_report             # Final HTML report
+
+🚀 Usage Examples:
+  # Run complete pipeline
+  .\scripts\cli.ps1 workflow
+
+  # Run specific target
+  .\scripts\cli.ps1 workflow -Target analyze_results
+
+  # Dry run to see what would execute
+  .\scripts\cli.ps1 workflow -DryRun
+
+  # Use more CPU cores
+  .\scripts\cli.ps1 workflow -Cores 8
+
+  # Clean all outputs
+  .\scripts\cli.ps1 workflow -Clean
+
+💡 Key Benefits:
+  • Automatic dependency tracking
+  • Incremental execution (only run what changed)
+  • Parallel execution where possible
+  • Reproducible pipelines
+
+"@
+        }
+        "dvc" {
+            Write-Host @"
+
+📊 DVC Data Version Control
+===========================
+
+DVC tracks your data, models, and experiment artifacts.
+
+📁 Tracked Directories:
+  artifacts/data/              # Processed datasets
+  artifacts/figures/           # Generated plots
+  artifacts/reports/           # Analysis reports
+
+🚀 Usage Examples:
+  # Check what's changed
+  .\scripts\cli.ps1 data status
+
+  # Reproduce the pipeline
+  .\scripts\cli.ps1 data repro
+
+  # View pipeline structure
+  .\scripts\cli.ps1 data dag
+
+  # Push data to remote storage
+  .\scripts\cli.ps1 data push
+
+  # Pull data from remote storage
+  .\scripts\cli.ps1 data pull
+
+💡 Key Concepts:
+  • Stages: Individual pipeline steps
+  • Dependencies: Input files/directories
+  • Outputs: Generated artifacts
+  • Remote Storage: Cloud storage for large files
+  • Reproducibility: Recreate results from any commit
+
+🔄 Integration:
+  DVC works with Snakemake to track data lineage and enable
+  reproducible research workflows.
+
+"@
+        }
+        "mlflow" {
+            Write-Host @"
+
+📈 MLflow Experiment Tracking
+=============================
+
+MLflow logs and tracks all your experiment runs with metrics, parameters, and artifacts.
+
+📊 Tracking Data:
+  • Parameters: Configuration settings (NFFT size, batch size)
+  • Metrics: Performance results (latency, throughput, accuracy)
+  • Artifacts: Generated files (plots, models, reports)
+
+🚀 Usage Examples:
+  # View experiment results in web UI
+  .\scripts\cli.ps1 track ui
+
+  # List all experiments
+  .\scripts\cli.ps1 track list
+
+  # Search runs with filters
+  .\scripts\cli.ps1 track search "metrics.latency < 100"
+
+  # View UI on different port
+  .\scripts\cli.ps1 track ui -Port 8080
+
+📁 Storage Location:
+  artifacts/mlruns/            # All experiment data
+
+💡 Web UI Features:
+  • Compare multiple runs side-by-side
+  • Visualize metrics over time
+  • Download artifacts
+  • Search and filter experiments
+  • Track model lineage
+
+🔗 Integration:
+  All benchmark scripts automatically log to MLflow.
+  Results are available immediately in the web UI.
+
+"@
+        }
+        "benchmarks" {
+            Write-Host @"
+
+⚡ Benchmark Scripts Architecture
+===============================
+
+Individual, focused benchmark runners following one-tool-one-job principle.
+
+📁 Benchmark Scripts:
+  benchmarks/run_latency.py    # Latency measurements
+  benchmarks/run_throughput.py # Throughput analysis
+  benchmarks/run_accuracy.py   # Accuracy validation
+  benchmarks/run_realtime.py   # Real-time performance
+
+🏗️ Script Architecture:
+  • Hydra-aware: Use configuration system
+  • MLflow integration: Automatic experiment logging
+  • Artifact output: Save results to artifacts/data/
+  • Validation: Pydantic models for config validation
+
+🚀 Usage Examples:
+  # Direct execution
+  python benchmarks/run_latency.py
+
+  # With parameter overrides
+  python benchmarks/run_latency.py engine.nfft=1024 benchmark.iterations=100
+
+  # Via CLI (recommended)
+  .\scripts\cli.ps1 experiment -Benchmark latency
+  .\scripts\cli.ps1 sweep -Config nfft_scaling -Benchmark throughput
+
+💡 Design Principles:
+  • Single Responsibility: Each script does one thing well
+  • Communication via Files: Scripts don't call each other
+  • Configuration-Driven: All behavior controlled via Hydra configs
+  • Traceable: Full MLflow integration for reproducibility
+
+"@
+        }
+        default {
+            Write-Host "❌ Unknown tool: $tool" -ForegroundColor Red
+            Write-Host "Available tools: overview, hydra, snakemake, dvc, mlflow, benchmarks" -ForegroundColor Yellow
+        }
+    }
+
+    Write-Host "`n💡 Need more help? Check the project documentation or run specific tool help commands." -ForegroundColor Green
+}
+
+# --- Legacy Benchmark Functions (Preserved for Compatibility) ---------------
 
 Function Invoke-Benchmark {
     param(
@@ -1408,35 +1958,9 @@ Function Invoke-Benchmark {
 }
 
 
-Function Invoke-ParameterSweep {
-    param(
-        [Parameter(Mandatory)]
-        [string]$Experiment,
-        [string]$Benchmark = "latency",
-        [string]$Output,
-        [string[]]$Overrides = @(),
-        [switch]$Parallel,
-        [int]$Workers = 4
-    )
+# Legacy Invoke-ParameterSweep function removed - replaced by Invoke-ModernSweep
 
-    $overrideList = @()
-    if ($Parallel) {
-        $overrideList += "hydra/launcher=joblib"
-        $overrideList += "hydra.launcher.n_jobs=$Workers"
-    }
-    if ($Overrides) { $overrideList += $Overrides }
-
-    Write-ResearchLog -Level Info -Message ("Starting sweep for {0}" -f $Experiment) -Component "Sweep" -Metadata @{
-        benchmark = $Benchmark
-        parallel = $Parallel.IsPresent
-        workers = $Workers
-        output = $Output
-    }
-
-    Invoke-Benchmark -Benchmark $Benchmark -Experiment $Experiment -Output $Output -Overrides $overrideList -Multirun
-}
-
-
+# Legacy function - prefer using Snakemake workflow via 'workflow' command
 Function Invoke-BenchmarkReport {
     param(
         [string]$ResultsDir,
@@ -1536,8 +2060,18 @@ Function Invoke-Profile {
         }
     }
     
-    # Add Python command
-    $profileCmd += "python", "-m", "ionosense_hpc.benchmarks.$Benchmark"
+    # Add Python command - use new benchmark scripts
+    $benchmarkScript = "benchmarks/run_$Benchmark.py"
+    if (-not (Test-Path (Join-Path $script:ProjectRoot $benchmarkScript))) {
+        throw "Benchmark script not found: $benchmarkScript"
+    }
+    $profileCmd += "python", $benchmarkScript
+    # Add Python command - use new benchmark scripts
+    $benchmarkScript = "benchmarks/run_$Benchmark.py"
+    if (-not (Test-Path (Join-Path $script:ProjectRoot $benchmarkScript))) {
+        throw "Benchmark script not found: $benchmarkScript"
+    }
+    $profileCmd += "python", $benchmarkScript
     
     if ($Config) {
         $configFile = if (Test-Path $Config) { $Config }
@@ -1684,7 +2218,138 @@ for i in range(n):
 Function Show-ResearchStatus {
     Write-Host "`n🔬 IONOSENSE-HPC RESEARCH STATUS" -ForegroundColor Magenta
     Write-Host "════════════════════════════════════════════════════════" -ForegroundColor DarkGray
-    
+
+    # Modern tools status
+    Write-Host "`n🌟 Modern Research Stack:" -ForegroundColor Yellow
+
+    # Check Hydra
+    $hydraStatus = Get-Command python -ErrorAction SilentlyContinue
+    if ($hydraStatus) {
+        try {
+            $hydraCheck = & python -c "import hydra; print('✓')" 2>$null
+            if ($hydraCheck -eq '✓') {
+                Write-Host "  🔧 Hydra Configuration:     ✅ Ready" -ForegroundColor Green
+            } else {
+                Write-Host "  🔧 Hydra Configuration:     ❌ Not installed" -ForegroundColor Red
+            }
+        } catch {
+            Write-Host "  🔧 Hydra Configuration:     ❌ Not available" -ForegroundColor Red
+        }
+    } else {
+        Write-Host "  🔧 Hydra Configuration:     ❌ Python not found" -ForegroundColor Red
+    }
+
+    # Check Snakemake
+    $snakemake = Get-Command snakemake -ErrorAction SilentlyContinue
+    if ($snakemake) {
+        Write-Host "  🐍 Snakemake Workflow:      ✅ Ready" -ForegroundColor Green
+    } else {
+        Write-Host "  🐍 Snakemake Workflow:      ❌ Not installed" -ForegroundColor Red
+    }
+
+    # Check DVC
+    $dvc = Get-Command dvc -ErrorAction SilentlyContinue
+    if ($dvc) {
+        Write-Host "  📊 DVC Data Versioning:     ✅ Ready" -ForegroundColor Green
+    } else {
+        Write-Host "  📊 DVC Data Versioning:     ❌ Not installed" -ForegroundColor Red
+    }
+
+    # Check MLflow
+    if ($hydraStatus) {
+        try {
+            $mlflowCheck = & python -c "import mlflow; print('✓')" 2>$null
+            if ($mlflowCheck -eq '✓') {
+                Write-Host "  📈 MLflow Tracking:         ✅ Ready" -ForegroundColor Green
+            } else {
+                Write-Host "  📈 MLflow Tracking:         ❌ Not installed" -ForegroundColor Red
+            }
+        } catch {
+            Write-Host "  📈 MLflow Tracking:         ❌ Not available" -ForegroundColor Red
+        }
+    }
+
+    # Check benchmark scripts
+    $benchmarkDir = Join-Path $script:ProjectRoot "benchmarks"
+    if (Test-Path $benchmarkDir) {
+        $scriptCount = (Get-ChildItem -Path $benchmarkDir -Filter "run_*.py" | Measure-Object).Count
+        Write-Host "  ⚡ Benchmark Scripts:        ✅ $scriptCount scripts ready" -ForegroundColor Green
+    } else {
+        Write-Host "  ⚡ Benchmark Scripts:        ❌ Not found" -ForegroundColor Red
+    }
+
+    # Quick start suggestion
+    Write-Host "`n💡 Quick Start:" -ForegroundColor Cyan
+    Write-Host "  .\scripts\cli.ps1 learn overview    # Learn about modern tools"
+    Write-Host "  .\scripts\cli.ps1 experiment         # Run a single experiment"
+    Write-Host "  .\scripts\cli.ps1 workflow           # Execute full pipeline"
+
+
+    # Modern tools status
+    Write-Host "`n🌟 Modern Research Stack:" -ForegroundColor Yellow
+
+    # Check Hydra
+    $hydraStatus = Get-Command python -ErrorAction SilentlyContinue
+    if ($hydraStatus) {
+        try {
+            $hydraCheck = & python -c "import hydra; print('✓')" 2>$null
+            if ($hydraCheck -eq '✓') {
+                Write-Host "  🔧 Hydra Configuration:     ✅ Ready" -ForegroundColor Green
+            } else {
+                Write-Host "  🔧 Hydra Configuration:     ❌ Not installed" -ForegroundColor Red
+            }
+        } catch {
+            Write-Host "  🔧 Hydra Configuration:     ❌ Not available" -ForegroundColor Red
+        }
+    } else {
+        Write-Host "  🔧 Hydra Configuration:     ❌ Python not found" -ForegroundColor Red
+    }
+
+    # Check Snakemake
+    $snakemake = Get-Command snakemake -ErrorAction SilentlyContinue
+    if ($snakemake) {
+        Write-Host "  🐍 Snakemake Workflow:      ✅ Ready" -ForegroundColor Green
+    } else {
+        Write-Host "  🐍 Snakemake Workflow:      ❌ Not installed" -ForegroundColor Red
+    }
+
+    # Check DVC
+    $dvc = Get-Command dvc -ErrorAction SilentlyContinue
+    if ($dvc) {
+        Write-Host "  📊 DVC Data Versioning:     ✅ Ready" -ForegroundColor Green
+    } else {
+        Write-Host "  📊 DVC Data Versioning:     ❌ Not installed" -ForegroundColor Red
+    }
+
+    # Check MLflow
+    if ($hydraStatus) {
+        try {
+            $mlflowCheck = & python -c "import mlflow; print('✓')" 2>$null
+            if ($mlflowCheck -eq '✓') {
+                Write-Host "  📈 MLflow Tracking:         ✅ Ready" -ForegroundColor Green
+            } else {
+                Write-Host "  📈 MLflow Tracking:         ❌ Not installed" -ForegroundColor Red
+            }
+        } catch {
+            Write-Host "  📈 MLflow Tracking:         ❌ Not available" -ForegroundColor Red
+        }
+    }
+
+    # Check benchmark scripts
+    $benchmarkDir = Join-Path $script:ProjectRoot "benchmarks"
+    if (Test-Path $benchmarkDir) {
+        $scriptCount = (Get-ChildItem -Path $benchmarkDir -Filter "run_*.py" | Measure-Object).Count
+        Write-Host "  ⚡ Benchmark Scripts:        ✅ $scriptCount scripts ready" -ForegroundColor Green
+    } else {
+        Write-Host "  ⚡ Benchmark Scripts:        ❌ Not found" -ForegroundColor Red
+    }
+
+    # Quick start suggestion
+    Write-Host "`n💡 Quick Start:" -ForegroundColor Cyan
+    Write-Host "  .\scripts\cli.ps1 learn overview    # Learn about modern tools"
+    Write-Host "  .\scripts\cli.ps1 experiment         # Run a single experiment"
+    Write-Host "  .\scripts\cli.ps1 workflow           # Execute full pipeline"
+
     # Show recent benchmarks
     Write-Host "`n📊 Recent Benchmarks:" -ForegroundColor Cyan
     if (Test-Path $script:BenchResultsDir) {
@@ -1814,12 +2479,18 @@ Function Show-Help {
 
 USAGE: .\scripts\cli.ps1 <command> [options]
 
-ENVIRONMENT MANAGEMENT
-  setup                    Create/update conda environment & install package
+ESSENTIAL SETUP & BUILD
+  setup                   Create/update conda environment & install package
+  build [-Preset] [-Clean] [-Verbose] [-Debug/-Release]
+                          Configure and build project with CMake presets
+  clean [-All]            Remove build artifacts (and results/logs with -All)
+
+ENVIRONMENT & STATUS
+  doctor [-Strict]        Verify environment/tooling and summarize status
   info [type]             Show system/benchmarks/presets/devices/configs info
   status                  Show research environment status
 
-BUILD & DEVELOPMENT  
+BUILD & DEVELOPMENT
   build [-Preset] [-Clean] [-Verbose]
                           Configure and build project
   test [-Suite all|python|py|cpp] [-Pattern] [-Coverage]
@@ -1827,50 +2498,72 @@ BUILD & DEVELOPMENT
   format [paths] [-Check] [-Verbose]
                           Format C/C++ code with .clang-format
   format [paths] [-Check] [-Staged] [-Verbose]
-                          Format only staged files with -Staged
+                          Format C/C++ code with clang-format
   lint [all|python|py|cpp] [-Staged] [-Fix] [-Verbose]
-                          Lint Python (ruff) and/or C++ (format check)
+                          Lint Python (ruff) and/or C++ code
   typecheck [-Strict] [-IncludeTests] [-Verbose]
-                          Run mypy type checking (src only by default)
-  doctor [-Strict]        Verify environment/tooling and summarize status
+                          Run mypy type checking
   check [-Staged] [-Verbose]
                           Run format -Check, lint, typecheck, and quick tests
   clean [-All]            Remove build artifacts (and results/logs with -All)
 
-BENCHMARKING (Research-Grade)
-  bench <name> [-Config] [-Output] [-Report]
-                          Run specific benchmark with YAML config
-  bench -Suite [-Config] [-Output]
-                          Run complete benchmark suite
-  sweep -Config <yaml> [-Parallel] [-Workers N]
-                          Run parameter sweep experiment
+MODERN RESEARCH WORKFLOW 🌟 (Recommended)
+  experiment [-Benchmark <name>] [-Config <config>] [-Engine <engine>] [overrides...]
+                          Run single experiment via Hydra
+  sweep -Config <config> [-Benchmark <name>] [-Parallel] [-Workers N] [overrides...]
+                          Run parameter sweep via Hydra multirun
+  run <script.py> [args...]
+                          Run any Python script with proper environment
+  workflow [-Target <name>] [-Cores N] [-DryRun] [-Verbose] [-Clean]
+                          Execute analysis pipeline via Snakemake
+  track [ui|list|search] [-Port N]
+                          MLflow experiment tracking operations
+  data [status|repro|push|pull|dag] [-Force] [-DryRun]
+                          DVC data versioning operations
+  learn [overview|hydra|snakemake|dvc|mlflow|benchmarks]
+                          Interactive learning guides for modern tools
 
-PROFILING & ANALYSIS
+LEGACY COMPATIBILITY (Use modern commands above)
+  bench <name> [-Config] [-Output] [-Report]
+                          ⚠️  Legacy - use 'experiment' instead
+  benchmark               Alias for bench command
   profile -Tool <nsys|ncu> -Benchmark <name> [-Full] [-OpenReport]
                           Profile with NVIDIA Nsight tools
-  report -ResultsDir <path> [-Format pdf|html|md] [-Type standard|sweep]
-                          Generate publication-quality report
+  report [-SkipAnalysis] [-SkipFigures]
+                          ⚠️  Legacy - use 'workflow' instead
 
 VALIDATION & MONITORING
   validate                Run numerical validation suite
   monitor                 Real-time GPU monitoring
 
-EXAMPLES:
+MODERN WORKFLOW EXAMPLES:
   # Initial setup
   .\scripts\cli.ps1 setup
   .\scripts\cli.ps1 build
 
-  # Run benchmark suite with report
-  .\scripts\cli.ps1 bench -Suite -Report
+  # 🌟 Run single experiment with modern tools
+  .\scripts\cli.ps1 experiment -Config baseline
+  .\scripts\cli.ps1 experiment -Benchmark latency engine.nfft=1024
 
-  # Run parameter sweep
-  .\scripts\cli.ps1 sweep -Config sweep_experiment -Parallel
+  # 🌟 Run parameter sweep with modern tools
+  .\scripts\cli.ps1 sweep -Config nfft_scaling -Parallel
+  .\scripts\cli.ps1 sweep -Config baseline -Benchmark throughput
 
-  # Profile with Nsight Systems
+  # 🌟 Execute complete analysis pipeline
+  .\scripts\cli.ps1 workflow
+  .\scripts\cli.ps1 workflow -Target generate_report -Cores 8
+
+  # 🌟 View experiment results
+  .\scripts\cli.ps1 track ui
+  .\scripts\cli.ps1 track search "metrics.latency < 100"
+
+  # 🌟 Learn about the modern tools
+  .\scripts\cli.ps1 learn overview
+  .\scripts\cli.ps1 learn hydra
+
+LEGACY EXAMPLES (still supported):
+  .\scripts\cli.ps1 bench latency -Report
   .\scripts\cli.ps1 profile -Tool nsys -Benchmark latency -Full
-
-  # Generate publication report
-  .\scripts\cli.ps1 report -ResultsDir ./results -Format pdf
 
 For detailed documentation, see: docs/research_guide.md
 "@
@@ -1936,42 +2629,30 @@ try {
             Invoke-Test @params
         }
         "bench"    {
-            $params = @{ Overrides = @() }
-            $positional = @()
+            # Simplified benchmark command - delegates to modern functions
+            Write-ResearchLog -Level Info -Message "Legacy 'bench' command - redirecting to modern implementation" -Component "Benchmark"
 
-            for ($i = 0; $i -lt $CommandArgs.Count; $i++) {
-                $arg = $CommandArgs[$i]
-                switch ($arg) {
-                    '-Benchmark' {
-                        if ($i + 1 -lt $CommandArgs.Count) { $params.Benchmark = $CommandArgs[$i + 1]; $i++ }
-                    }
-                    '-Experiment' {
-                        if ($i + 1 -lt $CommandArgs.Count) { $params.Experiment = $CommandArgs[$i + 1]; $i++ }
-                    }
-                    '-Output' {
-                        if ($i + 1 -lt $CommandArgs.Count) { $params.Output = $CommandArgs[$i + 1]; $i++ }
-                    }
-                    '-Override' {
-                        if ($i + 1 -lt $CommandArgs.Count) { $params.Overrides += $CommandArgs[$i + 1]; $i++ }
-                    }
-                    '-Multirun' { $params.Multirun = $true }
-                    '-Report' { $params.Report = $true }
-                    default {
-                        if ($arg -and $arg -notlike '-*') { $positional += $arg }
-                    }
-                }
+            # Check for multirun/sweep mode
+            if ($CommandArgs -contains "-Multirun") {
+                # Remove -Multirun and -Report flags, delegate to sweep
+                $newArgs = $CommandArgs | Where-Object { $_ -ne "-Multirun" -and $_ -ne "-Report" }
+                Invoke-ModernSweep -CommandArgs $newArgs
+            } else {
+                # Delegate to single experiment
+                $newArgs = $CommandArgs | Where-Object { $_ -ne "-Report" }
+                Invoke-ModernExperiment -CommandArgs $newArgs
             }
 
-            if (-not $params.ContainsKey('Benchmark') -and $positional.Count -gt 0) {
-                $params.Benchmark = $positional[0]
-                if ($positional.Count -gt 1) { $params.Overrides += $positional[1..($positional.Count-1)] }
-            } elseif ($positional.Count -gt 0) {
-                $params.Overrides += $positional
+            # If -Report was specified, run workflow to generate reports
+            if ($CommandArgs -contains "-Report") {
+                Write-ResearchLog -Level Info -Message "Generating reports via Snakemake workflow" -Component "Benchmark"
+                Invoke-ModernWorkflow -CommandArgs @("generate_report")
             }
-
-            if (-not $params.Overrides) { $params.Remove('Overrides') }
-
-            Invoke-Benchmark @params
+        }
+        "benchmark" {
+            # Alias for bench command
+            Write-ResearchLog -Level Info -Message "'benchmark' alias - redirecting to 'bench' command" -Component "Benchmark"
+            & $PSCommandPath "bench" @CommandArgs
         }
 
 
@@ -2005,49 +2686,26 @@ try {
             if ($CommandArgs -contains "-Verbose") { $params.Verbose = $true }
             Invoke-Typecheck @params
         }
+        "experiment" {
+            Invoke-ModernExperiment -CommandArgs $CommandArgs
+        }
         "sweep"    {
-            $params = @{ Overrides = @() }
-            $positional = @()
-
-            for ($i = 0; $i -lt $CommandArgs.Count; $i++) {
-                $arg = $CommandArgs[$i]
-                switch ($arg) {
-                    '-Benchmark' {
-                        if ($i + 1 -lt $CommandArgs.Count) { $params.Benchmark = $CommandArgs[$i + 1]; $i++ }
-                    }
-                    '-Experiment' {
-                        if ($i + 1 -lt $CommandArgs.Count) { $params.Experiment = $CommandArgs[$i + 1]; $i++ }
-                    }
-                    '-Output' {
-                        if ($i + 1 -lt $CommandArgs.Count) { $params.Output = $CommandArgs[$i + 1]; $i++ }
-                    }
-                    '-Override' {
-                        if ($i + 1 -lt $CommandArgs.Count) { $params.Overrides += $CommandArgs[$i + 1]; $i++ }
-                    }
-                    '-Parallel' { $params.Parallel = $true }
-                    '-Workers' {
-                        if ($i + 1 -lt $CommandArgs.Count) { $params.Workers = [int]$CommandArgs[$i + 1]; $i++ }
-                    }
-                    default {
-                        if ($arg -and $arg -notlike '-*') { $positional += $arg }
-                    }
-                }
-            }
-
-            if (-not $params.ContainsKey('Experiment') -and $positional.Count -gt 0) {
-                $params.Experiment = $positional[0]
-                if ($positional.Count -gt 1) { $params.Overrides += $positional[1..($positional.Count-1)] }
-            } elseif ($positional.Count -gt 0) {
-                $params.Overrides += $positional
-            }
-
-            if (-not $params.Experiment) {
-                throw "Experiment name required"
-            }
-
-            if (-not $params.Overrides) { $params.Remove('Overrides') }
-
-            Invoke-ParameterSweep @params
+            Invoke-ModernSweep -CommandArgs $CommandArgs
+        }
+        "run"      {
+            Invoke-ModernRun -CommandArgs $CommandArgs
+        }
+        "workflow" {
+            Invoke-ModernWorkflow -CommandArgs $CommandArgs
+        }
+        "track" {
+            Invoke-ModernTrack -CommandArgs $CommandArgs
+        }
+        "data" {
+            Invoke-ModernData -CommandArgs $CommandArgs
+        }
+        "learn" {
+            Invoke-ModernLearn -CommandArgs $CommandArgs
         }
 
 
@@ -2073,19 +2731,43 @@ try {
             Invoke-Profile @params
         }
         "report"    {
-            $params = @{}
-            for ($i = 0; $i -lt $CommandArgs.Count; $i++) {
-                switch ($CommandArgs[$i]) {
-                    '-ResultsDir' { if ($i + 1 -lt $CommandArgs.Count) { $params.ResultsDir = $CommandArgs[$i + 1]; $i++ } }
-                    '-FiguresDir' { if ($i + 1 -lt $CommandArgs.Count) { $params.FiguresDir = $CommandArgs[$i + 1]; $i++ } }
-                    '-Output' { if ($i + 1 -lt $CommandArgs.Count) { $params.Output = $CommandArgs[$i + 1]; $i++ } }
-                    '-SkipAnalysis' { $params.SkipAnalysis = $true }
-                    '-SkipFigures' { $params.SkipFigures = $true }
-                    default { }
+            # Simplified report command - delegates to Snakemake workflow
+            Write-ResearchLog -Level Info -Message "Legacy 'report' command - redirecting to Snakemake workflow" -Component "Report"
+
+            $targets = @()
+
+            # Parse arguments to determine workflow targets
+            $skipAnalysis = $CommandArgs -contains "-SkipAnalysis"
+            $skipFigures = $CommandArgs -contains "-SkipFigures"
+
+            if (-not $skipAnalysis -and -not $skipFigures) {
+                # Run complete reporting pipeline
+                $targets += "generate_report"
+            } else {
+                # Run specific parts
+                if (-not $skipAnalysis) { $targets += "analyze_results" }
+                if (-not $skipFigures) { $targets += "generate_figures" }
+            }
+
+            # Build workflow command arguments
+            $workflowArgs = @()
+            if ($targets.Count -gt 0) {
+                foreach ($target in $targets) {
+                    $workflowArgs += "-Target"
+                    $workflowArgs += $target
                 }
             }
 
-            Invoke-BenchmarkReport @params
+            # Check for custom paths (note: legacy behavior)
+            $hasCustomPaths = ($CommandArgs -contains "-ResultsDir") -or
+                              ($CommandArgs -contains "-FiguresDir") -or
+                              ($CommandArgs -contains "-Output")
+
+            if ($hasCustomPaths) {
+                Write-ResearchLog -Level Warning -Message "Custom paths not supported in modern workflow - using standard artifacts/ structure" -Component "Report"
+            }
+
+            Invoke-ModernWorkflow -CommandArgs $workflowArgs
         }
 
 
@@ -2105,14 +2787,6 @@ try {
             if ($CommandArgs -contains "-Staged")  { $params.Staged  = $true }
             if ($CommandArgs -contains "-Verbose") { $params.Verbose = $true }
             Invoke-Check @params
-        }
-        "validate" {
-            Write-ResearchLog -Level Info -Message "Running validation suite" -Component "Validate"
-            
-            Invoke-WithPythonPath {
-                python -m ionosense_hpc.benchmarks.accuracy
-                python -m ionosense_hpc.benchmarks.accuracy --validate-stability
-            }
         }
         "monitor"  {
             Write-ResearchLog -Level Info -Message "Starting GPU monitor" -Component "Monitor"

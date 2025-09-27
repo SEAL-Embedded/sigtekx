@@ -1,7 +1,7 @@
 # Snakefile
 # Simple workflow orchestration following one-tool-one-job principle
 
-configfile: "conf/config.yaml"
+configfile: "experiments/conf/config.yaml"
 
 # Define the final outputs we want
 rule all:
@@ -19,8 +19,8 @@ rule run_latency_sweep:
     shell:
         """
         python benchmarks/run_latency.py --multirun \
-            experiment=nfft_batch_sweep \
-            benchmark=latency
+            experiment=baseline \
+            "engine.nfft=256,512,1024,2048,4096,8192"
         """
 
 # Run throughput benchmark sweep
@@ -30,8 +30,8 @@ rule run_throughput_sweep:
     shell:
         """
         python benchmarks/run_throughput.py --multirun \
-            experiment=nfft_batch_sweep \
-            benchmark=throughput
+            experiment=baseline \
+            "engine.batch=1,2,4,8,16,32,64"
         """
 
 # Run accuracy benchmark sweep
@@ -41,8 +41,9 @@ rule run_accuracy_sweep:
     shell:
         """
         python benchmarks/run_accuracy.py --multirun \
-            experiment=nfft_batch_sweep \
-            benchmark=accuracy
+            experiment=baseline \
+            "engine.nfft=1024,2048,4096" \
+            "benchmark.iterations=100"
         """
 
 # Analyze all results and create summary statistics
@@ -87,12 +88,19 @@ rule generate_report:
 rule clean:
     shell:
         """
-        rm -rf artifacts/data/*
-        rm -rf artifacts/figures/*
-        rm -rf artifacts/reports/*
-        rm -rf outputs/
-        rm -rf multirun/
-        echo "Cleaned all artifacts"
+        python -c "
+import shutil, os, glob
+dirs_to_clean = ['artifacts/data', 'artifacts/figures', 'artifacts/reports', 'outputs', 'multirun']
+for d in dirs_to_clean:
+    if os.path.exists(d):
+        for item in glob.glob(os.path.join(d, '*')):
+            if os.path.isdir(item):
+                shutil.rmtree(item)
+            else:
+                os.remove(item)
+        print(f'Cleaned {d}')
+print('All artifacts cleaned')
+"
         """
 
 # Quick test run with minimal parameters

@@ -84,19 +84,20 @@ The ionosense-hpc CLI provides a unified interface for all development tasks, wi
 ./scripts/cli.sh typecheck      # Run mypy type checking
 ./scripts/cli.sh check          # Run format, lint, typecheck, and quick tests
 
-# Testing
-./scripts/cli.sh test           # Run all tests
-./scripts/cli.sh test py        # Python tests only
-./scripts/cli.sh test cpp       # C++ tests only
-./scripts/cli.sh test --coverage  # With coverage report
+# Testing (Direct Tools)
+pytest tests/ -v               # Run all Python tests
+ctest --preset windows-tests   # Run C++ tests (adjust preset for platform)
+pytest tests/ --cov=ionosense_hpc  # Python tests with coverage report
 
-# Research and benchmarking
-./scripts/cli.sh bench latency  # Run specific benchmark
-./scripts/cli.sh bench suite    # Run complete benchmark suite
-./scripts/cli.sh profile nsys latency  # Profile with Nsight Systems
-./scripts/cli.sh sweep experiment.yaml  # Parameter sweep
-./scripts/cli.sh validate       # Numerical validation suite
-./scripts/cli.sh monitor        # Real-time GPU monitoring
+# Modern research workflow (🌟 Recommended - Direct Tools)
+python benchmarks/run_latency.py experiment=baseline           # Run single experiment
+python benchmarks/run_latency.py --multirun experiment=nfft_scaling  # Run parameter sweep
+snakemake --cores 4 --snakefile experiments/Snakefile         # Execute analysis pipeline
+mlflow ui --backend-store-uri file://./artifacts/mlruns       # View experiment results
+python custom_script.py                                       # Run any Python script
+./scripts/cli.sh profile nsys latency                         # Profile with Nsight Systems
+python -m ionosense_hpc.benchmarks.accuracy                   # Numerical validation suite
+./scripts/cli.sh monitor                                      # Real-time GPU monitoring
 ```
 
 ### Windows Development Shell
@@ -104,80 +105,72 @@ The ionosense-hpc CLI provides a unified interface for all development tasks, wi
 The enhanced development shell (`.\scripts\open_dev_pwsh.ps1`) provides:
 
 - **Automatic MSVC Setup**: Configures 64-bit Visual Studio tools
-- **Conda Integration**: Activates ionosense-hpc environment  
-- **Smart Aliases**: Convenient shortcuts with tab completion
+- **Conda Integration**: Activates ionosense-hpc environment
+- **Essential CLI Aliases**: Shortcuts for essential build/development tasks
 - **Repository Awareness**: Commands work from any subdirectory
 
 ```powershell
 # Start development shell (one-time per session)
 .\scripts\open_dev_pwsh.ps1
 
-# Available aliases and shortcuts:
+# Available aliases for essential CLI commands:
 iono <command>        # Main CLI alias
 ib                    # Build (iono build)
 ir                    # Rebuild (iono rebuild)
-it                    # Test all (iono test)
-itp                   # Test Python only (iono test py)
-itc                   # Test C++ only (iono test cpp)
 
 # Code quality shortcuts
 ifmt                  # Format code (iono format)
 ilint                 # Lint code (iono lint)
 
-# Benchmarking shortcuts
-ibench latency        # Run latency benchmark
+# Development utilities
 iprof nsys latency    # Profile with Nsight
-ipq                   # Quick Nsight profile
-ipf                   # Full Nsight profile
-
-# Utilities
-ival                  # Validate (iono validate)
 imon                  # Monitor GPU (iono monitor)
 iinfo                 # System info (iono info)
 iclean                # Clean (iono clean)
+ilearn                # Learning guides (iono learn)
 
-# Tab completion works for all commands and arguments
-iono <TAB>           # Shows available commands
-ibench <TAB>         # Shows available benchmarks
-iprof <TAB>          # Shows profiling options
+# For research workflows, use direct tools:
+# python benchmarks/run_latency.py experiment=baseline
+# pytest tests/ -v
+# snakemake --cores 4 --snakefile experiments/Snakefile
 ```
 
 ### Daily Development Cycle
 
-**Linux/WSL2:**
+**Essential Development Tasks (All Platforms):**
 ```bash
 # Start development session
 cd ionosense-hpc
-./scripts/cli.sh doctor         # Check environment health
+.\scripts\cli.ps1 doctor         # Check environment health
 
 # Make changes to code...
 
-# Verify changes
-./scripts/cli.sh check          # Format, lint, typecheck, quick tests
-./scripts/cli.sh build          # Build with changes
-./scripts/cli.sh test           # Full test suite
+# Verify changes with essential CLI tools
+.\scripts\cli.ps1 check          # Format, lint, typecheck
+.\scripts\cli.ps1 build          # Build with changes
+pytest tests/ -v                 # Run tests
 
-# Research workflow
-./scripts/cli.sh bench latency  # Performance validation
-./scripts/cli.sh profile nsys latency  # Detailed profiling
+# Performance validation with direct tools
+python benchmarks/run_latency.py experiment=baseline  # Performance validation
+.\scripts\cli.ps1 profile nsys latency               # Detailed profiling
 ```
 
-**Windows:**
+**Windows Enhanced Shell (Optional):**
 ```powershell
-# Start development session
-.\scripts\open_dev_pwsh.ps1     # Enhanced shell with all tools
+# Start development session with enhanced aliases
+.\scripts\open_dev_pwsh.ps1     # Enhanced shell with aliases
 iono doctor                     # Check environment health
 
 # Make changes to code...
 
 # Verify changes (using aliases)
-iono check                      # Format, lint, typecheck, quick tests
-ib                             # Build with changes  
-it                             # Full test suite
+iono check                      # Format, lint, typecheck
+ib                             # Build with changes
+pytest tests/ -v               # Run tests
 
-# Research workflow
-ibench latency                 # Performance validation
-iprof nsys latency            # Detailed profiling
+# Research workflow with direct tools
+python benchmarks/run_latency.py experiment=baseline  # Performance validation
+iprof nsys latency            # Detailed profiling (alias)
 ```
 
 ## Project Structure
@@ -241,27 +234,30 @@ ionosense-hpc-lib/
 
 ## Building from Source
 
-### Using CLI (Recommended)
+### Using CLI (Essential Commands)
 
-**Linux/WSL2:**
+**All Platforms:**
 ```bash
 # Clean build
-./scripts/cli.sh clean
-./scripts/cli.sh build
+.\scripts\cli.ps1 clean
+.\scripts\cli.ps1 build
 
 # Debug build
-./scripts/cli.sh build linux-debug
+.\scripts\cli.ps1 build -Debug
+
+# Release build (default)
+.\scripts\cli.ps1 build -Release
 
 # Verbose build with all output
-./scripts/cli.sh build --verbose
+.\scripts\cli.ps1 build -Verbose
 
 # Build without NVTX profiling
-./scripts/cli.sh build --no-nvtx
+.\scripts\cli.ps1 build -NoNvtx
 ```
 
-**Windows (Development Shell):**
+**Windows Enhanced Shell (Optional Aliases):**
 ```powershell
-# Start enhanced shell
+# Start enhanced shell for aliases
 .\scripts\open_dev_pwsh.ps1
 
 # Clean build using aliases
@@ -269,16 +265,13 @@ iclean
 ib                    # or 'iono build'
 
 # Debug build
-iono build windows-debug
+iono build -Debug
 
 # Verbose build
-ib --verbose
-
-# Build without NVTX profiling  
-ib --no-nvtx
+ib -Verbose
 ```
 
-> Note: `iclean` removes only build outputs, while `iclean --all` additionally clears generated artifacts such as `artifacts/`, caches, and reports but intentionally leaves the version-controlled `experiments/` workflow tree intact.
+> Note: `clean` removes only build outputs, while `clean -All` additionally clears generated artifacts such as `artifacts/`, caches, and reports but intentionally leaves the version-controlled `experiments/` workflow tree intact.
 
 
 ### Manual Build (Advanced)
@@ -385,44 +378,42 @@ Closes #123
 
 ## Testing
 
-### Running Tests with CLI
+### Running Tests with Direct Tools
 
-**Linux/WSL2:**
+**Python Tests (pytest):**
 ```bash
-# Run all tests
-./scripts/cli.sh test
+# Run all Python tests
+pytest tests/ -v
 
-# Run specific test suites
-./scripts/cli.sh test py         # Python only
-./scripts/cli.sh test cpp        # C++ only
+# Run with coverage report
+pytest tests/ --cov=ionosense_hpc --cov-report=term-missing
 
-# Run with coverage
-./scripts/cli.sh test --coverage
+# Run specific test patterns
+pytest tests/ -k "test_engine" -v
 
-# Run specific patterns
-./scripts/cli.sh test --pattern "test_engine"
+# Run only GPU tests
+pytest tests/ -m gpu -v
 
-# Verbose output
-./scripts/cli.sh test --verbose
+# Run only non-GPU tests (for CI/testing without hardware)
+pytest tests/ -m "not gpu" -v
 ```
 
-**Windows (Development Shell):**
-```powershell
-# Run all tests
-it                              # or 'iono test'
+**C++ Tests (ctest):**
+```bash
+# Run all C++ tests (adjust preset for your platform)
+ctest --preset windows-tests --output-on-failure
 
-# Run specific test suites  
-itp                             # Python only (iono test py)
-itc                             # C++ only (iono test cpp)
+# Run C++ tests with specific pattern
+ctest --preset windows-tests -R "test_engine"
 
-# Run with coverage
-iono test --coverage
+# Verbose C++ test output
+ctest --preset windows-tests --output-on-failure --verbose
+```
 
-# Run specific patterns
-iono test --pattern "test_engine"
-
-# Verbose output
-it --verbose
+**Combined Testing:**
+```bash
+# Run both Python and C++ tests
+pytest tests/ -v && ctest --preset windows-tests --output-on-failure
 ```
 
 ### Test Categories
@@ -461,26 +452,22 @@ class TestEngine:
 
 **Environment Debugging:**
 ```bash
-# Linux/WSL2
-./scripts/cli.sh doctor          # Comprehensive environment check
-./scripts/cli.sh info system     # System information
-export IONO_LOG_LEVEL=DEBUG     # Enable debug logging
-
-# Windows (in dev shell)
-iono doctor                      # Comprehensive environment check
-iono info system                 # System information
-$env:IONO_LOG_LEVEL="DEBUG"     # Enable debug logging
+# All platforms
+.\scripts\cli.ps1 doctor          # Comprehensive environment check
+.\scripts\cli.ps1 info system     # System information
+$env:IONO_LOG_LEVEL="DEBUG"      # Enable debug logging (Windows)
+export IONO_LOG_LEVEL=DEBUG      # Enable debug logging (Linux/WSL)
 ```
 
 **Build Debugging:**
 ```bash
-# Linux/WSL2
-./scripts/cli.sh build linux-debug  # Debug build
-./scripts/cli.sh build --verbose    # Verbose build output
+# All platforms
+.\scripts\cli.ps1 build -Debug     # Debug build
+.\scripts\cli.ps1 build -Verbose   # Verbose build output
 
-# Windows (in dev shell)
-iono build windows-debug         # Debug build
-ib --verbose                     # Verbose build output
+# Windows enhanced shell (optional aliases)
+iono build -Debug         # Debug build
+ib -Verbose              # Verbose build output
 ```
 
 ### CUDA Debugging
@@ -493,8 +480,8 @@ export CUDA_LAUNCH_BLOCKING=1
 cuda-memcheck python your_script.py
 
 # Profile with Nsight (both platforms)
-./scripts/cli.sh profile nsys benchmark_name  # Linux
-iprof nsys benchmark_name                     # Windows
+.\scripts\cli.ps1 profile nsys latency       # Essential CLI
+iprof nsys latency                           # Windows alias (optional)
 ```
 
 ### Common Issues
@@ -504,12 +491,12 @@ iprof nsys benchmark_name                     # Windows
    - Windows: Use `.\scripts\open_dev_pwsh.ps1` for enhanced shell
 
 2. **Build Failures**
-   - Run `./scripts/cli.sh doctor` / `iono doctor` first
+   - Run `.\scripts\cli.ps1 doctor` first
    - Check CUDA toolkit installation
    - Verify conda environment activation
 
 3. **Import Errors**
-   - Rebuild: `./scripts/cli.sh rebuild` / `ir`
+   - Rebuild: `.\scripts\cli.ps1 clean` then `.\scripts\cli.ps1 build`
    - Check Python path in conda environment
 
 ## Contributing
@@ -518,14 +505,12 @@ iprof nsys benchmark_name                     # Windows
 
 1. **Setup Development Environment**
    ```bash
-   # Linux/WSL2
+   # All platforms
    git clone --recursive https://github.com/your-org/ionosense-hpc.git
    cd ionosense-hpc
-   ./scripts/cli.sh setup
-   
-   # Windows
-   git clone --recursive https://github.com/your-org/ionosense-hpc.git
-   cd ionosense-hpc
+   .\scripts\cli.ps1 setup
+
+   # Optional: Windows enhanced shell with aliases
    .\scripts\open_dev_pwsh.ps1
    iono setup
    ```
@@ -537,15 +522,15 @@ iprof nsys benchmark_name                     # Windows
 
 3. **Development Loop**
    ```bash
-   # Linux/WSL2
-   ./scripts/cli.sh check         # Format, lint, typecheck, quick tests
-   ./scripts/cli.sh build         # Build changes
-   ./scripts/cli.sh test          # Full test suite
-   
-   # Windows (in dev shell)
-   iono check                     # Format, lint, typecheck, quick tests
+   # All platforms - Essential CLI
+   .\scripts\cli.ps1 check         # Format, lint, typecheck
+   .\scripts\cli.ps1 build         # Build changes
+   pytest tests/ -v               # Run tests
+
+   # Windows enhanced shell (optional aliases)
+   iono check                     # Format, lint, typecheck
    ib                            # Build changes
-   it                            # Full test suite
+   pytest tests/ -v              # Run tests
    ```
 
 4. **Commit and Push**
@@ -562,49 +547,50 @@ iprof nsys benchmark_name                     # Windows
 The CLI provides aggregated checks for code quality:
 
 ```bash
-# Linux/WSL2
-./scripts/cli.sh check           # Format, lint, typecheck, quick tests
-./scripts/cli.sh check --staged  # Only check staged files
+# All platforms - Essential CLI
+.\scripts\cli.ps1 check           # Format, lint, typecheck
+.\scripts\cli.ps1 check -Staged   # Only check staged files
 
-# Windows (in dev shell)
-iono check                       # Format, lint, typecheck, quick tests
-iono check --staged              # Only check staged files
+# Windows enhanced shell (optional aliases)
+iono check                       # Format, lint, typecheck
+iono check -Staged               # Only check staged files
 ```
 
 This runs:
-- `format --check`: Verify C++ formatting
+- `format -Check`: Verify C++ formatting
 - `lint`: Python (ruff) and C++ linting
 - `typecheck`: mypy type checking
-- Quick Python tests (excluding slow/GPU tests)
+
+For tests, run `pytest tests/ -v` separately to have full control over test execution.
 
 ## Release Process
 
 ### Version Management
 
 ```bash
-# Linux/WSL2
-./scripts/cli.sh info            # Check current version
-./scripts/cli.sh test            # Full test suite
-./scripts/cli.sh bench suite     # Performance regression check
+# All platforms
+.\scripts\cli.ps1 info            # Check current version
+pytest tests/ -v                 # Full test suite
+python benchmarks/run_latency.py experiment=baseline  # Performance regression check
 
-# Windows (in dev shell)
+# Windows enhanced shell (optional aliases)
 iono info                        # Check current version
-it                              # Full test suite
-ibench suite                    # Performance regression check
+pytest tests/ -v                 # Full test suite
+python benchmarks/run_latency.py experiment=baseline  # Performance regression check
 ```
 
 ### Build and Package
 
 ```bash
-# Linux/WSL2
-./scripts/cli.sh clean --all     # Clean everything
-./scripts/cli.sh build          # Fresh release build
-./scripts/cli.sh test            # Verify build
+# All platforms - Essential CLI
+.\scripts\cli.ps1 clean -All     # Clean everything
+.\scripts\cli.ps1 build          # Fresh release build
+pytest tests/ -v                 # Verify build
 
-# Windows (in dev shell)
-iclean --all                    # Clean everything
-ib                             # Fresh release build
-it                             # Verify build
+# Windows enhanced shell (optional aliases)
+iclean -All                      # Clean everything
+ib                              # Fresh release build
+pytest tests/ -v                # Verify build
 ```
 
 ## Outputs & Artifacts
@@ -626,11 +612,21 @@ Override them in CI or custom setups if you need different paths.
 
 ## Resources
 
-- **CLI Help**: `./scripts/cli.sh help` / `iono help`
-- **Environment Check**: `./scripts/cli.sh doctor` / `iono doctor`
-- **System Info**: `./scripts/cli.sh info` / `iono info`
+### Essential CLI Commands
+- **CLI Help**: `.\scripts\cli.ps1 help`
+- **Environment Check**: `.\scripts\cli.ps1 doctor`
+- **System Info**: `.\scripts\cli.ps1 info`
+- **Learning Guides**: `.\scripts\cli.ps1 learn`
+
+### Direct Tools Documentation
+- [Hydra Configuration](https://hydra.cc/) - Experiment configuration management
+- [Snakemake Workflows](https://snakemake.readthedocs.io/) - Workflow orchestration
+- [MLflow Tracking](https://mlflow.org/) - Experiment tracking and management
+- [DVC Data Versioning](https://dvc.org/) - Data version control
+- [Pytest Testing](https://docs.pytest.org/) - Python testing framework
+
+### Development Resources
 - [CUDA Programming Guide](https://docs.nvidia.com/cuda/cuda-c-programming-guide/)
 - [cuFFT Documentation](https://docs.nvidia.com/cuda/cufft/)
 - [Python Packaging Guide](https://packaging.python.org/)
 - [Pydantic Documentation](https://docs.pydantic.dev/)
-- [Pytest Documentation](https://docs.pytest.org/)

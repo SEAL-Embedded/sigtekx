@@ -1,5 +1,9 @@
+# @package _global_
 defaults:
   - override /engine: throughput
+
+name: batch_scaling
+description: Sweep over different batch sizes
 
 hydra:
   mode: MULTIRUN

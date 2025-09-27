@@ -243,6 +243,17 @@ function global:imon   { param([Parameter(ValueFromRemainingArguments=$true)][ob
 function global:iinfo  { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono info     @Args }
 function global:iclean { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono clean    @Args }
 
+# Modern research stack shortcuts - Use direct tools instead:
+# python benchmarks/run_latency.py experiment=baseline
+# python benchmarks/run_latency.py --multirun experiment=nfft_scaling
+# snakemake --cores 4 --snakefile experiments/Snakefile
+# mlflow ui --backend-store-uri file://./artifacts/mlruns
+# dvc status
+function global:ilearn    {
+    param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
+    if ($Args.Count -eq 0) { iono learn } else { iono learn @Args }
+}
+
 # Optional tiny shorthands
 function global:ibr { ir }                # rebuild (no args)
 function global:itp { it py }             # python tests
@@ -250,11 +261,35 @@ function global:itc { it cpp }            # c++ tests
 function global:ipq { iprof nsys quick }  # nsys quick
 function global:ipf { iprof nsys full }   # nsys full
 
-# Tab-completion (simple + resilient)
-$global:IonoVerbs   = @('setup','build','rebuild','lint','format','test','list','bench','profile','validate','monitor','info','clean')
-$global:IonoTargets = @('cpp','py','suite','latency','throughput','spectrogram','nsys','ncu','quick','full','windows-rel','--ui','--help')
+# Modern workflow shortcuts (use direct tools):
+# python benchmarks/run_latency.py experiment=baseline
+# python benchmarks/run_latency.py --multirun experiment=baseline engine.nfft=256,512,1024,2048,4096,8192
+# python benchmarks/run_latency.py --multirun experiment=baseline engine.batch=1,2,4,8,16,32,64,128
+# mlflow ui --backend-store-uri file://./artifacts/mlruns
+# mlflow experiments list --tracking-uri file://./artifacts/mlruns
+# dvc status
+# snakemake --delete-all-output --snakefile experiments/Snakefile
 
-Register-ArgumentCompleter -CommandName iono,ib,ir,it,ilint,ifmt,ibench,iprof,ival,imon,iinfo,iclean -ScriptBlock {
+# Learning and help shortcuts
+function global:ihelp       {
+    param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
+    if ($Args.Count -eq 0) {
+        iono learn overview
+    } else {
+        iono learn overview @Args
+    }
+}
+function global:ihelp-hydra{ iono learn hydra }
+function global:ihelp-snake{ iono learn snakemake }
+function global:ihelp-dvc  { iono learn dvc }
+function global:ihelp-mlflow{ iono learn mlflow }
+function global:ihelp-bench{ iono learn benchmarks }
+
+# Tab-completion (simple + resilient)
+$global:IonoVerbs   = @('setup','build','rebuild','lint','format','list','profile','monitor','info','clean','learn')
+$global:IonoTargets = @('cpp','py','suite','latency','throughput','spectrogram','nsys','ncu','quick','full','windows-rel','--ui','--help','baseline','nfft_scaling','batch_scaling','accuracy','realtime','profiling','ui','status','repro','push','pull','dag','overview','hydra','snakemake','dvc','mlflow','benchmarks')
+
+Register-ArgumentCompleter -CommandName iono,ib,ir,it,ilint,ifmt,ibench,iprof,ival,imon,iinfo,iclean,ilearn -ScriptBlock {
     param($commandName,$parameterName,$wordToComplete,$commandAst,$fakeBoundParameters)
     $tokens = @()
     foreach ($e in $commandAst.CommandElements) {

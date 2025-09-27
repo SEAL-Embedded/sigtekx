@@ -1,6 +1,10 @@
+# @package _global_
 defaults:
   - override /engine: throughput
-  
+
+name: nfft_scaling
+description: Sweep over different NFFT sizes
+
 hydra:
   mode: MULTIRUN
   sweeper:
