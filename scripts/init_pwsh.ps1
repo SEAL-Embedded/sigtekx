@@ -84,79 +84,28 @@ function Activate-CondaEnv {
     if ($NoConda) { return }
     if ($env:CONDA_DEFAULT_ENV -eq $Name) { Info "Conda env '$Name' already active."; return }
 
-    $condaCmd = Get-Command conda -ErrorAction SilentlyContinue
-    if (-not $condaCmd) {
+    # Check if the 'conda' command is available before trying to use it.
+    if (-not (Get-Command conda -ErrorAction SilentlyContinue)) {
         Warn "conda executable not found; cannot activate '$Name'."
         return
     }
-        # Resolve the alias to the actual command to get the real source path
-    $resolvedCmd = if ($condaCmdInfo.CommandType -eq 'Alias') {
-        Get-Command $condaCmdInfo.Definition -ErrorAction SilentlyContinue
-    } else {
-        $condaCmdInfo
-    }
 
-    if (-not $resolvedCmd -or [string]::IsNullOrEmpty($resolvedCmd.Source)) {
-        Warn "Could not determine the source path for the conda command."
-        return
-    }
-    $condaSourcePath = $resolvedCmd.Source
-    
-    $condaBatCandidates = @(
-        (Join-Path (Split-Path -Parent $condaCmd.Source) 'conda.bat'),
-        (Join-Path (Split-Path -Parent $condaCmd.Source) 'activate.bat'),
-        (Join-Path (Split-Path -Parent (Split-Path -Parent $condaCmd.Source)) 'Scripts\conda.bat'),
-        (Join-Path (Split-Path -Parent (Split-Path -Parent $condaCmd.Source)) 'condabin\conda.bat')
-    ) | Where-Object { Test-Path $_ }
+    try {
+        # Ask conda to generate the activation script for PowerShell and execute it.
+        # This is the official, path-independent way to activate an environment.
+        & conda shell.powershell activate $Name | Invoke-Expression
 
-    $condaBat = $condaBatCandidates | Select-Object -First 1
-    if (-not $condaBat) {
-        Warn "Unable to locate conda.bat near $($condaCmd.Source)."
-        return
-    }
-
-    # Try activation without suppressing output first to see any errors
-    $activationOutput = cmd.exe /c "`"$condaBat`" activate $Name 2>&1"
-    if ($LASTEXITCODE -ne 0) {
-        Warn "conda activation failed (exit $LASTEXITCODE) for '$Name'."
-        if (-not $Quiet) {
-            Write-Host "Activation output:" -ForegroundColor Yellow
-            $activationOutput | Write-Host
+        # Verify that the activation was successful.
+        if ($env:CONDA_DEFAULT_ENV -eq $Name) {
+            Ok "Activated '$Name' via conda shell integration."
+        } else {
+            # This might happen if the conda command is a broken alias or function.
+            Warn "Conda activation script ran, but the environment was not set as expected."
         }
+    } catch {
+        Warn "An error occurred during conda activation for '$Name'."
+        Write-Warning $_.Exception.Message
         return
-    }
-
-    # Now get the environment dump
-    $envDump = cmd.exe /c "`"$condaBat`" activate $Name >nul 2>nul && set"
-    if ($LASTEXITCODE -ne 0) {
-        Warn "Failed to capture environment after conda activation."
-        return
-    }
-
-    $envVarsSet = 0
-    foreach ($line in $envDump) {
-        $kv = $line -split '=',2
-        if ($kv.Count -ne 2) { continue }
-        $key, $val = $kv
-        if (-not $key) { continue }
-
-        # Only set environment variables that seem conda-related or important
-        # to avoid overwriting system variables unnecessarily
-        if ($key -match '^(CONDA_|PATH|PYTHONPATH|CMAKE_|VS_|INCLUDE|LIB)' -or
-            $key -in @('VIRTUAL_ENV', 'VIRTUAL_ENV_PROMPT')) {
-            Set-Item -Path ("Env:{0}" -f $key) -Value $val
-            $envVarsSet++
-        }
-    }
-
-    if (-not $Quiet) {
-        Info "Set $envVarsSet environment variables from conda activation."
-    }
-
-    if ($env:CONDA_DEFAULT_ENV -eq $Name) {
-        Ok "Activated '$Name' via conda."
-    } else {
-        Warn "conda activation executed but CONDA_DEFAULT_ENV is '$($env:CONDA_DEFAULT_ENV)'."
     }
 }
 # ----- Ensure conda is available on PATH (robust for non-profile sessions) -----
