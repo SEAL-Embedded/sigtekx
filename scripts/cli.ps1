@@ -140,7 +140,14 @@ function Invoke-Test {
         }
         { $_ -in @("cpp", "c++", "cxx") } {
             Write-Status "Running C++ tests..."
-            $testExe = Join-Path $script:BuildDir "Release/tests/test_runner.exe"
+            # Check preset-specific build directory first, then fallback to generic
+            $presetBuildDir = Join-Path $script:BuildDir $script:BuildPreset
+            $testExe = if (Test-Path $presetBuildDir) {
+                Join-Path $presetBuildDir "test_engine.exe"
+            } else {
+                Join-Path $script:BuildDir "Release/tests/test_runner.exe"
+            }
+
             if (Test-Path $testExe) {
                 & $testExe
             } else {
@@ -152,7 +159,14 @@ function Invoke-Test {
             Write-Status "Running all tests..."
             & python -m pytest tests/ @args
 
-            $testExe = Join-Path $script:BuildDir "Release/tests/test_runner.exe"
+            # Check preset-specific build directory first, then fallback to generic
+            $presetBuildDir = Join-Path $script:BuildDir $script:BuildPreset
+            $testExe = if (Test-Path $presetBuildDir) {
+                Join-Path $presetBuildDir "test_engine.exe"
+            } else {
+                Join-Path $script:BuildDir "Release/tests/test_runner.exe"
+            }
+
             if (Test-Path $testExe) {
                 & $testExe
             } else {
