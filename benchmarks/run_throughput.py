@@ -25,21 +25,43 @@ def run_throughput_benchmark(cfg: DictConfig) -> float:
     Returns:
         Frames per second (negative for minimization in Hydra)
     """
-    # ===== ROBUSTNESS FIX: Auto-load default benchmark if missing =====
-    if 'benchmark' not in cfg:
-        warnings.warn("⚠️  Benchmark config not specified. Defaulting to '+benchmark=throughput'.")
-        # Get the original config directory to reliably find the default file
-        config_dir = f"{hydra.utils.get_original_cwd()}/experiments/conf/benchmark"
-        default_benchmark = OmegaConf.load(f"{config_dir}/throughput.yaml")
-        # Temporarily disable struct mode to allow adding benchmark key
-        OmegaConf.set_struct(cfg, False)
-        cfg.benchmark = default_benchmark
-        OmegaConf.set_struct(cfg, True)
-    # ===== END ROBUSTNESS FIX =====
+    try:
+        # ===== ROBUSTNESS FIX: Auto-load default benchmark if missing =====
+        if 'benchmark' not in cfg:
+            warnings.warn("⚠️  Benchmark config not specified. Defaulting to '+benchmark=throughput'.")
+            # Get the original config directory to reliably find the default file
+            config_dir = f"{hydra.utils.get_original_cwd()}/experiments/conf/benchmark"
+            default_benchmark = OmegaConf.load(f"{config_dir}/throughput.yaml")
+            # Temporarily disable struct mode to allow adding benchmark key
+            OmegaConf.set_struct(cfg, False)
+            cfg.benchmark = default_benchmark
+            OmegaConf.set_struct(cfg, True)
+        # ===== END ROBUSTNESS FIX =====
 
-    # Convert OmegaConf to Pydantic models for validation
-    engine_config = EngineConfig(**cfg.engine)
-    benchmark_config = ThroughputBenchmarkConfig(**cfg.benchmark, engine_config=engine_config.model_dump())
+        # Validate engine parameters
+        engine_params = cfg.engine
+        nfft = engine_params.get('nfft', 2048)
+        batch = engine_params.get('batch', 8)
+        overlap = engine_params.get('overlap', 0.5)
+
+        # Import validation (optional - only warn if not available)
+        try:
+            import sys
+            sys.path.append('experiments/conf')
+            from validation import validate_engine_parameters
+            if not validate_engine_parameters(nfft, batch, overlap):
+                warnings.warn("Parameter validation failed - proceeding anyway")
+        except ImportError:
+            pass  # Validation module not available
+
+        # Convert OmegaConf to Pydantic models for validation
+        engine_config = EngineConfig(**cfg.engine)
+        benchmark_config = ThroughputBenchmarkConfig(**cfg.benchmark, engine_config=engine_config.model_dump())
+
+    except Exception as e:
+        print(f"❌ Configuration error: {e}")
+        print("Check your experiment config and engine parameters")
+        raise
 
     # Setup MLflow
 

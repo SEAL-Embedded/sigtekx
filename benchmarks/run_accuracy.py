@@ -60,13 +60,18 @@ def run_accuracy_benchmark(cfg: DictConfig) -> float:
         benchmark = AccuracyBenchmark(benchmark_config)
         result = benchmark.run()
         
-        # Log metrics
-        pass_rate = result.statistics.get('pass_rate', 0)
+        # Helper function to extract float from potentially nested dict
+        def extract_float(value, default=0.0):
+            if isinstance(value, dict):
+                return float(value.get('mean', default))
+            return float(value) if value is not None else default
+
+        # Log metrics - ensure all values are floats
         mlflow.log_metrics({
-            "accuracy.pass_rate": pass_rate,
-            "accuracy.mean_snr_db": result.statistics.get('mean_snr_db', 0),
-            "accuracy.mean_error": result.statistics.get('mean_error', 0),
-            "accuracy.max_error": result.statistics.get('max_error', 0),
+            "accuracy.pass_rate": extract_float(result.statistics.get('pass_rate', 0)),
+            "accuracy.mean_snr_db": extract_float(result.statistics.get('mean_snr_db', 0)),
+            "accuracy.mean_error": extract_float(result.statistics.get('mean_error', 0)),
+            "accuracy.max_error": extract_float(result.statistics.get('max_error', 0)),
         })
         
         # Save results to CSV (for downstream analysis)
@@ -95,9 +100,9 @@ def run_accuracy_benchmark(cfg: DictConfig) -> float:
         summary = {
             'engine_nfft': engine_config.nfft,
             'engine_batch': engine_config.batch,
-            'pass_rate': pass_rate,
-            'mean_snr_db': result.statistics.get('mean_snr_db', 0),
-            'mean_error': result.statistics.get('mean_error', 0),
+            'pass_rate': extract_float(result.statistics.get('pass_rate', 0)),
+            'mean_snr_db': extract_float(result.statistics.get('mean_snr_db', 0)),
+            'mean_error': extract_float(result.statistics.get('mean_error', 0)),
         }
         
         summary_df = pd.DataFrame([summary])
@@ -106,7 +111,8 @@ def run_accuracy_benchmark(cfg: DictConfig) -> float:
         mlflow.log_artifact(str(summary_path))
         
     # Return error rate for minimization
-    return 1.0 - pass_rate
+    pass_rate_value = extract_float(result.statistics.get('pass_rate', 0))
+    return 1.0 - pass_rate_value
 
 
 if __name__ == "__main__":

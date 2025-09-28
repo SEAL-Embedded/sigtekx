@@ -3,13 +3,17 @@
 
 configfile: "experiments/conf/config.yaml"
 
-# Define the final outputs we want
+# Define the final outputs we want (both PNG and SVG formats)
 rule all:
     input:
         "artifacts/figures/latency_vs_nfft.png",
         "artifacts/figures/throughput_scaling.png",
         "artifacts/figures/accuracy_heatmap.png",
         "artifacts/figures/combined_analysis.png",
+        "artifacts/figures/latency_vs_nfft.svg",
+        "artifacts/figures/throughput_scaling.svg",
+        "artifacts/figures/accuracy_heatmap.svg",
+        "artifacts/figures/combined_analysis.svg",
         "artifacts/reports/final_report.html"
 
 # Run latency benchmark sweep
@@ -58,7 +62,7 @@ rule analyze_results:
     output:
         "artifacts/data/summary_statistics.csv"
     shell:
-        "python scripts/analyze.py"
+        "python experiments/scripts/analyze.py"
 
 # Generate figures from summary statistics
 rule generate_figures:
@@ -68,9 +72,13 @@ rule generate_figures:
         "artifacts/figures/latency_vs_nfft.png",
         "artifacts/figures/throughput_scaling.png",
         "artifacts/figures/accuracy_heatmap.png",
-        "artifacts/figures/combined_analysis.png"
+        "artifacts/figures/combined_analysis.png",
+        "artifacts/figures/latency_vs_nfft.svg",
+        "artifacts/figures/throughput_scaling.svg",
+        "artifacts/figures/accuracy_heatmap.svg",
+        "artifacts/figures/combined_analysis.svg"
     shell:
-        "python scripts/generate_figures.py"
+        "python experiments/scripts/generate_figures.py"
 
 # Generate final HTML report
 rule generate_report:
@@ -81,7 +89,7 @@ rule generate_report:
         "artifacts/reports/final_report.html"
     shell:
         """
-        python scripts/generate_report.py \
+        python experiments/scripts/generate_report.py \
             --input artifacts/data/summary_statistics.csv \
             --figures-dir artifacts/figures \
             --output artifacts/reports/final_report.html
@@ -110,7 +118,7 @@ print('All artifacts cleaned')
 rule test:
     shell:
         """
-        python benchmarks/run_latency.py engine.nfft=512 engine.batch=1 benchmark.iterations=10
-        python scripts/analyze.py
-        python scripts/generate_figures.py
+        python benchmarks/run_latency.py engine.nfft=512 engine.batch=1 +benchmark=latency benchmark.iterations=10
+        python experiments/scripts/analyze.py
+        python experiments/scripts/generate_figures.py
         """
