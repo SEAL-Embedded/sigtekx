@@ -39,7 +39,7 @@ def run_realtime_benchmark(cfg: DictConfig) -> float:
 
     # Convert OmegaConf to Pydantic models for validation
     engine_config = EngineConfig(**cfg.engine)
-    benchmark_config = RealtimeBenchmarkConfig(**cfg.benchmark)
+    benchmark_config = RealtimeBenchmarkConfig(**cfg.benchmark, engine_config=engine_config.model_dump())
 
     # Setup MLflow
     mlflow.set_tracking_uri(cfg.mlflow.tracking_uri)
@@ -62,7 +62,6 @@ def run_realtime_benchmark(cfg: DictConfig) -> float:
 
         # Run benchmark
         benchmark = RealtimeBenchmark(benchmark_config)
-        benchmark.engine_config = engine_config  # Set engine config for BaseBenchmark
         result = benchmark.run()
 
         stats = result.statistics if isinstance(result.statistics, dict) else {}

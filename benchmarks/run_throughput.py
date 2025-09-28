@@ -39,13 +39,13 @@ def run_throughput_benchmark(cfg: DictConfig) -> float:
 
     # Convert OmegaConf to Pydantic models for validation
     engine_config = EngineConfig(**cfg.engine)
-    benchmark_config = ThroughputBenchmarkConfig(**cfg.benchmark)
+    benchmark_config = ThroughputBenchmarkConfig(**cfg.benchmark, engine_config=engine_config.model_dump())
 
     # Setup MLflow
 
     mlflow.set_tracking_uri(cfg.mlflow.tracking_uri)
     mlflow.set_experiment(cfg.mlflow.experiment_name)
-    
+
     with mlflow.start_run(run_name=f"throughput_{engine_config.nfft}x{engine_config.batch}"):
         # Log configuration
         mlflow.log_params({
@@ -54,10 +54,9 @@ def run_throughput_benchmark(cfg: DictConfig) -> float:
             "engine.overlap": engine_config.overlap,
             "benchmark.test_duration_s": benchmark_config.test_duration_s,
         })
-        
+
         # Run benchmark
         benchmark = ThroughputBenchmark(benchmark_config)
-        benchmark.engine_config = engine_config  # Set engine config
         result = benchmark.run()
         
         # Log metrics

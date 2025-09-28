@@ -39,12 +39,12 @@ def run_latency_benchmark(cfg: DictConfig) -> float:
 
     # Convert OmegaConf to Pydantic models for validation
     engine_config = EngineConfig(**cfg.engine)
-    benchmark_config = LatencyBenchmarkConfig(**cfg.benchmark)
+    benchmark_config = LatencyBenchmarkConfig(**cfg.benchmark, engine_config=engine_config.model_dump())
 
     # Setup MLflow
     mlflow.set_tracking_uri(cfg.mlflow.tracking_uri)
     mlflow.set_experiment(cfg.mlflow.experiment_name)
-    
+
     with mlflow.start_run(run_name=f"latency_{engine_config.nfft}x{engine_config.batch}"):
         # Log configuration
         mlflow.log_params({
@@ -54,10 +54,9 @@ def run_latency_benchmark(cfg: DictConfig) -> float:
             "benchmark.iterations": benchmark_config.iterations,
             "benchmark.deadline_us": benchmark_config.deadline_us,
         })
-        
+
         # Run benchmark
         benchmark = LatencyBenchmark(benchmark_config)
-        benchmark.engine_config = engine_config  # Set engine config
         result = benchmark.run()
         
         # Log metrics

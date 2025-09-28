@@ -39,13 +39,13 @@ def run_accuracy_benchmark(cfg: DictConfig) -> float:
 
     # Convert OmegaConf to Pydantic models for validation
     engine_config = EngineConfig(**cfg.engine)
-    benchmark_config = AccuracyBenchmarkConfig(**cfg.benchmark)
+    benchmark_config = AccuracyBenchmarkConfig(**cfg.benchmark, engine_config=engine_config.model_dump())
 
     # Setup MLflow
-    
+
     mlflow.set_tracking_uri(cfg.mlflow.tracking_uri)
     mlflow.set_experiment(cfg.mlflow.experiment_name)
-    
+
     with mlflow.start_run(run_name=f"accuracy_{engine_config.nfft}x{engine_config.batch}"):
         # Log configuration
         mlflow.log_params({
@@ -55,10 +55,9 @@ def run_accuracy_benchmark(cfg: DictConfig) -> float:
             "benchmark.relative_tolerance": benchmark_config.relative_tolerance,
             "benchmark.snr_threshold_db": benchmark_config.snr_threshold_db,
         })
-        
+
         # Run benchmark
         benchmark = AccuracyBenchmark(benchmark_config)
-        benchmark.engine_config = engine_config  # Set engine config
         result = benchmark.run()
         
         # Log metrics
