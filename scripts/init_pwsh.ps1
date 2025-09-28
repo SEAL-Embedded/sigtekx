@@ -89,7 +89,19 @@ function Activate-CondaEnv {
         Warn "conda executable not found; cannot activate '$Name'."
         return
     }
+        # Resolve the alias to the actual command to get the real source path
+    $resolvedCmd = if ($condaCmdInfo.CommandType -eq 'Alias') {
+        Get-Command $condaCmdInfo.Definition -ErrorAction SilentlyContinue
+    } else {
+        $condaCmdInfo
+    }
 
+    if (-not $resolvedCmd -or [string]::IsNullOrEmpty($resolvedCmd.Source)) {
+        Warn "Could not determine the source path for the conda command."
+        return
+    }
+    $condaSourcePath = $resolvedCmd.Source
+    
     $condaBatCandidates = @(
         (Join-Path (Split-Path -Parent $condaCmd.Source) 'conda.bat'),
         (Join-Path (Split-Path -Parent $condaCmd.Source) 'activate.bat'),
