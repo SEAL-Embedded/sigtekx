@@ -201,6 +201,20 @@ function Check-PromptDupes {
     } catch { }
 }
 
+# ----- Set a session-specific, conda-aware prompt -----
+function Set-SessionPrompt {
+    # Define a prompt function in the global scope for this session only.
+    # This avoids permanently changing the user's profile.
+    function global:prompt {
+        if ($env:CONDA_DEFAULT_ENV) {
+            # If a conda environment is active, display its name.
+            Write-Host "($($env:CONDA_DEFAULT_ENV)) " -NoNewline -ForegroundColor Green
+        }
+        # Display the standard "PS C:\Path>" prompt.
+        "PS $($executionContext.SessionState.Path.CurrentLocation)$('>' * ($nestedPromptLevel + 1)) "
+    }
+}
+
 # ----- Interactive conda environment setup -----
 function Test-CondaEnvironmentExists {
     param([string]$Name)
@@ -302,6 +316,7 @@ if (-not $skipCondaActivation) {
     Activate-CondaEnv -Name $EnvName
 }
 Check-PromptDupes
+Set-SessionPrompt
 
 # cd into repo root
 if (Test-Path $Repo) {

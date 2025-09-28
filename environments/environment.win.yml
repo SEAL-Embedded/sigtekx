@@ -9,9 +9,6 @@ dependencies:
   - cmake>=3.26
   - ninja
 
-  # Build tools
-  - vs2022_win-64
-
   # CUDA toolchain (NVCC + dev libs)
   - cuda-compiler=13.0
   - cuda-libraries-dev=13.0

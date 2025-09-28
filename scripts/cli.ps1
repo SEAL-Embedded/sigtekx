@@ -63,7 +63,7 @@ function Invoke-Setup {
     }
 
     Write-Status "Installing package in development mode..."
-    & conda run -n $script:CondaEnvName pip install -e .
+    & pip install -e .[dev]
 
     if ($LASTEXITCODE -eq 0) {
         Write-Success "Setup completed successfully"
