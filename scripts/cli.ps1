@@ -750,9 +750,33 @@ try {
             Write-Status "Starting MLflow UI..."
             $uri = Join-Path $script:ProjectRoot "artifacts/mlruns"
             Write-Status "Backend URI: $uri"
-            # Use Start-Process to launch without blocking the terminal
-            Start-Process mlflow @("ui", "--backend-store-uri", $uri, "--port", "5000")
-            Write-Success "MLflow UI launched at http://localhost:5000"
+
+            # Check if MLflow is available
+            $mlflow = Get-Command mlflow -ErrorAction SilentlyContinue
+            if (-not $mlflow) {
+                Write-Error "MLflow not found. Install with: pip install mlflow"
+                exit 1
+            }
+
+            # Check if backend directory exists
+            if (-not (Test-Path $uri)) {
+                Write-Error "MLflow tracking directory not found: $uri"
+                Write-Host "Run some experiments first to generate tracking data" -ForegroundColor Yellow
+                exit 1
+            }
+
+            Write-Host ""
+            Write-Success "Starting MLflow UI at http://localhost:5000"
+            Write-Host ">> Press Ctrl+C to stop the server when done" -ForegroundColor Yellow
+            Write-Host ""
+
+            # Run MLflow UI directly (blocking)
+            & mlflow ui --backend-store-uri $uri --port 5000
+
+            if ($LASTEXITCODE -ne 0) {
+                Write-Error "MLflow UI failed to start"
+                exit 1
+            }
         }
         "run"      {
             if ($CommandArgs.Count -eq 0) {
