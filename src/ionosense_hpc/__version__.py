@@ -25,7 +25,7 @@ except PackageNotFoundError:
 def _parse_version(v: str) -> tuple:
     """Parses a version string into a tuple of integers."""
     parts: list[int] = []
-    # Handles version strings like "0.9.1" or "0.9.1.dev0"
+    # Handles version strings like "0.9.2" or "0.9.2.dev0"
     for segment in v.split("."):
         # Extract only the numeric part of the segment
         num = "".join(ch for ch in segment if ch.isdigit())

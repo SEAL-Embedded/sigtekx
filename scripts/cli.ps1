@@ -322,6 +322,268 @@ function Invoke-Doctor {
     }
 }
 
+function Invoke-Analysis {
+    param(
+        [int]$Cores = 4,
+        [string]$Target = "all",
+        [bool]$DryRun = $false
+    )
+
+    Write-Status "Running analysis pipeline..."
+
+    $snakefileePath = Join-Path $script:ProjectRoot "experiments/Snakefile"
+    if (-not (Test-Path $snakefileePath)) {
+        Write-Error "Snakefile not found at: $snakefileePath"
+        exit 1
+    }
+
+    $args = @("--cores", $Cores, "--snakefile", $snakefileePath)
+    if ($DryRun) { $args += "--dry-run" }
+    if ($Target -ne "all") { $args += $Target }
+
+    & snakemake @args
+
+    if ($LASTEXITCODE -eq 0) {
+        Write-Success "Analysis pipeline completed successfully"
+    } else {
+        Write-Error "Analysis pipeline failed"
+        exit 1
+    }
+}
+
+function Invoke-TypeCheck {
+    param(
+        [string[]]$Paths = @(),
+        [bool]$Verbose = $false
+    )
+
+    Write-Status "Running type checking..."
+
+    $mypy = Get-Command mypy -ErrorAction SilentlyContinue
+    if (-not $mypy) {
+        Write-Error "mypy not found. Install with: pip install mypy"
+        exit 1
+    }
+
+    if ($Paths.Count -eq 0) {
+        $Paths = @("src", "tests", "benchmarks", "experiments/scripts")
+    }
+
+    $args = @()
+    if ($Verbose) { $args += "--verbose" }
+
+    foreach ($path in $Paths) {
+        if (Test-Path $path) {
+            $args += $path
+        }
+    }
+
+    & mypy @args
+
+    if ($LASTEXITCODE -eq 0) {
+        Write-Success "Type checking completed successfully"
+    } else {
+        Write-Error "Type checking failed"
+        exit 1
+    }
+}
+
+function Show-Info {
+    Write-Host @"
+╔════════════════════════════════════════════════════════════════════════╗
+║  IONOSENSE-HPC PROJECT INFORMATION                                     ║
+╚════════════════════════════════════════════════════════════════════════╝
+"@
+
+    # Project info
+    $pyprojectPath = Join-Path $script:ProjectRoot "pyproject.toml"
+    if (Test-Path $pyprojectPath) {
+        $content = Get-Content $pyprojectPath -Raw
+        if ($content -match 'version\s*=\s*"([^"]+)"') {
+            Write-Host ">> Project: ionosense-hpc v$($Matches[1])" -ForegroundColor Green
+        }
+    }
+
+    # Environment info
+    if ($env:CONDA_DEFAULT_ENV) {
+        Write-Host ">> Environment: $($env:CONDA_DEFAULT_ENV)" -ForegroundColor Green
+    } else {
+        Write-Host ">> Environment: None (consider running setup)" -ForegroundColor Yellow
+    }
+
+    # Git info
+    try {
+        $branch = & git branch --show-current 2>$null
+        if ($branch) {
+            Write-Host ">> Branch: $branch" -ForegroundColor Green
+        }
+    } catch {}
+
+    # MLflow info
+    $mlrunsPath = Join-Path $script:ProjectRoot "artifacts/mlruns"
+    if (Test-Path $mlrunsPath) {
+        Write-Host ">> MLflow: Tracking data available" -ForegroundColor Green
+        Write-Host "   Start UI: iono ui" -ForegroundColor Gray
+    } else {
+        Write-Host ">> MLflow: No tracking data yet" -ForegroundColor Yellow
+    }
+
+    # Available experiments
+    $expDir = Join-Path $script:ProjectRoot "experiments/conf/experiment"
+    if (Test-Path $expDir) {
+        $experiments = Get-ChildItem $expDir -Name "*.yaml" | ForEach-Object { $_.Replace(".yaml", "") }
+        Write-Host ">> Available experiments: $($experiments -join ', ')" -ForegroundColor Cyan
+    }
+
+    Write-Host ""
+    Write-Host ">> Quick commands:" -ForegroundColor Cyan
+    Write-Host "   iono status    # Show comprehensive status" -ForegroundColor Gray
+    Write-Host "   iono analysis  # Run analysis pipeline" -ForegroundColor Gray
+    Write-Host "   iono learn     # Research workflow examples" -ForegroundColor Gray
+}
+
+function Show-Status {
+    Write-Host @"
+╔════════════════════════════════════════════════════════════════════════╗
+║  IONOSENSE-HPC PROJECT STATUS                                          ║
+╚════════════════════════════════════════════════════════════════════════╝
+"@
+
+    # Git status
+    Write-Host ">> Git Status:" -ForegroundColor Cyan
+    try {
+        $gitStatus = & git status --porcelain 2>$null
+        if ($gitStatus) {
+            Write-Host "   Modified files detected" -ForegroundColor Yellow
+        } else {
+            Write-Host "   Working tree clean" -ForegroundColor Green
+        }
+
+        $branch = & git branch --show-current 2>$null
+        if ($branch) {
+            Write-Host "   Branch: $branch" -ForegroundColor Green
+        }
+    } catch {
+        Write-Host "   Git not available or not a repository" -ForegroundColor Red
+    }
+
+    # DVC status
+    Write-Host ""
+    Write-Host ">> DVC Status:" -ForegroundColor Cyan
+    try {
+        $dvcStatus = & dvc status 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            if ($dvcStatus) {
+                Write-Host "   Changes detected in pipeline" -ForegroundColor Yellow
+            } else {
+                Write-Host "   Pipeline up to date" -ForegroundColor Green
+            }
+        } else {
+            Write-Host "   DVC not initialized or unavailable" -ForegroundColor Yellow
+        }
+    } catch {
+        Write-Host "   DVC not available" -ForegroundColor Red
+    }
+
+    # Environment status
+    Write-Host ""
+    Write-Host ">> Environment Status:" -ForegroundColor Cyan
+    if ($env:CONDA_DEFAULT_ENV) {
+        Write-Host "   Active: $($env:CONDA_DEFAULT_ENV)" -ForegroundColor Green
+    } else {
+        Write-Host "   No conda environment active" -ForegroundColor Yellow
+    }
+
+    # Build status
+    Write-Host ""
+    Write-Host ">> Build Status:" -ForegroundColor Cyan
+    if (Test-Path $script:BuildDir) {
+        Write-Host "   Build directory exists" -ForegroundColor Green
+    } else {
+        Write-Host "   No build found (run 'iono build')" -ForegroundColor Yellow
+    }
+
+    # MLflow experiments
+    Write-Host ""
+    Write-Host ">> MLflow Status:" -ForegroundColor Cyan
+    $mlrunsPath = Join-Path $script:ProjectRoot "artifacts/mlruns"
+    if (Test-Path $mlrunsPath) {
+        try {
+            $experiments = Get-ChildItem $mlrunsPath -Directory | Where-Object { $_.Name -ne "0" } | Measure-Object
+            Write-Host "   $($experiments.Count) experiment(s) tracked" -ForegroundColor Green
+        } catch {
+            Write-Host "   Tracking data available" -ForegroundColor Green
+        }
+    } else {
+        Write-Host "   No experiments tracked yet" -ForegroundColor Yellow
+    }
+
+    Write-Host ""
+    Write-Host ">> Next steps:" -ForegroundColor Cyan
+    Write-Host "   iono analysis  # Run analysis pipeline" -ForegroundColor Gray
+    Write-Host "   iono ui        # View experiment results" -ForegroundColor Gray
+    Write-Host "   iono learn     # Research workflow examples" -ForegroundColor Gray
+}
+
+function Show-Learn {
+    Write-Host @"
+╔════════════════════════════════════════════════════════════════════════╗
+║  IONOSENSE-HPC RESEARCH WORKFLOW GUIDE                                 ║
+╚════════════════════════════════════════════════════════════════════════╝
+"@
+
+    Write-Host ""
+    Write-Host ">> START HERE - IONO WORKFLOW COMMANDS" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "1. Check your setup:" -ForegroundColor Cyan
+    Write-Host "   iono info                  # Project info & available experiments" -ForegroundColor Gray
+    Write-Host "   iono status                # Git, environment & MLflow status" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "2. Run experiments & analysis:" -ForegroundColor Cyan
+    Write-Host "   iono analysis              # Run full analysis pipeline" -ForegroundColor Gray
+    Write-Host "   iono analysis -DryRun      # Preview what will run" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "3. View results:" -ForegroundColor Cyan
+    Write-Host "   iono ui                    # Launch MLflow UI for results" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "4. Code quality:" -ForegroundColor Cyan
+    Write-Host "   iono typecheck             # Check Python types" -ForegroundColor Gray
+    Write-Host "   iono test                  # Run tests" -ForegroundColor Gray
+    Write-Host "   iono lint                  # Check code style" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host ">> IONOSPHERE RESEARCH EXPERIMENTS" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "Start with testing:" -ForegroundColor Cyan
+    Write-Host "   python benchmarks/run_throughput.py --multirun experiment=ionosphere_test +benchmark=throughput" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "Then try full studies:" -ForegroundColor Cyan
+    Write-Host "   python benchmarks/run_throughput.py --multirun experiment=ionosphere_resolution +benchmark=throughput" -ForegroundColor Gray
+    Write-Host "   python benchmarks/run_throughput.py --multirun experiment=ionosphere_temporal +benchmark=throughput" -ForegroundColor Gray
+    Write-Host "   python benchmarks/run_latency.py experiment=ionosphere_multiscale +benchmark=latency" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host ">> ADVANCED DIRECT CONTROLS" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "Snakemake pipeline:" -ForegroundColor Cyan
+    Write-Host "   snakemake --cores 4 --snakefile experiments/Snakefile" -ForegroundColor Gray
+    Write-Host "   snakemake --cores 4 generate_figures --snakefile experiments/Snakefile" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "MLflow direct:" -ForegroundColor Cyan
+    Write-Host "   mlflow ui --backend-store-uri file://./artifacts/mlruns" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "Data versioning:" -ForegroundColor Cyan
+    Write-Host "   dvc status                 # Check pipeline status" -ForegroundColor Gray
+    Write-Host "   dvc repro                  # Reproduce pipeline" -ForegroundColor Gray
+    Write-Host "   dvc dag                    # View pipeline DAG" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "!! CRITICAL REQUIREMENTS" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "* ALWAYS specify +benchmark=throughput for throughput tests" -ForegroundColor Red
+    Write-Host "* ALWAYS specify +benchmark=latency for latency tests" -ForegroundColor Red
+    Write-Host "* Use experiment=ionosphere_test for quick testing" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host ">> More detailed examples: See CLAUDE.md" -ForegroundColor Cyan
+}
+
 function Show-Help {
     Write-Host @"
 ╔════════════════════════════════════════════════════════════════════════╗
@@ -344,6 +606,15 @@ ESSENTIAL DEVELOPMENT
   clean [-All]            Remove build artifacts
   doctor                  Check development environment health
   ui                      Launch MLflow UI for experiment tracking
+
+NEW RESEARCH & STATUS COMMANDS
+  analysis [-Cores] [-Target] [-DryRun]
+                          Run analysis pipeline via Snakemake
+  info                    Show project information and available experiments
+  status                  Show comprehensive project status (git, DVC, MLflow)
+  typecheck [paths] [-Verbose]
+                          Run Python type checking with mypy
+  learn                   Show research workflow examples and best practices
 
 PYTHON SCRIPT RUNNER
   run <script.py> [args...]
@@ -448,6 +719,33 @@ try {
             Invoke-Clean @params
         }
         "doctor"   { Invoke-Doctor }
+        "analysis" {
+            $params = @{}
+            if ($CommandArgs -icontains "-DryRun") { $params.DryRun = $true }
+
+            for ($i = 0; $i -lt $CommandArgs.Count; $i++) {
+                if ($CommandArgs[$i] -eq "-Cores" -and $i+1 -lt $CommandArgs.Count) {
+                    $params.Cores = [int]$CommandArgs[$i+1]
+                }
+                if ($CommandArgs[$i] -eq "-Target" -and $i+1 -lt $CommandArgs.Count) {
+                    $params.Target = $CommandArgs[$i+1]
+                }
+            }
+
+            Invoke-Analysis @params
+        }
+        "typecheck" {
+            $params = @{}
+            if ($CommandArgs -icontains "-Verbose") { $params.Verbose = $true }
+
+            $paths = $CommandArgs | Where-Object { $_ -and $_ -notlike "-*" }
+            if ($paths) { $params.Paths = $paths }
+
+            Invoke-TypeCheck @params
+        }
+        "info"     { Show-Info }
+        "status"   { Show-Status }
+        "learn"    { Show-Learn }
         "ui"       {
             Write-Status "Starting MLflow UI..."
             $uri = Join-Path $script:ProjectRoot "artifacts/mlruns"
@@ -477,7 +775,7 @@ try {
 
     # Only check exit code for commands that actually set it
     # Clean command doesn't set LASTEXITCODE, so don't check it
-    if ($Command -notin @("clean", "doctor", "help", "ui") -and $LASTEXITCODE -ne 0) {
+    if ($Command -notin @("clean", "doctor", "help", "ui", "info", "status", "learn") -and $LASTEXITCODE -ne 0) {
         Write-Error "Command failed with exit code $LASTEXITCODE"
         exit $LASTEXITCODE
     }
