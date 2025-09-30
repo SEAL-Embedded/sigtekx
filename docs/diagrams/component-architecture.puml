@@ -1,0 +1,107 @@
+@startuml "Ionosense HPC - Component Architecture"
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam componentBackgroundColor #F0F8FF
+skinparam componentBorderColor #4169E1
+skinparam packageBackgroundColor #E6F3FF
+skinparam packageBorderColor #4169E1
+skinparam arrowColor #4169E1
+skinparam noteBackgroundColor #FFFACD
+
+title Ionosense HPC - Component Architecture
+footer IEEE Publication Quality Diagram - © 2025
+
+package "Python Bindings Layer" #FFE6E6 {
+  component [PyResearchEngine] as PyEngine
+  component [pybind11 Module] as PyBind
+}
+
+package "C++ Public API" #E6F3FF {
+  component [ResearchEngine] as Engine
+  component [Engine Factory] as Factory
+  component [Configuration] as Config
+  component [Statistics] as Stats
+}
+
+package "Processing Pipeline" #E6F3FF {
+  component [Window Stage] as Window
+  component [FFT Stage] as FFT
+  component [Magnitude Stage] as Magnitude
+  component [Stage Factory] as StageFactory
+}
+
+package "CUDA Resource Management" #D4E6FF {
+  component [CudaStream] as Stream
+  component [CudaEvent] as Event
+  component [DeviceBuffer] as DevBuf
+  component [PinnedHostBuffer] as PinBuf
+  component [CufftPlan] as Plan
+}
+
+package "CUDA Kernels" <<Device>> #FFE4B5 {
+  component [Window Kernels] as WinKern
+  component [FFT Kernels\n(cuFFT)] as FFTKern
+  component [Magnitude Kernels] as MagKern
+}
+
+package "Profiling & Debug" #F0E6FF {
+  component [NVTX Profiling] as NVTX
+  component [Performance Metrics] as Metrics
+}
+
+database "GPU Memory" as GPU #FFD700
+database "Host Memory" as Host #90EE90
+
+' Connections
+PyEngine --> PyBind : wraps
+PyBind --> Engine : binds
+
+Engine --> Factory : creates
+Engine --> Config : configured by
+Engine --> Stats : generates
+Engine --> Stream : manages
+Engine --> Event : synchronizes
+Engine --> DevBuf : allocates
+Engine --> PinBuf : stages
+
+Engine ..> Window : orchestrates
+Engine ..> FFT : orchestrates
+Engine ..> Magnitude : orchestrates
+
+Window --> WinKern : launches
+FFT --> FFTKern : executes
+Magnitude --> MagKern : launches
+
+Window --> DevBuf : uses
+FFT --> Plan : uses
+Magnitude --> DevBuf : uses
+
+Stream --> GPU : commands
+Event --> GPU : synchronizes
+DevBuf --> GPU : allocates
+PinBuf --> Host : allocates
+
+Engine ..> NVTX : instruments
+Engine ..> Metrics : collects
+
+StageFactory --> Window : creates
+StageFactory --> FFT : creates
+StageFactory --> Magnitude : creates
+
+' Notes
+note top of PyEngine
+  Python interface providing
+  NumPy array conversion
+end note
+
+note right of GPU
+  Device memory managed
+  via RAII wrappers
+end note
+
+note bottom of Engine
+  Pimpl idiom hides
+  CUDA dependencies
+end note
+
+@enduml

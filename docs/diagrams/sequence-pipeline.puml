@@ -1,0 +1,85 @@
+@startuml "Ionosense HPC - Processing Pipeline Flow"
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam sequenceParticipantBackgroundColor #F0F8FF
+skinparam sequenceParticipantBorderColor #4169E1
+skinparam sequenceLifeLineBorderColor #4169E1
+skinparam sequenceArrowColor #4169E1
+skinparam noteBackgroundColor #FFFACD
+
+title Ionosense HPC - Asynchronous Processing Pipeline
+footer IEEE Publication Quality Diagram - © 2025
+
+participant Client
+participant ResearchEngine
+participant "ResearchEngine::Impl" as Impl
+participant "Stream[0]\nH2D" as Stream0
+participant "Stream[1]\nCompute" as Stream1
+participant "Stream[2]\nD2H" as Stream2
+participant WindowStage
+participant FFTStage
+participant MagnitudeStage
+
+autonumber
+
+Client -> ResearchEngine: process(input, output, num_samples)
+activate ResearchEngine
+
+ResearchEngine -> Impl: process(input, output, num_samples)
+activate Impl
+
+== Host to Device Transfer ==
+Impl -> Stream0: copy_from_host(input)
+activate Stream0
+note right: Asynchronous H2D transfer\non Stream 0
+Stream0 -> Stream0: record event_h2d_done
+deactivate Stream0
+
+== Compute Pipeline ==
+Impl -> Stream1: wait(event_h2d_done)
+activate Stream1
+note right: Stream 1 waits for\nH2D completion
+
+Stream1 -> WindowStage: process(d_input, d_input)
+activate WindowStage
+WindowStage -> WindowStage: apply_window_kernel<<<>>>
+WindowStage --> Stream1:
+deactivate WindowStage
+
+Stream1 -> FFTStage: process(d_input, d_intermediate)
+activate FFTStage
+FFTStage -> FFTStage: cufftExecR2C()
+FFTStage --> Stream1:
+deactivate FFTStage
+
+Stream1 -> MagnitudeStage: process(d_intermediate, d_output)
+activate MagnitudeStage
+MagnitudeStage -> MagnitudeStage: magnitude_kernel<<<>>>
+MagnitudeStage --> Stream1:
+deactivate MagnitudeStage
+
+Stream1 -> Stream1: record event_compute_done
+deactivate Stream1
+
+== Device to Host Transfer ==
+Impl -> Stream2: wait(event_compute_done)
+activate Stream2
+note right: Stream 2 waits for\ncompute completion
+Stream2 -> Stream2: copy_to_host(output)
+deactivate Stream2
+
+== Synchronization ==
+Impl -> Stream2: synchronize()
+activate Stream2
+note right: Block until D2H\ncomplete
+Stream2 --> Impl:
+deactivate Stream2
+
+Impl -> Impl: update_statistics()
+Impl --> ResearchEngine:
+deactivate Impl
+
+ResearchEngine --> Client:
+deactivate ResearchEngine
+
+@enduml

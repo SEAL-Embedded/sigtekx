@@ -243,6 +243,7 @@ python custom_script.py                                       # Run any custom s
 
 ### Detailed Documentation
 - **[Installation Guide](docs/INSTALL.md)** - Platform-specific installation instructions
+- **[Architecture Documentation](docs/ARCHITECTURE.md)** - C++ architecture, design patterns, and performance analysis
 - **[API Documentation](docs/API.md)** - Python API reference and examples
 - **[Benchmarking Guide](docs/BENCHMARKING.md)** - Performance testing and analysis
 - **[Development Guide](docs/DEVELOPMENT.md)** - Contributing and development setup

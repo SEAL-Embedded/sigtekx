@@ -1,0 +1,359 @@
+@startuml "Ionosense HPC - C++ Architecture Overview"
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam classBackgroundColor #F0F8FF
+skinparam classBorderColor #4169E1
+skinparam packageBackgroundColor #E6F3FF
+skinparam packageBorderColor #4169E1
+skinparam arrowColor #4169E1
+skinparam noteBackgroundColor #FFFACD
+skinparam noteBorderColor #FFD700
+
+title Ionosense HPC Library - C++ Architecture
+footer IEEE Publication Quality Diagram - © 2025
+
+' Define packages for logical grouping
+package "Public API Layer" #E6F3FF {
+  interface IPipelineEngine {
+    {abstract} +initialize(config: EngineConfig): void
+    {abstract} +process(input: float*, output: float*, num_samples: size_t): void
+    {abstract} +process_async(input: float*, num_samples: size_t, callback: ResultCallback): void
+    {abstract} +synchronize(): void
+    {abstract} +reset(): void
+    {abstract} +get_stats(): ProcessingStats
+    {abstract} +get_runtime_info(): RuntimeInfo
+    {abstract} +is_initialized(): bool
+  }
+
+  class ResearchEngine {
+    -pImpl: unique_ptr<Impl>
+    --
+    +ResearchEngine()
+    +~ResearchEngine()
+    +initialize(config: EngineConfig): void
+    +process(input: float*, output: float*, num_samples: size_t): void
+    +process_async(input: float*, num_samples: size_t, callback: ResultCallback): void
+    +synchronize(): void
+    +reset(): void
+    +get_stats(): ProcessingStats
+    +get_runtime_info(): RuntimeInfo
+    +is_initialized(): bool
+    +set_profiling_enabled(enabled: bool): void
+    +add_stage(stage: unique_ptr<IProcessingStage>): void
+    +clear_stages(): void
+    +num_stages(): size_t
+    +set_stage_config(config: StageConfig): void
+    +get_stage_config(): StageConfig
+  }
+
+  class "ResearchEngine::Impl" as ResearchEngineImpl <<(P,orchid) Pimpl>> {
+    -config_: EngineConfig
+    -stage_config_: StageConfig
+    -device_id_: int
+    -device_props_: cudaDeviceProp
+    -stages_: vector<unique_ptr<IProcessingStage>>
+    -streams_: vector<CudaStream>
+    -events_: vector<CudaEvent>
+    -d_input_buffers_: vector<DeviceBuffer<float>>
+    -d_intermediate_buffers_: vector<DeviceBuffer<float>>
+    -d_output_buffers_: vector<DeviceBuffer<float>>
+    -h_input_staging_: PinnedHostBuffer<float>
+    -h_output_staging_: PinnedHostBuffer<float>
+    -initialized_: bool
+    -profiling_enabled_: bool
+    -frame_counter_: uint64_t
+    -stats_: ProcessingStats
+    --
+    +initialize(config: EngineConfig): void
+    +process(input: float*, output: float*, num_samples: size_t): void
+    +process_async(input: float*, num_samples: size_t, callback: ResultCallback): void
+    +synchronize(): void
+    +reset(): void
+    -run_warmup(): void
+    -calculate_throughput(num_samples: size_t, latency_us: float): float
+  }
+}
+
+package "Processing Stage Layer" #E6F3FF {
+  interface IProcessingStage {
+    {abstract} +initialize(config: StageConfig, stream: cudaStream_t): void
+    {abstract} +process(input: void*, output: void*, num_elements: size_t, stream: cudaStream_t): void
+    {abstract} +name(): string
+    {abstract} +supports_inplace(): bool
+    {abstract} +get_workspace_size(): size_t
+  }
+
+  class WindowStage {
+    -pImpl: unique_ptr<Impl>
+    --
+    +WindowStage()
+    +~WindowStage()
+    +initialize(config: StageConfig, stream: cudaStream_t): void
+    +process(input: void*, output: void*, num_samples: size_t, stream: cudaStream_t): void
+    +name(): string
+    +supports_inplace(): bool
+    +get_workspace_size(): size_t
+  }
+
+  class FFTStage {
+    -pImpl: unique_ptr<Impl>
+    --
+    +FFTStage()
+    +~FFTStage()
+    +initialize(config: StageConfig, stream: cudaStream_t): void
+    +process(input: void*, output: void*, num_samples: size_t, stream: cudaStream_t): void
+    +name(): string
+    +supports_inplace(): bool
+    +get_workspace_size(): size_t
+  }
+
+  class MagnitudeStage {
+    -pImpl: unique_ptr<Impl>
+    --
+    +MagnitudeStage()
+    +~MagnitudeStage()
+    +initialize(config: StageConfig, stream: cudaStream_t): void
+    +process(input: void*, output: void*, num_samples: size_t, stream: cudaStream_t): void
+    +name(): string
+    +supports_inplace(): bool
+    +get_workspace_size(): size_t
+  }
+
+  class StageFactory <<(S,#FF7700) Singleton>> {
+    {static} +create(type: StageType): unique_ptr<IProcessingStage>
+    {static} +create_default_pipeline(): vector<unique_ptr<IProcessingStage>>
+  }
+
+  enum StageType {
+    WINDOW
+    FFT
+    MAGNITUDE
+  }
+}
+
+package "CUDA Resource Management" #E6F3FF {
+  class CudaStream <<(R,lightgreen) RAII>> {
+    -stream_: cudaStream_t
+    -owned_: bool
+    --
+    +CudaStream()
+    +CudaStream(stream: cudaStream_t)
+    +~CudaStream()
+    +get(): cudaStream_t
+    +synchronize(): void
+    +query(): bool
+    ..Move-only semantics..
+    +CudaStream(&&): CudaStream
+    +operator=(&&): CudaStream&
+  }
+
+  class CudaEvent <<(R,lightgreen) RAII>> {
+    -event_: cudaEvent_t
+    --
+    +CudaEvent()
+    +CudaEvent(flags: unsigned int)
+    +~CudaEvent()
+    +get(): cudaEvent_t
+    +record(stream: cudaStream_t): void
+    +synchronize(): void
+    +query(): bool
+    +elapsed_ms(start: CudaEvent&): float
+    ..Move-only semantics..
+    +CudaEvent(&&): CudaEvent
+    +operator=(&&): CudaEvent&
+  }
+
+  class "DeviceBuffer<T>" as DeviceBuffer <<(R,lightgreen) RAII>> {
+    -ptr_: T*
+    -size_: size_t
+    --
+    +DeviceBuffer()
+    +DeviceBuffer(count: size_t)
+    +~DeviceBuffer()
+    +get(): T*
+    +size(): size_t
+    +bytes(): size_t
+    +resize(new_count: size_t): void
+    +memset(value: int): void
+    +copy_from_host(host_ptr: T*, count: size_t, stream: cudaStream_t): void
+    +copy_to_host(host_ptr: T*, count: size_t, stream: cudaStream_t): void
+    ..Move-only semantics..
+    +DeviceBuffer(&&): DeviceBuffer
+    +operator=(&&): DeviceBuffer&
+  }
+
+  class "PinnedHostBuffer<T>" as PinnedHostBuffer <<(R,lightgreen) RAII>> {
+    -ptr_: T*
+    -size_: size_t
+    --
+    +PinnedHostBuffer()
+    +PinnedHostBuffer(count: size_t)
+    +~PinnedHostBuffer()
+    +get(): T*
+    +data(): T*
+    +size(): size_t
+    +bytes(): size_t
+    +operator[](idx: size_t): T&
+    +resize(new_count: size_t): void
+    +memset(value: int): void
+    ..Move-only semantics..
+    +PinnedHostBuffer(&&): PinnedHostBuffer
+    +operator=(&&): PinnedHostBuffer&
+  }
+
+  class CufftPlan <<(R,lightgreen) RAII>> {
+    -plan_: cufftHandle
+    -work_area_: DeviceBuffer<char>
+    -work_size_: size_t
+    --
+    +CufftPlan()
+    +~CufftPlan()
+    +get(): cufftHandle
+    +create_plan_many(...): void
+    +exec_r2c(input: cufftReal*, output: cufftComplex*): void
+    +work_size(): size_t
+    ..Move-only semantics..
+    +CufftPlan(&&): CufftPlan
+    +operator=(&&): CufftPlan&
+  }
+}
+
+package "Configuration & Statistics" #E6F3FF {
+  class EngineConfig <<(D,lightblue) Data>> {
+    +nfft: int = 1024
+    +batch: int = 2
+    +overlap: float = 0.5f
+    +sample_rate_hz: int = 48000
+    +stream_count: int = 3
+    +pinned_buffer_count: int = 2
+    +warmup_iters: int = 1
+    +timeout_ms: int = 1000
+    +use_cuda_graphs: bool = false
+    +enable_profiling: bool = false
+    --
+    +hop_size(): int
+    +num_output_bins(): int
+  }
+
+  class StageConfig <<(D,lightblue) Data>> {
+    +nfft: int = 1024
+    +batch: int = 2
+    +overlap: float = 0.5f
+    +sample_rate_hz: int = 48000
+    +window_type: WindowType = HANN
+    +window_norm: WindowNorm = UNITY
+    +preload_window: bool = true
+    +scale_policy: ScalePolicy = ONE_OVER_N
+    +output_mode: OutputMode = MAGNITUDE
+    +inplace: bool = true
+    +warmup_iters: int = 1
+    --
+    +hop_size(): int
+  }
+
+  class ProcessingStats <<(D,lightblue) Data>> {
+    +latency_us: float = 0.0f
+    +throughput_gbps: float = 0.0f
+    +frames_processed: size_t = 0
+    +is_warmup: bool = true
+  }
+
+  class RuntimeInfo <<(D,lightblue) Data>> {
+    +cuda_version: string
+    +cufft_version: string
+    +device_name: string
+    +device_compute_capability_major: int
+    +device_compute_capability_minor: int
+    +device_memory_total_mb: size_t
+    +device_memory_free_mb: size_t
+    +cuda_driver_version: int
+    +cuda_runtime_version: int
+  }
+}
+
+package "CUDA Kernels" <<(K,#FFE4B5) Kernels>> #FFE4B5 {
+  class "ops_fft.cu" as OpsFft {
+    {static} +apply_window_kernel(): __global__ void
+    {static} +apply_window_complex_kernel(): __global__ void
+    {static} +real_to_complex_kernel(): __global__ void
+    {static} +window_and_convert_kernel(): __global__ void
+    {static} +magnitude_kernel(): __global__ void
+    {static} +magnitude_strided_kernel(): __global__ void
+    {static} +magnitude_squared_kernel(): __global__ void
+    {static} +magnitude_to_db_kernel(): __global__ void
+    {static} +scale_fft_output_kernel(): __global__ void
+    --
+    {static} +launch_apply_window(): void
+    {static} +launch_real_to_complex(): void
+    {static} +launch_window_and_convert(): void
+    {static} +launch_magnitude(): void
+    {static} +launch_magnitude_squared(): void
+    {static} +launch_scale_fft(): void
+  }
+}
+
+package "Exception Handling" #FFE6E6 {
+  class CudaException {
+    -error_: cudaError_t
+    --
+    +CudaException(error: cudaError_t, call: char*, file: char*, line: int)
+    +error(): cudaError_t
+    -format_message(...): string
+  }
+
+  class CufftException {
+    -result_: cufftResult
+    --
+    +CufftException(result: cufftResult, call: char*, file: char*, line: int)
+    +result(): cufftResult
+    -format_message(...): string
+  }
+}
+
+' Relationships
+ResearchEngine ..|> IPipelineEngine : implements
+ResearchEngine *--> ResearchEngineImpl : owns (Pimpl)
+ResearchEngineImpl o--> "1..*" IProcessingStage : manages
+ResearchEngineImpl *--> "1..*" CudaStream : owns
+ResearchEngineImpl *--> "1..*" CudaEvent : owns
+ResearchEngineImpl *--> "1..*" DeviceBuffer : owns
+ResearchEngineImpl *--> "2" PinnedHostBuffer : owns
+ResearchEngineImpl ..> EngineConfig : uses
+ResearchEngineImpl ..> StageConfig : uses
+ResearchEngineImpl ..> ProcessingStats : generates
+
+WindowStage ..|> IProcessingStage : implements
+FFTStage ..|> IProcessingStage : implements
+MagnitudeStage ..|> IProcessingStage : implements
+
+WindowStage ..> DeviceBuffer : uses
+FFTStage ..> CufftPlan : uses
+MagnitudeStage ..> OpsFft : calls
+
+StageFactory ..> WindowStage : creates
+StageFactory ..> FFTStage : creates
+StageFactory ..> MagnitudeStage : creates
+StageFactory ..> StageType : uses
+
+CufftPlan *--> DeviceBuffer : owns work_area
+
+' Notes
+note right of ResearchEngine
+  **Design Pattern: Pimpl**
+  Hides CUDA dependencies
+  from public headers
+end note
+
+note right of IProcessingStage
+  **Design Pattern: Strategy**
+  Allows flexible pipeline
+  composition
+end note
+
+note bottom of CudaStream
+  **Design Pattern: RAII**
+  Automatic resource
+  management
+end note
+
+@enduml

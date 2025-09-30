@@ -1,0 +1,98 @@
+@startuml "Ionosense HPC - Memory Management"
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam classBackgroundColor #F0F8FF
+skinparam classBorderColor #4169E1
+skinparam packageBackgroundColor #E6F3FF
+skinparam arrowColor #4169E1
+
+title Ionosense HPC - Memory Management Architecture
+footer IEEE Publication Quality Diagram - © 2025
+
+package "Host Memory Space" #90EE90 {
+  class "Input Buffer\n(float*)" as HostInput {
+    size: nfft * batch
+    layout: interleaved
+  }
+
+  class "Output Buffer\n(float*)" as HostOutput {
+    size: (nfft/2+1) * batch
+    layout: magnitude spectrum
+  }
+
+  class "PinnedHostBuffer[0]" as Pinned0 <<page-locked>> {
+    size: nfft * batch
+    purpose: double buffering
+  }
+
+  class "PinnedHostBuffer[1]" as Pinned1 <<page-locked>> {
+    size: nfft * batch
+    purpose: double buffering
+  }
+}
+
+package "Device Memory Space" #FFD700 {
+  class "DeviceBuffer[0]\nInput" as DevInput0 {
+    size: nfft * batch * sizeof(float)
+    stride: nfft
+  }
+
+  class "DeviceBuffer[1]\nInput" as DevInput1 {
+    size: nfft * batch * sizeof(float)
+    stride: nfft
+  }
+
+  class "DeviceBuffer\nIntermediate" as DevIntermediate {
+    size: (nfft/2+1) * batch * sizeof(float2)
+    format: complex (R2C output)
+  }
+
+  class "DeviceBuffer\nOutput" as DevOutput {
+    size: (nfft/2+1) * batch * sizeof(float)
+    format: magnitude
+  }
+
+  class "Window Coefficients" as WindowCoef <<cached>> {
+    size: nfft * sizeof(float)
+    precomputed: true
+  }
+
+  class "cuFFT Work Area" as WorkArea {
+    size: dynamic
+    managed by: CufftPlan
+  }
+}
+
+package "PCIe Transfer" <<Transport>> #FFE4E4 {
+  class "H2D Stream[0]" as H2D
+  class "D2H Stream[2]" as D2H
+}
+
+' Data flow
+HostInput --> Pinned0 : memcpy
+Pinned0 --> H2D : async
+H2D --> DevInput0 : cudaMemcpyAsync
+
+DevInput0 --> DevInput0 : window (in-place)
+DevInput0 --> DevIntermediate : FFT (R2C)
+DevIntermediate --> DevOutput : magnitude
+
+DevOutput --> D2H : async
+D2H --> Pinned1 : cudaMemcpyAsync
+Pinned1 --> HostOutput : memcpy
+
+WindowCoef --> DevInput0 : element-wise mult
+
+note right of Pinned0
+  **Page-locked memory**
+  Enables faster PCIe
+  transfers (~25 GB/s)
+end note
+
+note bottom of DevIntermediate
+  **Complex format**
+  Hermitian symmetry
+  Only N/2+1 bins stored
+end note
+
+@enduml
