@@ -1,0 +1,255 @@
+@startuml "Ionosense HPC - Experiment & Analysis Workflow Architecture"
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam packageBackgroundColor #E6F3FF
+skinparam packageBorderColor #4169E1
+skinparam componentBackgroundColor #F0F8FF
+skinparam componentBorderColor #4169E1
+skinparam databaseBackgroundColor #FFE4B5
+skinparam databaseBorderColor #FF8C00
+skinparam cloudBackgroundColor #E6FFE6
+skinparam cloudBorderColor #228B22
+skinparam arrowColor #4169E1
+skinparam noteBackgroundColor #FFFACD
+skinparam noteBorderColor #FFD700
+skinparam actorBackgroundColor #FFE4E1
+
+title Ionosense HPC - Experiment & Analysis Workflow Architecture
+footer IEEE Publication Quality Diagram - © 2025
+
+' ============================================================================
+' Actors
+' ============================================================================
+actor "Researcher" as Researcher #FFE4E1
+
+' ============================================================================
+' Configuration Layer
+' ============================================================================
+package "Configuration Layer (Hydra)" #E6F3FF {
+  
+  package "experiments/conf" <<Config>> #F0F8FF {
+    component "==config.yaml\n---\nproject_metadata\npaths_configuration\nmlflow_settings\nseed_and_reproducibility" as MainConfig
+    
+    package "engine/" <<Presets>> {
+      component [realtime.yaml] as EngineRT
+      component [throughput.yaml] as EngineThroughput
+      component [validation.yaml] as EngineVal
+      component "==ionosphere_*.yaml\n---\nionosphere_realtime\nionosphere_hires\nionosphere_longterm" as EngineIono
+    }
+    
+    package "benchmark/" <<Benchmarks>> {
+      component [latency.yaml] as BenchLatency
+      component [throughput.yaml] as BenchThroughput
+      component [accuracy.yaml] as BenchAccuracy
+      component [realtime.yaml] as BenchRealtime
+    }
+    
+    package "experiment/" <<Experiments>> {
+      component [baseline.yaml] as ExpBaseline
+      component [nfft_scaling.yaml] as ExpNFFT
+      component [batch_scaling.yaml] as ExpBatch
+      component "==ionosphere_*.yaml\n---\nionosphere_resolution\nionosphere_temporal\nionosphere_multiscale" as ExpIono
+    }
+  }
+  
+  component "==Hydra Sweeper\n---\nmultirun_mode\nparameter_sweeps\noptuna_integration\nparallel_execution" as HydraSweeper
+}
+
+' ============================================================================
+' Execution Layer
+' ============================================================================
+package "Execution Layer" #FFE6E6 {
+  
+  package "Benchmark Scripts" <<Scripts>> #FFE4B5 {
+    component "==run_latency.py\n---\n@hydra.main()\nLatencyBenchmark\nMLflow_tracking\nCSV_output" as RunLatency
+    component "==run_throughput.py\n---\n@hydra.main()\nThroughputBenchmark\nMLflow_tracking\nCSV_output" as RunThroughput
+    component "==run_accuracy.py\n---\n@hydra.main()\nAccuracyBenchmark\nMLflow_tracking\nCSV_output" as RunAccuracy
+    component "==run_realtime.py\n---\n@hydra.main()\nRealtimeBenchmark\nMLflow_tracking\nCSV_output" as RunRealtime
+  }
+  
+  component "==Engine Instance\n<<C++/CUDA>>\n---\nResearchEngine\nGPU_execution\nPerformance_metrics" as EngineInstance
+}
+
+' ============================================================================
+' Orchestration Layer
+' ============================================================================
+package "Orchestration Layer (Snakemake)" #F0FFE6 {
+  
+  component "==Snakefile\n---\nrule_run_latency_sweep\nrule_run_throughput_sweep\nrule_run_accuracy_sweep\nrule_analyze_results\nrule_generate_figures\nrule_generate_report" as Snakefile
+  component "==DAG Executor\n---\ndependency_resolution\nparallel_execution\nincremental_builds\nresource_management" as DAGExecutor
+}
+
+' ============================================================================
+' Analysis Layer
+' ============================================================================
+package "Analysis Layer" #E6FFE6 {
+  
+  package "Analysis Scripts" <<Scripts>> {
+    component "==analyze.py\n---\nload_CSV_data\naggregate_results\nstatistical_analysis\nsummary_statistics" as Analyze
+    component "==generate_figures.py\n---\nthroughput_scaling_plots\nlatency_analysis_plots\naccuracy_heatmaps\ncombined_visualizations\nPNG_and_SVG_output" as GenFigures
+    component "==generate_report.py\n---\nHTML_generation\nembedded_figures\nexecutive_summary\nperformance_tables" as GenReport
+    component "==quick_plot.py\n---\ninteractive_plotting\nrapid_visualization\ndebugging_support" as QuickPlot
+  }
+}
+
+' ============================================================================
+' Data Storage Layer
+' ============================================================================
+database "Data Storage" as DataStorage #FFE4B5 {
+  
+  package "artifacts/" <<FileSystem>> {
+    folder "==data/\n---\n\"*_summary_*.csv\"\nsummary_statistics.csv\ndetailed_analysis.json" as DataDir
+    folder "==figures/\n---\nthroughput_scaling.png/svg\nlatency_vs_nfft.png/svg\naccuracy_heatmap.png/svg\ncombined_analysis.png/svg" as FiguresDir
+    folder "==reports/\n---\nfinal_report.html\ncoverage/" as ReportsDir
+    folder "==experiments/\n---\n\"{date}/{time}/\"\nsweeps/\n.hydra/" as ExperimentsDir
+  }
+}
+
+' ============================================================================
+' Tracking & Versioning Layer
+' ============================================================================
+cloud "Tracking & Versioning" as Tracking #E6FFE6 {
+  
+  component "==MLflow\n---\nexperiment_tracking\nmetric_logging\nparameter_tracking\nartifact_storage\nUI_server" as MLflow
+  component "==DVC\n---\ndata_versioning\npipeline_tracking\nreproducibility\ndvc.yaml\ndvc.lock" as DVC
+  database "==mlruns/\n---\nexperiments/\nmodels/\nmetrics/\nparams/" as MLRuns
+}
+
+' ============================================================================
+' Development Interface
+' ============================================================================
+package "Development Interface" #FFE4E4 {
+  
+  component "==cli.ps1\n---\niono_analysis\niono_ui\niono_status\niono_info" as CLI
+  component "==Direct Commands\n---\n\"python benchmarks/run_*.py\"\n\"snakemake --cores 4\"\n\"mlflow ui\"\n\"dvc status/repro\"" as DirectCmd
+}
+
+' ============================================================================
+' Relationships - Configuration Flow
+' ============================================================================
+Researcher --> CLI : initiates
+Researcher --> DirectCmd : advanced usage
+
+MainConfig ..> HydraSweeper : configures
+EngineRT ..> HydraSweeper : engine params
+EngineThroughput ..> HydraSweeper : engine params
+EngineIono ..> HydraSweeper : engine params
+BenchLatency ..> HydraSweeper : benchmark params
+BenchThroughput ..> HydraSweeper : benchmark params
+ExpBaseline ..> HydraSweeper : experiment params
+ExpIono ..> HydraSweeper : experiment params
+
+' ============================================================================
+' Relationships - Execution Flow
+' ============================================================================
+HydraSweeper --> RunLatency : launches with config
+HydraSweeper --> RunThroughput : launches with config
+HydraSweeper --> RunAccuracy : launches with config
+HydraSweeper --> RunRealtime : launches with config
+
+RunLatency --> EngineInstance : instantiates
+RunThroughput --> EngineInstance : instantiates
+RunAccuracy --> EngineInstance : instantiates
+RunRealtime --> EngineInstance : instantiates
+
+RunLatency --> DataDir : writes CSV
+RunThroughput --> DataDir : writes CSV
+RunAccuracy --> DataDir : writes CSV
+RunRealtime --> DataDir : writes CSV
+
+RunLatency --> MLflow : logs metrics
+RunThroughput --> MLflow : logs metrics
+RunAccuracy --> MLflow : logs metrics
+RunRealtime --> MLflow : logs metrics
+
+' ============================================================================
+' Relationships - Orchestration Flow
+' ============================================================================
+CLI --> Snakefile : invokes
+DirectCmd --> Snakefile : invokes
+Snakefile --> DAGExecutor : processes rules
+DAGExecutor --> RunLatency : executes
+DAGExecutor --> RunThroughput : executes
+DAGExecutor --> RunAccuracy : executes
+DAGExecutor --> Analyze : executes
+DAGExecutor --> GenFigures : executes
+DAGExecutor --> GenReport : executes
+
+' ============================================================================
+' Relationships - Analysis Flow
+' ============================================================================
+DataDir --> Analyze : reads CSVs
+Analyze --> DataDir : writes summary
+DataDir --> GenFigures : reads summary
+GenFigures --> FiguresDir : saves plots
+DataDir --> GenReport : reads data
+FiguresDir --> GenReport : embeds figures
+GenReport --> ReportsDir : saves HTML
+DataDir --> QuickPlot : reads for debugging
+
+' ============================================================================
+' Relationships - Tracking
+' ============================================================================
+MLflow --> MLRuns : stores
+DVC --> DataDir : tracks
+DVC --> FiguresDir : tracks
+DVC --> ReportsDir : tracks
+DVC --> Snakefile : orchestrates
+
+CLI --> MLflow : "iono ui"
+DirectCmd --> MLflow : "mlflow ui"
+
+' ============================================================================
+' Notes
+' ============================================================================
+note top of HydraSweeper
+  **Hydra Configuration**
+  Enables parameter sweeps,
+  multirun experiments, and
+  configuration composition
+end note
+
+note right of Snakefile
+  **Snakemake Pipeline**
+  DAG-based workflow with
+  automatic dependency
+  resolution and parallelization
+end note
+
+note bottom of MLflow
+  **Experiment Tracking**
+  All metrics, parameters, and
+  artifacts tracked for reproducibility
+  and comparison
+end note
+
+note left of EngineInstance
+  **GPU Acceleration**
+  C++/CUDA backend provides
+  high-performance FFT processing
+  for all benchmarks
+end note
+
+note right of ExpIono
+  **Ionosphere Studies**
+  Specialized configurations for
+  ionospheric scintillation analysis
+  with multi-scale parameter sweeps
+end note
+
+' ============================================================================
+' Legend
+' ============================================================================
+legend right
+  |= Symbol |= Meaning |
+  | <&person> | User/Researcher |
+  | <&folder> | Configuration |
+  | <&cog> | Processing |
+  | <&graph> | Analysis |
+  | <&database> | Storage |
+  | <&cloud> | Tracking |
+  | -> | Direct flow |
+  | ..> | Configuration |
+endlegend
+
+@enduml

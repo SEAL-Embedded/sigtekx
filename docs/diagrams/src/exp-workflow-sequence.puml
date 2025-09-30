@@ -1,0 +1,281 @@
+@startuml "Ionosense HPC - Experimental Workflow Sequence"
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam sequenceParticipantBackgroundColor #F0F8FF
+skinparam sequenceParticipantBorderColor #4169E1
+skinparam sequenceLifeLineBorderColor #4169E1
+skinparam sequenceArrowColor #4169E1
+skinparam noteBackgroundColor #FFFACD
+
+title Ionosense HPC - Experimental Workflow Sequence
+footer IEEE Publication Quality Diagram - © 2025
+
+' ============================================================================
+' Participants
+' ============================================================================
+actor Researcher
+participant "CLI\n(iono)" as CLI
+participant "Snakemake" as Snake
+participant "Hydra" as Hydra
+participant "Benchmark\nScripts" as Bench
+participant "Engine\n(C++/CUDA)" as Engine
+participant "Analysis\nScripts" as Analysis
+database "Artifacts" as Artifacts
+database "MLflow" as MLflow
+participant "Report\nGenerator" as Report
+participant "DVC" as DVC
+
+' ============================================================================
+' Initialization Phase
+' ============================================================================
+== Initialization Phase ==
+
+Researcher -> CLI: iono info
+activate CLI
+CLI -> Artifacts: check experiments/
+CLI --> Researcher: show available experiments
+deactivate CLI
+
+Researcher -> CLI: iono status
+activate CLI
+CLI -> MLflow: check tracking data
+CLI -> DVC: check pipeline status
+CLI --> Researcher: show project status
+deactivate CLI
+
+' ============================================================================
+' Experiment Execution Phase
+' ============================================================================
+== Experiment Execution Phase ==
+
+Researcher -> CLI: iono analysis
+activate CLI
+CLI -> Snake: snakemake --cores 4
+activate Snake
+
+Snake -> Snake: parse Snakefile
+Snake -> Snake: build DAG
+
+group Latency Sweep
+    Snake -> Bench: run_latency.py --multirun
+    activate Bench
+    
+    Bench -> Hydra: load config
+    activate Hydra
+    Hydra -> Hydra: compose configuration
+    Hydra -> Hydra: setup multirun sweep
+    Hydra --> Bench: config objects
+    deactivate Hydra
+    
+    loop For each parameter combination
+        Bench -> Engine: Engine(config)
+        activate Engine
+        Engine -> Engine: initialize CUDA
+        Engine -> Engine: allocate buffers
+        Engine --> Bench: engine instance
+        deactivate Engine
+        
+        Bench -> Engine: process(test_data)
+        activate Engine
+        Engine -> Engine: GPU FFT processing
+        Engine --> Bench: results + metrics
+        deactivate Engine
+        
+        Bench -> MLflow: log_metrics()
+        activate MLflow
+        MLflow -> MLflow: store experiment
+        deactivate MLflow
+        
+        Bench -> Artifacts: save CSV
+        activate Artifacts
+        Artifacts -> Artifacts: write latency_summary_*.csv
+        deactivate Artifacts
+    end
+    
+    Bench --> Snake: latency_sweep.done
+    deactivate Bench
+end
+
+group Throughput Sweep
+    Snake -> Bench: run_throughput.py --multirun
+    activate Bench
+    note right: Similar process as latency\nwith different parameters
+    Bench -> Hydra: load config
+    Bench -> Engine: benchmark loop
+    Bench -> MLflow: log metrics
+    Bench -> Artifacts: save CSV
+    Bench --> Snake: throughput_sweep.done
+    deactivate Bench
+end
+
+group Accuracy Sweep
+    Snake -> Bench: run_accuracy.py --multirun
+    activate Bench
+    note right: Validates against\nreference implementation
+    Bench -> Hydra: load config
+    Bench -> Engine: benchmark loop
+    Bench -> MLflow: log metrics
+    Bench -> Artifacts: save CSV
+    Bench --> Snake: accuracy_sweep.done
+    deactivate Bench
+end
+
+Snake --> CLI: benchmarks complete
+deactivate Snake
+deactivate CLI
+
+' ============================================================================
+' Analysis Phase
+' ============================================================================
+== Analysis Phase ==
+
+CLI -> Snake: continue pipeline
+activate CLI
+activate Snake
+
+Snake -> Analysis: analyze.py
+activate Analysis
+
+Analysis -> Artifacts: load all CSVs
+activate Artifacts
+Artifacts --> Analysis: benchmark data
+deactivate Artifacts
+
+Analysis -> Analysis: aggregate results
+Analysis -> Analysis: compute statistics
+Analysis -> Analysis: identify optimal configs
+
+Analysis -> Artifacts: save summary_statistics.csv
+activate Artifacts
+Artifacts -> Artifacts: write aggregated data
+deactivate Artifacts
+
+Analysis --> Snake: analysis complete
+deactivate Analysis
+
+' ============================================================================
+' Visualization Phase
+' ============================================================================
+== Visualization Phase ==
+
+Snake -> Analysis: generate_figures.py
+activate Analysis
+
+Analysis -> Artifacts: load summary_statistics.csv
+activate Artifacts
+Artifacts --> Analysis: aggregated data
+deactivate Artifacts
+
+Analysis -> Analysis: create throughput plots
+Analysis -> Analysis: create latency plots
+Analysis -> Analysis: create accuracy heatmaps
+Analysis -> Analysis: create combined analysis
+
+Analysis -> Artifacts: save figures (PNG + SVG)
+activate Artifacts
+Artifacts -> Artifacts: write to figures/
+deactivate Artifacts
+
+Analysis --> Snake: figures complete
+deactivate Analysis
+
+' ============================================================================
+' Reporting Phase
+' ============================================================================
+== Reporting Phase ==
+
+Snake -> Report: generate_report.py
+activate Report
+
+Report -> Artifacts: load summary + figures
+activate Artifacts
+Artifacts --> Report: data + images
+deactivate Artifacts
+
+Report -> Report: generate HTML
+Report -> Report: embed figures (base64)
+Report -> Report: create tables
+Report -> Report: executive summary
+
+Report -> Artifacts: save final_report.html
+activate Artifacts
+Artifacts -> Artifacts: write to reports/
+deactivate Artifacts
+
+Report --> Snake: report complete
+deactivate Report
+
+Snake --> CLI: pipeline complete
+deactivate Snake
+
+' ============================================================================
+' Review Phase
+' ============================================================================
+== Review Phase ==
+
+CLI -> DVC: track artifacts
+activate DVC
+DVC -> Artifacts: compute hashes
+DVC -> DVC: update dvc.lock
+DVC --> CLI: tracking updated
+deactivate DVC
+
+CLI --> Researcher: Analysis complete!
+deactivate CLI
+
+Researcher -> CLI: iono ui
+activate CLI
+CLI -> MLflow: mlflow ui
+activate MLflow
+MLflow --> Researcher: http://localhost:5000
+deactivate MLflow
+deactivate CLI
+
+Researcher -> Researcher: review results\nin MLflow UI
+
+' ============================================================================
+' Optional: Quick Iteration
+' ============================================================================
+== Optional: Quick Iteration ==
+
+Researcher -> Analysis: quick_plot.py --latest
+activate Analysis
+Analysis -> Artifacts: load recent data
+Analysis -> Analysis: generate plots
+Analysis --> Researcher: display plots
+deactivate Analysis
+
+note right: For rapid iteration\nand debugging
+
+' ============================================================================
+' Notes
+' ============================================================================
+note over Hydra
+  **Configuration Management**
+  - Composes configs from modular YAML files
+  - Enables parameter sweeps via multirun
+  - Supports Optuna for optimization
+end note
+
+note over Engine
+  **GPU Processing**
+  - CUDA FFT kernels
+  - Optimized memory transfers
+  - Real-time capable
+end note
+
+note over MLflow
+  **Experiment Tracking**
+  - Every run tracked with parameters
+  - Metrics logged for comparison
+  - Web UI for visualization
+end note
+
+note over DVC
+  **Data Version Control**
+  - Tracks large artifacts
+  - Ensures reproducibility
+  - Pipeline dependencies
+end note
+
+@enduml
