@@ -1,0 +1,457 @@
+@startuml "Ionosense HPC - Python Package Architecture"
+allow_mixing
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam packageBackgroundColor #E6F3FF
+skinparam packageBorderColor #4169E1
+skinparam classBackgroundColor #F0F8FF
+skinparam classBorderColor #4169E1
+skinparam interfaceBackgroundColor #FFF0F5
+skinparam interfaceBorderColor #FF69B4
+skinparam arrowColor #4169E1
+skinparam noteBackgroundColor #FFFACD
+skinparam noteBorderColor #FFD700
+
+title Ionosense HPC - Python Package Architecture
+footer IEEE Publication Quality Diagram - © 2025
+
+' ============================================================================
+' Core Package
+' ============================================================================
+package "ionosense_hpc" #E6F3FF {
+  
+  package "core" #F0F8FF {
+    class Engine <<(E,orchid) Primary API>> {
+      -_config: EngineConfig
+      -_cpp_engine: ResearchEngine
+      -_initialized: bool
+      -_validate_inputs: bool
+      --
+      +__init__(config)
+      +process(data): FloatArray
+      +reset(): void
+      +close(): void
+      +synchronize(): void
+      ..Properties..
+      +config: EngineConfig {readonly}
+      +is_initialized: bool {readonly}
+      +stats: dict {readonly}
+      +device_info: dict {readonly}
+      ..Context Manager..
+      +__enter__(): Engine
+      +__exit__(): void
+      ..Advanced Research..
+      +get_cuda_stream(index: int): int
+      +enable_experimental_feature(feature: str): void
+      +detailed_metrics: dict {readonly}
+    }
+    
+    interface "_engine (C++)" as CppEngine <<(I,pink) Extension>> {
+      ResearchEngine
+      EngineConfig
+      get_available_devices()
+      select_best_device()
+    }
+  }
+
+  package "config" #F0F8FF {
+    class EngineConfig <<(D,lightblue) Pydantic>> {
+      +nfft: int = 1024
+      +batch: int = 2
+      +overlap: float = 0.5
+      +sample_rate_hz: int = 48000
+      +stream_count: int = 3
+      +pinned_buffer_count: int = 2
+      +warmup_iters: int = 1
+      +timeout_ms: int = 1000
+      +use_cuda_graphs: bool = False
+      +enable_profiling: bool = False
+      +experiment_id: str
+      +tags: list
+      --
+      +hop_size: int {computed}
+      +num_output_bins: int {computed}
+      +frame_duration_ms: float {computed}
+      +memory_estimate_mb: float {computed}
+      +to_experiment_dict(): dict
+    }
+    
+    class Presets <<(S,#FF7700) Factory>> {
+      {static} +realtime(): EngineConfig
+      {static} +throughput(): EngineConfig
+      {static} +validation(): EngineConfig
+      {static} +profiling(): EngineConfig
+      {static} +custom(**kwargs): EngineConfig
+    }
+
+    class ResearchConfig <<(D,lightblue) Pydantic>> {
+      +metadata: ExperimentMetadata
+      +engine_configs: dict
+      +benchmark_configs: dict
+      +parameter_sweeps: list
+      +reproducibility: dict
+      --
+      +to_file(path: str): void
+      {static} +from_file(path: str): ResearchConfig
+    }
+  }
+
+  package "benchmarks" #F0F8FF {
+    abstract class BaseBenchmark <<(A,wheat) Abstract>> {
+      #config: BenchmarkConfig
+      #context: BenchmarkContext
+      #results: list
+      --
+      +__init__(config: BenchmarkConfig)
+      {abstract} +setup(): void
+      {abstract} +execute_iteration(): dict
+      {abstract} +teardown(): void
+      +run(): BenchmarkResult
+      +validate_environment(): tuple
+    }
+
+    class BenchmarkConfig <<(D,lightblue) Pydantic>> {
+      +name: str
+      +iterations: int = 1000
+      +warmup_iterations: int = 0
+      +confidence_level: float = 0.95
+      +outlier_threshold: float = 3.0
+      +engine_config: dict
+      +seed: int = 42
+      +deterministic: bool = True
+    }
+
+    class BenchmarkContext <<(D,lightblue) Dataclass>> {
+      +timestamp: str
+      +hostname: str
+      +platform_info: dict
+      +cuda_info: dict
+      +git_info: dict
+      +package_versions: dict
+      +environment_hash: str
+      --
+      +to_dict(): dict
+    }
+
+    class BenchmarkResult <<(D,lightblue) Dataclass>> {
+      +name: str
+      +config: dict
+      +context: BenchmarkContext
+      +measurements: Any
+      +statistics: dict
+      +metadata: dict
+      +passed: bool
+      +errors: list
+      --
+      +to_dict(): dict
+    }
+
+    class LatencyBenchmark {
+      -engine: Engine
+      -test_data: ndarray
+      -gpu_events: Any
+      --
+      +setup(): void
+      +execute_iteration(): dict
+      +teardown(): void
+      +analyze_results(result): dict
+    }
+
+    class ThroughputBenchmark {
+      -engine: Engine
+      -test_data: ndarray
+      -resource_samples: list
+      --
+      +execute_iteration(): dict
+      -_calculate_memory_bandwidth(): dict
+      -_calculate_pcie_bandwidth(): dict
+    }
+
+    class AccuracyBenchmark {
+      -engine: Engine
+      -test_results: list
+      -validation_errors: list
+      --
+      +execute_iteration(): dict
+      -_compute_reference_fft(): ndarray
+      -_compare_spectra(): dict
+      -_test_parseval_theorem(): dict
+    }
+
+    class RealtimeBenchmark {
+      -engine: Engine
+      -frame_times: list
+      -deadline_misses: list
+      --
+      +execute_iteration(): dict
+      -_analyze_timing_stability(): dict
+      -_assess_system_capability(): dict
+    }
+  }
+
+  package "utils" #F0F8FF {
+    package "device" <<Node>> {
+      class DeviceUtils {
+        {static} +gpu_count(): int
+        {static} +current_device(): int
+        {static} +device_info(id): dict
+        {static} +get_memory_usage(): tuple
+        {static} +check_cuda_available(): bool
+      }
+    }
+  
+    package "signals" <<Node>> {
+      class SignalGenerator {
+        {static} +make_sine(...): ndarray
+        {static} +make_chirp(...): ndarray
+        {static} +make_multitone(...): ndarray
+        {static} +make_noise(...): ndarray
+        {static} +make_test_batch(...): ndarray
+        {static} +make_impulse(...): ndarray
+        {static} +make_pulse_train(...): ndarray
+      }
+    }
+  
+    package "profiling" <<Node>> {
+      class Profiler {
+        {static} +nvtx_range(name, color): Context
+        {static} +nvtx_decorate(...): Decorator
+        {static} +benchmark_range(name): Context
+        {static} +compute_range(name): Context
+        +ProfilingDomain: Enum
+        +ProfileColor: Enum
+        +NVTX_AVAILABLE: bool
+      }
+    }
+  
+    package "logging" <<Node>> {
+      class LoggerSetup {
+        +logger: Logger
+        {static} +setup_logging(...): Logger
+        {static} +log_config(config): void
+        {static} +log_performance(stats): void
+        {static} +log_device_info(info): void
+      }
+    }
+  
+    package "paths" <<Node>> {
+      class PathManager {
+        {static} +get_artifacts_root(): Path
+        {static} +get_benchmarks_root(): Path
+        {static} +get_experiments_root(): Path
+        {static} +normalize_benchmark_name(name): str
+      }
+    }
+  
+    class DataArchiver {
+      -base_dir: Path
+      --
+      +archive_results(...): Path
+      +load_results(...): dict
+      +compare_versions(...): dict
+    }
+  
+    class DeterministicGenerator {
+      -base_seed: int
+      -context: str
+      -_rng_cache: dict
+      --
+      +get_rng(stream_id): Generator
+      +reset(): void
+    }
+  
+    class ValidationHelper {
+      {static} +validate_measurements(...): dict
+      {static} +compare_distributions(...): dict
+    }
+  }
+
+  package "exceptions" #FFE6E6 {
+    class IonosenseError <<(E,red) Base>> {
+      +message: str
+      +hint: str
+      +context: dict
+    }
+
+    class ConfigError {
+      +field: str
+      +value: Any
+    }
+
+    class ValidationError {
+      +expected: str
+      +got: str
+    }
+
+    class EngineStateError {
+      +current_state: str
+    }
+
+    class DeviceNotFoundError {
+    }
+
+    class BenchmarkError {
+      +benchmark_name: str
+    }
+  }
+
+  package "stages" <<Future>> #FFFFCC {
+    enum StageType {
+      WINDOW
+      FFT
+      MAGNITUDE
+      PHASE
+      FILTER
+      RESAMPLE
+    }
+
+    class StageRegistry {
+      -_stages: dict
+      -_metadata: dict
+      --
+      +register(name, fn, metadata): void
+      +get(name): Callable
+      +list_stages(): list
+    }
+  }
+
+  package "testing" #F0F8FF {
+    class "fixtures" as Fixtures <<(M,#90EE90) pytest>> {
+      test_engine()
+      validation_config()
+      benchmark_runner()
+      test_signal_suite()
+      gpu_available()
+    }
+
+    class "validators" as Validators <<(M,#90EE90) pytest>> {
+      assert_allclose()
+      assert_spectral_peak()
+      assert_parseval()
+      assert_snr()
+      compare_with_reference()
+    }
+  }
+}
+
+' ============================================================================
+' External Dependencies
+' ============================================================================
+package "External Dependencies" <<Cloud>> #FFE4E4 {
+  component NumPy #FFB6C1
+  component SciPy #FFB6C1
+  component Pydantic #FFB6C1
+  component NVTX #FFA07A
+  component PyNVML #FFA07A
+  component Pytest #90EE90
+}
+
+' ============================================================================
+' C++ Layer
+' ============================================================================
+package "C++ Extension (_engine.so)" <<Library>> #FFE4B5 {
+  class ResearchEngine <<Native>> {
+    +initialize(config)
+    +process(input)
+    +get_stats()
+    +reset()
+  }
+  
+  note right: Compiled from\nCMake build system
+}
+
+' ============================================================================
+' Relationships
+' ============================================================================
+
+' Core relationships
+Engine --> CppEngine : wraps
+Engine --> EngineConfig : configured by
+Engine ..> Presets : uses
+CppEngine --> ResearchEngine : binds
+
+' Config relationships
+Presets --> EngineConfig : creates
+ResearchConfig *--> EngineConfig : contains
+
+' Benchmark relationships
+BaseBenchmark <|-- LatencyBenchmark : extends
+BaseBenchmark <|-- ThroughputBenchmark : extends
+BaseBenchmark <|-- AccuracyBenchmark : extends
+BaseBenchmark <|-- RealtimeBenchmark : extends
+BaseBenchmark *--> BenchmarkConfig : uses
+BaseBenchmark *--> BenchmarkContext : creates
+BaseBenchmark --> BenchmarkResult : produces
+LatencyBenchmark --> Engine : uses
+ThroughputBenchmark --> Engine : uses
+AccuracyBenchmark --> Engine : uses
+RealtimeBenchmark --> Engine : uses
+
+' Utils relationships
+Engine ..> DeviceUtils : queries
+Engine ..> LoggerSetup : uses
+BaseBenchmark ..> SignalGenerator : generates
+BaseBenchmark ..> Profiler : instruments
+BaseBenchmark ..> DataArchiver : stores
+AccuracyBenchmark ..> ValidationHelper : validates
+SignalGenerator ..> DeterministicGenerator : uses
+
+' Exception hierarchy
+IonosenseError <|-- ConfigError
+IonosenseError <|-- ValidationError
+IonosenseError <|-- EngineStateError
+IonosenseError <|-- DeviceNotFoundError
+IonosenseError <|-- BenchmarkError
+
+' External dependencies
+Engine ..> NumPy : processes
+SignalGenerator ..> NumPy : generates
+SignalGenerator ..> SciPy : filters
+EngineConfig ..> Pydantic : validates
+Profiler ..> NVTX : wraps
+DeviceUtils ..> PyNVML : queries
+Fixtures ..> Pytest : extends
+
+' Testing relationships
+Fixtures --> Engine : mocks
+Validators ..> NumPy : uses
+testing ..> benchmarks : tests
+
+' Future extensibility
+StageRegistry ..> StageType : manages
+Engine ..> StageRegistry : <<future>>
+
+' ============================================================================
+' Notes
+' ============================================================================
+
+note top of Engine
+  **Single Entry Point**
+  The Engine class provides a unified
+  API following the principle:
+  "Make simple things simple,
+  complex things possible"
+end note
+
+note right of BaseBenchmark
+  **RSE/RE Standards**
+  Research Software Engineering
+  compliant benchmark framework
+  with reproducibility guarantees
+end note
+
+note bottom of CppEngine
+  **Zero-Copy Interface**
+  NumPy arrays passed directly
+  to C++ without copying via
+  pybind11 buffer protocol
+end note
+
+note left of stages
+  **v2.0 Extensibility**
+  Prepared for pluggable
+  processing stages in
+  future releases
+end note
+
+@enduml
