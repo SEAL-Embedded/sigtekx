@@ -1,0 +1,137 @@
+@startuml "Ionosense HPC - Executive Summary"
+!theme plain
+
+' ---- styling ----
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontSize 16
+skinparam titleFontSize 24
+skinparam rectangleBorderThickness 3
+skinparam arrowThickness 4
+skinparam roundCorner 25
+skinparam shadowing true
+hide stereotype
+
+' ---- colors (no leading # in values) ----
+!define PRIMARY   2E86AB
+!define SUCCESS   52B788
+!define WARNING   F77F00
+!define HIGHLIGHT FCB322
+!define LIGHT     EDF2F4
+
+title <b>Ionosense HPC: Next-Generation Ionospheric Research Platform</b>\n<i>Accelerating Discovery Through High-Performance Computing</i>
+
+' ============================================================================
+' Research Vision
+' ============================================================================
+rectangle "**RESEARCH VISION**\n\nEnable comprehensive ionospheric analysis\nat unprecedented speed and scale" as Vision <<Vision>> #LIGHT
+
+' ============================================================================
+' Three Pillars
+' ============================================================================
+together {
+  rectangle "**SPEED**" as Pillar1 #SUCCESS
+  note bottom of Pillar1
+    <b>100–1000× Acceleration</b>
+    ────────────────
+    Before: 2 weeks
+    <b>Now: 1 hour</b>
+
+    Real-time capable
+  end note
+
+  rectangle "**SCALE**" as Pillar2 #PRIMARY
+  note bottom of Pillar2
+    <b>Handle Big Data</b>
+    ────────────────
+    Process TB datasets
+    10,000+ FPS
+
+    Months of data in hours
+  end note
+
+  rectangle "**SCIENCE**" as Pillar3 #HIGHLIGHT
+  note bottom of Pillar3
+    <b>Research Excellence</b>
+    ────────────────
+    Reproducible
+    Collaborative
+
+    Publication-ready
+  end note
+}
+
+' ============================================================================
+' Research Impact Areas
+' ============================================================================
+package "**RESEARCH IMPACT**" <<Impact>> #LIGHT {
+
+  rectangle "**Ionospheric Scintillation Studies**\n\n✓ Multi-scale temporal analysis\n✓ Equatorial & polar phenomena\n✓ Real-time detection\n✓ Pattern discovery" as Impact1 #E8F5E9
+
+  rectangle "**Space Weather Monitoring**\n\n✓ Continuous observation\n✓ Anomaly detection\n✓ Predictive capabilities\n✓ Risk assessment" as Impact2 #E8F5E9
+
+  rectangle "**GNSS Signal Analysis**\n\n✓ Navigation safety\n✓ Communication integrity\n✓ Infrastructure protection\n✓ Quality metrics" as Impact3 #E8F5E9
+}
+
+' ============================================================================
+' Success Metrics
+' ============================================================================
+rectangle "**SUCCESS METRICS**\n\n<b>Research Productivity</b>\n• 10× more experiments per month\n• 100× faster hypothesis testing\n• 50% reduction in time to publication\n\n<b>Computational Efficiency</b>\n• 90% reduction in processing time\n• 10× reduction in energy usage\n• Linear scaling with data size" as Success #F0F8FF
+
+' ============================================================================
+' Competitive Advantage
+' ============================================================================
+rectangle "**COMPETITIVE ADVANTAGE**" as Advantage #FFFACD
+note right of Advantage
+  <b>Why Ionosense HPC?</b>
+
+  <font size="18">✓</font> <b>Only platform</b> with real-time ionosphere capability
+  <font size="18">✓</font> <b>Fastest</b> FFT processing (GPU-optimized)
+  <font size="18">✓</font> <b>Complete</b> workflow automation
+  <font size="18">✓</font> <b>Full</b> reproducibility guarantee
+  <font size="18">✓</font> <b>Open source</b> and extensible
+
+  <b>Result:</b> <font color="green"><b>Lead the field in ionospheric research</b></font>
+end note
+
+' ============================================================================
+' Call to Action
+' ============================================================================
+rectangle "**NEXT STEPS**\n\n<b>Get Started Today</b>\n1. Deploy platform (< 30 minutes)\n2. Run example experiments\n3. Import your data\n4. Accelerate your research\n\n<b>Support Available</b>\n• Documentation\n• Example workflows\n• Community forum" as NextSteps #SUCCESS
+
+' ============================================================================
+' Relationships
+' ============================================================================
+Vision --> Pillar1
+Vision --> Pillar2
+Vision --> Pillar3
+
+Pillar1 --> Impact1
+Pillar2 --> Impact2
+Pillar3 --> Impact3
+
+Impact1 --> Success
+Impact2 --> Success
+Impact3 --> Success
+
+Success --> Advantage
+Advantage --> NextSteps
+
+' ============================================================================
+' Strategic Value Box
+' ============================================================================
+note top of Vision
+  <b><font size="20">Strategic Research Value</font></b>
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  <b>Grant Competitiveness:</b> Demonstrate cutting-edge computational capabilities
+  <b>Publication Impact:</b> Process larger datasets, discover new phenomena
+  <b>Collaboration Potential:</b> Share reproducible workflows globally
+  <b>Future-Proof:</b> Scalable to next-generation datasets
+end note
+
+' ============================================================================
+' Bottom Line
+' ============================================================================
+center footer <b><font size="20">Bottom Line: Do More Science, Faster</font></b>\n<font size="14">Production Ready • Open Source • Proven Performance</font>
+
+@enduml

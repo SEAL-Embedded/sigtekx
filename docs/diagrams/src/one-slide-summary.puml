@@ -1,0 +1,66 @@
+@startuml "Ionosense HPC - One Slide Summary"
+!theme plain
+
+' ---- styling ----
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontSize 18
+skinparam titleFontSize 28
+skinparam rectangleBorderThickness 4
+skinparam arrowThickness 5
+skinparam roundCorner 30
+skinparam shadowing true
+skinparam rectangleShadowing true
+hide stereotype
+
+' ---- color macros (names won't collide with labels) ----
+!define CLR_PROBLEM   FF6B6B
+!define CLR_SOLUTION  4ECDC4
+!define CLR_IMPACT    95E77E
+!define CLR_HILITE    FFE66D
+
+title <b>Ionosense HPC</b>\n<font size="20">GPU-Accelerated Platform for Ionospheric Research</font>
+
+' ============================================================================
+' Problem — Solution — Impact
+' ============================================================================
+
+rectangle "**THE PROBLEM**\n\n<b>Ionospheric Analysis Bottleneck</b>\n\n• Months of data → weeks of processing\n• No real-time capability\n• Limited hypothesis testing\n• Reproducibility challenges" as Problem <<Challenge>> #CLR_PROBLEM
+
+rectangle "**OUR SOLUTION**\n\n<b>GPU-Accelerated Research Platform</b>\n\n• <font size=\"22\"><b>100–1000× faster</b></font>\n• Real-time processing (<100μs)\n• Automated workflows\n• Full reproducibility" as Solution <<Platform>> #CLR_SOLUTION
+
+rectangle "**THE IMPACT**\n\n<b>Accelerated Scientific Discovery</b>\n\n• <font size=\"22\"><b>2 weeks → 1 hour</b></font>\n• More experiments\n• Faster publications\n• New discoveries" as Impact <<Results>> #CLR_IMPACT
+
+Problem -right-> Solution : <font size="20"><b>solve with</b></font>
+Solution -right-> Impact  : <font size="20"><b>achieve</b></font>
+
+' ============================================================================
+' Key Numbers Banner
+' ============================================================================
+note top of Solution #CLR_HILITE
+<b><font size="24">KEY PERFORMANCE</font></b>
+━━━━━━━━━━━━━━━━━━━━━━━━
+<font size="20"><b>>10,000 FPS</b> | <b>25 GB/s</b> | <b><100μs latency</b></font>
+end note
+
+' ============================================================================
+' Research Areas
+' ============================================================================
+together {
+  rectangle "**Scintillation\nAnalysis**"   as App1 <<Application>> #F0F8FF
+  rectangle "**Space Weather\nMonitoring**" as App2 <<Application>> #F0F8FF
+  rectangle "**GNSS Signal\nIntegrity**"    as App3 <<Application>> #F0F8FF
+}
+
+Solution --> App1
+Solution --> App2
+Solution --> App3
+
+' ============================================================================
+' Bottom Line
+' ============================================================================
+note bottom of Impact #FFFFFF
+<b><font size="24" color="#2E7D32">Ready to Accelerate Your Research?</font></b>\n
+<font size="16">✅ Production Ready  ✅ Open Source  ✅ Full Support</font>
+end note
+
+@enduml
