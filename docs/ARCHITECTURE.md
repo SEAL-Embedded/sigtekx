@@ -55,7 +55,7 @@ The library follows a layered architecture with clear separation between host an
 
 The core architecture centers around the `ResearchEngine` class implementing the `IPipelineEngine` interface, with modular processing stages and comprehensive CUDA resource management.
 
-![Class Architecture](diagrams/generated/class-architecture.svg)
+![Class Architecture](diagrams/figures/class-arch.svg)
 
 *Figure 1: Complete class hierarchy showing design patterns and relationships*
 
@@ -84,7 +84,7 @@ The core architecture centers around the `ResearchEngine` class implementing the
 
 The processing pipeline implements a sophisticated asynchronous execution model using multiple CUDA streams for optimal GPU utilization.
 
-![Processing Pipeline](diagrams/generated/sequence-pipeline.svg)
+![Processing Pipeline](diagrams/figures/sequence-pipeline.svg)
 
 *Figure 2: Asynchronous processing pipeline showing stream overlap and synchronization*
 
@@ -117,7 +117,7 @@ The processing pipeline implements a sophisticated asynchronous execution model 
 
 The component architecture shows the relationship between major subsystems and their dependencies.
 
-![Component Architecture](diagrams/generated/component-architecture.svg)
+![Component Architecture](diagrams/figures/component-arch.svg)
 
 *Figure 3: High-level component relationships and data flow*
 
@@ -145,7 +145,7 @@ The component architecture shows the relationship between major subsystems and t
 
 The memory management system implements a sophisticated multi-level hierarchy optimized for high-throughput streaming applications.
 
-![Memory Management](diagrams/generated/memory-management.svg)
+![Memory Management](diagrams/figures/memory-management.svg)
 
 *Figure 4: Memory layout and data flow patterns*
 
