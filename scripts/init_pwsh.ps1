@@ -319,7 +319,7 @@ function global:iono {
     }
 
     # Only allow commands that actually exist in simplified CLI
-    $validCommands = @('setup','build','test','lint','format','clean','doctor','ui','run','help')
+    $validCommands = @('setup','build','test','lint','format','clean','doctor','ui','run','help','profile')
     if ($Args.Count -gt 0 -and $Args[0] -notin $validCommands) {
         Write-Warning "Command '$($Args[0])' not available. Use 'iono help' for available commands."
         Write-Host "💡 For research workflows, use direct tools:" -ForegroundColor Cyan
@@ -339,6 +339,7 @@ function global:it     { param([Parameter(ValueFromRemainingArguments=$true)][ob
 function global:ilint  { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono lint   @Args }
 function global:ifmt   { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono format @Args }
 function global:iclean { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono clean  @Args }
+function global:iprof  { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono profile @Args }
 
 # Use direct research tools instead of custom wrappers:
 # python benchmarks/run_latency.py experiment=baseline
@@ -362,11 +363,18 @@ function global:itc { it cpp }            # c++ tests
 # Help shortcuts (use CLI help instead of removed learn commands)
 function global:ihelp { iono help }
 
-# Tab-completion (only for commands that actually exist)
-$global:IonoVerbs   = @('setup','build','test','lint','format','clean','doctor','ui','run','help')
-$global:IonoTargets = @('python','cpp','all','-Clean','-Verbose','-Fix','-Check','-Coverage','-Pattern','-All')
+# Reload iono functions (useful when init_pwsh.ps1 is updated)
+function global:ireload {
+    Write-Host "Reloading iono functions..." -ForegroundColor Cyan
+    . (Join-Path $global:IONO_ROOT 'scripts\init_pwsh.ps1') -Quiet
+    Write-Host "Functions reloaded. Try: iono profile nsys latency" -ForegroundColor Green
+}
 
-Register-ArgumentCompleter -CommandName iono,ib,it,ilint,ifmt,iclean,itp,itc,ihelp -ScriptBlock {
+# Tab-completion (only for commands that actually exist)
+$global:IonoVerbs   = @('setup','build','test','lint','format','clean','doctor','ui','run','help','profile')
+$global:IonoTargets = @('python','cpp','all','-Clean','-Verbose','-Fix','-Check','-Coverage','-Pattern','-All','nsys','ncu','latency','throughput','accuracy','realtime','custom','-Full','-NoOpen','-Mode','-Script','-Kernel','-Duration')
+
+Register-ArgumentCompleter -CommandName iono,ib,it,ilint,ifmt,iclean,itp,itc,ihelp,iprof -ScriptBlock {
     param($commandName,$parameterName,$wordToComplete,$commandAst,$fakeBoundParameters)
     $tokens = @()
     foreach ($e in $commandAst.CommandElements) {

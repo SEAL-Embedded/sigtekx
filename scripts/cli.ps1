@@ -322,6 +322,115 @@ function Invoke-Doctor {
     }
 }
 
+function Invoke-Profile {
+    param(
+        [string]$Tool = "",
+        [string]$Target = "",
+        [string]$Mode = "quick",
+        [string]$Script = "",
+        [string]$Kernel = "",
+        [int]$Duration = 0,
+        [bool]$OpenAfter = $true,
+        [bool]$Interactive = $false
+    )
+
+    Write-Status "Starting GPU profiling session..."
+
+    # Validate prof_helper.py exists
+    $profHelper = Join-Path $script:ProjectRoot "scripts/prof_helper.py"
+    if (-not (Test-Path $profHelper)) {
+        Write-Error "prof_helper.py not found at: $profHelper"
+        exit 1
+    }
+
+    # Interactive mode if no parameters provided
+    if (-not $Tool -or -not $Target) {
+        $Interactive = $true
+    }
+
+    if ($Interactive) {
+        Write-Host "`n🎯 GPU Profiling Tool Selection" -ForegroundColor Cyan
+        Write-Host "1. nsys (Nsight Systems) - Timeline analysis, CUDA API tracing"
+        Write-Host "2. ncu  (Nsight Compute) - Kernel performance analysis"
+        do {
+            $toolChoice = Read-Host "Select profiling tool (1-2)"
+        } while ($toolChoice -notin @("1", "2"))
+
+        $Tool = if ($toolChoice -eq "1") { "nsys" } else { "ncu" }
+
+        Write-Host "`n📊 Benchmark Target Selection" -ForegroundColor Cyan
+        Write-Host "1. latency    - Latency benchmark with profiling config"
+        Write-Host "2. throughput - Throughput benchmark with profiling config"
+        Write-Host "3. accuracy   - Accuracy benchmark with profiling config"
+        Write-Host "4. realtime   - Realtime benchmark with profiling config"
+        Write-Host "5. custom     - Specify custom script path"
+        do {
+            $targetChoice = Read-Host "Select benchmark target (1-5)"
+        } while ($targetChoice -notin @("1", "2", "3", "4", "5"))
+
+        $Target = switch ($targetChoice) {
+            "1" { "latency" }
+            "2" { "throughput" }
+            "3" { "accuracy" }
+            "4" { "realtime" }
+            "5" {
+                $Script = Read-Host "Enter custom script path"
+                "custom"
+            }
+        }
+
+        if ($Tool -eq "ncu") {
+            $modeChoice = Read-Host "Profiling mode? (quick/full) [quick]"
+            if ($modeChoice) { $Mode = $modeChoice }
+        }
+    }
+
+    # Validate target benchmark exists for presets
+    if ($Target -in @("latency", "throughput", "accuracy", "realtime")) {
+        $benchmarkScript = Join-Path $script:ProjectRoot "benchmarks/run_$Target.py"
+        if (-not (Test-Path $benchmarkScript)) {
+            Write-Error "Benchmark script not found: $benchmarkScript"
+            exit 1
+        }
+    }
+
+    # Build prof_helper command
+    $args = @($Tool)
+
+    if ($Script) {
+        $args += $Script
+    } else {
+        $args += $Target
+    }
+
+    $args += "--mode", $Mode
+
+    if ($Kernel) { $args += "--kernel", $Kernel }
+    if ($Duration -gt 0) { $args += "--duration", $Duration }
+
+    # Add profiling config for preset benchmarks
+    if ($Target -in @("latency", "throughput", "accuracy", "realtime")) {
+        $args += "--", "experiment=profiling", "+benchmark=$Target"
+    }
+
+    Write-Status "Executing: python `"$profHelper`" $($args -join ' ')"
+    Write-Host ""
+
+    # Run profiling
+    & python $profHelper @args
+
+    if ($LASTEXITCODE -eq 0 -and $OpenAfter) {
+        Write-Host "`n🚀 Opening profiling results..." -ForegroundColor Green
+
+        # Open artifacts/profiling directory
+        $profilingDir = Join-Path $script:ProjectRoot "artifacts/profiling"
+        if (Test-Path $profilingDir) {
+            Write-Status "Opening profiling directory: $profilingDir"
+            Start-Process "explorer.exe" -ArgumentList $profilingDir
+        }
+    }
+}
+
 function Show-Help {
     Write-Host @"
 ╔════════════════════════════════════════════════════════════════════════╗
@@ -344,6 +453,19 @@ ESSENTIAL DEVELOPMENT
   clean [-All]            Remove build artifacts
   doctor                  Check development environment health
   ui                      Launch MLflow UI for experiment tracking
+
+GPU PROFILING
+  profile [tool] [target] Profile GPU performance with Nsight tools
+                          Tools: nsys (Systems), ncu (Compute)
+                          Targets: latency, throughput, accuracy, realtime, custom
+                          Interactive mode if no args provided
+
+PROFILING EXAMPLES:
+  .\scripts\cli.ps1 profile nsys latency      # Profile latency benchmark
+  .\scripts\cli.ps1 profile ncu throughput   # Profile throughput with NCU
+  .\scripts\cli.ps1 profile                   # Interactive mode
+  .\scripts\cli.ps1 profile nsys latency -Full -Duration 30
+  .\scripts\cli.ps1 profile ncu custom -Script "my_script.py"
 
 PYTHON SCRIPT RUNNER
   run <script.py> [args...]
@@ -455,6 +577,35 @@ try {
             # Use Start-Process to launch without blocking the terminal
             Start-Process mlflow @("ui", "--backend-store-uri", $uri, "--port", "5000")
             Write-Success "MLflow UI launched at http://localhost:5000"
+        }
+        "profile"  {
+            $params = @{}
+
+            # Parse tool and target from args
+            $nonFlagArgs = $CommandArgs | Where-Object { $_ -and $_ -notlike "-*" }
+            if ($nonFlagArgs.Count -ge 1) { $params.Tool = $nonFlagArgs[0] }
+            if ($nonFlagArgs.Count -ge 2) { $params.Target = $nonFlagArgs[1] }
+
+            # Parse flags
+            if ($CommandArgs -icontains "-Full") { $params.Mode = "full" }
+            if ($CommandArgs -icontains "-NoOpen") { $params.OpenAfter = $false }
+
+            for ($i = 0; $i -lt $CommandArgs.Count; $i++) {
+                if ($CommandArgs[$i] -eq "-Mode" -and $i+1 -lt $CommandArgs.Count) {
+                    $params.Mode = $CommandArgs[$i+1]
+                }
+                if ($CommandArgs[$i] -eq "-Script" -and $i+1 -lt $CommandArgs.Count) {
+                    $params.Script = $CommandArgs[$i+1]
+                }
+                if ($CommandArgs[$i] -eq "-Kernel" -and $i+1 -lt $CommandArgs.Count) {
+                    $params.Kernel = $CommandArgs[$i+1]
+                }
+                if ($CommandArgs[$i] -eq "-Duration" -and $i+1 -lt $CommandArgs.Count) {
+                    $params.Duration = [int]$CommandArgs[$i+1]
+                }
+            }
+
+            Invoke-Profile @params
         }
         "run"      {
             if ($CommandArgs.Count -eq 0) {
