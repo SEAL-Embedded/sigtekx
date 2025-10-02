@@ -1,0 +1,13 @@
+name: profiling
+type: latency
+iterations: 20
+warmup_iterations: 5
+confidence_level: 0.95
+outlier_threshold: 3.0
+measure_gpu_time: true
+measure_components: false
+test_signal_type: sine
+test_frequency: 1000.0
+deadline_us: 200.0
+analyze_jitter: true
+save_raw_data: true

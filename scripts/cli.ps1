@@ -410,7 +410,14 @@ function Invoke-Profile {
 
     # Add profiling config for preset benchmarks
     if ($Target -in @("latency", "throughput", "accuracy", "realtime")) {
-        $args += "--", "experiment=profiling", "+benchmark=$Target"
+        # Map targets to their lightweight profiling benchmark configs
+        $benchmarkConfig = switch ($Target) {
+            "latency"    { "profiling" }
+            "throughput" { "profiling_throughput" }
+            "realtime"   { "profiling_realtime" }
+            "accuracy"   { "profiling_accuracy" }
+        }
+        $args += "--", "experiment=profiling", "+benchmark=$benchmarkConfig"
     }
 
     Write-Status "Executing: python `"$profHelper`" $($args -join ' ')"

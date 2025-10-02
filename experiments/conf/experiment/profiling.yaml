@@ -1,0 +1,8 @@
+# @package _global_
+defaults:
+  - override /engine: profiling
+
+experiment:
+  name: profiling
+  description: Lightweight configuration for GPU profiling
+  tags: [profiling, development, quick]

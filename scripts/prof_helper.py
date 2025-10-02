@@ -553,9 +553,23 @@ def main():
     preset_targets = ["latency", "throughput", "accuracy", "realtime"]
 
     if args.target in preset_targets:
-        # Use simple direct Engine approach - bypass complex Hydra system
-        target_cmd = ["python", "generate_demo_data.py"]
-        if args.args and args.args[0] == "--":
+        # Route to the correct benchmark script
+        target_cmd = ["python", f"benchmarks/run_{args.target}.py"]
+
+        # If no arguments provided, use profiling defaults
+        if not args.args or (args.args and args.args[0] != "--"):
+            # Default to fast profiling configuration
+            # Use benchmark-specific profiling config if available
+            if args.target == "latency":
+                target_cmd.extend(["experiment=profiling", "+benchmark=profiling"])
+            elif args.target == "throughput":
+                target_cmd.extend(["experiment=profiling", "+benchmark=profiling_throughput"])
+            elif args.target == "realtime":
+                target_cmd.extend(["experiment=profiling", "+benchmark=profiling_realtime"])
+            elif args.target == "accuracy":
+                target_cmd.extend(["experiment=profiling", "+benchmark=profiling_accuracy"])
+        elif args.args and args.args[0] == "--":
+            # User provided custom arguments
             target_cmd.extend(args.args[1:])
         else:
             target_cmd.extend(args.args)
