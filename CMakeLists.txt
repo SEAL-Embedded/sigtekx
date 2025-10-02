@@ -33,7 +33,7 @@ if(IONO_WITH_CUDA)
   set(CMAKE_CUDA_RUNTIME_LIBRARY Static) # Use static runtime for CUDA on Windows
   # --- CUDA Flags (apply to all platforms) ---
   set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -diag-suppress 177") # Suppress unused warnings from nvcc
-  set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -g -G -O0")
+  set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -g -G -lineinfo -O0")
   set(CMAKE_CUDA_FLAGS_RELEASE "${CMAKE_CUDA_FLAGS_RELEASE} -O3 -DNDEBUG")
 endif()
 

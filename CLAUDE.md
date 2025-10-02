@@ -119,6 +119,44 @@ dvc pull
 dvc dag
 ```
 
+### GPU Profiling with Nsight Tools
+
+#### Quick Profiling (Recommended for Development)
+```bash
+# Fast profiling with minimal iterations - auto-selects correct config
+iprof nsys latency        # Uses profiling (20 iterations)
+iprof nsys throughput     # Uses profiling_throughput (3s duration)
+iprof nsys realtime       # Uses profiling_realtime (3s duration)
+iprof nsys accuracy       # Uses profiling_accuracy (2 iterations, 3 signals)
+
+# NCU profiling (slower but more detailed)
+iprof ncu latency
+iprof ncu throughput
+```
+
+#### Full Benchmark Profiling (Research/Production)
+```bash
+# Full benchmark profiles (SLOW - use sparingly!)
+iprof nsys latency -- experiment=profiling +benchmark=latency        # 5000 iterations
+iprof nsys throughput -- experiment=profiling +benchmark=throughput  # 10s duration
+iprof nsys accuracy -- experiment=profiling +benchmark=accuracy      # 10 iterations, 8 signals
+```
+
+#### Expected Profiling Times
+
+| Benchmark | Quick Config | Quick Params | nsys (quick) | ncu (quick) | Full Config | nsys (full) | ncu (full) |
+|-----------|--------------|--------------|--------------|-------------|-------------|-------------|------------|
+| latency | `profiling` | 20 iter | 30-60s | 5-10min | `latency` (5000 iter) | 12-15min | 2-4hrs |
+| throughput | `profiling_throughput` | 3s | 20-30s | 5-8min | `throughput` (10s) | 8-10min | 1-2hrs |
+| realtime | `profiling_realtime` | 3s | 20-30s | 5-8min | `realtime` (10s) | 8-10min | 1-2hrs |
+| accuracy | `profiling_accuracy` | 2 iter, 3 signals | 30-45s | 8-12min | `accuracy` (10 iter, 8 signals) | 5-8min | 1-2hrs |
+
+**Best Practices:**
+- Use `+benchmark=profiling` for iterative development and kernel optimization
+- Use `+benchmark=latency` only for production profiling runs
+- Always start with `nsys` before moving to `ncu` (nsys is 10-50× faster)
+- Use `ncu --kernel-name <pattern>` to profile specific kernels only
+
 ## System Reliability Notes
 
 ### Configuration System
@@ -145,4 +183,4 @@ python benchmarks/run_latency.py experiment=ionosphere_multiscale +benchmark=lat
 python benchmarks/run_throughput.py --multirun experiment=ionosphere_resolution
 ```
 
-Last updated: 2025-09-27 (Fixed benchmark config override issue)
+Last updated: 2025-10-01 (Added profiling benchmark config and timing guidance)

@@ -63,6 +63,47 @@ class ProfileCategory(str, Enum):
     WARMUP = "Warmup"
 
 
+# -----------------------------
+# Internal helpers (private)
+# -----------------------------
+
+
+def _build_nvtx_attrs(
+    message: str,
+    color: str | ProfileColor,
+    domain: str | ProfilingDomain | None,
+    category: str | ProfileCategory | None,
+    payload: Any | None,
+) -> dict[str, Any]:
+    """
+    Build the NVTX annotation attributes dict from user-friendly inputs.
+    Converts enums to strings and includes optional fields only when provided.
+    Numeric payloads (int/float) are kept numeric; others are coerced to str.
+    """
+    # Convert enums -> strings
+    if isinstance(color, ProfileColor):
+        color = color.value
+    if isinstance(domain, ProfilingDomain):
+        domain = domain.value
+    if isinstance(category, ProfileCategory):
+        category = category.value
+
+    # Base attrs
+    attrs: dict[str, Any] = {"message": message, "color": color}
+
+    # Optional fields
+    if domain:
+        attrs["domain"] = domain
+    if category:
+        attrs["category"] = category
+    if payload is not None:
+        attrs["payload"] = payload if isinstance(payload, (int, float)) else str(payload)
+
+    return attrs
+
+
+
+
 # ============================================================================
 # Core profiling utilities
 # ============================================================================
@@ -75,35 +116,13 @@ def nvtx_range(
     category: str | ProfileCategory | None = None,
     payload: Any | None = None,
 ):
-    """
-    Create a context-managed NVTX range for detailed profiling.
-
-    Args:
-        name: Descriptive name for the range
-        color: Color for visualization
-        domain: NVTX domain for filtering
-        category: Optional category for organization
-        payload: Optional payload data (e.g., iteration)
-    """
+    """Create a context-managed NVTX range for detailed profiling."""
     if not NVTX_AVAILABLE:
+        # NVTX not present -> no-op but still act like a context manager
         yield
         return
 
-    if isinstance(color, ProfileColor):
-        color = color.value
-    if isinstance(domain, ProfilingDomain):
-        domain = domain.value
-    if isinstance(category, ProfileCategory):
-        category = category.value
-
-    attrs: dict[str, Any] = {"message": name, "color": color}
-    if domain:
-        attrs["domain"] = domain
-    if category:
-        attrs["category"] = category
-    if payload is not None:
-        attrs["payload"] = payload if isinstance(payload, int | float) else str(payload)
-
+    attrs = _build_nvtx_attrs(name, color, domain, category, payload)
     with nvtx.annotate(**attrs):  # type: ignore[attr-defined]
         yield
 
@@ -239,25 +258,10 @@ def mark_event(
     payload: Any | None = None,
 ) -> None:
     """Insert a point event into the NVTX timeline."""
-
     if not NVTX_AVAILABLE:
         return
 
-    if isinstance(color, ProfileColor):
-        color = color.value
-    if isinstance(domain, ProfilingDomain):
-        domain = domain.value
-    if isinstance(category, ProfileCategory):
-        category = category.value
-
-    attrs: dict[str, Any] = {"message": message, "color": color}
-    if domain:
-        attrs["domain"] = domain
-    if category:
-        attrs["category"] = category
-    if payload is not None:
-        attrs["payload"] = payload if isinstance(payload, int | float) else str(payload)
-
+    attrs = _build_nvtx_attrs(message, color, domain, category, payload)
     # Implement as zero-duration range for compatibility
     with nvtx.annotate(**attrs):  # type: ignore[attr-defined]
         pass

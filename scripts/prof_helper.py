@@ -16,6 +16,8 @@ import shutil
 from typing import Optional, List, Dict, Any
 import threading
 import queue
+import platform
+import webbrowser
 
 
 class Colors:
@@ -47,24 +49,24 @@ class ProfileSession:
         
         # Setup paths
         self.project_root = Path(__file__).parent.parent
-        self.build_dir = self.project_root / "build"
-        self.reports_dir = self.build_dir / "nsight_reports"
-        
+        self.artifacts_dir = self.project_root / "artifacts"
+        self.reports_dir = self.artifacts_dir / "profiling"
+
         # Create report directories
-        self.nsys_dir = self.reports_dir / "nsys_reports"
-        self.ncu_dir = self.reports_dir / "ncu_reports"
+        self.nsys_dir = self.reports_dir / "nsys"
+        self.ncu_dir = self.reports_dir / "ncu"
         self.nsys_dir.mkdir(parents=True, exist_ok=True)
         self.ncu_dir.mkdir(parents=True, exist_ok=True)
     
     def print_header(self):
         """Print a clean session header"""
-        print(f"\n{Colors.CYAN}┌─────────────────────────────────────────────────────────┐{Colors.RESET}")
-        print(f"{Colors.CYAN}│{Colors.RESET}  {Colors.MAGENTA}🎯 PROFILING SESSION{Colors.RESET}                                   {Colors.CYAN}│{Colors.RESET}")
-        print(f"{Colors.CYAN}├─────────────────────────────────────────────────────────┤{Colors.RESET}")
-        print(f"{Colors.CYAN}│{Colors.RESET}  Tool:     {Colors.YELLOW}{self.tool.upper()}{Colors.RESET} [{self.mode} mode]")
-        print(f"{Colors.CYAN}│{Colors.RESET}  Target:   {Colors.YELLOW}{self.target}{Colors.RESET}")
-        print(f"{Colors.CYAN}│{Colors.RESET}  Time:     {Colors.WHITE}{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}{Colors.RESET}")
-        print(f"{Colors.CYAN}└─────────────────────────────────────────────────────────┘{Colors.RESET}\n")
+        print(f"\n{Colors.CYAN}+-------------------------------------------------------------+{Colors.RESET}")
+        print(f"{Colors.CYAN}|{Colors.RESET}  {Colors.MAGENTA}GPU PROFILING SESSION{Colors.RESET}                                    {Colors.CYAN}|{Colors.RESET}")
+        print(f"{Colors.CYAN}+-------------------------------------------------------------+{Colors.RESET}")
+        print(f"{Colors.CYAN}|{Colors.RESET}  Tool:     {Colors.YELLOW}{self.tool.upper()}{Colors.RESET} [{self.mode} mode]")
+        print(f"{Colors.CYAN}|{Colors.RESET}  Target:   {Colors.YELLOW}{self.target}{Colors.RESET}")
+        print(f"{Colors.CYAN}|{Colors.RESET}  Time:     {Colors.WHITE}{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}{Colors.RESET}")
+        print(f"{Colors.CYAN}+-------------------------------------------------------------+{Colors.RESET}\n")
     
     def format_time(self, seconds: float) -> str:
         """Format elapsed time nicely"""
@@ -88,7 +90,7 @@ class ProfileSession:
         kernel_count = 0
         current_kernel = ""
         current_passes = 0
-        max_passes = 43 if self.mode == "full" else 5
+        max_passes = 43 if self.mode == "full" else 15
         
         for line in iter(process.stdout.readline, ''):
             if process.poll() is not None:
@@ -102,12 +104,12 @@ class ProfileSession:
                     
                     if kernel_name != current_kernel:
                         if current_kernel:
-                            print(f"\r  {Colors.GREEN}✓{Colors.RESET} [{kernel_count}] {current_kernel[:40]:<40} ({current_passes} passes)")
+                            print(f"\r  {Colors.GREEN}[OK]{Colors.RESET} [{kernel_count}] {current_kernel[:40]:<40} ({current_passes} passes)")
                         kernel_count += 1
                         current_kernel = kernel_name
                         current_passes = 0
                         self.kernel_progress[kernel_name] = 0
-                        print(f"\n  {Colors.YELLOW}⚡{Colors.RESET} [{kernel_count}] Profiling: {Colors.CYAN}{kernel_name[:40]}{Colors.RESET}")
+                        print(f"\n  {Colors.YELLOW}[*]{Colors.RESET} [{kernel_count}] Profiling: {Colors.CYAN}{kernel_name[:40]}{Colors.RESET}")
             
             # Update progress bar
             if "%" in line:
@@ -129,17 +131,191 @@ class ProfileSession:
             
             # Show any important messages
             elif "==WARNING==" in line or "==ERROR==" in line:
-                print(f"\n  {Colors.YELLOW}⚠{Colors.RESET}  {line.strip()}")
+                print(f"\n  {Colors.YELLOW}[WARN]{Colors.RESET}  {line.strip()}")
         
         # Final kernel summary
         if current_kernel:
-            print(f"\r  {Colors.GREEN}✓{Colors.RESET} [{kernel_count}] {current_kernel[:40]:<40} ({current_passes} passes)")
+            print(f"\r  {Colors.GREEN}[OK]{Colors.RESET} [{kernel_count}] {current_kernel[:40]:<40} ({current_passes} passes)")
         
-        print(f"\n{Colors.GREEN}✓ Profiled {kernel_count} unique kernel(s) in {self.format_time(time.time() - self.start_time)}{Colors.RESET}")
+        print(f"\n{Colors.GREEN}[OK] Profiled {kernel_count} unique kernel(s) in {self.format_time(time.time() - self.start_time)}{Colors.RESET}")
+
+    def open_file_location(self, file_path: str):
+        """Open file location in system file manager"""
+        print(f"  {Colors.CYAN}[EXEC] open_file_location() executing for: {file_path}{Colors.RESET}")
+        try:
+            file_path = Path(file_path)
+            if platform.system() == "Windows":
+                # Open in Explorer and select the file
+                print(f"  {Colors.CYAN}[EXEC] Running: explorer /select, {file_path}{Colors.RESET}")
+                subprocess.run(["explorer", "/select,", str(file_path)], check=False)
+            elif platform.system() == "Darwin":  # macOS
+                subprocess.run(["open", "-R", str(file_path)], check=False)
+            else:  # Linux
+                subprocess.run(["xdg-open", str(file_path.parent)], check=False)
+            return True
+        except Exception as e:
+            print(f"  {Colors.YELLOW}[WARN] Could not open file location: {e}{Colors.RESET}")
+            return False
+
+    def discover_gui_tool_path(self, tool: str) -> Optional[str]:
+        """Discover the actual path to the GUI tool executable"""
+        print(f"  {Colors.CYAN}[DISCOVERY] Searching for {tool} GUI executable...{Colors.RESET}")
+
+        try:
+            # First, find the command-line tool to get installation directory
+            if tool == "nsys":
+                cmd_result = subprocess.run(["where", "nsys"], capture_output=True, text=True, timeout=5)
+                if cmd_result.returncode == 0:
+                    nsys_path = Path(cmd_result.stdout.strip().split('\n')[0])
+                    print(f"  {Colors.CYAN}[DISCOVERY] Found nsys at: {nsys_path}{Colors.RESET}")
+
+                    # Navigate to installation root and look for GUI in host directory
+                    install_root = nsys_path.parent.parent  # Go up from target-windows-x64 to root
+                    gui_candidates = [
+                        install_root / "host-windows-x64" / "nsys-ui.exe",
+                        install_root / "host" / "windows-x64" / "nsys-ui.exe",
+                        install_root / "host" / "nsys-ui.exe"
+                    ]
+
+                    for candidate in gui_candidates:
+                        if candidate.exists():
+                            print(f"  {Colors.GREEN}[DISCOVERY] Found nsys-ui at: {candidate}{Colors.RESET}")
+                            return str(candidate)
+
+            elif tool == "ncu":
+                cmd_result = subprocess.run(["where", "ncu"], capture_output=True, text=True, timeout=5)
+                if cmd_result.returncode == 0:
+                    ncu_paths = cmd_result.stdout.strip().split('\n')
+                    # Look for the .bat file first (it's in the root directory)
+                    for ncu_path in ncu_paths:
+                        if ncu_path.endswith('.bat'):
+                            install_root = Path(ncu_path).parent
+                            print(f"  {Colors.CYAN}[DISCOVERY] Found ncu installation at: {install_root}{Colors.RESET}")
+
+                            # Check for ncu-ui.bat first (simpler)
+                            ncu_ui_bat = install_root / "ncu-ui.bat"
+                            if ncu_ui_bat.exists():
+                                print(f"  {Colors.GREEN}[DISCOVERY] Found ncu-ui.bat at: {ncu_ui_bat}{Colors.RESET}")
+                                return str(ncu_ui_bat)
+
+                            # Check for executable in host directory
+                            gui_candidates = [
+                                install_root / "host" / "windows-desktop-win7-x64" / "ncu-ui.exe",
+                                install_root / "host" / "windows-x64" / "ncu-ui.exe",
+                                install_root / "host" / "ncu-ui.exe"
+                            ]
+
+                            for candidate in gui_candidates:
+                                if candidate.exists():
+                                    print(f"  {Colors.GREEN}[DISCOVERY] Found ncu-ui at: {candidate}{Colors.RESET}")
+                                    return str(candidate)
+                            break
+
+            # Fallback: Search common NVIDIA installation directories
+            print(f"  {Colors.YELLOW}[DISCOVERY] Trying fallback search in common NVIDIA directories...{Colors.RESET}")
+            program_files = Path("C:/Program Files/NVIDIA Corporation")
+            if program_files.exists():
+                if tool == "nsys":
+                    for nsys_dir in program_files.glob("Nsight Systems*"):
+                        for gui_path in nsys_dir.rglob("nsys-ui.exe"):
+                            print(f"  {Colors.GREEN}[DISCOVERY] Found nsys-ui via fallback: {gui_path}{Colors.RESET}")
+                            return str(gui_path)
+                elif tool == "ncu":
+                    for ncu_dir in program_files.glob("Nsight Compute*"):
+                        ncu_ui_bat = ncu_dir / "ncu-ui.bat"
+                        if ncu_ui_bat.exists():
+                            print(f"  {Colors.GREEN}[DISCOVERY] Found ncu-ui.bat via fallback: {ncu_ui_bat}{Colors.RESET}")
+                            return str(ncu_ui_bat)
+                        for gui_path in ncu_dir.rglob("ncu-ui.exe"):
+                            print(f"  {Colors.GREEN}[DISCOVERY] Found ncu-ui.exe via fallback: {gui_path}{Colors.RESET}")
+                            return str(gui_path)
+
+            print(f"  {Colors.RED}[DISCOVERY] Could not find {tool} GUI tool anywhere{Colors.RESET}")
+            return None
+
+        except Exception as e:
+            print(f"  {Colors.YELLOW}[DISCOVERY] Error during discovery: {e}{Colors.RESET}")
+            return None
+
+    def launch_nsight_gui(self, file_path: str, tool: str):
+        """Launch appropriate Nsight GUI tool"""
+        print(f"  {Colors.CYAN}[EXEC] launch_nsight_gui() executing for: {file_path} with tool: {tool}{Colors.RESET}")
+        try:
+            file_path = Path(file_path)
+            if not file_path.exists():
+                print(f"  {Colors.RED}[ERROR] Report file not found: {file_path}{Colors.RESET}")
+                return False
+
+            # Discover the actual GUI tool path
+            gui_path = self.discover_gui_tool_path(tool)
+            if not gui_path:
+                print(f"  {Colors.RED}[ERROR] {tool.upper()} GUI tool not found. Please install NVIDIA Nsight tools.{Colors.RESET}")
+                print(f"  {Colors.YELLOW}[HINT] Expected locations:{Colors.RESET}")
+                if tool == "nsys":
+                    print(f"    • C:/Program Files/NVIDIA Corporation/Nsight Systems*/host-*/nsys-ui.exe")
+                elif tool == "ncu":
+                    print(f"    • C:/Program Files/NVIDIA Corporation/Nsight Compute*/ncu-ui.bat")
+                    print(f"    • C:/Program Files/NVIDIA Corporation/Nsight Compute*/host/*/ncu-ui.exe")
+                return False
+
+            print(f"  {Colors.CYAN}[LAUNCH] Starting {tool} GUI...{Colors.RESET}")
+            print(f"  {Colors.CYAN}[EXEC] Running: {gui_path} {file_path}{Colors.RESET}")
+
+            # Ensure file path is absolute and properly formatted
+            abs_file_path = str(Path(file_path).resolve())
+            print(f"  {Colors.CYAN}[DEBUG] Absolute path: {abs_file_path}{Colors.RESET}")
+
+            # Launch GUI in background with safer parameters
+            if platform.system() == "Windows":
+                # Use simpler approach without complex creation flags
+                try:
+                    subprocess.Popen([gui_path, abs_file_path],
+                                   shell=False,
+                                   stdout=subprocess.DEVNULL,
+                                   stderr=subprocess.DEVNULL)
+                    print(f"  {Colors.GREEN}[DEBUG] Process launched successfully{Colors.RESET}")
+                except Exception as launch_error:
+                    print(f"  {Colors.YELLOW}[DEBUG] Primary launch failed: {launch_error}{Colors.RESET}")
+                    # Fallback: try with shell=True
+                    try:
+                        cmd = f'"{gui_path}" "{abs_file_path}"'
+                        print(f"  {Colors.CYAN}[DEBUG] Trying fallback: {cmd}{Colors.RESET}")
+                        subprocess.Popen(cmd, shell=True,
+                                       stdout=subprocess.DEVNULL,
+                                       stderr=subprocess.DEVNULL)
+                        print(f"  {Colors.GREEN}[DEBUG] Fallback launch successful{Colors.RESET}")
+                    except Exception as fallback_error:
+                        print(f"  {Colors.RED}[DEBUG] Fallback also failed: {fallback_error}{Colors.RESET}")
+                        raise fallback_error
+            else:
+                subprocess.Popen([gui_path, abs_file_path],
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+            return True
+        except Exception as e:
+            print(f"  {Colors.YELLOW}[WARN] Could not launch {tool} GUI: {e}{Colors.RESET}")
+            return False
+
+    def print_clickable_path(self, file_path: str):
+        """Print clickable file path for terminals that support it"""
+        try:
+            file_path = Path(file_path).resolve()
+            if platform.system() == "Windows":
+                # Windows Terminal supports file:// links
+                path_str = str(file_path).replace('\\', '/')
+                clickable = f"file:///{path_str}"
+            else:
+                clickable = f"file://{file_path}"
+
+            print(f"  {Colors.CYAN}[PATH] Open location:{Colors.RESET} {clickable}")
+            print(f"     {Colors.GRAY}(Ctrl+Click to open in file manager){Colors.RESET}")
+        except Exception:
+            # Fallback to regular path
+            print(f"  {Colors.CYAN}[PATH] File location:{Colors.RESET} {file_path}")
     
     def monitor_nsys_progress(self, process):
         """Monitor nsys output and show progress"""
-        spinner = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+        spinner = ['|', '/', '-', '\\', '|', '/', '-', '\\']
         spin_idx = 0
         
         # Start a thread to read output
@@ -163,7 +339,7 @@ class ProfileSession:
                 if line is None:
                     break
                 if "Generating" in line or "Processing" in line:
-                    print(f"\r  {Colors.CYAN}📊{Colors.RESET} {line[:60]:<60}", end='', flush=True)
+                    print(f"\r  {Colors.CYAN}[INFO]{Colors.RESET} {line[:60]:<60}", end='', flush=True)
             except queue.Empty:
                 pass
             
@@ -177,7 +353,7 @@ class ProfileSession:
                 break
         
         thread.join(timeout=1)
-        print(f"\r  {Colors.GREEN}✓ Profiling complete! [{self.format_time(time.time() - self.start_time)}]{Colors.RESET}          ")
+        print(f"\r  {Colors.GREEN}[OK] Profiling complete! [{self.format_time(time.time() - self.start_time)}]{Colors.RESET}          ")
     
     def run_nsys(self, target_cmd: List[str], output_name: str, **kwargs):
         """Run Nsight Systems profiling"""
@@ -191,7 +367,7 @@ class ProfileSession:
             cmd.extend(["--cuda-memory-usage=true"])
             cmd.extend(["--gpu-metrics-device=all"])
         else:
-            print(f"  {Colors.CYAN}⚡ Quick mode:{Colors.RESET} Essential CUDA + NVTX traces")
+            print(f"  {Colors.CYAN}[*] Quick mode:{Colors.RESET} Essential CUDA + NVTX traces")
             cmd.extend(["--trace=cuda,nvtx"])
         
         # Add duration limit if specified
@@ -201,7 +377,7 @@ class ProfileSession:
         
         cmd.extend(target_cmd)
         
-        print(f"\n  {Colors.YELLOW}►{Colors.RESET} Starting Nsight Systems...")
+        print(f"\n  {Colors.YELLOW}[>]{Colors.RESET} Starting Nsight Systems...")
         self.start_time = time.time()
         
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
@@ -213,43 +389,53 @@ class ProfileSession:
         expected_file = f"{report_path}.nsys-rep"
         if Path(expected_file).exists():
             size = Path(expected_file).stat().st_size
-            print(f"\n  {Colors.GREEN}📄 Report saved:{Colors.RESET} {expected_file}")
+            print(f"\n  {Colors.GREEN}[FILE] Report saved:{Colors.RESET} {expected_file}")
             print(f"     Size: {self.format_size(size)}")
-            print(f"\n  {Colors.CYAN}📈 View with:{Colors.RESET} nsys-ui \"{expected_file}\"")
+
+            # Print clickable path
+            self.print_clickable_path(expected_file)
+
+            # Offer to launch GUI
+            print(f"\n  {Colors.CYAN}[LAUNCH] Launch options:{Colors.RESET}")
+            print(f"     • Nsight Systems GUI: nsys-ui \"{expected_file}\"")
+
             return expected_file
         else:
-            print(f"\n  {Colors.RED}❌ Report not found at expected location{Colors.RESET}")
+            print(f"\n  {Colors.RED}[ERROR] Report not found at expected location{Colors.RESET}")
             return None
     
     def run_ncu(self, target_cmd: List[str], output_name: str, **kwargs):
         """Run Nsight Compute profiling"""
         report_path = self.ncu_dir / output_name
-        
-        cmd = ["ncu", "-o", str(report_path)]
-        
+
+        cmd = ["ncu"]
+
+        # Add metric set first (must come before -o)
         if self.mode == "full":
             print(f"  {Colors.CYAN}🔬 Full mode:{Colors.RESET} Complete kernel analysis (~43 passes per kernel)")
-            print(f"  {Colors.YELLOW}⚠  Warning:{Colors.RESET} This will take several minutes...")
+            print(f"  {Colors.YELLOW}[WARN]  Warning:{Colors.RESET} This will take several minutes...")
             cmd.extend(["--set", "full"])
         else:
-            print(f"  {Colors.CYAN}⚡ Quick mode:{Colors.RESET} Essential metrics (~5 passes per kernel)")
-            metrics = [
-                "sm__throughput.avg.pct_of_peak_sustained_elapsed",
-                "dram__throughput.avg.pct_of_peak_sustained_elapsed",
-                "gpu__time_duration.sum",
-                "sm__warps_active.avg.pct_of_peak_sustained_active"
-            ]
-            cmd.extend(["--metrics", ",".join(metrics)])
-        
+            print(f"  {Colors.CYAN}[*] Quick mode:{Colors.RESET} Detailed metrics with source correlation (~15 passes per kernel)")
+            cmd.extend(["--set", "detailed"])
+
+        # Add source correlation for readable source view
+        cmd.extend([
+            "--import-source", "on",
+            "--source-folders", str(self.project_root / "cpp")
+        ])
+
         # Add kernel filter if specified
         if kwargs.get('kernel_filter'):
             cmd.extend(["--kernel-name", kwargs['kernel_filter']])
             print(f"  {Colors.CYAN}🎯 Filter:{Colors.RESET} {kwargs['kernel_filter']}")
-        
+
+        # Output file and target process options
         cmd.extend(["--target-processes", "all"])
+        cmd.extend(["-o", str(report_path)])
         cmd.extend(target_cmd)
         
-        print(f"\n  {Colors.YELLOW}►{Colors.RESET} Starting Nsight Compute...")
+        print(f"\n  {Colors.YELLOW}[>]{Colors.RESET} Starting Nsight Compute...")
         self.start_time = time.time()
         
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
@@ -261,12 +447,19 @@ class ProfileSession:
         expected_file = f"{report_path}.ncu-rep"
         if Path(expected_file).exists():
             size = Path(expected_file).stat().st_size
-            print(f"\n  {Colors.GREEN}📄 Report saved:{Colors.RESET} {expected_file}")
+            print(f"\n  {Colors.GREEN}[FILE] Report saved:{Colors.RESET} {expected_file}")
             print(f"     Size: {self.format_size(size)}")
-            print(f"\n  {Colors.CYAN}📈 View with:{Colors.RESET} ncu-ui \"{expected_file}\"")
+
+            # Print clickable path
+            self.print_clickable_path(expected_file)
+
+            # Offer to launch GUI
+            print(f"\n  {Colors.CYAN}[LAUNCH] Launch options:{Colors.RESET}")
+            print(f"     • Nsight Compute GUI: ncu-ui \"{expected_file}\"")
+
             return expected_file
         else:
-            print(f"\n  {Colors.RED}❌ Report not found at expected location{Colors.RESET}")
+            print(f"\n  {Colors.RED}[ERROR] Report not found at expected location{Colors.RESET}")
             return None
 
 
@@ -285,14 +478,136 @@ def main():
     # Setup session
     session = ProfileSession(args.tool, args.target, args.mode)
     session.print_header()
+
+    # Safety measures and validation - FAIL FAST
+    print(f"  {Colors.CYAN}[VALIDATE] Running comprehensive profiling setup validation...{Colors.RESET}")
+    validation_errors = []
+
+    # 1. Check Python environment
+    try:
+        import sys
+        python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+        print(f"  {Colors.GREEN}[OK] Python {python_version} detected{Colors.RESET}")
+    except Exception as e:
+        validation_errors.append(f"Python environment issue: {e}")
+
+    # 2. Check for CUDA availability
+    try:
+        result = subprocess.run(["nvidia-smi"], capture_output=True, text=True, timeout=10)
+        if result.returncode == 0:
+            # Extract GPU info from nvidia-smi
+            lines = result.stdout.split('\n')
+            gpu_line = next((line for line in lines if 'NVIDIA' in line and 'Driver Version' in line), None)
+            if gpu_line:
+                print(f"  {Colors.GREEN}[OK] CUDA GPU detected{Colors.RESET}")
+            else:
+                print(f"  {Colors.YELLOW}[WARN] nvidia-smi responded but no GPU info found{Colors.RESET}")
+        else:
+            validation_errors.append("nvidia-smi command failed - CUDA may not be available")
+    except subprocess.TimeoutExpired:
+        validation_errors.append("nvidia-smi command timed out - system may be unresponsive")
+    except FileNotFoundError:
+        validation_errors.append("nvidia-smi not found - NVIDIA drivers may not be installed")
+
+    # 3. Check for profiling tool availability with detailed validation
+    tool_cmd = args.tool
+    try:
+        result = subprocess.run([tool_cmd, "--version"], capture_output=True, text=True, timeout=10)
+        if result.returncode == 0:
+            version_info = result.stdout.strip()
+            print(f"  {Colors.GREEN}[OK] {tool_cmd.upper()} available: {version_info.split()[-1] if version_info else 'version unknown'}{Colors.RESET}")
+        else:
+            validation_errors.append(f"{tool_cmd.upper()} version check failed (exit code: {result.returncode})")
+    except subprocess.TimeoutExpired:
+        validation_errors.append(f"{tool_cmd.upper()} command timed out - tool may be unresponsive")
+    except FileNotFoundError:
+        validation_errors.append(f"{tool_cmd.upper()} not found in PATH - please install NVIDIA Nsight tools")
+
+    # 3.5. Check GUI tool availability (informational - not critical)
+    gui_path = session.discover_gui_tool_path(tool_cmd)
+    if gui_path:
+        print(f"  {Colors.GREEN}[OK] {tool_cmd.upper()} GUI tool discovered: {Path(gui_path).name}{Colors.RESET}")
+    else:
+        print(f"  {Colors.YELLOW}[WARN] {tool_cmd.upper()} GUI tool not found - command-line profiling will work, but GUI launch will fail{Colors.RESET}")
+
+    # 4. Check write permissions for output directory
+    try:
+        session.reports_dir.mkdir(parents=True, exist_ok=True)
+        test_file = session.reports_dir / ".test_write"
+        test_file.write_text("test")
+        test_file.unlink()
+        print(f"  {Colors.GREEN}[OK] Write permissions verified for: {session.reports_dir}{Colors.RESET}")
+    except Exception as e:
+        validation_errors.append(f"Cannot write to reports directory {session.reports_dir}: {e}")
+
+    # FAIL FAST: Stop immediately if critical issues found
+    if validation_errors:
+        print(f"\n  {Colors.RED}[FATAL] Validation failed! Found {len(validation_errors)} critical issues:{Colors.RESET}")
+        for i, error in enumerate(validation_errors, 1):
+            print(f"    {i}. {error}")
+        print(f"\n  {Colors.YELLOW}[ACTION] Please fix these issues before profiling:{Colors.RESET}")
+        print(f"    • Install NVIDIA drivers and CUDA toolkit")
+        print(f"    • Install NVIDIA Nsight tools (nsys, ncu)")
+        print(f"    • Ensure sufficient disk space and permissions")
+        print(f"    • Check system stability (no hanging processes)")
+        exit(1)
     
     # Build target command
-    target_cmd = ["python", "-m", f"ionosense_hpc.benchmarks.{args.target}"]
-    if args.args and args.args[0] == "--":
-        target_cmd.extend(args.args[1:])
+    preset_targets = ["latency", "throughput", "accuracy", "realtime"]
+
+    if args.target in preset_targets:
+        # Route to the correct benchmark script
+        target_cmd = ["python", f"benchmarks/run_{args.target}.py"]
+
+        # If no arguments provided, use profiling defaults
+        if not args.args or (args.args and args.args[0] != "--"):
+            # Default to fast profiling configuration
+            # Use benchmark-specific profiling config if available
+            if args.target == "latency":
+                target_cmd.extend(["experiment=profiling", "+benchmark=profiling"])
+            elif args.target == "throughput":
+                target_cmd.extend(["experiment=profiling", "+benchmark=profiling_throughput"])
+            elif args.target == "realtime":
+                target_cmd.extend(["experiment=profiling", "+benchmark=profiling_realtime"])
+            elif args.target == "accuracy":
+                target_cmd.extend(["experiment=profiling", "+benchmark=profiling_accuracy"])
+        elif args.args and args.args[0] == "--":
+            # User provided custom arguments
+            target_cmd.extend(args.args[1:])
+        else:
+            target_cmd.extend(args.args)
+    elif args.target == "custom" and args.args:
+        # Custom script path provided
+        script_path = args.args[0] if args.args else "custom_script.py"
+        target_cmd = ["python", script_path]
+        if len(args.args) > 1:
+            target_cmd.extend(args.args[1:])
     else:
-        target_cmd.extend(args.args)
-    
+        # Legacy format or module-based target
+        if "." in args.target or "/" in args.target or "\\" in args.target:
+            # Looks like a file path
+            target_cmd = ["python", args.target]
+        else:
+            # Module format
+            target_cmd = ["python", "-m", f"ionosense_hpc.benchmarks.{args.target}"]
+
+        if args.args and args.args[0] == "--":
+            target_cmd.extend(args.args[1:])
+        else:
+            target_cmd.extend(args.args)
+
+    # Validate target script exists for preset targets
+    if args.target in preset_targets:
+        project_root = Path(__file__).parent.parent
+        script_path = project_root / "benchmarks" / f"run_{args.target}.py"
+        if not script_path.exists():
+            print(f"  {Colors.RED}[X] Benchmark script not found: {script_path}{Colors.RESET}")
+            exit(1)
+        else:
+            print(f"  {Colors.GREEN}[OK] Target script found: run_{args.target}.py{Colors.RESET}")
+
+    print(f"  {Colors.GREEN}[OK] Validation complete{Colors.RESET}\n")
+
     # Generate output name
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_name = f"{args.target}_{args.mode}_{timestamp}"
@@ -316,11 +631,41 @@ def main():
             with open(csv_out, 'w') as f:
                 subprocess.run(["ncu", "-i", report, "--csv"], stdout=f, stderr=subprocess.DEVNULL)
             print(f"     CSV: {csv_out}")
-    
+
+    # Post-profiling actions
+    if report:
+        print(f"\n{Colors.CYAN}[OPTIONS] Post-profiling actions:{Colors.RESET}")
+
+        # Offer to open file location
+        try:
+            response = input(f"Open file location in explorer? (y/N): ").strip().lower()
+            if response in ['y', 'yes']:
+                print(f"  {Colors.CYAN}[DEBUG] Calling open_file_location() for: {report}{Colors.RESET}")
+                success = session.open_file_location(report)
+                if success:
+                    print(f"  {Colors.GREEN}[OK] File location opened in Windows Explorer{Colors.RESET}")
+                else:
+                    print(f"  {Colors.RED}[ERROR] Failed to open file location{Colors.RESET}")
+        except (KeyboardInterrupt, EOFError):
+            print()  # Clean newline
+
+        # Offer to launch GUI
+        try:
+            response = input(f"Launch {args.tool.upper()} GUI? (y/N): ").strip().lower()
+            if response in ['y', 'yes']:
+                print(f"  {Colors.CYAN}[DEBUG] Calling launch_nsight_gui() for: {report} with tool: {args.tool}{Colors.RESET}")
+                success = session.launch_nsight_gui(report, args.tool)
+                if success:
+                    print(f"  {Colors.GREEN}[OK] {args.tool.upper()} GUI launched successfully{Colors.RESET}")
+                else:
+                    print(f"  {Colors.RED}[ERROR] Failed to launch {args.tool.upper()} GUI{Colors.RESET}")
+        except (KeyboardInterrupt, EOFError):
+            print()  # Clean newline
+
     # Print footer
-    print(f"\n{Colors.GRAY}────────────────────────────────────────────────────────{Colors.RESET}")
-    print(f"{Colors.CYAN}💾 Reports directory:{Colors.RESET} {session.reports_dir}")
-    print(f"{Colors.GRAY}────────────────────────────────────────────────────────{Colors.RESET}")
+    print(f"\n{Colors.GRAY}{'='*60}{Colors.RESET}")
+    print(f"{Colors.CYAN}[REPORTS] Directory:{Colors.RESET} {session.reports_dir}")
+    print(f"{Colors.GRAY}{'='*60}{Colors.RESET}")
 
 
 if __name__ == "__main__":

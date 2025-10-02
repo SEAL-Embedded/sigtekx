@@ -80,7 +80,10 @@ function Invoke-Build {
         [bool]$Verbose = $false
     )
 
-    Write-Status "Building project with preset: $Preset"
+    $script:BuildPreset = $Preset
+    $configLabel = if ($Preset -match 'debug') { 'Debug' } else { 'Release' }
+
+    Write-Status "Building project with preset: $Preset ($configLabel)"
 
     if ($Clean) {
         Write-Status "Cleaning build directory..."
@@ -89,26 +92,22 @@ function Invoke-Build {
         }
     }
 
-    $args = @("--preset", $Preset)
-    if ($Verbose) { $args += "--verbose" }
+    $configureArgs = @("--preset", $Preset)
+    if ($Verbose) { $configureArgs += "--log-level=VERBOSE" }
 
     Write-Status "Configuring with CMake..."
-    & cmake @args .
+    & cmake @configureArgs
 
     if ($LASTEXITCODE -ne 0) {
         Write-Error "CMake configuration failed"
         exit 1
     }
 
-    # Build directory includes the preset name when using --preset
-    $actualBuildDir = if ($args -contains "--preset") {
-        Join-Path $script:BuildDir $Preset
-    } else {
-        $script:BuildDir
-    }
-
     Write-Status "Building..."
-    & cmake --build $actualBuildDir --config Release
+    $buildArgs = @("--build", "--preset", $Preset)
+    if ($Verbose) { $buildArgs += "--verbose" }
+
+    & cmake @buildArgs
 
     if ($LASTEXITCODE -eq 0) {
         Write-Success "Build completed successfully"
@@ -322,266 +321,120 @@ function Invoke-Doctor {
     }
 }
 
-function Invoke-Analysis {
+function Invoke-Profile {
     param(
-        [int]$Cores = 4,
-        [string]$Target = "all",
-        [bool]$DryRun = $false
+        [string]$Tool = "",
+        [string]$Target = "",
+        [string]$Mode = "quick",
+        [string]$Script = "",
+        [string]$Kernel = "",
+        [int]$Duration = 0,
+        [bool]$OpenAfter = $true,
+        [bool]$Interactive = $false
     )
 
-    Write-Status "Running analysis pipeline..."
+    Write-Status "Starting GPU profiling session..."
 
-    $snakefileePath = Join-Path $script:ProjectRoot "experiments/Snakefile"
-    if (-not (Test-Path $snakefileePath)) {
-        Write-Error "Snakefile not found at: $snakefileePath"
+    # Validate prof_helper.py exists
+    $profHelper = Join-Path $script:ProjectRoot "scripts/prof_helper.py"
+    if (-not (Test-Path $profHelper)) {
+        Write-Error "prof_helper.py not found at: $profHelper"
         exit 1
     }
 
-    $args = @("--cores", $Cores, "--snakefile", $snakefileePath)
-    if ($DryRun) { $args += "--dry-run" }
-    if ($Target -ne "all") { $args += $Target }
-
-    & snakemake @args
-
-    if ($LASTEXITCODE -eq 0) {
-        Write-Success "Analysis pipeline completed successfully"
-    } else {
-        Write-Error "Analysis pipeline failed"
-        exit 1
-    }
-}
-
-function Invoke-TypeCheck {
-    param(
-        [string[]]$Paths = @(),
-        [bool]$Verbose = $false
-    )
-
-    Write-Status "Running type checking..."
-
-    $mypy = Get-Command mypy -ErrorAction SilentlyContinue
-    if (-not $mypy) {
-        Write-Error "mypy not found. Install with: pip install mypy"
-        exit 1
+    # Interactive mode if no parameters provided
+    if (-not $Tool -or -not $Target) {
+        $Interactive = $true
     }
 
-    if ($Paths.Count -eq 0) {
-        $Paths = @("src", "tests", "benchmarks", "experiments/scripts")
-    }
+    if ($Interactive) {
+        Write-Host "`n🎯 GPU Profiling Tool Selection" -ForegroundColor Cyan
+        Write-Host "1. nsys (Nsight Systems) - Timeline analysis, CUDA API tracing"
+        Write-Host "2. ncu  (Nsight Compute) - Kernel performance analysis"
+        do {
+            $toolChoice = Read-Host "Select profiling tool (1-2)"
+        } while ($toolChoice -notin @("1", "2"))
 
-    $args = @()
-    if ($Verbose) { $args += "--verbose" }
+        $Tool = if ($toolChoice -eq "1") { "nsys" } else { "ncu" }
 
-    foreach ($path in $Paths) {
-        if (Test-Path $path) {
-            $args += $path
-        }
-    }
+        Write-Host "`n📊 Benchmark Target Selection" -ForegroundColor Cyan
+        Write-Host "1. latency    - Latency benchmark with profiling config"
+        Write-Host "2. throughput - Throughput benchmark with profiling config"
+        Write-Host "3. accuracy   - Accuracy benchmark with profiling config"
+        Write-Host "4. realtime   - Realtime benchmark with profiling config"
+        Write-Host "5. custom     - Specify custom script path"
+        do {
+            $targetChoice = Read-Host "Select benchmark target (1-5)"
+        } while ($targetChoice -notin @("1", "2", "3", "4", "5"))
 
-    & mypy @args
-
-    if ($LASTEXITCODE -eq 0) {
-        Write-Success "Type checking completed successfully"
-    } else {
-        Write-Error "Type checking failed"
-        exit 1
-    }
-}
-
-function Show-Info {
-    Write-Host @"
-╔════════════════════════════════════════════════════════════════════════╗
-║  IONOSENSE-HPC PROJECT INFORMATION                                     ║
-╚════════════════════════════════════════════════════════════════════════╝
-"@
-
-    # Project info
-    $pyprojectPath = Join-Path $script:ProjectRoot "pyproject.toml"
-    if (Test-Path $pyprojectPath) {
-        $content = Get-Content $pyprojectPath -Raw
-        if ($content -match 'version\s*=\s*"([^"]+)"') {
-            Write-Host ">> Project: ionosense-hpc v$($Matches[1])" -ForegroundColor Green
-        }
-    }
-
-    # Environment info
-    if ($env:CONDA_DEFAULT_ENV) {
-        Write-Host ">> Environment: $($env:CONDA_DEFAULT_ENV)" -ForegroundColor Green
-    } else {
-        Write-Host ">> Environment: None (consider running setup)" -ForegroundColor Yellow
-    }
-
-    # Git info
-    try {
-        $branch = & git branch --show-current 2>$null
-        if ($branch) {
-            Write-Host ">> Branch: $branch" -ForegroundColor Green
-        }
-    } catch {}
-
-    # MLflow info
-    $mlrunsPath = Join-Path $script:ProjectRoot "artifacts/mlruns"
-    if (Test-Path $mlrunsPath) {
-        Write-Host ">> MLflow: Tracking data available" -ForegroundColor Green
-        Write-Host "   Start UI: iono ui" -ForegroundColor Gray
-    } else {
-        Write-Host ">> MLflow: No tracking data yet" -ForegroundColor Yellow
-    }
-
-    # Available experiments
-    $expDir = Join-Path $script:ProjectRoot "experiments/conf/experiment"
-    if (Test-Path $expDir) {
-        $experiments = Get-ChildItem $expDir -Name "*.yaml" | ForEach-Object { $_.Replace(".yaml", "") }
-        Write-Host ">> Available experiments: $($experiments -join ', ')" -ForegroundColor Cyan
-    }
-
-    Write-Host ""
-    Write-Host ">> Quick commands:" -ForegroundColor Cyan
-    Write-Host "   iono status    # Show comprehensive status" -ForegroundColor Gray
-    Write-Host "   iono analysis  # Run analysis pipeline" -ForegroundColor Gray
-    Write-Host "   iono learn     # Research workflow examples" -ForegroundColor Gray
-}
-
-function Show-Status {
-    Write-Host @"
-╔════════════════════════════════════════════════════════════════════════╗
-║  IONOSENSE-HPC PROJECT STATUS                                          ║
-╚════════════════════════════════════════════════════════════════════════╝
-"@
-
-    # Git status
-    Write-Host ">> Git Status:" -ForegroundColor Cyan
-    try {
-        $gitStatus = & git status --porcelain 2>$null
-        if ($gitStatus) {
-            Write-Host "   Modified files detected" -ForegroundColor Yellow
-        } else {
-            Write-Host "   Working tree clean" -ForegroundColor Green
-        }
-
-        $branch = & git branch --show-current 2>$null
-        if ($branch) {
-            Write-Host "   Branch: $branch" -ForegroundColor Green
-        }
-    } catch {
-        Write-Host "   Git not available or not a repository" -ForegroundColor Red
-    }
-
-    # DVC status
-    Write-Host ""
-    Write-Host ">> DVC Status:" -ForegroundColor Cyan
-    try {
-        $dvcStatus = & dvc status 2>$null
-        if ($LASTEXITCODE -eq 0) {
-            if ($dvcStatus) {
-                Write-Host "   Changes detected in pipeline" -ForegroundColor Yellow
-            } else {
-                Write-Host "   Pipeline up to date" -ForegroundColor Green
+        $Target = switch ($targetChoice) {
+            "1" { "latency" }
+            "2" { "throughput" }
+            "3" { "accuracy" }
+            "4" { "realtime" }
+            "5" {
+                $Script = Read-Host "Enter custom script path"
+                "custom"
             }
-        } else {
-            Write-Host "   DVC not initialized or unavailable" -ForegroundColor Yellow
         }
-    } catch {
-        Write-Host "   DVC not available" -ForegroundColor Red
-    }
 
-    # Environment status
-    Write-Host ""
-    Write-Host ">> Environment Status:" -ForegroundColor Cyan
-    if ($env:CONDA_DEFAULT_ENV) {
-        Write-Host "   Active: $($env:CONDA_DEFAULT_ENV)" -ForegroundColor Green
-    } else {
-        Write-Host "   No conda environment active" -ForegroundColor Yellow
-    }
-
-    # Build status
-    Write-Host ""
-    Write-Host ">> Build Status:" -ForegroundColor Cyan
-    if (Test-Path $script:BuildDir) {
-        Write-Host "   Build directory exists" -ForegroundColor Green
-    } else {
-        Write-Host "   No build found (run 'iono build')" -ForegroundColor Yellow
-    }
-
-    # MLflow experiments
-    Write-Host ""
-    Write-Host ">> MLflow Status:" -ForegroundColor Cyan
-    $mlrunsPath = Join-Path $script:ProjectRoot "artifacts/mlruns"
-    if (Test-Path $mlrunsPath) {
-        try {
-            $experiments = Get-ChildItem $mlrunsPath -Directory | Where-Object { $_.Name -ne "0" } | Measure-Object
-            Write-Host "   $($experiments.Count) experiment(s) tracked" -ForegroundColor Green
-        } catch {
-            Write-Host "   Tracking data available" -ForegroundColor Green
+        if ($Tool -eq "ncu") {
+            $modeChoice = Read-Host "Profiling mode? (quick/full) [quick]"
+            if ($modeChoice) { $Mode = $modeChoice }
         }
-    } else {
-        Write-Host "   No experiments tracked yet" -ForegroundColor Yellow
     }
 
-    Write-Host ""
-    Write-Host ">> Next steps:" -ForegroundColor Cyan
-    Write-Host "   iono analysis  # Run analysis pipeline" -ForegroundColor Gray
-    Write-Host "   iono ui        # View experiment results" -ForegroundColor Gray
-    Write-Host "   iono learn     # Research workflow examples" -ForegroundColor Gray
-}
+    # Validate target benchmark exists for presets
+    if ($Target -in @("latency", "throughput", "accuracy", "realtime")) {
+        $benchmarkScript = Join-Path $script:ProjectRoot "benchmarks/run_$Target.py"
+        if (-not (Test-Path $benchmarkScript)) {
+            Write-Error "Benchmark script not found: $benchmarkScript"
+            exit 1
+        }
+    }
 
-function Show-Learn {
-    Write-Host @"
-╔════════════════════════════════════════════════════════════════════════╗
-║  IONOSENSE-HPC RESEARCH WORKFLOW GUIDE                                 ║
-╚════════════════════════════════════════════════════════════════════════╝
-"@
+    # Build prof_helper command
+    $args = @($Tool)
 
+    if ($Script) {
+        $args += $Script
+    } else {
+        $args += $Target
+    }
+
+    $args += "--mode", $Mode
+
+    if ($Kernel) { $args += "--kernel", $Kernel }
+    if ($Duration -gt 0) { $args += "--duration", $Duration }
+
+    # Add profiling config for preset benchmarks
+    if ($Target -in @("latency", "throughput", "accuracy", "realtime")) {
+        # Map targets to their lightweight profiling benchmark configs
+        $benchmarkConfig = switch ($Target) {
+            "latency"    { "profiling" }
+            "throughput" { "profiling_throughput" }
+            "realtime"   { "profiling_realtime" }
+            "accuracy"   { "profiling_accuracy" }
+        }
+        $args += "--", "experiment=profiling", "+benchmark=$benchmarkConfig"
+    }
+
+    Write-Status "Executing: python `"$profHelper`" $($args -join ' ')"
     Write-Host ""
-    Write-Host ">> START HERE - IONO WORKFLOW COMMANDS" -ForegroundColor Green
-    Write-Host ""
-    Write-Host "1. Check your setup:" -ForegroundColor Cyan
-    Write-Host "   iono info                  # Project info & available experiments" -ForegroundColor Gray
-    Write-Host "   iono status                # Git, environment & MLflow status" -ForegroundColor Gray
-    Write-Host ""
-    Write-Host "2. Run experiments & analysis:" -ForegroundColor Cyan
-    Write-Host "   iono analysis              # Run full analysis pipeline" -ForegroundColor Gray
-    Write-Host "   iono analysis -DryRun      # Preview what will run" -ForegroundColor Gray
-    Write-Host ""
-    Write-Host "3. View results:" -ForegroundColor Cyan
-    Write-Host "   iono ui                    # Launch MLflow UI for results" -ForegroundColor Gray
-    Write-Host ""
-    Write-Host "4. Code quality:" -ForegroundColor Cyan
-    Write-Host "   iono typecheck             # Check Python types" -ForegroundColor Gray
-    Write-Host "   iono test                  # Run tests" -ForegroundColor Gray
-    Write-Host "   iono lint                  # Check code style" -ForegroundColor Gray
-    Write-Host ""
-    Write-Host ">> IONOSPHERE RESEARCH EXPERIMENTS" -ForegroundColor Green
-    Write-Host ""
-    Write-Host "Start with testing:" -ForegroundColor Cyan
-    Write-Host "   python benchmarks/run_throughput.py --multirun experiment=ionosphere_test +benchmark=throughput" -ForegroundColor Gray
-    Write-Host ""
-    Write-Host "Then try full studies:" -ForegroundColor Cyan
-    Write-Host "   python benchmarks/run_throughput.py --multirun experiment=ionosphere_resolution +benchmark=throughput" -ForegroundColor Gray
-    Write-Host "   python benchmarks/run_throughput.py --multirun experiment=ionosphere_temporal +benchmark=throughput" -ForegroundColor Gray
-    Write-Host "   python benchmarks/run_latency.py experiment=ionosphere_multiscale +benchmark=latency" -ForegroundColor Gray
-    Write-Host ""
-    Write-Host ">> ADVANCED DIRECT CONTROLS" -ForegroundColor Yellow
-    Write-Host ""
-    Write-Host "Snakemake pipeline:" -ForegroundColor Cyan
-    Write-Host "   snakemake --cores 4 --snakefile experiments/Snakefile" -ForegroundColor Gray
-    Write-Host "   snakemake --cores 4 generate_figures --snakefile experiments/Snakefile" -ForegroundColor Gray
-    Write-Host ""
-    Write-Host "MLflow direct:" -ForegroundColor Cyan
-    Write-Host "   mlflow ui --backend-store-uri file://./artifacts/mlruns" -ForegroundColor Gray
-    Write-Host ""
-    Write-Host "Data versioning:" -ForegroundColor Cyan
-    Write-Host "   dvc status                 # Check pipeline status" -ForegroundColor Gray
-    Write-Host "   dvc repro                  # Reproduce pipeline" -ForegroundColor Gray
-    Write-Host "   dvc dag                    # View pipeline DAG" -ForegroundColor Gray
-    Write-Host ""
-    Write-Host "!! CRITICAL REQUIREMENTS" -ForegroundColor Red
-    Write-Host ""
-    Write-Host "* ALWAYS specify +benchmark=throughput for throughput tests" -ForegroundColor Red
-    Write-Host "* ALWAYS specify +benchmark=latency for latency tests" -ForegroundColor Red
-    Write-Host "* Use experiment=ionosphere_test for quick testing" -ForegroundColor Yellow
-    Write-Host ""
-    Write-Host ">> More detailed examples: See CLAUDE.md" -ForegroundColor Cyan
+
+    # Run profiling
+    & python $profHelper @args
+
+    if ($LASTEXITCODE -eq 0 -and $OpenAfter) {
+        Write-Host "`n🚀 Opening profiling results..." -ForegroundColor Green
+
+        # Open artifacts/profiling directory
+        $profilingDir = Join-Path $script:ProjectRoot "artifacts/profiling"
+        if (Test-Path $profilingDir) {
+            Write-Status "Opening profiling directory: $profilingDir"
+            Start-Process "explorer.exe" -ArgumentList $profilingDir
+        }
+    }
 }
 
 function Show-Help {
@@ -595,26 +448,30 @@ USAGE: .\scripts\cli.ps1 <command> [options]
 
 ESSENTIAL DEVELOPMENT
   setup [-Clean]          Create/update conda environment & install package
-  build [-Preset] [-Clean] [-Verbose] [-Debug/-Release]
+  build [-Preset <name>] [-Clean] [--debug|--release] [--verbose]
                           Configure and build project with CMake
-  test [all|python|cpp] [-Pattern] [-Coverage] [-Verbose]
+  test [all|python|cpp] [-Pattern] [-Coverage] [--verbose]
                           Run tests
-  format [paths] [-Check] [-Verbose]
+  format [paths] [-Check] [--verbose]
                           Format C++ code with clang-format
-  lint [all|python|cpp] [-Fix] [-Verbose]
+  lint [all|python|cpp] [-Fix] [--verbose]
                           Lint code with ruff
   clean [-All]            Remove build artifacts
   doctor                  Check development environment health
   ui                      Launch MLflow UI for experiment tracking
 
-NEW RESEARCH & STATUS COMMANDS
-  analysis [-Cores] [-Target] [-DryRun]
-                          Run analysis pipeline via Snakemake
-  info                    Show project information and available experiments
-  status                  Show comprehensive project status (git, DVC, MLflow)
-  typecheck [paths] [-Verbose]
-                          Run Python type checking with mypy
-  learn                   Show research workflow examples and best practices
+GPU PROFILING
+  profile [tool] [target] Profile GPU performance with Nsight tools
+                          Tools: nsys (Systems), ncu (Compute)
+                          Targets: latency, throughput, accuracy, realtime, custom
+                          Interactive mode if no args provided
+
+PROFILING EXAMPLES:
+  .\scripts\cli.ps1 profile nsys latency      # Profile latency benchmark
+  .\scripts\cli.ps1 profile ncu throughput   # Profile throughput with NCU
+  .\scripts\cli.ps1 profile                   # Interactive mode
+  .\scripts\cli.ps1 profile nsys latency -Full -Duration 30
+  .\scripts\cli.ps1 profile ncu custom -Script "my_script.py"
 
 PYTHON SCRIPT RUNNER
   run <script.py> [args...]
@@ -653,6 +510,20 @@ For detailed research workflow, see: CLAUDE.md
 try {
     Set-Location $script:ProjectRoot
 
+    $normalizedArgs = @()
+    foreach ($arg in $CommandArgs) {
+        if ($null -ne $arg) {
+            $normalizedArgs += $arg.ToLowerInvariant()
+        }
+    }
+
+    $commonDebug = $false
+    $commonVerbose = $false
+    if ($null -ne $PSBoundParameters) {
+        if ($PSBoundParameters.ContainsKey('Debug')) { $commonDebug = $true }
+        if ($PSBoundParameters.ContainsKey('Verbose')) { $commonVerbose = $true }
+    }
+
     switch ($Command.ToLower()) {
         "help"     { Show-Help }
         "setup"    {
@@ -662,8 +533,12 @@ try {
         }
         "build"    {
             $params = @{}
-            if ($CommandArgs -icontains "-Clean") { $params.Clean = $true }
-            if ($CommandArgs -icontains "-Verbose") { $params.Verbose = $true }
+
+            if ($normalizedArgs -contains "-clean" -or $normalizedArgs -contains "--clean") { $params.Clean = $true }
+
+            if ($commonVerbose -or $normalizedArgs -contains "-verbose" -or $normalizedArgs -contains "--verbose") {
+                $params.Verbose = $true
+            }
 
             # Handle preset
             for ($i = 0; $i -lt $CommandArgs.Count; $i++) {
@@ -672,15 +547,19 @@ try {
                 }
             }
 
-            if ($CommandArgs -icontains "-Debug") { $params.Preset = "windows-debug" }
-            elseif ($CommandArgs -icontains "-Release") { $params.Preset = "windows-rel" }
+            if ($commonDebug -or $normalizedArgs -contains "-debug" -or $normalizedArgs -contains "--debug") {
+                $params.Preset = "windows-debug"
+            } elseif ($normalizedArgs -contains "-release" -or $normalizedArgs -contains "--release") {
+                $params.Preset = "windows-rel"
+            }
 
             Invoke-Build @params
         }
+
         "test"     {
             $params = @{}
-            if ($CommandArgs -icontains "-Coverage") { $params.Coverage = $true }
-            if ($CommandArgs -icontains "-Verbose") { $params.Verbose = $true }
+            if ($normalizedArgs -contains "-coverage" -or $normalizedArgs -contains "--coverage") { $params.Coverage = $true }
+            if ($commonVerbose -or $normalizedArgs -contains "-verbose" -or $normalizedArgs -contains "--verbose") { $params.Verbose = $true }
 
             for ($i = 0; $i -lt $CommandArgs.Count; $i++) {
                 if ($CommandArgs[$i] -eq "-Pattern" -and $i+1 -lt $CommandArgs.Count) {
@@ -693,26 +572,29 @@ try {
 
             Invoke-Test @params
         }
+
         "format"   {
             $params = @{}
-            if ($CommandArgs -icontains "-Check") { $params.Check = $true }
-            if ($CommandArgs -icontains "-Verbose") { $params.Verbose = $true }
+            if ($normalizedArgs -contains "-check" -or $normalizedArgs -contains "--check") { $params.Check = $true }
+            if ($commonVerbose -or $normalizedArgs -contains "-verbose" -or $normalizedArgs -contains "--verbose") { $params.Verbose = $true }
 
             $paths = $CommandArgs | Where-Object { $_ -and $_ -notlike "-*" }
             if ($paths) { $params.Paths = $paths }
 
             Invoke-Format @params
         }
+
         "lint"     {
             $params = @{}
-            if ($CommandArgs -icontains "-Fix") { $params.Fix = $true }
-            if ($CommandArgs -icontains "-Verbose") { $params.Verbose = $true }
+            if ($normalizedArgs -contains "-fix" -or $normalizedArgs -contains "--fix") { $params.Fix = $true }
+            if ($commonVerbose -or $normalizedArgs -contains "-verbose" -or $normalizedArgs -contains "--verbose") { $params.Verbose = $true }
 
             $target = $CommandArgs | Where-Object { $_ -notlike "-*" } | Select-Object -First 1
             if ($target) { $params.Target = $target }
 
             Invoke-Lint @params
         }
+
         "clean"    {
             $params = @{}
             if ($CommandArgs -icontains "-All") { $params.All = $true }
@@ -750,33 +632,38 @@ try {
             Write-Status "Starting MLflow UI..."
             $uri = Join-Path $script:ProjectRoot "artifacts/mlruns"
             Write-Status "Backend URI: $uri"
+            # Use Start-Process to launch without blocking the terminal
+            Start-Process mlflow @("ui", "--backend-store-uri", $uri, "--port", "5000")
+            Write-Success "MLflow UI launched at http://localhost:5000"
+        }
+        "profile"  {
+            $params = @{}
 
-            # Check if MLflow is available
-            $mlflow = Get-Command mlflow -ErrorAction SilentlyContinue
-            if (-not $mlflow) {
-                Write-Error "MLflow not found. Install with: pip install mlflow"
-                exit 1
+            # Parse tool and target from args
+            $nonFlagArgs = $CommandArgs | Where-Object { $_ -and $_ -notlike "-*" }
+            if ($nonFlagArgs.Count -ge 1) { $params.Tool = $nonFlagArgs[0] }
+            if ($nonFlagArgs.Count -ge 2) { $params.Target = $nonFlagArgs[1] }
+
+            # Parse flags
+            if ($CommandArgs -icontains "-Full") { $params.Mode = "full" }
+            if ($CommandArgs -icontains "-NoOpen") { $params.OpenAfter = $false }
+
+            for ($i = 0; $i -lt $CommandArgs.Count; $i++) {
+                if ($CommandArgs[$i] -eq "-Mode" -and $i+1 -lt $CommandArgs.Count) {
+                    $params.Mode = $CommandArgs[$i+1]
+                }
+                if ($CommandArgs[$i] -eq "-Script" -and $i+1 -lt $CommandArgs.Count) {
+                    $params.Script = $CommandArgs[$i+1]
+                }
+                if ($CommandArgs[$i] -eq "-Kernel" -and $i+1 -lt $CommandArgs.Count) {
+                    $params.Kernel = $CommandArgs[$i+1]
+                }
+                if ($CommandArgs[$i] -eq "-Duration" -and $i+1 -lt $CommandArgs.Count) {
+                    $params.Duration = [int]$CommandArgs[$i+1]
+                }
             }
 
-            # Check if backend directory exists
-            if (-not (Test-Path $uri)) {
-                Write-Error "MLflow tracking directory not found: $uri"
-                Write-Host "Run some experiments first to generate tracking data" -ForegroundColor Yellow
-                exit 1
-            }
-
-            Write-Host ""
-            Write-Success "Starting MLflow UI at http://localhost:5000"
-            Write-Host ">> Press Ctrl+C to stop the server when done" -ForegroundColor Yellow
-            Write-Host ""
-
-            # Run MLflow UI directly (blocking)
-            & mlflow ui --backend-store-uri $uri --port 5000
-
-            if ($LASTEXITCODE -ne 0) {
-                Write-Error "MLflow UI failed to start"
-                exit 1
-            }
+            Invoke-Profile @params
         }
         "run"      {
             if ($CommandArgs.Count -eq 0) {

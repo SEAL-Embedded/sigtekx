@@ -1,0 +1,24 @@
+name: profiling_accuracy
+type: accuracy
+iterations: 2                     # Reduced from 10 for fast profiling
+warmup_iterations: 0
+absolute_tolerance: 1.0e-6
+relative_tolerance: 1.0e-5
+snr_threshold_db: 60.0
+phase_tolerance_deg: 1.0
+validate_parseval: true
+validate_linearity: true
+validate_time_invariance: true
+validate_numerical_stability: true
+validate_window_accuracy: true
+use_double_precision_reference: true
+reference_implementation: scipy
+test_signals:                     # Reduced from 8 signals to 3 essential ones
+  - type: sine
+    frequency: 1000
+    amplitude: 1.0
+  - type: multitone
+    frequencies: [1000, 2000, 3000, 4000, 5000]
+  - type: noise
+    noise_type: white
+    amplitude: 0.1
