@@ -90,7 +90,7 @@ class ProfileSession:
         kernel_count = 0
         current_kernel = ""
         current_passes = 0
-        max_passes = 43 if self.mode == "full" else 5
+        max_passes = 43 if self.mode == "full" else 15
         
         for line in iter(process.stdout.readline, ''):
             if process.poll() is not None:
@@ -407,29 +407,32 @@ class ProfileSession:
     def run_ncu(self, target_cmd: List[str], output_name: str, **kwargs):
         """Run Nsight Compute profiling"""
         report_path = self.ncu_dir / output_name
-        
-        cmd = ["ncu", "-o", str(report_path)]
-        
+
+        cmd = ["ncu"]
+
+        # Add metric set first (must come before -o)
         if self.mode == "full":
             print(f"  {Colors.CYAN}🔬 Full mode:{Colors.RESET} Complete kernel analysis (~43 passes per kernel)")
             print(f"  {Colors.YELLOW}[WARN]  Warning:{Colors.RESET} This will take several minutes...")
             cmd.extend(["--set", "full"])
         else:
-            print(f"  {Colors.CYAN}[*] Quick mode:{Colors.RESET} Essential metrics (~5 passes per kernel)")
-            metrics = [
-                "sm__throughput.avg.pct_of_peak_sustained_elapsed",
-                "dram__throughput.avg.pct_of_peak_sustained_elapsed",
-                "gpu__time_duration.sum",
-                "sm__warps_active.avg.pct_of_peak_sustained_active"
-            ]
-            cmd.extend(["--metrics", ",".join(metrics)])
-        
+            print(f"  {Colors.CYAN}[*] Quick mode:{Colors.RESET} Detailed metrics with source correlation (~15 passes per kernel)")
+            cmd.extend(["--set", "detailed"])
+
+        # Add source correlation for readable source view
+        cmd.extend([
+            "--import-source", "on",
+            "--source-folders", str(self.project_root / "cpp")
+        ])
+
         # Add kernel filter if specified
         if kwargs.get('kernel_filter'):
             cmd.extend(["--kernel-name", kwargs['kernel_filter']])
             print(f"  {Colors.CYAN}🎯 Filter:{Colors.RESET} {kwargs['kernel_filter']}")
-        
+
+        # Output file and target process options
         cmd.extend(["--target-processes", "all"])
+        cmd.extend(["-o", str(report_path)])
         cmd.extend(target_cmd)
         
         print(f"\n  {Colors.YELLOW}[>]{Colors.RESET} Starting Nsight Compute...")
