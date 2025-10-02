@@ -330,16 +330,142 @@ function global:iono {
         return
     }
 
-    & $global:IONO_CLI @Args
+    if ($Args.Count -eq 0) {
+        & $global:IONO_CLI
+        return
+    }
+
+    $lowerArgs = @()
+    foreach ($arg in $Args) {
+        if ($null -ne $arg) {
+            $lowerArgs += $arg.ToString().ToLowerInvariant()
+        }
+    }
+
+    $injected = @()
+    if ($PSBoundParameters.ContainsKey('Debug') -and -not ($lowerArgs -contains '--debug' -or $lowerArgs -contains '-debug')) {
+        $injected += '--debug'
+    }
+    if ($PSBoundParameters.ContainsKey('Verbose') -and -not ($lowerArgs -contains '--verbose' -or $lowerArgs -contains '-verbose')) {
+        $injected += '--verbose'
+    }
+
+    $processedArgs = @($Args[0])
+    if ($injected.Count -gt 0) {
+        $processedArgs += $injected
+    }
+    if ($Args.Count -gt 1) {
+        $processedArgs += $Args[1..($Args.Count-1)]
+    }
+
+    & $global:IONO_CLI @processedArgs
 }
 
+
 # Essential CLI shortcuts (only for commands that actually exist)
-function global:ib     { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono build  @Args }
-function global:it     { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono test   @Args }
-function global:ilint  { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono lint   @Args }
-function global:ifmt   { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono format @Args }
-function global:iclean { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono clean  @Args }
-function global:iprof  { param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args) iono profile @Args }
+function global:ib {
+    [CmdletBinding()]
+    param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
+
+    $common = @{}
+    foreach ($name in @('Debug','Verbose')) {
+        if ($PSBoundParameters.ContainsKey($name)) {
+            $common[$name] = $PSBoundParameters[$name]
+        }
+    }
+
+    if ($common.Count -gt 0) {
+        iono @common build @Args
+    } else {
+        iono build @Args
+    }
+}
+function global:it {
+    [CmdletBinding()]
+    param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
+
+    $common = @{}
+    foreach ($name in @('Debug','Verbose')) {
+        if ($PSBoundParameters.ContainsKey($name)) {
+            $common[$name] = $PSBoundParameters[$name]
+        }
+    }
+
+    if ($common.Count -gt 0) {
+        iono @common test @Args
+    } else {
+        iono test @Args
+    }
+}
+function global:ilint {
+    [CmdletBinding()]
+    param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
+
+    $common = @{}
+    foreach ($name in @('Debug','Verbose')) {
+        if ($PSBoundParameters.ContainsKey($name)) {
+            $common[$name] = $PSBoundParameters[$name]
+        }
+    }
+
+    if ($common.Count -gt 0) {
+        iono @common lint @Args
+    } else {
+        iono lint @Args
+    }
+}
+function global:ifmt {
+    [CmdletBinding()]
+    param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
+
+    $common = @{}
+    foreach ($name in @('Debug','Verbose')) {
+        if ($PSBoundParameters.ContainsKey($name)) {
+            $common[$name] = $PSBoundParameters[$name]
+        }
+    }
+
+    if ($common.Count -gt 0) {
+        iono @common format @Args
+    } else {
+        iono format @Args
+    }
+}
+function global:iclean {
+    [CmdletBinding()]
+    param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
+
+    $common = @{}
+    foreach ($name in @('Debug','Verbose')) {
+        if ($PSBoundParameters.ContainsKey($name)) {
+            $common[$name] = $PSBoundParameters[$name]
+        }
+    }
+
+    if ($common.Count -gt 0) {
+        iono @common clean @Args
+    } else {
+        iono clean @Args
+    }
+}
+function global:iprof {
+    [CmdletBinding()]
+    param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
+
+    $common = @{}
+    foreach ($name in @('Debug','Verbose')) {
+        if ($PSBoundParameters.ContainsKey($name)) {
+            $common[$name] = $PSBoundParameters[$name]
+        }
+    }
+
+    if ($common.Count -gt 0) {
+        iono @common profile @Args
+    } else {
+        iono profile @Args
+    }
+}
+
 
 # Use direct research tools instead of custom wrappers:
 # python benchmarks/run_latency.py experiment=baseline
@@ -372,7 +498,7 @@ function global:ireload {
 
 # Tab-completion (only for commands that actually exist)
 $global:IonoVerbs   = @('setup','build','test','lint','format','clean','doctor','ui','run','help','profile')
-$global:IonoTargets = @('python','cpp','all','-Clean','-Verbose','-Fix','-Check','-Coverage','-Pattern','-All','nsys','ncu','latency','throughput','accuracy','realtime','custom','-Full','-NoOpen','-Mode','-Script','-Kernel','-Duration')
+$global:IonoTargets = @('python','cpp','all','-Clean','--clean','-Verbose','--verbose','--debug','--release','-Fix','-Check','-Coverage','-Pattern','-All','nsys','ncu','latency','throughput','accuracy','realtime','custom','-Full','-NoOpen','-Mode','-Script','-Kernel','-Duration')
 
 Register-ArgumentCompleter -CommandName iono,ib,it,ilint,ifmt,iclean,itp,itc,ihelp,iprof -ScriptBlock {
     param($commandName,$parameterName,$wordToComplete,$commandAst,$fakeBoundParameters)

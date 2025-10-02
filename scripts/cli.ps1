@@ -80,7 +80,10 @@ function Invoke-Build {
         [bool]$Verbose = $false
     )
 
-    Write-Status "Building project with preset: $Preset"
+    $script:BuildPreset = $Preset
+    $configLabel = if ($Preset -match 'debug') { 'Debug' } else { 'Release' }
+
+    Write-Status "Building project with preset: $Preset ($configLabel)"
 
     if ($Clean) {
         Write-Status "Cleaning build directory..."
@@ -89,26 +92,22 @@ function Invoke-Build {
         }
     }
 
-    $args = @("--preset", $Preset)
-    if ($Verbose) { $args += "--verbose" }
+    $configureArgs = @("--preset", $Preset)
+    if ($Verbose) { $configureArgs += "--log-level=VERBOSE" }
 
     Write-Status "Configuring with CMake..."
-    & cmake @args .
+    & cmake @configureArgs
 
     if ($LASTEXITCODE -ne 0) {
         Write-Error "CMake configuration failed"
         exit 1
     }
 
-    # Build directory includes the preset name when using --preset
-    $actualBuildDir = if ($args -contains "--preset") {
-        Join-Path $script:BuildDir $Preset
-    } else {
-        $script:BuildDir
-    }
-
     Write-Status "Building..."
-    & cmake --build $actualBuildDir --config Release
+    $buildArgs = @("--build", "--preset", $Preset)
+    if ($Verbose) { $buildArgs += "--verbose" }
+
+    & cmake @buildArgs
 
     if ($LASTEXITCODE -eq 0) {
         Write-Success "Build completed successfully"
@@ -449,13 +448,13 @@ USAGE: .\scripts\cli.ps1 <command> [options]
 
 ESSENTIAL DEVELOPMENT
   setup [-Clean]          Create/update conda environment & install package
-  build [-Preset] [-Clean] [-Verbose] [-Debug/-Release]
+  build [-Preset <name>] [-Clean] [--debug|--release] [--verbose]
                           Configure and build project with CMake
-  test [all|python|cpp] [-Pattern] [-Coverage] [-Verbose]
+  test [all|python|cpp] [-Pattern] [-Coverage] [--verbose]
                           Run tests
-  format [paths] [-Check] [-Verbose]
+  format [paths] [-Check] [--verbose]
                           Format C++ code with clang-format
-  lint [all|python|cpp] [-Fix] [-Verbose]
+  lint [all|python|cpp] [-Fix] [--verbose]
                           Lint code with ruff
   clean [-All]            Remove build artifacts
   doctor                  Check development environment health
@@ -511,6 +510,20 @@ For detailed research workflow, see: CLAUDE.md
 try {
     Set-Location $script:ProjectRoot
 
+    $normalizedArgs = @()
+    foreach ($arg in $CommandArgs) {
+        if ($null -ne $arg) {
+            $normalizedArgs += $arg.ToLowerInvariant()
+        }
+    }
+
+    $commonDebug = $false
+    $commonVerbose = $false
+    if ($null -ne $PSBoundParameters) {
+        if ($PSBoundParameters.ContainsKey('Debug')) { $commonDebug = $true }
+        if ($PSBoundParameters.ContainsKey('Verbose')) { $commonVerbose = $true }
+    }
+
     switch ($Command.ToLower()) {
         "help"     { Show-Help }
         "setup"    {
@@ -520,8 +533,12 @@ try {
         }
         "build"    {
             $params = @{}
-            if ($CommandArgs -icontains "-Clean") { $params.Clean = $true }
-            if ($CommandArgs -icontains "-Verbose") { $params.Verbose = $true }
+
+            if ($normalizedArgs -contains "-clean" -or $normalizedArgs -contains "--clean") { $params.Clean = $true }
+
+            if ($commonVerbose -or $normalizedArgs -contains "-verbose" -or $normalizedArgs -contains "--verbose") {
+                $params.Verbose = $true
+            }
 
             # Handle preset
             for ($i = 0; $i -lt $CommandArgs.Count; $i++) {
@@ -530,15 +547,19 @@ try {
                 }
             }
 
-            if ($CommandArgs -icontains "-Debug") { $params.Preset = "windows-debug" }
-            elseif ($CommandArgs -icontains "-Release") { $params.Preset = "windows-rel" }
+            if ($commonDebug -or $normalizedArgs -contains "-debug" -or $normalizedArgs -contains "--debug") {
+                $params.Preset = "windows-debug"
+            } elseif ($normalizedArgs -contains "-release" -or $normalizedArgs -contains "--release") {
+                $params.Preset = "windows-rel"
+            }
 
             Invoke-Build @params
         }
+
         "test"     {
             $params = @{}
-            if ($CommandArgs -icontains "-Coverage") { $params.Coverage = $true }
-            if ($CommandArgs -icontains "-Verbose") { $params.Verbose = $true }
+            if ($normalizedArgs -contains "-coverage" -or $normalizedArgs -contains "--coverage") { $params.Coverage = $true }
+            if ($commonVerbose -or $normalizedArgs -contains "-verbose" -or $normalizedArgs -contains "--verbose") { $params.Verbose = $true }
 
             for ($i = 0; $i -lt $CommandArgs.Count; $i++) {
                 if ($CommandArgs[$i] -eq "-Pattern" -and $i+1 -lt $CommandArgs.Count) {
@@ -551,26 +572,29 @@ try {
 
             Invoke-Test @params
         }
+
         "format"   {
             $params = @{}
-            if ($CommandArgs -icontains "-Check") { $params.Check = $true }
-            if ($CommandArgs -icontains "-Verbose") { $params.Verbose = $true }
+            if ($normalizedArgs -contains "-check" -or $normalizedArgs -contains "--check") { $params.Check = $true }
+            if ($commonVerbose -or $normalizedArgs -contains "-verbose" -or $normalizedArgs -contains "--verbose") { $params.Verbose = $true }
 
             $paths = $CommandArgs | Where-Object { $_ -and $_ -notlike "-*" }
             if ($paths) { $params.Paths = $paths }
 
             Invoke-Format @params
         }
+
         "lint"     {
             $params = @{}
-            if ($CommandArgs -icontains "-Fix") { $params.Fix = $true }
-            if ($CommandArgs -icontains "-Verbose") { $params.Verbose = $true }
+            if ($normalizedArgs -contains "-fix" -or $normalizedArgs -contains "--fix") { $params.Fix = $true }
+            if ($commonVerbose -or $normalizedArgs -contains "-verbose" -or $normalizedArgs -contains "--verbose") { $params.Verbose = $true }
 
             $target = $CommandArgs | Where-Object { $_ -notlike "-*" } | Select-Object -First 1
             if ($target) { $params.Target = $target }
 
             Invoke-Lint @params
         }
+
         "clean"    {
             $params = @{}
             if ($CommandArgs -icontains "-All") { $params.All = $true }
