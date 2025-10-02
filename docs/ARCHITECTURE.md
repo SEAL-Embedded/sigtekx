@@ -36,7 +36,7 @@ Ionosense HPC is a high-performance research platform designed for GPU-accelerat
 
 ### 1.2 High-Level Platform Overview
 
-![Research Platform Overview](docs/diagrams/src/research-platform.puml)
+![Research Platform Overview](diagrams/src/research-platform.puml)
 
 The platform serves three primary research applications:
 
@@ -73,7 +73,7 @@ The platform serves three primary research applications:
 
 ### 2.1 Component Architecture
 
-![Component Architecture](docs/diagrams/src/component-arch.puml)
+![Component Architecture](diagrams/src/component-arch.puml)
 
 The system is organized into distinct architectural layers:
 
@@ -161,7 +161,7 @@ The system is organized into distinct architectural layers:
 
 ### 3.1 C++ Class Architecture
 
-![C++ Class Architecture](docs/diagrams/src/class-arch.puml)
+![C++ Class Architecture](diagrams/src/class-arch.puml)
 
 ### 3.2 Key Design Elements
 
@@ -265,7 +265,7 @@ struct StageConfig {
 
 ### 4.1 Package Structure
 
-![Python Package Architecture](docs/diagrams/src/py-pkg-arch.puml)
+![Python Package Architecture](diagrams/src/py-pkg-arch.puml)
 
 ### 4.2 Core Modules
 
@@ -415,7 +415,7 @@ All exceptions include:
 
 ### 5.1 Memory Architecture
 
-![Memory Management](docs/diagrams/src/memory-management.puml)
+![Memory Management](diagrams/src/memory-management.puml)
 
 ### 5.2 Memory Spaces
 
@@ -518,7 +518,7 @@ Typical memory usage (nfft=1024, batch=2): **~10 MB**
 
 ### 6.1 Synchronous Pipeline
 
-![Processing Pipeline Sequence](docs/diagrams/src/sequence-pipeline.puml)
+![Processing Pipeline Sequence](diagrams/src/sequence-pipeline.puml)
 
 ### 6.2 Pipeline Stages
 
@@ -636,7 +636,7 @@ Exceptions include:
 
 ### 7.1 Workflow Architecture
 
-![Experiment Workflow Architecture](docs/diagrams/src/exp-analysis-workflow.puml)
+![Experiment Workflow Architecture](diagrams/src/exp-analysis-workflow.puml)
 
 ### 7.2 Configuration Layer (Hydra)
 
@@ -859,7 +859,7 @@ dvc push
 
 ### 7.7 Workflow Sequence
 
-![Workflow Sequence](docs/diagrams/src/exp-workflow-sequence.puml)
+![Workflow Sequence](diagrams/src/exp-workflow-sequence.puml)
 
 **Typical Workflow:**
 
