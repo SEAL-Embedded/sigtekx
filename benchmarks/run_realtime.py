@@ -65,15 +65,37 @@ def run_realtime_benchmark(cfg: DictConfig) -> float:
         result = benchmark.run()
 
         stats = result.statistics if isinstance(result.statistics, dict) else {}
-        compliance = float(stats.get("deadline_compliance_rate", 0.0))
+        # Extract scalar metrics from potentially nested statistics dictionaries
+        def extract_float(value, default=0.0) -> float:
+            if isinstance(value, dict):
+                for key in ("mean", "median", "value"):
+                    if key in value and value[key] is not None:
+                        try:
+                            return float(value[key])
+                        except (TypeError, ValueError):
+                            continue
+                for candidate in value.values():
+                    if candidate is None:
+                        continue
+                    try:
+                        return float(candidate)
+                    except (TypeError, ValueError):
+                        continue
+                return float(default)
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return float(default)
+
+        compliance = extract_float(stats.get("deadline_compliance_rate"), 0.0)
         mlflow.log_metrics({
             "realtime.compliance_rate": compliance,
-            "realtime.mean_latency_ms": float(stats.get("mean_latency_ms", 0.0)),
-            "realtime.p99_latency_ms": float(stats.get("p99_latency_ms", 0.0)),
-            "realtime.mean_jitter_ms": float(stats.get("mean_jitter_ms", 0.0)),
-            "realtime.frames_processed": float(stats.get("frames_processed", 0.0)),
-            "realtime.deadline_misses": float(stats.get("deadline_misses", 0.0)),
-            "realtime.frames_dropped": float(stats.get("frames_dropped", 0.0)),
+            "realtime.mean_latency_ms": extract_float(stats.get("mean_latency_ms"), 0.0),
+            "realtime.p99_latency_ms": extract_float(stats.get("p99_latency_ms"), 0.0),
+            "realtime.mean_jitter_ms": extract_float(stats.get("mean_jitter_ms"), 0.0),
+            "realtime.frames_processed": extract_float(stats.get("frames_processed"), 0.0),
+            "realtime.deadline_misses": extract_float(stats.get("deadline_misses"), 0.0),
+            "realtime.frames_dropped": extract_float(stats.get("frames_dropped"), 0.0),
         })
 
         # Persist summary to artifacts/data
@@ -85,12 +107,12 @@ def run_realtime_benchmark(cfg: DictConfig) -> float:
             "engine_batch": engine_config.batch,
             "stream_duration_s": benchmark_config.stream_duration_s,
             "deadline_compliance_rate": compliance,
-            "mean_latency_ms": float(stats.get("mean_latency_ms", 0.0)),
-            "p99_latency_ms": float(stats.get("p99_latency_ms", 0.0)),
-            "mean_jitter_ms": float(stats.get("mean_jitter_ms", 0.0)),
-            "frames_processed": float(stats.get("frames_processed", 0.0)),
-            "deadline_misses": float(stats.get("deadline_misses", 0.0)),
-            "frames_dropped": float(stats.get("frames_dropped", 0.0)),
+            "mean_latency_ms": extract_float(stats.get("mean_latency_ms"), 0.0),
+            "p99_latency_ms": extract_float(stats.get("p99_latency_ms"), 0.0),
+            "mean_jitter_ms": extract_float(stats.get("mean_jitter_ms"), 0.0),
+            "frames_processed": extract_float(stats.get("frames_processed"), 0.0),
+            "deadline_misses": extract_float(stats.get("deadline_misses"), 0.0),
+            "frames_dropped": extract_float(stats.get("frames_dropped"), 0.0),
         }
 
         summary_df = pd.DataFrame([summary])

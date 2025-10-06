@@ -440,8 +440,9 @@ def calculate_statistics(
     """
     # Normalize input
     data = np.asarray(data)
+    original_size = int(data.size)
 
-    if data.size == 0:
+    if original_size == 0:
         return {'error': 'No data'}
 
     config = config or BenchmarkConfig(name="default")
@@ -456,6 +457,21 @@ def calculate_statistics(
             # Best-effort: map truthy/falsy to floats
             data = np.array([float(x) for x in data], dtype=np.float64)
 
+    n_invalid = 0
+    if np.issubdtype(data.dtype, np.number):
+        finite_mask = np.isfinite(data)
+        n_invalid = int(original_size - int(np.count_nonzero(finite_mask)))
+        if n_invalid:
+            data = data[finite_mask]
+
+    if data.size == 0:
+        return {
+            'n': 0,
+            'n_total': original_size,
+            'n_invalid': n_invalid,
+            'error': 'No finite data'
+        }
+
     # Remove outliers using Z-score method
     z_scores = np.abs((data - np.mean(data)) / (np.std(data) + 1e-10))
     mask = z_scores < config.outlier_threshold
@@ -468,10 +484,12 @@ def calculate_statistics(
     # Basic statistics
     stats = {
         'n': len(data),
+        'n_total': original_size,
+        'n_invalid': n_invalid,
         'n_filtered': len(filtered_data),
-        'n_outliers': n_outliers,
+        'n_outliers': int(n_outliers),
         'mean': float(np.mean(filtered_data)),
-        'std': float(np.std(filtered_data, ddof=1) if len(filtered_data) > 1 else 0),
+        'std': float(np.std(filtered_data, ddof=1)) if len(filtered_data) > 1 else 0.0,
         'min': float(np.min(filtered_data)),
         'max': float(np.max(filtered_data)),
         'median': float(np.median(filtered_data))

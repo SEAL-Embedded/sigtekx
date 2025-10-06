@@ -322,9 +322,19 @@ class AccuracyBenchmark(BaseBenchmark):
         rel_error = abs_error / (np.abs(ref_output) + 1e-10)
 
         # Calculate SNR
-        signal_power = np.mean(ref_output**2)
-        noise_power = np.mean(abs_error**2)
-        snr_db = 10 * np.log10(signal_power / (noise_power + 1e-12))
+        signal_power = float(np.mean(np.square(ref_output, dtype=np.float64)))
+        noise_power = float(np.mean(np.square(abs_error, dtype=np.float64)))
+        eps = np.finfo(np.float64).tiny
+        if signal_power <= eps:
+            if noise_power <= eps:
+                # Perfect silence reconstructed exactly; treat as a very high but finite SNR.
+                snr_db = float(self.config.snr_threshold_db + 120.0)
+            else:
+                # No measurable signal but noise present; classify as a very low SNR.
+                snr_db = float(-self.config.snr_threshold_db - 120.0)
+        else:
+            denom = max(noise_power, eps)
+            snr_db = float(10.0 * np.log10(signal_power / denom))
 
         # Check pass criteria
         max_rel_error = np.max(rel_error)
