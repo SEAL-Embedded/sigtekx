@@ -96,6 +96,16 @@ class AccuracyBenchmark(BaseBenchmark):
             else:
                 self.engine_config = Presets.validation()
 
+            # Accuracy validation is single-frame; force zero overlap for determinism.
+            if self.engine_config.overlap != 0.0:
+                original_overlap = self.engine_config.overlap
+                self.engine_config.overlap = 0.0
+                logger.info(
+                    "Accuracy benchmark overriding engine overlap %.2f -> %.2f",
+                    original_overlap,
+                    self.engine_config.overlap,
+                )
+
             # Initialize engine
             with nvtx_range("InitializeEngine", color=ProfileColor.DARK_GRAY):
                 self.engine = Engine(self.engine_config)
