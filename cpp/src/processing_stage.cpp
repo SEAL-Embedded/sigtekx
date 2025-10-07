@@ -67,7 +67,7 @@ class WindowStage::Impl {
       std::vector<float> host_window(config.nfft);
       bool sqrt_norm = (config.window_norm == StageConfig::WindowNorm::SQRT);
       window_utils::generate_window(
-          host_window.data(), config.nfft, config.window_type, sqrt_norm);
+          host_window.data(), config.nfft, config.window_type, sqrt_norm, config.window_symmetry);
 
       // Allocate device memory and upload the window coefficients.
       d_window_.resize(config.nfft);
@@ -373,11 +373,22 @@ window_functions::WindowKind to_window_kind(StageConfig::WindowType type) {
   return window_functions::WindowKind::RECTANGULAR;
 }
 
+window_functions::WindowSymmetry to_window_symmetry(StageConfig::WindowSymmetry symmetry) {
+  switch (symmetry) {
+    case StageConfig::WindowSymmetry::PERIODIC:
+      return window_functions::WindowSymmetry::PERIODIC;
+    case StageConfig::WindowSymmetry::SYMMETRIC:
+      return window_functions::WindowSymmetry::SYMMETRIC;
+  }
+  return window_functions::WindowSymmetry::PERIODIC;
+}
+
 void generate_window(float* window, int size, StageConfig::WindowType type,
-                     bool sqrt_norm) {
+                     bool sqrt_norm, StageConfig::WindowSymmetry symmetry) {
   IONO_NVTX_RANGE("Generate Window", profiling::colors::DARK_GRAY);
   const auto kind = to_window_kind(type);
-  window_functions::fill_window(window, size, kind, sqrt_norm);
+  const auto sym = to_window_symmetry(symmetry);
+  window_functions::fill_window(window, size, kind, sqrt_norm, sym);
 }
 
 void normalize_window(float* window, int size, StageConfig::WindowNorm norm) {

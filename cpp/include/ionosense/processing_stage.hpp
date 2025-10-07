@@ -57,6 +57,12 @@ struct StageConfig {
   };  ///< Normalization type for the window.
   WindowNorm window_norm = WindowNorm::UNITY;  ///< The normalization scheme.
 
+  enum class WindowSymmetry {
+    PERIODIC,   ///< Periodic window (FFT processing, denominator N)
+    SYMMETRIC   ///< Symmetric window (signal analysis, denominator N-1)
+  };  ///< Window symmetry type.
+  WindowSymmetry window_symmetry = WindowSymmetry::PERIODIC;  ///< Default to periodic for FFT processing.
+
   bool preload_window = true;  ///< If true, window coefficients are uploaded to
                                ///< GPU once at initialization.
 
@@ -246,13 +252,15 @@ class StageFactory {
  */
 namespace window_utils {
 /**
- * @brief Generates Hann window coefficients on the CPU.
+ * @brief Generates window coefficients on the CPU.
  * @param[out] window Pointer to the host array to store coefficients.
  * @param size The size of the window (number of coefficients).
+ * @param type The type of window to generate.
  * @param sqrt_norm If true, applies a square root normalization.
+ * @param symmetry Window symmetry type (PERIODIC for FFT, SYMMETRIC for analysis).
  */
 void generate_window(float* window, int size, StageConfig::WindowType type,
-                     bool sqrt_norm = false);
+                     bool sqrt_norm = false, StageConfig::WindowSymmetry symmetry = StageConfig::WindowSymmetry::PERIODIC);
 
 /**
  * @brief Normalizes a window to have a specific property (e.g., unity gain).

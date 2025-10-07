@@ -30,14 +30,23 @@ enum class WindowKind {
     BLACKMAN
 };
 
+enum class WindowSymmetry {
+    PERIODIC,   ///< Periodic window (FFT processing, denominator N)
+    SYMMETRIC   ///< Symmetric window (signal analysis, denominator N-1)
+};
+
 inline constexpr double PI = 3.14159265358979323846264338327950288;
 
 /**
  * @brief Returns a safe denominator for window calculations.
  * @param size The window size.
- * @return (size - 1) if size > 1, otherwise 1.0.
+ * @param symmetry Window symmetry type (PERIODIC for FFT, SYMMETRIC for analysis).
+ * @return N or (N-1) based on symmetry, with safety for edge cases.
  */
-IONO_HD inline double safe_denominator(int size) {
+IONO_HD inline double safe_denominator(int size, WindowSymmetry symmetry) {
+    if (symmetry == WindowSymmetry::PERIODIC) {
+        return size > 0 ? static_cast<double>(size) : 1.0;
+    }
     return size > 1 ? static_cast<double>(size - 1) : 1.0;
 }
 
@@ -45,6 +54,7 @@ IONO_HD inline double safe_denominator(int size) {
  * @brief Generates the base Hann window coefficient at a given index.
  * @param index The sample index within the window.
  * @param size The total window size.
+ * @param symmetry Window symmetry type (PERIODIC for FFT, SYMMETRIC for analysis).
  * @return The Hann window coefficient, or NaN (GPU) / throws exception (CPU) on error.
  *
  * Error conditions:
@@ -53,7 +63,7 @@ IONO_HD inline double safe_denominator(int size) {
  * - index >= size: Out-of-bounds index
  * - Non-finite result: Numerical instability detected
  */
-IONO_HD inline double hann_base(int index, int size) {
+IONO_HD inline double hann_base(int index, int size, WindowSymmetry symmetry = WindowSymmetry::PERIODIC) {
     // Input validation
     if (size <= 0 || index < 0 || index >= size) {
 #if defined(__CUDA_ARCH__)
@@ -66,7 +76,7 @@ IONO_HD inline double hann_base(int index, int size) {
 #endif
     }
 
-    const double ratio = (2.0 * PI * static_cast<double>(index)) / safe_denominator(size);
+    const double ratio = (2.0 * PI * static_cast<double>(index)) / safe_denominator(size, symmetry);
     const double result = 0.5 * (1.0 - ::cos(ratio));
 
     // IEEE-754 validation: ensure result is finite
@@ -87,6 +97,7 @@ IONO_HD inline double hann_base(int index, int size) {
  * @brief Generates the base Blackman window coefficient at a given index.
  * @param index The sample index within the window.
  * @param size The total window size.
+ * @param symmetry Window symmetry type (PERIODIC for FFT, SYMMETRIC for analysis).
  * @return The Blackman window coefficient, or NaN (GPU) / throws exception (CPU) on error.
  *
  * Error conditions:
@@ -95,7 +106,7 @@ IONO_HD inline double hann_base(int index, int size) {
  * - index >= size: Out-of-bounds index
  * - Non-finite result: Numerical instability detected
  */
-IONO_HD inline double blackman_base(int index, int size) {
+IONO_HD inline double blackman_base(int index, int size, WindowSymmetry symmetry = WindowSymmetry::PERIODIC) {
     // Input validation
     if (size <= 0 || index < 0 || index >= size) {
 #if defined(__CUDA_ARCH__)
@@ -108,7 +119,7 @@ IONO_HD inline double blackman_base(int index, int size) {
 #endif
     }
 
-    const double ratio = static_cast<double>(index) / safe_denominator(size);
+    const double ratio = static_cast<double>(index) / safe_denominator(size, symmetry);
     const double two_pi = 2.0 * PI * ratio;
     const double four_pi = 4.0 * PI * ratio;
     const double result = 0.42 - 0.5 * ::cos(two_pi) + 0.08 * ::cos(four_pi);
@@ -132,12 +143,13 @@ IONO_HD inline double blackman_base(int index, int size) {
  * @param kind The type of window function.
  * @param index The sample index within the window.
  * @param size The total window size.
+ * @param symmetry Window symmetry type (PERIODIC for FFT, SYMMETRIC for analysis).
  * @return The window coefficient, or NaN (GPU) / throws exception (CPU) on error.
  */
-IONO_HD inline double base(WindowKind kind, int index, int size) {
+IONO_HD inline double base(WindowKind kind, int index, int size, WindowSymmetry symmetry = WindowSymmetry::PERIODIC) {
     switch (kind) {
         case WindowKind::RECTANGULAR:
-            // Rectangular window has simpler validation
+            // Rectangular window has simpler validation (same for periodic/symmetric)
             if (size <= 0 || index < 0 || index >= size) {
 #if defined(__CUDA_ARCH__)
                 return __longlong_as_double(0x7FF8000000000000ULL);
@@ -148,9 +160,9 @@ IONO_HD inline double base(WindowKind kind, int index, int size) {
             }
             return 1.0;
         case WindowKind::HANN:
-            return hann_base(index, size);
+            return hann_base(index, size, symmetry);
         case WindowKind::BLACKMAN:
-            return blackman_base(index, size);
+            return blackman_base(index, size, symmetry);
     }
     // Unknown window kind - should never reach here
 #if defined(__CUDA_ARCH__)
@@ -166,10 +178,11 @@ IONO_HD inline double base(WindowKind kind, int index, int size) {
  * @param index The sample index within the window.
  * @param size The total window size.
  * @param sqrt_norm If true, applies square-root normalization.
+ * @param symmetry Window symmetry type (PERIODIC for FFT, SYMMETRIC for analysis).
  * @return The final window value, or NaN (GPU) / throws exception (CPU) on error.
  */
-IONO_HD inline float window_value(WindowKind kind, int index, int size, bool sqrt_norm) {
-    const double value = base(kind, index, size);
+IONO_HD inline float window_value(WindowKind kind, int index, int size, bool sqrt_norm, WindowSymmetry symmetry = WindowSymmetry::PERIODIC) {
+    const double value = base(kind, index, size, symmetry);
 
     // Check for NaN propagation from base() - important for GPU error detection
 #if defined(__CUDA_ARCH__)
@@ -206,11 +219,12 @@ IONO_HD inline float window_value(WindowKind kind, int index, int size, bool sqr
  * @param size The window size.
  * @param kind The type of window function.
  * @param sqrt_norm If true, applies square-root normalization.
+ * @param symmetry Window symmetry type (PERIODIC for FFT, SYMMETRIC for analysis).
  *
  * Note: This function validates inputs and may throw exceptions on the CPU path
  * if invalid parameters are provided. On GPU, errors would be signaled via NaN.
  */
-inline void fill_window(float* destination, int size, WindowKind kind, bool sqrt_norm) {
+inline void fill_window(float* destination, int size, WindowKind kind, bool sqrt_norm, WindowSymmetry symmetry = WindowSymmetry::PERIODIC) {
     if (destination == nullptr) {
         throw std::invalid_argument("Null destination pointer");
     }
@@ -219,7 +233,7 @@ inline void fill_window(float* destination, int size, WindowKind kind, bool sqrt
     }
 
     for (int i = 0; i < size; ++i) {
-        destination[i] = window_value(kind, i, size, sqrt_norm);
+        destination[i] = window_value(kind, i, size, sqrt_norm, symmetry);
     }
 }
 
