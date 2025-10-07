@@ -141,8 +141,13 @@ class ResearchEngine::Impl {
 
       for (int i = 0; i < config.pinned_buffer_count; ++i) {
         d_input_buffers_.emplace_back(buffer_size);
+        d_input_buffers_.back().memset(0);
+
         d_output_buffers_.emplace_back(output_buffer_size);
+        d_output_buffers_.back().memset(0);
+
         d_intermediate_buffers_.emplace_back(complex_buffer_size * 2);
+        d_intermediate_buffers_.back().memset(0);
       }
 
       h_input_staging_.resize(buffer_size);
@@ -193,6 +198,13 @@ class ResearchEngine::Impl {
 
     auto& e_h2d_done = events_[buffer_idx * 2 + 0];
     auto& e_compute_done = events_[buffer_idx * 2 + 1];
+
+    // Ensure this buffer is free from previous frame using same buffer slot
+    // Critical for correctness with round-robin buffer reuse
+    if (frame_counter_ >= static_cast<size_t>(config_.pinned_buffer_count)) {
+      IONO_NVTX_RANGE("Wait for Buffer Availability", profiling::colors::YELLOW);
+      IONO_CUDA_CHECK(cudaStreamSynchronize(streams_[compute_stream_idx].get()));
+    }
 
     // --- Asynchronous Pipeline Execution ---
     // 1. Host-to-Device Transfer
