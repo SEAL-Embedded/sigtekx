@@ -24,6 +24,15 @@ class EngineConfig(BaseModel):
     objects are immutable after creation and can be safely shared across threads.
     """
 
+    # Memory calculation constants
+    BYTES_PER_FLOAT32: int = 4
+    DEVICE_BUFFER_MULTIPLIER: int = 3 # Input + Output + Intermediate
+    BYTES_PER_MB: int = 1024 * 1024
+
+    # Memory safety constants
+    DEFAULT_MEMORY_HEADROOM_PCT: float = 20.0
+    MIN_MEMORY_HEADROOM_PCT: float = 512
+
     # =====================================================================
     # SIGNAL PARAMETERS
     # =====================================================================
@@ -173,12 +182,16 @@ class EngineConfig(BaseModel):
         return self.sample_rate_hz / self.hop_size if self.hop_size > 0 else 0
 
     @property
+
+    
     def memory_estimate_mb(self) -> float:
         """Estimated GPU memory usage in MB."""
-        bytes_per_input = self.nfft * self.batch * 4
-        bytes_per_output = self.num_output_bins * self.batch * 4
-        total_bytes = (bytes_per_input + bytes_per_output) * self.pinned_buffer_count * 3
-        return total_bytes / (1024 * 1024)
+
+        bytes_per_input = self.nfft * self.batch * self.BYTES_PER_FLOAT32
+        bytes_per_output = self.num_output_bins * self.batch * self.BYTES_PER_FLOAT32
+        base_memory = bytes_per_input + bytes_per_output
+        total_bytes = (bytes_per_input + bytes_per_output) * self.pinned_buffer_count * self.BYTES_PER_FLOAT32
+        return total_bytes / self.BYTES_PER_MB
 
     def to_experiment_dict(self) -> dict[str, Any]:
         """Export configuration with experiment metadata."""
