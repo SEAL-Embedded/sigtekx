@@ -78,19 +78,28 @@ def run_accuracy_benchmark(cfg: DictConfig) -> float:
         output_dir = Path(cfg.paths.data)
         output_dir.mkdir(parents=True, exist_ok=True)
         
-        # Save test results
+        # Save test results with enhanced diagnostics
         if hasattr(benchmark, 'test_results'):
             results_data = []
             for test_result in benchmark.test_results:
-                results_data.append({
+                row = {
                     'signal_type': test_result['signal'].get('type', 'unknown'),
                     'passed': test_result['passed'],
                     'mean_error': test_result['comparison'].get('mean_error', 0),
+                    'max_error': test_result['comparison'].get('max_abs_error', 0),
+                    'max_rel_error': test_result['comparison'].get('max_rel_error', 0),
                     'snr_db': test_result['comparison'].get('snr_db', 0),
                     'engine_nfft': engine_config.nfft,
                     'engine_batch': engine_config.batch,
-                })
-            
+                }
+                # Add GPU vs Reference stats if available
+                if 'gpu_stats' in test_result:
+                    row['gpu_mean'] = test_result['gpu_stats']['mean']
+                    row['gpu_std'] = test_result['gpu_stats']['std']
+                    row['ref_mean'] = test_result['ref_stats']['mean']
+                    row['ref_std'] = test_result['ref_stats']['std']
+                results_data.append(row)
+
             df = pd.DataFrame(results_data)
             output_path = output_dir / f"accuracy_details_{engine_config.nfft}_{engine_config.batch}.csv"
             df.to_csv(output_path, index=False)

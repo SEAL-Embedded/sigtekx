@@ -158,11 +158,23 @@ class AccuracyBenchmark(BaseBenchmark):
                 with nvtx_range("CompareResults", color=ProfileColor.YELLOW):
                     comparison = self._compare_spectra(gpu_output, ref_output)
 
-                # Store results
+                # Store results with enhanced diagnostics
                 self.test_results.append({
                     'signal': signal_spec,
                     'comparison': comparison,
-                    'passed': comparison['passed']
+                    'passed': comparison['passed'],
+                    'gpu_stats': {
+                        'mean': float(np.mean(gpu_output)),
+                        'std': float(np.std(gpu_output)),
+                        'min': float(np.min(gpu_output)),
+                        'max': float(np.max(gpu_output)),
+                    },
+                    'ref_stats': {
+                        'mean': float(np.mean(ref_output)),
+                        'std': float(np.std(ref_output)),
+                        'min': float(np.min(ref_output)),
+                        'max': float(np.max(ref_output)),
+                    }
                 })
 
             metrics['total_tests'] += 1.0

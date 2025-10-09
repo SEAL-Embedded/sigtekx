@@ -31,8 +31,14 @@ if(IONO_WITH_CUDA)
   set(CMAKE_CUDA_STANDARD 17)
   set(CMAKE_CUDA_ARCHITECTURES 75 86 89) # NVIDIA Turing, Ampere, Ada Lovelace
   set(CMAKE_CUDA_RUNTIME_LIBRARY Static) # Use static runtime for CUDA on Windows
+
+  # --- IEEE-754 Compliance Flags ---
+  # --fmad=false: Disable fused multiply-add for deterministic rounding (IEEE-754 strict)
+  # --ftz=false: Preserve denormal numbers (do not flush to zero)
+  set(IEEE754_FLAGS "--fmad=false --ftz=false")
+
   # --- CUDA Flags (apply to all platforms) ---
-  set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -diag-suppress 177") # Suppress unused warnings from nvcc
+  set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -diag-suppress 177 ${IEEE754_FLAGS}") # Suppress unused warnings from nvcc
   set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -g -G -lineinfo -O0")
   set(CMAKE_CUDA_FLAGS_RELEASE "${CMAKE_CUDA_FLAGS_RELEASE} -O3 -DNDEBUG")
 endif()
