@@ -203,7 +203,10 @@ class ResearchEngine::Impl {
     // Critical for correctness with round-robin buffer reuse
     if (frame_counter_ >= static_cast<size_t>(config_.pinned_buffer_count)) {
       IONO_NVTX_RANGE("Wait for Buffer Availability", profiling::colors::YELLOW);
+      // FIX: Must synchronize BOTH compute and D2H streams to prevent race condition
+      // Previous bug: Only waited for compute stream, but D2H could still be reading buffer
       IONO_CUDA_CHECK(cudaStreamSynchronize(streams_[compute_stream_idx].get()));
+      IONO_CUDA_CHECK(cudaStreamSynchronize(streams_[d2h_stream_idx].get()));
     }
 
     // --- Asynchronous Pipeline Execution ---
