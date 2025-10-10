@@ -67,9 +67,6 @@ Reading this taxonomy early helps you quickly interpret validation failures, run
 - [src/ionosense_hpc/utils/paths.py](src/ionosense_hpc/utils/paths.py)  
   *Manages output directories and file naming.* Defaults land under `build/` but can be overridden by env vars. Ensures reproducible run layouts, avoids cluttering repo root.
 
-- [src/ionosense_hpc/utils/logging.py](src/ionosense_hpc/utils/logging.py)  
-  *Centralized logging.* Provides `get_logger()` wrapper with levels controlled by `IONO_LOG_LEVEL`. Ensures consistent formatting across CLI, tests, and benchmarks.
-
 - [src/ionosense_hpc/utils/device.py](src/ionosense_hpc/utils/device.py)  
   *CUDA/NVML info and fallbacks.* Wraps `pynvml` and CUDA APIs to query device count, memory, and capabilities. Falls back gracefully on CPU-only machines so tests and docs don’t crash.
 
@@ -88,9 +85,6 @@ Reading this taxonomy early helps you quickly interpret validation failures, run
 
 - [src/ionosense_hpc/utils/signals.py](src/ionosense_hpc/utils/signals.py)  
   *Synthetic signal generators.* Provides sine, noise, and composite test vectors with seeded RNG. Used across fixtures, validation, and benchmarks.
-
-- [src/ionosense_hpc/utils/reporting.py](src/ionosense_hpc/utils/reporting.py)  
-  *Report generation.* Produces PDF/HTML/Markdown summaries of benchmarks. Integrates plots, stats, and metadata for publication or CI artifacts.
 
 - [src/ionosense_hpc/utils/__init__.py](src/ionosense_hpc/utils/__init__.py)  
   *Namespace management.* Re-exports key helpers and implements lazy import wrappers to reduce startup overhead.
