@@ -1,8 +1,9 @@
 /**
  * @file architecture_demo.cpp
- * @brief Demonstrates the new v0.9.3 composable architecture.
+ * @brief Demonstrates the v0.9.3 composable architecture.
  *
- * This example shows how to use the refactored architecture with:
+ * This example shows how to use the architecture with:
+ * - ResearchEngine for general-purpose processing
  * - PipelineBuilder for custom pipelines
  * - Different executor types (Batch vs Realtime)
  * - Specialized engines (RealtimeIonoEngine)
@@ -14,16 +15,16 @@
 #include "ionosense/core/executor_config.hpp"
 #include "ionosense/core/pipeline_builder.hpp"
 #include "ionosense/engines/realtime_iono_engine.hpp"
-#include "ionosense/engines/research_engine_v2.hpp"
+#include "ionosense/engines/research_engine.hpp"
 #include "ionosense/executors/batch_executor.hpp"
 
 using namespace ionosense;
 
-void demo_research_engine_v2() {
-  std::cout << "=== ResearchEngineV2 Demo ===\n";
+void demo_research_engine() {
+  std::cout << "=== ResearchEngine Demo ===\n";
 
   // Create engine with default configuration
-  ResearchEngineV2 engine;
+  ResearchEngine engine;
 
   EngineConfig config;
   config.nfft = 1024;
@@ -117,7 +118,7 @@ int main() {
   std::cout << "=========================================\n\n";
 
   try {
-    demo_research_engine_v2();
+    demo_research_engine();
     demo_realtime_iono_engine();
     demo_custom_pipeline();
 

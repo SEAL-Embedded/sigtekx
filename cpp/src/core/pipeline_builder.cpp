@@ -12,7 +12,7 @@
 #include <algorithm>
 #include <stdexcept>
 
-#include "ionosense/profiling_macros.hpp"
+#include "ionosense/core/profiling_macros.hpp"
 
 namespace ionosense {
 

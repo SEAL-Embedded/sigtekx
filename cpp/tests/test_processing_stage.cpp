@@ -20,9 +20,9 @@
 #include <numeric>
 #include <vector>
 
-#include "ionosense/cuda_wrappers.hpp"
-#include "ionosense/processing_stage.hpp"
-#include "ionosense/window_functions.hpp"
+#include "ionosense/core/cuda_wrappers.hpp"
+#include "ionosense/core/processing_stage.hpp"
+#include "ionosense/core/window_functions.hpp"
 
 // IEEE Std 1003.1-2001 compliance for mathematical constants
 #ifndef M_PI

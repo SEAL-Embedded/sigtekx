@@ -16,8 +16,8 @@
 #include <chrono>
 #include <stdexcept>
 
-#include "ionosense/cuda_wrappers.hpp"
-#include "ionosense/profiling_macros.hpp"
+#include "ionosense/core/cuda_wrappers.hpp"
+#include "ionosense/core/profiling_macros.hpp"
 
 namespace ionosense {
 
