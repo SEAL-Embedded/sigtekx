@@ -133,10 +133,18 @@ FetchContent_Declare(
 # ============================================================================
 if(IONO_WITH_CUDA)
 add_library(ion_engine OBJECT
+    # Original sources
     cpp/src/ops_fft.cu
     cpp/src/research_engine.cpp
     cpp/src/processing_stage.cpp
     cpp/src/profiling_nvtx.cu
+
+    # New architecture (v0.9.3)
+    cpp/src/core/pipeline_builder.cpp
+    cpp/src/executors/batch_executor.cpp
+    cpp/src/executors/realtime_executor.cpp
+    cpp/src/engines/research_engine_v2.cpp
+    cpp/src/engines/realtime_iono_engine.cpp
 )
 target_include_directories(ion_engine PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/cpp/include
