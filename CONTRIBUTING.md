@@ -1,285 +1,279 @@
 # Contributing to Ionosense-HPC
 
-Thank you for your interest in contributing to ionosense-hpc! This document provides guidelines and instructions for contributing to the project using our integrated CLI platform.
+Thank you for your interest in contributing to ionosense-hpc! This document provides guidelines and instructions for contributing to the project.
 
 ## Table of Contents
 
 - [Getting Started](#getting-started)
-- [CLI-Based Development Workflow](#cli-based-development-workflow)
+- [Development Workflow](#development-workflow)
+- [Team Structure](#team-structure)
 - [How to Contribute](#how-to-contribute)
 - [Development Process](#development-process)
 - [Style Guidelines](#style-guidelines)
 - [Testing Requirements](#testing-requirements)
 - [Pull Request Process](#pull-request-process)
 - [Reporting Issues](#reporting-issues)
-- [Community](#community)
 
 ## Getting Started
 
 ### Prerequisites
 
-Before contributing, ensure you have the development environment set up using our CLI platform.
+Before contributing, ensure you have the development environment set up properly.
 
-#### Linux/WSL2 Setup
+#### Required Software
 
-```bash
+- **Python 3.11+** (via Conda/Miniconda)
+- **CUDA Toolkit 12.0+** 
+- **Visual Studio 2022** with C++ build tools (Windows)
+- **CMake 3.25+**
+- **PowerShell 7.0+** (for Windows development)
+- **NVIDIA GPU** with compute capability 6.0+
+
+#### Initial Setup
+
+```powershell
 # Clone the repository with submodules
 git clone --recursive https://github.com/your-org/ionosense-hpc.git
 cd ionosense-hpc
 
-# One-command setup using CLI
-./scripts/cli.sh setup
+# Start development shell (handles MSVC, conda activation, etc.)
+.\scripts\init_pwsh.ps1 -Interactive
 
-# Verify environment
-./scripts/cli.sh doctor
-```
-
-#### Windows Setup
-
-```powershell
-# Clone the repository
-git clone --recursive https://github.com/your-org/ionosense-hpc.git
-cd ionosense-hpc
-
-# Start enhanced development shell
-.\scripts\open_dev_pwsh.ps1
-
-# One-command setup using alias
+# Setup environment (creates conda env, installs dependencies)
 iono setup
 
 # Verify environment
 iono doctor
 ```
 
-### Development Environment Verification
+### Development Shell
 
-**Linux/WSL2:**
-```bash
-./scripts/cli.sh doctor         # Comprehensive environment check
-./scripts/cli.sh info system    # System information
-./scripts/cli.sh build          # Verify build works
-./scripts/cli.sh test           # Verify tests pass
+The project uses an enhanced PowerShell development shell (`init_pwsh.ps1`) that:
+- Automatically activates Visual Studio build tools (MSVC)
+- Sets up conda environment
+- Provides convenient command aliases (`iono`, `ib`, `it`, etc.)
+- Ensures correct 64-bit environment for CUDA
+
+**Always start your development session with:**
+```powershell
+.\scripts\init_pwsh.ps1 -Interactive
 ```
 
-**Windows (Enhanced Development Shell):**
+### Verify Your Setup
+
 ```powershell
 iono doctor                     # Comprehensive environment check
-iono info system                # System information
-ib                             # Verify build works (iono build)
-it                             # Verify tests pass (iono test)
+iono build                      # Verify build works
+iono test                       # Verify tests pass
 ```
 
-## CLI-Based Development Workflow
+## Development Workflow
 
-Ionosense-HPC uses a unified CLI platform that streamlines all development tasks. Familiarize yourself with these commands for efficient contribution.
+### CLI Commands
 
-### Linux/WSL2 Commands
-
-```bash
-# Environment management
-./scripts/cli.sh setup          # Create conda environment and install deps
-./scripts/cli.sh doctor         # Comprehensive environment check
-./scripts/cli.sh info           # Show system/project information
-
-# Build and development
-./scripts/cli.sh build          # Configure and build (release)
-./scripts/cli.sh build linux-debug  # Debug build
-./scripts/cli.sh rebuild        # Clean rebuild
-./scripts/cli.sh clean          # Clean build artifacts
-
-# Code quality (essential for contributions)
-./scripts/cli.sh format         # Format C++ code with clang-format
-./scripts/cli.sh format --check # Check formatting without changes
-./scripts/cli.sh lint           # Lint Python (ruff) and C++ (format check)
-./scripts/cli.sh typecheck      # Run mypy type checking
-./scripts/cli.sh check          # Run format, lint, typecheck, and quick tests
-
-# Testing
-./scripts/cli.sh test           # Run all tests
-./scripts/cli.sh test py        # Python tests only
-./scripts/cli.sh test cpp       # C++ tests only
-./scripts/cli.sh test --coverage  # With coverage report
-
-# Research validation
-./scripts/cli.sh validate       # Numerical validation suite
-./scripts/cli.sh bench latency  # Performance validation
-```
-
-### Windows Development Shell Commands
-
-The enhanced development shell provides convenient aliases and automatic environment setup:
+The `iono` CLI provides essential development commands:
 
 ```powershell
-# Start development shell (required for Windows development)
-.\scripts\open_dev_pwsh.ps1
+# Environment management
+iono setup                      # Create conda environment and install package
+iono doctor                     # Check development environment health
 
-# Available aliases for common tasks:
-iono <command>                  # Main CLI alias
-ib                             # Build (iono build)
-ir                             # Rebuild (iono rebuild)
-it                             # Test all (iono test)
-itp                            # Test Python only (iono test py)
-itc                            # Test C++ only (iono test cpp)
+# Build
+iono build                      # Build with default preset (windows-rel)
+iono build --debug              # Build debug configuration
+iono build --clean              # Clean rebuild
+iono build --verbose            # Verbose build output
 
-# Code quality shortcuts (essential for contributions)
-ifmt                           # Format code (iono format)
-ifmt --check                   # Check formatting (iono format --check)
-ilint                          # Lint code (iono lint)
-iono typecheck                 # Type checking
-iono check                     # All quality checks
+# Testing
+iono test                       # Run all tests (Python + C++)
+iono test python                # Python tests only
+iono test cpp                   # C++ tests only
+iono test --coverage            # With coverage report
+iono test --verbose             # Verbose test output
 
-# Research validation shortcuts
-ival                           # Validate (iono validate)
-ibench latency                 # Performance validation
+# Code Quality
+iono format                     # Format C++ code with clang-format
+iono format --check             # Check formatting without changes
+iono lint                       # Lint Python code with ruff
+iono lint --fix                 # Auto-fix lint issues
+
+# Utilities
+iono clean                      # Remove build artifacts
+iono clean --all                # Remove build + artifacts directories
+iono ui                         # Launch MLflow UI
+iono profile nsys latency       # Profile with Nsight Systems
+iono profile ncu throughput     # Profile with Nsight Compute
+iono run <script.py>            # Run Python script with proper environment
 ```
+
+### Convenient Aliases
+
+The development shell provides short aliases for common commands:
+
+```powershell
+ib                              # iono build
+it                              # iono test
+itp                             # iono test python
+itc                             # iono test cpp
+ifmt                            # iono format
+ilint                           # iono lint
+iclean                          # iono clean
+iprof                           # iono profile
+ihelp                           # iono help
+ireload                         # Reload shell functions
+```
+
+## Team Structure
+
+The project is organized into **two primary development boards**:
+
+### Board 1: Platform & Core Systems
+**Teams:** Core Systems (Team 1) + MLOps (Team 2)
+
+- **Team 1**: C++/CUDA backend, processing pipeline, performance optimization
+- **Team 2**: Build systems, CI/CD, development tooling, environment management
+
+**Focus:** Infrastructure that enables research
+
+### Board 2: User Interface & Research
+**Teams:** Python Ecosystem (Team 3) + Research & Data Science (Team 4)
+
+- **Team 3**: Python API, configuration, benchmarks, testing
+- **Team 4**: Research experiments, analysis pipelines, data science
+
+**Focus:** User-facing capabilities and scientific workflows
+
+See the [Project Boards](https://github.com/your-org/ionosense-hpc/projects) for active work items.
 
 ## How to Contribute
 
 ### Types of Contributions
 
-#### 1. Bug Reports
+#### 1. Bug Reports (All Teams)
 - Use the GitHub issue tracker
 - Check if the issue already exists
-- Run diagnostics: `./scripts/cli.sh doctor` / `iono doctor`
+- Run diagnostics: `iono doctor`
 - Provide minimal reproducible example
-- Include system information from `./scripts/cli.sh info system` / `iono info system`
+- Include full error output
 
-#### 2. Bug Fixes
+#### 2. Bug Fixes (All Teams)
 - Reference the issue number in your PR
-- Include tests: `./scripts/cli.sh test` / `it`
-- Verify fix with: `./scripts/cli.sh validate` / `ival`
+- Include tests that verify the fix
 - Update documentation if needed
+- Ensure all existing tests still pass
 
 #### 3. New Features
-- Discuss major features in an issue first
-- Implement with tests and documentation
-- Follow existing architecture patterns
-- Verify with: `./scripts/cli.sh check` / `iono check`
-- Consider performance impact: `./scripts/cli.sh bench` / `ibench`
 
-#### 4. Performance Improvements
-- Include benchmark results: `./scripts/cli.sh bench suite` / `ibench suite`
-- Profile changes: `./scripts/cli.sh profile nsys` / `iprof nsys`
-- Ensure no regression in other areas
-- Document the optimization approach
+**Team 1 (C++/CUDA):**
+- Discuss major architecture changes first
+- Follow RAII patterns for resource management
+- Include performance benchmarks
+- Update Python bindings if needed
 
-#### 5. Documentation
-- Verify examples work: `./scripts/cli.sh test` / `it`
-- Check formatting: `./scripts/cli.sh format --check` / `ifmt --check`
-- Test CLI commands referenced in docs
+**Team 2 (Infrastructure):**
+- Test on clean environment
+- Update documentation for new workflows
+- Consider cross-platform implications
+- Verify CI/CD integration
 
-#### 6. Tests
-- Run existing tests: `./scripts/cli.sh test` / `it`
-- Add missing test coverage
-- Verify performance: `./scripts/cli.sh validate` / `ival`
-- Test on both platforms if possible
+**Team 3 (Python API):**
+- Include comprehensive tests
+- Add type hints for all public APIs
+- Update documentation and examples
+- Follow Pydantic patterns for configuration
+
+**Team 4 (Research):**
+- Document experiment configurations
+- Include analysis scripts
+- Ensure reproducibility (seeds, versioning)
+- Share results in MLflow
+
+#### 4. Performance Improvements (Teams 1, 3)
+- Profile before and after changes
+- Use `iono profile` for GPU profiling
+- Document optimization techniques
+- Ensure no accuracy regressions
+
+#### 5. Documentation (All Teams)
+- Keep code examples up to date
+- Test all command-line examples
+- Update architecture diagrams if needed
+- Add Jupyter notebook examples for complex workflows
 
 ## Development Process
 
-### 1. Fork and Create Branch
+### 1. Fork and Clone
 
-```bash
+```powershell
 # Fork the repository on GitHub, then:
 git clone https://github.com/YOUR_USERNAME/ionosense-hpc.git
 cd ionosense-hpc
 git remote add upstream https://github.com/original/ionosense-hpc.git
 
 # Setup development environment
-./scripts/cli.sh setup        # Linux/WSL2
-# OR (Windows)
-.\scripts\open_dev_pwsh.ps1
+.\scripts\init_pwsh.ps1 -Interactive
 iono setup
 ```
 
 ### 2. Create Feature Branch
 
-```bash
+```powershell
 # Update your fork
 git checkout main
 git fetch upstream
 git merge upstream/main
 
-# Create feature branch
-git checkout -b feature/your-feature-name
-# Or for bugs
-git checkout -b fix/issue-number-description
+# Create feature branch following conventions:
+git checkout -b feat/team-X/your-feature-name      # For features
+git checkout -b fix/team-X/issue-number-description  # For bugs
+git checkout -b docs/team-X/documentation-update    # For docs
+
+# Team prefixes: team-1 (C++), team-2 (infra), team-3 (python), team-4 (research)
 ```
 
-### 3. Development Loop with CLI
+### 3. Development Loop
 
-**Linux/WSL2:**
-```bash
-# Make your changes...
-
-# Verify code quality (runs format check, lint, typecheck, quick tests)
-./scripts/cli.sh check
-
-# Build with changes
-./scripts/cli.sh build
-
-# Run full test suite
-./scripts/cli.sh test
-
-# Validate performance (for performance-critical changes)
-./scripts/cli.sh validate
-./scripts/cli.sh bench latency
-```
-
-**Windows (in development shell):**
 ```powershell
 # Make your changes...
 
-# Verify code quality using aliases
-iono check                     # format, lint, typecheck, quick tests
+# Build and test frequently
+ib                              # Quick build
+it                              # Run all tests
 
-# Build with changes
-ib                            # iono build
+# For C++ work (Team 1):
+iono build --debug              # Debug build for development
+itc                             # C++ tests only
+iono profile nsys latency       # Profile performance
 
-# Run full test suite
-it                            # iono test
+# For Python work (Team 3):
+itp                             # Python tests only
+ilint --fix                     # Fix lint issues
+iono test --coverage            # Check coverage
 
-# Validate performance (for performance-critical changes)
-ival                          # iono validate
-ibench latency                # iono bench latency
+# For Research work (Team 4):
+python benchmarks/run_latency.py experiment=baseline +benchmark=latency
+iono ui                         # View results in MLflow
 ```
 
-### 4. Pre-commit Validation
+### 4. Code Quality Checks
 
-Before committing, always run the complete validation suite:
+Before committing, ensure code quality:
 
-```bash
-# Linux/WSL2
-./scripts/cli.sh check --staged    # Check only staged files
-./scripts/cli.sh build             # Ensure builds cleanly
-./scripts/cli.sh test              # Full test suite
+```powershell
+# Format C++ code
+iono format
 
-# Windows (dev shell)
-iono check --staged               # Check only staged files
-ib                               # Ensure builds cleanly
-it                               # Full test suite
+# Lint Python code
+iono lint --fix
+
+# Run all tests
+iono test
+
+# Verify build is clean
+iono build --clean
 ```
 
 ### 5. Commit Your Changes
-
-```bash
-# Stage your changes
-git add .
-
-# Verify staged changes
-./scripts/cli.sh format --staged   # Linux/WSL2
-ifmt --staged                      # Windows (dev shell)
-
-# Commit with descriptive message
-git commit -m "feat(module): add new capability
-
-- Detailed description of what changed
-- Why the change was needed
-- Any breaking changes or side effects
-
-Closes #123"
-```
-
-#### Commit Message Format
 
 Follow [Conventional Commits](https://www.conventionalcommits.org/):
 
@@ -294,79 +288,75 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 **Types:**
 - `feat`: New feature
 - `fix`: Bug fix
-- `docs`: Documentation changes
-- `style`: Code style changes (formatting, etc.)
-- `refactor`: Code refactoring
-- `perf`: Performance improvements
-- `test`: Test additions or corrections
-- `build`: Build system changes
-- `ci`: CI/CD changes
-- `chore`: Maintenance tasks
+- `docs`: Documentation
+- `style`: Formatting
+- `refactor`: Code restructuring
+- `perf`: Performance improvement
+- `test`: Tests
+- `build`: Build system
+- `ci`: CI/CD
+- `chore`: Maintenance
 
-### 6. Push Changes
+**Scopes:** `team-1`, `team-2`, `team-3`, `team-4`, `core`, `api`, `benchmarks`, `cli`, `docs`
 
+**Example:**
 ```bash
-git push origin feature/your-feature-name
+git commit -m "feat(team-3): add real-time latency benchmark
+
+- Implements sub-millisecond latency measurement
+- Adds deadline miss tracking
+- Integrates with MLflow for tracking
+
+Closes #123"
 ```
+
+### 6. Push and Create PR
+
+```powershell
+git push origin feat/team-X/your-feature-name
+```
+
+Then create a Pull Request on GitHub.
 
 ## Style Guidelines
 
-### Code Formatting and Linting
+### Python Style (Teams 3, 4)
 
-Ionosense-HPC enforces code quality through the CLI platform. Always use these commands before committing:
-
-**Linux/WSL2:**
-```bash
-./scripts/cli.sh format         # Format C++ code
-./scripts/cli.sh lint           # Lint Python and C++
-./scripts/cli.sh typecheck      # Type checking
-./scripts/cli.sh check          # All quality checks
-```
-
-**Windows (development shell):**
-```powershell
-ifmt                           # Format C++ code (iono format)
-ilint                          # Lint Python and C++ (iono lint)
-iono typecheck                 # Type checking
-iono check                     # All quality checks
-```
-
-### Python Style
-
-- **Style Guide**: PEP 8 with 100-character line limit
-- **Type Hints**: Required for all public APIs
-- **Docstrings**: Google style for all public functions/classes
-- **Formatting**: Enforced by `./scripts/cli.sh format` / `ifmt`
-- **Linting**: Enforced by `./scripts/cli.sh lint` / `ilint`
+- **PEP 8** with 100-character line limit
+- **Type hints** required for all public APIs
+- **Docstrings** (Google style) for all public functions/classes
+- **Formatting**: Enforced by `ruff` (run `iono lint --fix`)
 
 ```python
 def process_signal(
     data: np.ndarray,
     config: EngineConfig | None = None,
-    validate: bool = True
+    validate: bool = True,
 ) -> np.ndarray:
     """Process a signal using the FFT engine.
     
     Args:
-        data: Input signal array
+        data: Input signal array (shape: [batch, nfft])
         config: Optional engine configuration
-        validate: Whether to validate input
+        validate: Whether to validate input dimensions
         
     Returns:
-        Magnitude spectrum array
+        Magnitude spectrum array (shape: [batch, nfft//2+1])
         
     Raises:
         ValidationError: If input validation fails
+        EngineStateError: If engine is not initialized
     """
+    # Implementation
 ```
 
-### C++ Style
+### C++ Style (Team 1)
 
-- **Style Guide**: Google C++ Style Guide
-- **Formatting**: Enforced by `./scripts/cli.sh format` / `ifmt` (clang-format)
-- **Naming**: snake_case for functions, CamelCase for classes
-- **Headers**: Include guards and forward declarations
-- **Memory**: RAII and smart pointers
+- **Google C++ Style Guide**
+- **Formatting**: Enforced by `clang-format` (run `iono format`)
+- **Naming**: `snake_case` for functions/variables, `CamelCase` for classes
+- **RAII**: Use smart pointers, avoid manual memory management
+- **Move semantics**: Delete copy, default move for resource-owning classes
 
 ```cpp
 class ResearchEngine {
@@ -382,84 +372,88 @@ public:
     ResearchEngine(ResearchEngine&&) noexcept = default;
     ResearchEngine& operator=(ResearchEngine&&) noexcept = default;
     
-    void process(const float* input, float* output);
+    void process(const float* input, float* output, size_t num_samples);
     
 private:
     class Impl;
-    std::unique_ptr<Impl> pImpl;
+    std::unique_ptr<Impl> pImpl_;  // Pimpl pattern
 };
+```
+
+### Configuration Style (Team 4)
+
+Use Hydra YAML for experiment configurations:
+
+```yaml
+# experiments/conf/experiment/my_experiment.yaml
+# @package _global_
+
+defaults:
+  - /engine: throughput
+  - /benchmark: throughput
+
+experiment:
+  name: my_experiment
+  description: "Description of what this experiment does"
+  
+engine:
+  nfft: 2048
+  batch: 8
+  overlap: 0.5
+
+benchmark:
+  iterations: 1000
+  warmup_iterations: 100
 ```
 
 ## Testing Requirements
 
-### Test Coverage
+### Running Tests
 
-All contributions must include appropriate tests and pass the existing test suite.
-
-**Running Tests with CLI:**
-```bash
-# Linux/WSL2
-./scripts/cli.sh test           # All tests
-./scripts/cli.sh test py        # Python tests only
-./scripts/cli.sh test cpp       # C++ tests only
-./scripts/cli.sh test --coverage  # With coverage report
-
-# Windows (dev shell)
-it                             # All tests (iono test)
-itp                            # Python tests (iono test py)
-itc                            # C++ tests (iono test cpp)
-iono test --coverage           # With coverage report
+```powershell
+iono test                       # All tests
+iono test python                # Python only
+iono test cpp                   # C++ only
+iono test --coverage            # With coverage report
+iono test --verbose             # Verbose output
+iono test -Pattern "test_name"  # Specific test pattern
 ```
 
-### Performance Validation
-
-For performance-critical changes, validate with benchmarks:
-
-```bash
-# Linux/WSL2
-./scripts/cli.sh validate      # Numerical validation
-./scripts/cli.sh bench latency # Performance validation
-./scripts/cli.sh bench suite   # Comprehensive benchmarks
-
-# Windows (dev shell)
-ival                          # Numerical validation (iono validate)
-ibench latency                # Performance validation
-ibench suite                  # Comprehensive benchmarks
-```
-
-### Test Structure
+### Test Structure (Teams 3, 4)
 
 ```python
 import pytest
 import numpy as np
-from ionosense_hpc import Engine, EngineConfig
+from ionosense_hpc import Engine
+from ionosense_hpc.config import Presets
 
 class TestEngine:
     """Test the Engine class."""
     
     @pytest.fixture
-    def processor(self):
-        """Create a test processor."""
-        config = EngineConfig(nfft=256, batch=1)
-        return Engine(config)
+    def engine(self):
+        """Create a test engine instance."""
+        return Engine(Presets.validation())
     
-    def test_basic_processing(self, processor):
+    def test_basic_processing(self, engine):
         """Test basic signal processing."""
         # Arrange
-        input_data = np.random.randn(256).astype(np.float32)
+        input_data = np.random.randn(1024).astype(np.float32)
         
         # Act
         output = engine.process(input_data)
         
         # Assert
-        assert output.shape == (1, 129)
+        assert output.shape == (1, 513)  # nfft//2+1
         assert output.dtype == np.float32
+        assert np.all(output >= 0)  # Magnitude is non-negative
         assert not np.any(np.isnan(output))
     
-    @pytest.mark.parametrize("nfft", [256, 512, 1024])
+    @pytest.mark.parametrize("nfft", [256, 512, 1024, 2048])
     def test_different_sizes(self, nfft):
         """Test processing with different FFT sizes."""
-        config = EngineConfig(nfft=nfft)
+        config = Presets.validation()
+        config.nfft = nfft
         engine = Engine(config)
         
         input_data = np.zeros(nfft, dtype=np.float32)
@@ -468,20 +462,20 @@ class TestEngine:
         assert output.shape == (1, nfft // 2 + 1)
 ```
 
-### Performance Tests
+### Performance Tests (Teams 1, 3)
 
 ```python
 def test_latency_requirement():
     """Ensure real-time latency requirement is met."""
-    config = Presets.realtime()
-    engine = Engine(config)
-    
-    # Warm up
+    engine = Engine(Presets.realtime())
     data = np.random.randn(2048).astype(np.float32)
+    
+    # Warmup
     for _ in range(100):
         engine.process(data)
     
     # Measure
+    import time
     latencies = []
     for _ in range(1000):
         start = time.perf_counter()
@@ -489,257 +483,305 @@ def test_latency_requirement():
         latencies.append((time.perf_counter() - start) * 1e6)
     
     p99_latency = np.percentile(latencies, 99)
-    assert p99_latency < 200, f"P99 latency {p99_latency:.1f}μs exceeds 200μs requirement"
+    assert p99_latency < 200, f"P99 latency {p99_latency:.1f}μs exceeds 200μs"
 ```
+
+### C++ Tests (Team 1)
+
+Use Google Test framework. Tests are run automatically with `iono test cpp`.
 
 ## Pull Request Process
 
 ### Before Submitting
 
-1. **Run Complete Validation**
-   ```bash
-   # Linux/WSL2
-   ./scripts/cli.sh check       # Format, lint, typecheck, quick tests
-   ./scripts/cli.sh build       # Build cleanly
-   ./scripts/cli.sh test        # Full test suite
-   
-   # Windows (dev shell)
-   iono check                   # Format, lint, typecheck, quick tests
-   ib                          # Build cleanly
-   it                          # Full test suite
+1. **Ensure Code Quality**
+   ```powershell
+   iono format              # Format C++ code
+   iono lint --fix          # Fix lint issues
    ```
 
-2. **Update Documentation**
+2. **Run All Tests**
+   ```powershell
+   iono test                # All tests must pass
+   iono build --clean       # Must build cleanly
+   ```
+
+3. **Update Documentation**
    - Add/update docstrings
-   - Update README if needed
-   - Add to CHANGELOG.md (unreleased section)
-   - Verify CLI commands in docs work
+   - Update README.md if needed
+   - Add entry to CHANGELOG.md (Unreleased section)
+   - Update architecture diagrams if applicable
 
-3. **Performance Validation** (if relevant)
-   ```bash
-   # Linux/WSL2
-   ./scripts/cli.sh validate    # Numerical validation
-   ./scripts/cli.sh bench latency  # Performance check
-   
-   # Windows (dev shell)
-   ival                        # Numerical validation
-   ibench latency              # Performance check
-   ```
-
-4. **Rebase if Needed**
-   ```bash
-   git fetch upstream
-   git rebase upstream/main
+4. **Verify on Clean Environment** (Team 2)
+   ```powershell
+   iono clean --all
+   iono setup
+   iono build
+   iono test
    ```
 
 ### PR Template
 
-When creating your pull request, use this template:
-
 ```markdown
 ## Description
-Brief description of changes
+[Brief description of changes]
 
 ## Type of Change
-- [ ] Bug fix (non-breaking change fixing an issue)
-- [ ] New feature (non-breaking change adding functionality)
-- [ ] Breaking change (fix or feature causing existing functionality to not work as expected)
+- [ ] Bug fix (non-breaking)
+- [ ] New feature (non-breaking)
+- [ ] Breaking change
 - [ ] Documentation update
 - [ ] Performance improvement
+- [ ] Infrastructure/tooling
 
-## CLI Validation
-- [ ] `./scripts/cli.sh check` passes (Linux) OR `iono check` passes (Windows)
-- [ ] `./scripts/cli.sh test` passes (Linux) OR `it` passes (Windows)
-- [ ] `./scripts/cli.sh validate` passes (Linux) OR `ival` passes (Windows) (if performance-related)
+## Team
+- [ ] Team 1 (C++/CUDA)
+- [ ] Team 2 (MLOps/Infrastructure)
+- [ ] Team 3 (Python API)
+- [ ] Team 4 (Research/Data Science)
+
+## Validation
+- [ ] `iono format` applied
+- [ ] `iono lint` passes
+- [ ] `iono test` passes
+- [ ] `iono build --clean` succeeds
+- [ ] Tested on GPU: [model name]
 
 ## Testing
-- [ ] All tests pass locally
+- [ ] All existing tests pass
 - [ ] Added new tests for changes
-- [ ] Tested on GPU (specify model): _______________
+- [ ] Manual testing completed
 
-## Checklist
-- [ ] Code follows project style guidelines (enforced by CLI)
-- [ ] Self-reviewed code
-- [ ] Added/updated documentation
+## Documentation
+- [ ] Code includes docstrings/comments
+- [ ] Updated relevant documentation
 - [ ] Updated CHANGELOG.md
-- [ ] No new warnings generated
 
 ## Related Issues
-Closes #(issue number)
+Closes #[issue number]
 
 ## Performance Impact
-[If applicable, include benchmark results from `./scripts/cli.sh bench` / `ibench`]
+[If applicable, include before/after benchmarks]
 
-## Screenshots
-[If applicable, include screenshots]
+## Breaking Changes
+[If applicable, describe migration path]
 ```
 
 ### Review Process
 
 1. **Automated Checks**
-   - CI/CD pipeline runs tests
+   - CI/CD runs tests and builds
    - Code coverage analysis
-   - Style checking (same as CLI commands)
+   - Style checking
 
 2. **Peer Review**
-   - At least one maintainer review
-   - Address all feedback
-   - Discuss design decisions
+   - At least one maintainer approval required
+   - Team lead review for team-specific changes
+   - Address all review feedback
 
 3. **Merge Criteria**
    - All tests passing
    - Approved by maintainer
    - No merge conflicts
    - Documentation updated
-   - CLI validation completed
+   - CHANGELOG.md updated
 
 ## Reporting Issues
 
-### Environment Information
+For detailed guidance on creating high-quality issues, see **[Creating Issues Guide](docs/CREATING_ISSUES.md)**.
 
-Always include environment information when reporting issues:
+### Quick Issue Guidelines
 
-```bash
-# Linux/WSL2
-./scripts/cli.sh doctor --verbose > environment_info.txt
-./scripts/cli.sh info system >> environment_info.txt
+**Title Format:** `[Action Verb] [Specific Problem] in [Component]`
 
-# Windows (dev shell)
-iono doctor --verbose > environment_info.txt
-iono info system >> environment_info.txt
-```
+**Required Labels:**
+- **Type**: `bug`, `feature`, or `task`
+- **Team**: `team-1-cpp`, `team-2-mlops`, `team-3-python`, `team-4-research`
+- **Categories**: `python`, `c++`, `cuda`, `performance`, `documentation`, etc.
 
-### Bug Report Template
+### Bug Reports
 
 ```markdown
-## Description
-Clear description of the bug
+## Bug Description
+[Clear description of the bug]
 
 ## To Reproduce
-Steps to reproduce (include CLI commands used):
-1. `./scripts/cli.sh setup` (or `iono setup`)
-2. `./scripts/cli.sh build` (or `ib`)
-3. See error
+Steps to reproduce (include exact commands):
+1. `iono setup`
+2. `iono build`
+3. Run: `python script.py`
+4. See error
 
 ## Expected Behavior
-What should happen
+[What should happen]
 
 ## Actual Behavior
-What actually happens
+[What actually happens]
 
 ## Environment
-Attach output from:
-- Linux/WSL2: `./scripts/cli.sh doctor --verbose`
-- Windows: `iono doctor --verbose`
-
-## CLI Commands Used
-List the specific CLI commands that led to the issue
-
-## Additional Context
-Any other relevant information
-
-## Possible Solution
-[Optional] Suggest a fix
+```powershell
+# Run these commands and paste output:
+iono doctor
 ```
 
-### Feature Request Template
+## System Information
+- OS: [Windows 10/11]
+- Python: [version from `python --version`]
+- CUDA: [version from `nvcc --version`]
+- GPU: [model from `nvidia-smi`]
+
+## Error Output
+```
+[Paste full error message and stack trace]
+```
+
+## Additional Context
+[Any other relevant information]
+```
+
+### Feature Requests
+
+For detailed guidance on proposing features, see **[Creating Issues Guide](docs/CREATING_ISSUES.md)**.
 
 ```markdown
 ## Feature Description
-Clear description of the feature
+[Clear description of the proposed feature]
 
 ## Motivation
-Why is this feature needed?
+Why is this feature needed? What problem does it solve?
 
-## Proposed CLI Integration
-How should this feature integrate with the CLI?
-- New commands?
-- Modified existing commands?
-- Configuration changes?
+## Proposed Implementation
+[High-level description of how it could be implemented]
 
-## Proposed Solution
-How could this be implemented?
+## Team Assignment
+Which team(s) would this affect?
+- [ ] Team 1 (C++/CUDA Core)
+- [ ] Team 2 (Infrastructure)
+- [ ] Team 3 (Python API)
+- [ ] Team 4 (Research)
 
 ## Alternatives Considered
-Other approaches considered
+[Other approaches you've considered]
 
 ## Additional Context
-Any other relevant information
+[Any other relevant information, examples, or mockups]
 ```
+
+## Research Contributions (Team 4)
+
+### Experiment Contributions
+
+1. **Create Experiment Configuration**
+   ```yaml
+   # experiments/conf/experiment/my_study.yaml
+   # @package _global_
+   
+   defaults:
+     - /engine: throughput
+     - /benchmark: throughput
+   
+   experiment:
+     name: my_study
+     description: "Study description"
+   
+   engine:
+     nfft: 4096
+     batch: 16
+   ```
+
+2. **Run Experiment**
+   ```powershell
+   python benchmarks/run_throughput.py experiment=my_study +benchmark=throughput
+   ```
+
+3. **Document Results**
+   - Save outputs to `artifacts/`
+   - Track in MLflow (`iono ui`)
+   - Create analysis notebook in `experiments/notebooks/`
+   - Add figures to `artifacts/figures/`
+
+4. **Share Findings**
+   - Open PR with configuration and analysis
+   - Include visualizations
+   - Document methodology in notebook
+   - Reference related papers/research
 
 ## Community
 
 ### Getting Help
 
-- **CLI Help**: `./scripts/cli.sh help` / `iono help`
-- **Environment Check**: `./scripts/cli.sh doctor` / `iono doctor`
-- **Documentation**: Read the [docs](docs/)
+- **CLI Help**: `iono help`
+- **Environment Check**: `iono doctor`
+- **Documentation**: Check `docs/` directory
 - **Issues**: Search [existing issues](https://github.com/ionosense-hpc/issues)
 - **Discussions**: Join [GitHub Discussions](https://github.com/ionosense-hpc/discussions)
-- **Email**: contact@ionosense.com
 
-### Communication Channels
+### Communication
 
 - **GitHub Issues**: Bug reports and feature requests
-- **GitHub Discussions**: General questions and discussions
+- **GitHub Discussions**: Questions and design discussions
 - **Pull Requests**: Code contributions
-- **Email List**: Major announcements
+- **Project Boards**: Track active work
 
-### Development Community Standards
+### Code of Conduct
 
-1. **Use CLI for Consistency**: Always use the CLI commands for builds, tests, and validation
-2. **Cross-Platform Awareness**: Test on both Linux and Windows if possible
-3. **Performance Consciousness**: Validate performance impact of changes
-4. **Documentation First**: Update docs along with code changes
-5. **Research Standards**: Follow RSE/RE practices for reproducible research
+- Be respectful and inclusive
+- Use clear, professional language
+- Focus on constructive feedback
+- Help newcomers learn the codebase
+- Follow the project's technical standards
 
-### Recognition
-
-Contributors are recognized in:
-- [CONTRIBUTORS.md](CONTRIBUTORS.md) file
-- GitHub contributors page
-- Release notes for significant contributions
-- Annual contributor spotlight (blog post)
-
-## CLI Quick Reference for Contributors
+## Quick Reference
 
 ### Essential Commands
 
-**Linux/WSL2:**
-```bash
-./scripts/cli.sh setup          # One-time setup
-./scripts/cli.sh check          # Pre-commit validation
-./scripts/cli.sh build          # Build project
-./scripts/cli.sh test           # Run all tests
-./scripts/cli.sh doctor         # Environment check
-./scripts/cli.sh validate       # Performance validation
-```
-
-**Windows (Enhanced Development Shell):**
 ```powershell
-.\scripts\open_dev_pwsh.ps1     # Start dev shell
-iono setup                      # One-time setup
-iono check                      # Pre-commit validation
-ib                             # Build project (iono build)
-it                             # Run all tests (iono test)
-iono doctor                     # Environment check
-ival                           # Performance validation (iono validate)
+# Setup and environment
+.\scripts\init_pwsh.ps1 -Interactive    # Start dev shell
+iono setup                              # Setup environment
+iono doctor                             # Check health
+
+# Development cycle
+ib                                      # Build (iono build)
+it                                      # Test (iono test)
+ifmt                                    # Format (iono format)
+ilint                                   # Lint (iono lint)
+
+# Specialized tasks
+iono profile nsys latency               # GPU profiling
+iono ui                                 # MLflow UI
+python benchmarks/run_*.py              # Run benchmarks
 ```
 
-### Code Quality Commands
+### Team-Specific Workflows
 
-```bash
-# Format and lint (Linux/WSL2)
-./scripts/cli.sh format --check
-./scripts/cli.sh format --staged
-./scripts/cli.sh lint
-./scripts/cli.sh typecheck
+**Team 1 (C++/CUDA):**
+```powershell
+iono build --debug
+itc
+iono profile ncu throughput
+```
 
-# Format and lint (Windows dev shell)
-ifmt --check                   # iono format --check
-ifmt --staged                  # iono format --staged
-ilint                         # iono lint
-iono typecheck
+**Team 2 (Infrastructure):**
+```powershell
+iono clean --all
+iono setup
+iono build --clean
+iono test
+```
+
+**Team 3 (Python):**
+```powershell
+itp
+ilint --fix
+iono test --coverage
+```
+
+**Team 4 (Research):**
+```powershell
+python benchmarks/run_latency.py experiment=my_exp +benchmark=latency
+iono ui
+jupyter lab experiments/notebooks/
 ```
 
 ## License
@@ -748,9 +790,9 @@ By contributing, you agree that your contributions will be licensed under the MI
 
 ## Questions?
 
-If you have questions about contributing:
-1. Check this guide and other documentation
-2. Use CLI help: `./scripts/cli.sh help` / `iono help`
+If you have questions:
+1. Check `iono help` for CLI documentation
+2. Run `iono doctor` for environment issues
 3. Search existing issues and discussions
 4. Open a discussion for general questions
 5. Contact maintainers for specific concerns
