@@ -1,35 +1,35 @@
 /**
- * @file research_engine_v2.cpp
+ * @file research_engine.cpp
  * @version 0.9.3
  * @date 2025-10-09
  * @author [Kevin Rahsaz]
  *
- * @brief Implementation of ResearchEngineV2.
+ * @brief Implementation of ResearchEngine using composable architecture.
  */
 
-#include "ionosense/engines/research_engine_v2.hpp"
+#include "ionosense/engines/research_engine.hpp"
 
 #include <sstream>
 #include <stdexcept>
 
 #include "ionosense/core/pipeline_builder.hpp"
-#include "ionosense/cuda_wrappers.hpp"
+#include "ionosense/core/cuda_wrappers.hpp"
 #include "ionosense/executors/batch_executor.hpp"
-#include "ionosense/profiling_macros.hpp"
+#include "ionosense/core/profiling_macros.hpp"
 
 namespace ionosense {
 
 // ============================================================================
-//  ResearchEngineV2::Impl
+//  ResearchEngine::Impl
 // ============================================================================
 
-class ResearchEngineV2::Impl {
+class ResearchEngine::Impl {
  public:
   Impl() = default;
   ~Impl() = default;
 
   void initialize(const EngineConfig& config) {
-    IONO_NVTX_RANGE("ResearchEngineV2::Initialize",
+    IONO_NVTX_RANGE("ResearchEngine::Initialize",
                     profiling::colors::DARK_GRAY);
 
     // Build the default pipeline
@@ -135,42 +135,42 @@ class ResearchEngineV2::Impl {
 };
 
 // ============================================================================
-//  ResearchEngineV2 Public Interface
+//  ResearchEngine Public Interface
 // ============================================================================
 
-ResearchEngineV2::ResearchEngineV2() : pImpl(std::make_unique<Impl>()) {}
-ResearchEngineV2::~ResearchEngineV2() = default;
-ResearchEngineV2::ResearchEngineV2(ResearchEngineV2&&) noexcept = default;
-ResearchEngineV2& ResearchEngineV2::operator=(ResearchEngineV2&&) noexcept =
+ResearchEngine::ResearchEngine() : pImpl(std::make_unique<Impl>()) {}
+ResearchEngine::~ResearchEngine() = default;
+ResearchEngine::ResearchEngine(ResearchEngine&&) noexcept = default;
+ResearchEngine& ResearchEngine::operator=(ResearchEngine&&) noexcept =
     default;
 
-void ResearchEngineV2::initialize(const EngineConfig& config) {
+void ResearchEngine::initialize(const EngineConfig& config) {
   pImpl->initialize(config);
 }
 
-void ResearchEngineV2::process(const float* input, float* output,
-                               size_t num_samples) {
+void ResearchEngine::process(const float* input, float* output,
+                             size_t num_samples) {
   pImpl->process(input, output, num_samples);
 }
 
-void ResearchEngineV2::process_async(const float* input, size_t num_samples,
-                                    ResultCallback callback) {
+void ResearchEngine::process_async(const float* input, size_t num_samples,
+                                  ResultCallback callback) {
   pImpl->process_async(input, num_samples, callback);
 }
 
-void ResearchEngineV2::synchronize() { pImpl->synchronize(); }
+void ResearchEngine::synchronize() { pImpl->synchronize(); }
 
-void ResearchEngineV2::reset() { pImpl->reset(); }
+void ResearchEngine::reset() { pImpl->reset(); }
 
-ProcessingStats ResearchEngineV2::get_stats() const {
+ProcessingStats ResearchEngine::get_stats() const {
   return pImpl->get_stats();
 }
 
-RuntimeInfo ResearchEngineV2::get_runtime_info() const {
+RuntimeInfo ResearchEngine::get_runtime_info() const {
   return pImpl->get_runtime_info();
 }
 
-bool ResearchEngineV2::is_initialized() const {
+bool ResearchEngine::is_initialized() const {
   return pImpl->is_initialized();
 }
 

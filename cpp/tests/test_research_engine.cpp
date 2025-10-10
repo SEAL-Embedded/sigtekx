@@ -20,10 +20,10 @@
 #include <thread>
 #include <vector>
 
-#include "ionosense/processing_stage.hpp"
-#include "ionosense/research_engine.hpp"
+#include "ionosense/core/processing_stage.hpp"
+#include "ionosense/engines/research_engine.hpp"
 // Ensure CUDA runtime symbols are available to this test
-#include "ionosense/cuda_wrappers.hpp"
+#include "ionosense/core/cuda_wrappers.hpp"
 
 // IEEE Std 1003.1-2001 compliance for mathematical constants
 #ifndef M_PI
@@ -371,39 +371,9 @@ TEST_F(ResearchEngineTest, RuntimeInfo) {
 // Configuration Tests
 // ============================================================================
 
-/**
- * @test ResearchEngineTest.StageConfiguration
- * @brief Verifies setting and getting of stage configurations.
- */
-TEST_F(ResearchEngineTest, StageConfiguration) {
-  ResearchEngine engine;
-
-  StageConfig stage_config;
-  stage_config.nfft = 1024;
-  stage_config.batch = 4;
-  stage_config.window_type = StageConfig::WindowType::HANN;
-  stage_config.scale_policy = StageConfig::ScalePolicy::ONE_OVER_N;
-
-  engine.set_stage_config(stage_config);
-  auto retrieved = engine.get_stage_config();
-
-  EXPECT_EQ(retrieved.nfft, stage_config.nfft);
-  EXPECT_EQ(retrieved.batch, stage_config.batch);
-  EXPECT_EQ(retrieved.window_type, stage_config.window_type);
-  EXPECT_EQ(retrieved.scale_policy, stage_config.scale_policy);
-}
-
-/**
- * @test ResearchEngineTest.ProfilingToggle
- * @brief Ensures the profiling flag can be toggled without error.
- */
-TEST_F(ResearchEngineTest, ProfilingToggle) {
-  ResearchEngine engine;
-  engine.initialize(config_);
-
-  EXPECT_NO_THROW(engine.set_profiling_enabled(true));
-  EXPECT_NO_THROW(engine.set_profiling_enabled(false));
-}
+// NOTE: StageConfiguration and ProfilingToggle tests removed in v0.9.3
+// The new architecture manages stage configuration internally via the pipeline,
+// and profiling is controlled through EngineConfig.enable_profiling.
 
 // ============================================================================
 // Performance Tests
@@ -467,18 +437,9 @@ TEST_F(ResearchEngineTest, Synchronization) {
 // Factory and Utility Tests
 // ============================================================================
 
-/**
- * @test ResearchEngineTest.EngineFactory
- * @brief Tests the `create_engine` factory function for various engine types.
- */
-TEST_F(ResearchEngineTest, EngineFactory) {
-  auto engine = create_engine("research");
-  EXPECT_NE(engine, nullptr);
-
-  EXPECT_THROW(create_engine("ife"), std::runtime_error);
-  EXPECT_THROW(create_engine("obe"), std::runtime_error);
-  EXPECT_THROW(create_engine("invalid"), std::invalid_argument);
-}
+// NOTE: EngineFactory test removed in v0.9.3
+// The new architecture doesn't use a factory function. Users instantiate
+// specific engines directly (ResearchEngine, RealtimeIonoEngine, etc.).
 
 /**
  * @test ResearchEngineTest.GetAvailableDevices

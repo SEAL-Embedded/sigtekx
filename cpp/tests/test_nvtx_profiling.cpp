@@ -16,10 +16,10 @@
 #include <string>
 #include <vector>
 
-#include "ionosense/cuda_wrappers.hpp"
-#include "ionosense/processing_stage.hpp"  // for ProcessingStats definition
-#include "ionosense/profiling_macros.hpp"
-#include "ionosense/research_engine.hpp"
+#include "ionosense/core/cuda_wrappers.hpp"
+#include "ionosense/core/processing_stage.hpp"  // for ProcessingStats definition
+#include "ionosense/core/profiling_macros.hpp"
+#include "ionosense/engines/research_engine.hpp"
 
 using namespace ionosense;
 
@@ -61,7 +61,6 @@ TEST(NvtxProfilingTest, BenchmarkPhasesRun) {
   const int warmup_iters = 5;
 
   ResearchEngine engine;
-  EXPECT_NO_THROW(engine.set_profiling_enabled(true));
 
   EngineConfig cfg;
   cfg.nfft = nfft;

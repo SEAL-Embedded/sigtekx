@@ -15,7 +15,8 @@
 #include <memory>
 
 #include "ionosense/core/executor_config.hpp"
-#include "ionosense/processing_stage.hpp"
+#include "ionosense/core/processing_stage.hpp"
+#include "ionosense/core/pipeline_executor.hpp"
 
 namespace ionosense {
 

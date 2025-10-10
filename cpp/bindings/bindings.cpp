@@ -18,8 +18,8 @@
 
 #include <sstream>
 
-#include "ionosense/processing_stage.hpp"
-#include "ionosense/research_engine.hpp"
+#include "ionosense/core/processing_stage.hpp"
+#include "ionosense/engines/research_engine.hpp"
 
 namespace py = pybind11;
 namespace ionosense {
@@ -95,22 +95,8 @@ class PyResearchEngine {
   /** @brief Checks if the engine has been initialized. */
   bool is_initialized() const { return engine_->is_initialized(); }
 
-  /** @brief Enables or disables internal profiling. */
-  void set_profiling_enabled(bool enabled) {
-    engine_->set_profiling_enabled(enabled);
-  }
-
   /** @brief Gets the current engine configuration. */
   EngineConfig get_config() const { return config_; }
-
-  /** @brief Gets the current stage configuration. */
-  StageConfig get_stage_config() const { return engine_->get_stage_config(); }
-
-  /** @brief Sets a new stage configuration. Note: requires re-initialization.
-   */
-  void set_stage_config(const StageConfig& config) {
-    engine_->set_stage_config(config);
-  }
 
  private:
   std::unique_ptr<ResearchEngine> engine_;

@@ -13,7 +13,7 @@
  * the header, promoting cleaner architecture and faster compile times.
  */
 
-#include "ionosense/processing_stage.hpp"
+#include "ionosense/core/processing_stage.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -21,9 +21,9 @@
 #include <string>
 #include <vector>
 
-#include "ionosense/cuda_wrappers.hpp"
-#include "ionosense/profiling_macros.hpp"
-#include "ionosense/window_functions.hpp"
+#include "ionosense/core/cuda_wrappers.hpp"
+#include "ionosense/core/profiling_macros.hpp"
+#include "ionosense/core/window_functions.hpp"
 
 // --- External Kernel Launch Function Declarations (from ops_fft.cu) ---
 namespace ionosense {

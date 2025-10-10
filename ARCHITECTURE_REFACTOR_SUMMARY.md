@@ -16,7 +16,7 @@ Successfully implemented the architecture refactor transforming ionosense-hpc-li
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                Application Layer                         │
-│  - ResearchEngineV2                                     │
+│  - ResearchEngine                                     │
 │  - RealtimeIonoEngine                                   │
 └────────────┬────────────────────────┬───────────────────┘
              │                        │
@@ -112,13 +112,13 @@ Simplified streaming executor (v0.9.3):
 
 ### Engine Facades
 
-#### 1. ResearchEngineV2
-**Location**: `cpp/src/engines/research_engine_v2.cpp`
+#### 1. ResearchEngine
+**Location**: `cpp/src/engines/research_engine.cpp`
 
 New implementation using executor delegation:
 
 ```cpp
-class ResearchEngineV2::Impl {
+class ResearchEngine::Impl {
   std::unique_ptr<IPipelineExecutor> executor_;
 
   void initialize(const EngineConfig& config) {
@@ -171,7 +171,7 @@ cpp/
 │   │   ├── batch_executor.hpp          [NEW]
 │   │   └── realtime_executor.hpp       [NEW]
 │   └── engines/
-│       ├── research_engine_v2.hpp      [NEW]
+│       ├── research_engine.hpp      [NEW]
 │       └── realtime_iono_engine.hpp    [NEW]
 ├── src/
 │   ├── core/
@@ -180,7 +180,7 @@ cpp/
 │   │   ├── batch_executor.cpp          [NEW]
 │   │   └── realtime_executor.cpp       [NEW]
 │   └── engines/
-│       ├── research_engine_v2.cpp      [NEW]
+│       ├── research_engine.cpp      [NEW]
 │       └── realtime_iono_engine.cpp    [NEW]
 └── examples/
     └── architecture_demo.cpp            [NEW]
@@ -208,7 +208,7 @@ add_library(ion_engine OBJECT
     cpp/src/core/pipeline_builder.cpp
     cpp/src/executors/batch_executor.cpp
     cpp/src/executors/realtime_executor.cpp
-    cpp/src/engines/research_engine_v2.cpp
+    cpp/src/engines/research_engine.cpp
     cpp/src/engines/realtime_iono_engine.cpp
 )
 ```
@@ -234,11 +234,11 @@ add_library(ion_engine OBJECT
 
 ## Usage Examples
 
-### Example 1: ResearchEngineV2
+### Example 1: ResearchEngine
 ```cpp
-#include "ionosense/engines/research_engine_v2.hpp"
+#include "ionosense/engines/research_engine.hpp"
 
-ResearchEngineV2 engine;
+ResearchEngine engine;
 EngineConfig config;
 config.nfft = 1024;
 config.batch = 2;
@@ -323,12 +323,7 @@ executor.initialize(exec_config, std::move(stages));
 4. **JIT Pipeline Compiler**: Runtime code generation
 5. **Dynamic Reconfiguration**: Change pipeline without reinitialization
 
-## Migration Path
 
-### For Existing Code
-1. **No immediate changes required**: Original `ResearchEngine` still available
-2. **Gradual migration**: Test new architecture in parallel
-3. **Drop-in replacement**: `ResearchEngineV2` has same interface
 
 ### For New Features
 1. **Use new architecture**: Build with `PipelineBuilder` + executors
@@ -346,7 +341,6 @@ executor.initialize(exec_config, std::move(stages));
 
 ## Conclusion
 
-The architecture refactor successfully transforms ionosense-hpc-lib into a composable, extensible HPC toolkit while maintaining 100% backward compatibility and zero performance regression. The new design enables:
 
 1. **Rapid prototyping**: Mix and match pipelines and executors
 2. **Domain-specific engines**: Easy specialization (e.g., ionosphere processing)

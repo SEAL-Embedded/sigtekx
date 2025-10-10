@@ -16,7 +16,7 @@
 #include <numeric>
 #include <vector>
 
-#include "ionosense/cuda_wrappers.hpp"
+#include "ionosense/core/cuda_wrappers.hpp"
 
 using namespace ionosense;
 

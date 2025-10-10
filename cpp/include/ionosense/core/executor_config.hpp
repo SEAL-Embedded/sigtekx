@@ -12,7 +12,7 @@
 
 #pragma once
 
-#include "ionosense/research_engine.hpp"  // For EngineConfig base
+#include "ionosense/core/engine_config.hpp"  // For EngineConfig base
 
 namespace ionosense {
 

@@ -16,7 +16,7 @@
 #include <string>
 #include <vector>
 
-#include "ionosense/processing_stage.hpp"
+#include "ionosense/core/processing_stage.hpp"
 
 namespace ionosense {
 
