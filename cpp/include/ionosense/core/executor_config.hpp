@@ -1,0 +1,80 @@
+/**
+ * @file executor_config.hpp
+ * @version 0.9.3
+ * @date 2025-10-09
+ * @author [Kevin Rahsaz]
+ *
+ * @brief Configuration structures for pipeline executors.
+ *
+ * Defines ExecutorConfig which extends EngineConfig with executor-specific
+ * settings like execution mode, CUDA graph preferences, and resource hints.
+ */
+
+#pragma once
+
+#include "ionosense/research_engine.hpp"  // For EngineConfig base
+
+namespace ionosense {
+
+/**
+ * @struct ExecutorConfig
+ * @brief Configuration for pipeline executor behavior and resource management.
+ *
+ * Extends EngineConfig with executor-specific settings that control how the
+ * pipeline is executed (batch vs streaming vs low-latency) and which
+ * optimizations to apply.
+ */
+struct ExecutorConfig : EngineConfig {
+  /**
+   * @enum ExecutionMode
+   * @brief Defines the execution strategy for the pipeline.
+   */
+  enum class ExecutionMode {
+    BATCH,        ///< Process complete batches with maximum throughput
+    STREAMING,    ///< Continuous processing with input accumulation
+    LOW_LATENCY   ///< Minimize latency at the cost of some throughput
+  };
+
+  // --- Executor-Specific Settings ---
+
+  /// Execution strategy to use
+  ExecutionMode mode = ExecutionMode::BATCH;
+
+  /// If true, attempt to use CUDA graphs for reduced kernel launch overhead
+  bool prefer_cuda_graphs = false;
+
+  /// Maximum number of batches that can be in-flight simultaneously
+  /// (used in streaming mode)
+  int max_inflight_batches = 2;
+
+  /// Device ID to use (defaults to best available)
+  int device_id = -1;  // -1 means auto-select
+
+  /**
+   * @brief Validates the executor configuration.
+   * @param[out] error_msg Error message if validation fails.
+   * @return True if configuration is valid, false otherwise.
+   */
+  bool validate(std::string& error_msg) const {
+    // First validate base EngineConfig
+    if (!engine_utils::validate_config(*this, error_msg)) {
+      return false;
+    }
+
+    // Validate executor-specific constraints
+    if (max_inflight_batches < 1) {
+      error_msg = "max_inflight_batches must be at least 1.";
+      return false;
+    }
+
+    if (mode == ExecutionMode::STREAMING && pinned_buffer_count < max_inflight_batches) {
+      error_msg = "pinned_buffer_count must be >= max_inflight_batches for streaming mode.";
+      return false;
+    }
+
+    error_msg.clear();
+    return true;
+  }
+};
+
+}  // namespace ionosense

@@ -1,0 +1,68 @@
+/**
+ * @file batch_executor.hpp
+ * @version 0.9.3
+ * @date 2025-10-09
+ * @author [Kevin Rahsaz]
+ *
+ * @brief Batch-oriented pipeline executor with round-robin buffer management.
+ *
+ * Implements the IPipelineExecutor interface for high-throughput batch
+ * processing using multiple CUDA streams and double/triple buffering.
+ */
+
+#pragma once
+
+#include <memory>
+
+#include "ionosense/core/executor_config.hpp"
+#include "ionosense/core/pipeline_executor.hpp"
+
+namespace ionosense {
+
+/**
+ * @class BatchExecutor
+ * @brief Executor optimized for batch processing with maximum throughput.
+ *
+ * This executor implements the execution logic extracted from the original
+ * ResearchEngine::Impl. It manages:
+ * - Multiple CUDA streams for H2D, compute, and D2H operations
+ * - Round-robin buffer selection for pipelining
+ * - Event-based synchronization between pipeline stages
+ * - Double/triple buffering for overlapping operations
+ *
+ * Key features:
+ * - Asynchronous H2D → Compute → D2H pipeline
+ * - Minimal blocking with event-based dependencies
+ * - Proper buffer reuse with cross-frame synchronization
+ * - NVTX profiling integration
+ */
+class BatchExecutor : public IPipelineExecutor {
+ public:
+  BatchExecutor();
+  ~BatchExecutor() override;
+
+  // Disable copy, enable move
+  BatchExecutor(const BatchExecutor&) = delete;
+  BatchExecutor& operator=(const BatchExecutor&) = delete;
+  BatchExecutor(BatchExecutor&&) noexcept;
+  BatchExecutor& operator=(BatchExecutor&&) noexcept;
+
+  // IPipelineExecutor interface
+  void initialize(const ExecutorConfig& config,
+                  std::vector<std::unique_ptr<IProcessingStage>> stages) override;
+  void reset() override;
+  void submit(const float* input, float* output, size_t num_samples) override;
+  void submit_async(const float* input, size_t num_samples,
+                   ResultCallback callback) override;
+  void synchronize() override;
+  ProcessingStats get_stats() const override;
+  bool supports_streaming() const override { return false; }
+  size_t get_memory_usage() const override;
+  bool is_initialized() const override;
+
+ private:
+  class Impl;
+  std::unique_ptr<Impl> pImpl;
+};
+
+}  // namespace ionosense
