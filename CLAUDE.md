@@ -71,9 +71,40 @@ dvc repro
 ./scripts/cli.ps1 setup                   # Environment setup
 ./scripts/cli.ps1 build                   # Build project
 ./scripts/cli.ps1 test                    # Run tests
+./scripts/cli.ps1 test python -Coverage   # Run Python tests with coverage
+./scripts/cli.ps1 test cpp -Coverage      # Run C++ tests with coverage
+./scripts/cli.ps1 coverage                # Run C++ tests with coverage (standalone)
 ./scripts/cli.ps1 format                  # Format code
 ./scripts/cli.ps1 lint                    # Lint code
 ./scripts/cli.ps1 doctor                  # System health check
+```
+
+## Code Coverage
+
+### C++ Coverage (gcovr)
+```bash
+# Run C++ tests with coverage report (builds with windows-coverage preset)
+./scripts/cli.ps1 test cpp -Coverage      # Runs tests and opens HTML report
+./scripts/cli.ps1 coverage                # Alternative standalone command
+
+# Coverage report location
+# Terminal: Color-coded coverage summary
+# HTML: artifacts/reports/coverage-cpp/index.html
+
+# Manual coverage workflow (if needed)
+./scripts/cli.ps1 build -Preset windows-coverage    # Build with coverage
+./build/windows-coverage/test_engine.exe            # Run tests
+gcovr --root . --filter "cpp/.*" --html-details artifacts/reports/coverage-cpp/index.html
+```
+
+### Python Coverage (pytest-cov)
+```bash
+# Run Python tests with coverage (like you're used to)
+./scripts/cli.ps1 test python -Coverage   # Runs tests with coverage report
+
+# Coverage report location
+# Terminal: Coverage summary
+# HTML: artifacts/reports/coverage/index.html
 ```
 
 ## Tool-Specific Quick Commands
@@ -183,4 +214,4 @@ python benchmarks/run_latency.py experiment=ionosphere_multiscale +benchmark=lat
 python benchmarks/run_throughput.py --multirun experiment=ionosphere_resolution
 ```
 
-Last updated: 2025-10-01 (Added profiling benchmark config and timing guidance)
+Last updated: 2025-10-11 (Added C++ code coverage with gcovr)

@@ -319,7 +319,7 @@ function global:iono {
     }
 
     # Only allow commands that actually exist in simplified CLI
-    $validCommands = @('setup','build','test','lint','format','clean','doctor','ui','run','help','profile')
+    $validCommands = @('setup','build','test','coverage','lint','format','clean','doctor','ui','run','help','profile')
     if ($Args.Count -gt 0 -and $Args[0] -notin $validCommands) {
         Write-Warning "Command '$($Args[0])' not available. Use 'iono help' for available commands."
         Write-Host "💡 For research workflows, use direct tools:" -ForegroundColor Cyan
@@ -497,7 +497,7 @@ function global:ireload {
 }
 
 # Tab-completion (only for commands that actually exist)
-$global:IonoVerbs   = @('setup','build','test','lint','format','clean','doctor','ui','run','help','profile')
+$global:IonoVerbs   = @('setup','build','test','coverage','lint','format','clean','doctor','ui','run','help','profile')
 $global:IonoTargets = @('python','cpp','all','-Clean','--clean','-Verbose','--verbose','--debug','--release','-Fix','-Check','-Coverage','-Pattern','-All','nsys','ncu','latency','throughput','accuracy','realtime','custom','-Full','-NoOpen','-Mode','-Script','-Kernel','-Duration')
 
 Register-ArgumentCompleter -CommandName iono,ib,it,ilint,ifmt,iclean,itp,itc,ihelp,iprof -ScriptBlock {

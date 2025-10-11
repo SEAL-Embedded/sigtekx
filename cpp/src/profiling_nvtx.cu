@@ -15,13 +15,12 @@
 namespace ionosense {
 namespace profiling {
 
+#ifdef IONOSENSE_ENABLE_PROFILING
 // Single runtime toggle shared across all TUs
 static bool g_profiling_enabled = true;
 
 bool profiling_enabled() { return g_profiling_enabled; }
 void set_profiling_enabled(bool enable) { g_profiling_enabled = enable; }
-
-#ifdef IONOSENSE_ENABLE_PROFILING
 // Convert 0xAARRGGBB to nvtx3::argb
 static inline nvtx3::v1::argb to_argb(uint32_t argb) {
   return nvtx3::v1::argb{static_cast<unsigned char>((argb >> 24) & 0xFF),
