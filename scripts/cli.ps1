@@ -216,24 +216,15 @@ function Invoke-Coverage {
         exit 1
     }
 
-    # Step 2: Run tests
-    Write-Status "Running C++ tests..."
+    # Step 2: Run tests with coverage
+    Write-Status "Running C++ tests with coverage analysis..."
     $testExe = Join-Path $script:BuildDir "windows-coverage/test_engine.exe"
     if (-not (Test-Path $testExe)) {
         Write-Error "Test executable not found at: $testExe"
         exit 1
     }
 
-    # Use brief output by default, full output with -Verbose
-    $testArgs = @()
-    if (-not $Verbose) {
-        $testArgs += "--gtest_brief=1"
-    }
-    & $testExe @testArgs
-    $testExitCode = $LASTEXITCODE
-
-    # Step 3: Generate coverage reports
-    Write-Status "Generating coverage reports..."
+    # Step 3: Setup coverage report directories
     $reportsDir = Join-Path $script:ProjectRoot "artifacts/reports"
     $coverageDir = Join-Path $reportsDir "coverage-cpp"
 
@@ -245,33 +236,82 @@ function Invoke-Coverage {
     }
     New-Item -ItemType Directory -Path $coverageDir -Force | Out-Null
 
-    # Generate HTML report
-    $srcDir = Join-Path $script:ProjectRoot "cpp"
-    $buildCoverageDir = Join-Path $script:BuildDir "windows-coverage"
+    # Detect platform and use appropriate coverage tool
+    # $IsWindows is a built-in read-only variable in PowerShell Core (v6+)
+    $onWindows = if ($PSVersionTable.PSVersion.Major -ge 6) { $IsWindows } else { $true }
 
-    Write-Status "Analyzing coverage data with gcovr..."
+    if ($onWindows) {
+        # Windows: Use OpenCppCoverage (MSVC native)
+        Write-Status "Using OpenCppCoverage for MSVC coverage analysis..."
 
-    # Convert Windows paths to forward slashes for gcovr regex compatibility
-    $rootPath = $script:ProjectRoot -replace '\\', '/'
-    $srcFilter = ($srcDir -replace '\\', '/') + '/.*'
+        if (-not (Get-Command OpenCppCoverage -ErrorAction SilentlyContinue)) {
+            Write-Error "OpenCppCoverage not found. Install via: choco install opencppcoverage"
+            Write-Host "See: https://github.com/OpenCppCoverage/OpenCppCoverage" -ForegroundColor Yellow
+            exit 1
+        }
 
-    # Terminal summary
-    & gcovr `
-        --root $rootPath `
-        --filter $srcFilter `
-        --exclude ".*test.*" `
-        --exclude ".*_deps.*" `
-        --print-summary
+        # Build test arguments
+        $testArgs = @()
+        if (-not $Verbose) {
+            $testArgs += "--gtest_brief=1"
+        }
 
-    # HTML report
-    & gcovr `
-        --root $rootPath `
-        --filter $srcFilter `
-        --exclude ".*test.*" `
-        --exclude ".*_deps.*" `
-        --html-details "$coverageDir/index.html"
+        # OpenCppCoverage arguments
+        $coverageArgs = @(
+            "--sources", "cpp\src",
+            "--sources", "cpp\include",
+            "--excluded_sources", "cpp\tests",
+            "--excluded_sources", "*\googletest*",
+            "--excluded_sources", "*\_deps\*",
+            "--export_type", "html:$coverageDir",
+            "--",
+            $testExe
+        )
+        if ($testArgs.Count -gt 0) {
+            $coverageArgs += $testArgs
+        }
 
-    if ($LASTEXITCODE -eq 0) {
+        & OpenCppCoverage @coverageArgs
+        $testExitCode = $LASTEXITCODE
+
+    } else {
+        # Linux: Use gcovr (GCC/Clang coverage)
+        Write-Status "Using gcovr for GCC/Clang coverage analysis..."
+
+        # Run tests first
+        $testArgs = @()
+        if (-not $Verbose) {
+            $testArgs += "--gtest_brief=1"
+        }
+        & $testExe @testArgs
+        $testExitCode = $LASTEXITCODE
+
+        # Analyze coverage with gcovr
+        $srcDir = Join-Path $script:ProjectRoot "cpp"
+        $rootPath = $script:ProjectRoot -replace '\\', '/'
+        $srcFilter = ($srcDir -replace '\\', '/') + '/.*'
+
+        # Terminal summary
+        & gcovr `
+            --root $rootPath `
+            --filter $srcFilter `
+            --exclude ".*test.*" `
+            --exclude ".*_deps.*" `
+            --print-summary
+
+        # HTML report
+        & gcovr `
+            --root $rootPath `
+            --filter $srcFilter `
+            --exclude ".*test.*" `
+            --exclude ".*_deps.*" `
+            --html-details "$coverageDir/index.html"
+    }
+
+    # Check coverage report generation (separate from test success)
+    $coverageReportExists = Test-Path "$coverageDir/index.html"
+
+    if ($coverageReportExists) {
         Write-Success "Coverage report generated: $coverageDir/index.html"
 
         if ($OpenReport) {
@@ -280,11 +320,15 @@ function Invoke-Coverage {
         }
     } else {
         Write-Error "Coverage report generation failed"
+        Write-Host "This indicates a problem with OpenCppCoverage itself, not the tests." -ForegroundColor Yellow
     }
 
-    # Return test exit code
-    if ($testExitCode -ne 0) {
-        Write-Error "Tests failed"
+    # Report test results (separate from coverage generation)
+    if ($testExitCode -eq 0) {
+        Write-Success "All tests passed"
+    } else {
+        Write-Error "Tests failed with exit code: $testExitCode"
+        Write-Host "Coverage report was still generated - check it to see which code paths were tested." -ForegroundColor Yellow
         exit $testExitCode
     }
 }
@@ -413,6 +457,17 @@ function Invoke-Doctor {
             Write-Host "  ✅ ${tool}: Available" -ForegroundColor Green
         } else {
             Write-Host "  ❌ ${tool}: Not found" -ForegroundColor Red
+        }
+    }
+
+    # Check C++ coverage tool (Windows only)
+    if ($IsWindows -or ($PSVersionTable.PSVersion.Major -lt 6)) {
+        $opencppcov = Get-Command OpenCppCoverage -ErrorAction SilentlyContinue
+        if ($opencppcov) {
+            Write-Host "  ✅ OpenCppCoverage: Available (C++ coverage)" -ForegroundColor Green
+        } else {
+            Write-Host "  ⚠️  OpenCppCoverage: Not found (C++ coverage unavailable)" -ForegroundColor Yellow
+            Write-Host "     Install via: choco install opencppcoverage" -ForegroundColor DarkGray
         }
     }
 

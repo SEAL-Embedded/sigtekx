@@ -419,13 +419,16 @@ TEST_F(ProcessingStageTest, WindowUtilsHannGeneration) {
   const int size = 64;
   std::vector<float> window(size);
 
-  window_utils::generate_window(window.data(), size, StageConfig::WindowType::HANN, false);
+  // Test SYMMETRIC mode explicitly (original test expected SYMMETRIC behavior)
+  window_utils::generate_window(window.data(), size, StageConfig::WindowType::HANN, false,
+                                StageConfig::WindowSymmetry::SYMMETRIC);
 
   for (int i = 0; i < size; ++i) {
     float expected = 0.5f * (1.0f - std::cos(2.0f * M_PI * i / (size - 1)));
     EXPECT_NEAR(window[i], expected, 1e-5f);
   }
 
+  // SYMMETRIC mode has exact zeros at endpoints
   EXPECT_NEAR(window[0], 0.0f, 1e-6f);
   EXPECT_NEAR(window[size - 1], 0.0f, 1e-6f);
   EXPECT_NEAR(window[size / 2], 1.0f, 0.1f);
