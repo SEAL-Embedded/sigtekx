@@ -8,6 +8,30 @@
  * - IEEE-754 compliant error signaling (NaN on GPU, exceptions on CPU)
  * - Protection against NaN/Inf propagation
  * - Consistent behavior across CPU and GPU code paths
+ *
+ * ## Window Symmetry Architecture
+ *
+ * All window functions support two symmetry modes that control the denominator
+ * in coefficient calculations, affecting endpoint values and spectral characteristics:
+ *
+ * ### PERIODIC Mode (Denominator = N)
+ * - **Primary use case**: FFT-based spectral analysis (default)
+ * - **Endpoint behavior**: Non-zero endpoints (except at i=0)
+ * - **Applications**: STFT, spectrograms, ionosphere research
+ * - **Formula example**: Hann[i] = 0.5 * (1 - cos(2πi/N))
+ * - **Rationale**: Treats the window as one period of a periodic signal
+ *
+ * ### SYMMETRIC Mode (Denominator = N-1)
+ * - **Primary use case**: Time-domain signal analysis and FIR filter design
+ * - **Endpoint behavior**: Exactly zero at both ends
+ * - **Applications**: Windowed FIR filters, direct signal tapering
+ * - **Formula example**: Hann[i] = 0.5 * (1 - cos(2πi/(N-1)))
+ * - **Rationale**: Ensures symmetric tapering with zero-valued endpoints
+ *
+ * **Default**: All functions default to PERIODIC mode as this library is designed
+ * for FFT-based ionosphere research workflows.
+ *
+ * @see StageConfig::WindowSymmetry in processing_stage.hpp for usage in pipeline stages
  */
 
 #pragma once
@@ -40,7 +64,7 @@ inline constexpr double PI = 3.14159265358979323846264338327950288;
 /**
  * @brief Returns a safe denominator for window calculations.
  * @param size The window size.
- * @param symmetry Window symmetry type (PERIODIC for FFT, SYMMETRIC for analysis).
+ * @param symmetry Window symmetry mode (see module-level documentation).
  * @return N or (N-1) based on symmetry, with safety for edge cases.
  */
 IONO_HD inline double safe_denominator(int size, WindowSymmetry symmetry) {
@@ -54,7 +78,7 @@ IONO_HD inline double safe_denominator(int size, WindowSymmetry symmetry) {
  * @brief Generates the base Hann window coefficient at a given index.
  * @param index The sample index within the window.
  * @param size The total window size.
- * @param symmetry Window symmetry type (PERIODIC for FFT, SYMMETRIC for analysis).
+ * @param symmetry Window symmetry mode (see module-level documentation).
  * @return The Hann window coefficient, or NaN (GPU) / throws exception (CPU) on error.
  *
  * Error conditions:
@@ -97,7 +121,7 @@ IONO_HD inline double hann_base(int index, int size, WindowSymmetry symmetry = W
  * @brief Generates the base Blackman window coefficient at a given index.
  * @param index The sample index within the window.
  * @param size The total window size.
- * @param symmetry Window symmetry type (PERIODIC for FFT, SYMMETRIC for analysis).
+ * @param symmetry Window symmetry mode (see module-level documentation).
  * @return The Blackman window coefficient, or NaN (GPU) / throws exception (CPU) on error.
  *
  * Error conditions:
@@ -143,7 +167,7 @@ IONO_HD inline double blackman_base(int index, int size, WindowSymmetry symmetry
  * @param kind The type of window function.
  * @param index The sample index within the window.
  * @param size The total window size.
- * @param symmetry Window symmetry type (PERIODIC for FFT, SYMMETRIC for analysis).
+ * @param symmetry Window symmetry mode (see module-level documentation).
  * @return The window coefficient, or NaN (GPU) / throws exception (CPU) on error.
  */
 IONO_HD inline double base(WindowKind kind, int index, int size, WindowSymmetry symmetry = WindowSymmetry::PERIODIC) {
@@ -178,7 +202,7 @@ IONO_HD inline double base(WindowKind kind, int index, int size, WindowSymmetry 
  * @param index The sample index within the window.
  * @param size The total window size.
  * @param sqrt_norm If true, applies square-root normalization.
- * @param symmetry Window symmetry type (PERIODIC for FFT, SYMMETRIC for analysis).
+ * @param symmetry Window symmetry mode (see module-level documentation).
  * @return The final window value, or NaN (GPU) / throws exception (CPU) on error.
  */
 IONO_HD inline float window_value(WindowKind kind, int index, int size, bool sqrt_norm, WindowSymmetry symmetry = WindowSymmetry::PERIODIC) {
@@ -219,7 +243,7 @@ IONO_HD inline float window_value(WindowKind kind, int index, int size, bool sqr
  * @param size The window size.
  * @param kind The type of window function.
  * @param sqrt_norm If true, applies square-root normalization.
- * @param symmetry Window symmetry type (PERIODIC for FFT, SYMMETRIC for analysis).
+ * @param symmetry Window symmetry mode (see module-level documentation).
  *
  * Note: This function validates inputs and may throw exceptions on the CPU path
  * if invalid parameters are provided. On GPU, errors would be signaled via NaN.
