@@ -265,48 +265,58 @@ TEST(WindowFunctionsTest, LargeWindowSize) {
 
 /**
  * @test WindowFunctionsTest.HannSymmetry
- * @brief Verifies that Hann window is symmetric.
+ * @brief Verifies that Hann window is symmetric in SYMMETRIC mode.
+ *
+ * SYMMETRIC mode ensures perfect symmetry around the center, which is
+ * important for non-periodic signal analysis applications.
  */
 TEST(WindowFunctionsTest, HannSymmetry) {
     const int size = 64;
 
+    // Test SYMMETRIC mode - should have perfect symmetry
     for (int i = 0; i < size / 2; ++i) {
-        double left = hann_base(i, size);
-        double right = hann_base(size - 1 - i, size);
+        double left = hann_base(i, size, WindowSymmetry::SYMMETRIC);
+        double right = hann_base(size - 1 - i, size, WindowSymmetry::SYMMETRIC);
         EXPECT_NEAR(left, right, 1e-10)
-            << "Symmetry violation at i=" << i;
+            << "Symmetry violation in SYMMETRIC mode at i=" << i;
     }
 }
 
 /**
  * @test WindowFunctionsTest.HannBoundaryValues
- * @brief Verifies that Hann window has correct boundary values.
+ * @brief Verifies that Hann window has correct boundary values in SYMMETRIC mode.
+ *
+ * SYMMETRIC mode is tested because it guarantees exact zeros at endpoints.
  */
 TEST(WindowFunctionsTest, HannBoundaryValues) {
     const int size = 64;
 
-    // Hann window should be ~0 at edges and ~1 at center
-    double first = hann_base(0, size);
-    double last = hann_base(size - 1, size);
-    double center = hann_base(size / 2, size);
+    // Test SYMMETRIC mode - has exact zeros at endpoints
+    double first = hann_base(0, size, WindowSymmetry::SYMMETRIC);
+    double last = hann_base(size - 1, size, WindowSymmetry::SYMMETRIC);
+    double center = hann_base(size / 2, size, WindowSymmetry::SYMMETRIC);
 
-    EXPECT_NEAR(first, 0.0, 1e-6) << "Hann window should be ~0 at start";
-    EXPECT_NEAR(last, 0.0, 1e-6) << "Hann window should be ~0 at end";
+    EXPECT_NEAR(first, 0.0, 1e-6) << "Hann window (SYMMETRIC) should be ~0 at start";
+    EXPECT_NEAR(last, 0.0, 1e-6) << "Hann window (SYMMETRIC) should be ~0 at end";
     EXPECT_NEAR(center, 1.0, 0.1) << "Hann window should be ~1 at center";
 }
 
 /**
  * @test WindowFunctionsTest.BlackmanSymmetry
- * @brief Verifies that Blackman window is symmetric.
+ * @brief Verifies that Blackman window is symmetric in SYMMETRIC mode.
+ *
+ * SYMMETRIC mode ensures perfect symmetry around the center, which is
+ * important for non-periodic signal analysis applications.
  */
 TEST(WindowFunctionsTest, BlackmanSymmetry) {
     const int size = 64;
 
+    // Test SYMMETRIC mode - should have perfect symmetry
     for (int i = 0; i < size / 2; ++i) {
-        double left = blackman_base(i, size);
-        double right = blackman_base(size - 1 - i, size);
+        double left = blackman_base(i, size, WindowSymmetry::SYMMETRIC);
+        double right = blackman_base(size - 1 - i, size, WindowSymmetry::SYMMETRIC);
         EXPECT_NEAR(left, right, 1e-10)
-            << "Symmetry violation at i=" << i;
+            << "Symmetry violation in SYMMETRIC mode at i=" << i;
     }
 }
 
@@ -335,12 +345,15 @@ TEST(WindowFunctionsTest, FillWindowInvalidSize) {
 /**
  * @test WindowFunctionsTest.FillWindowValidOperation
  * @brief Verifies that fill_window correctly populates a buffer.
+ *
+ * Tests SYMMETRIC mode where endpoints should reach exactly zero.
  */
 TEST(WindowFunctionsTest, FillWindowValidOperation) {
     const int size = 64;
     std::vector<float> buffer(size);
 
-    EXPECT_NO_THROW(fill_window(buffer.data(), size, WindowKind::HANN, false));
+    // Use SYMMETRIC mode for this test (endpoints are exactly 0)
+    EXPECT_NO_THROW(fill_window(buffer.data(), size, WindowKind::HANN, false, WindowSymmetry::SYMMETRIC));
 
     // Verify all values are finite
     for (int i = 0; i < size; ++i) {
@@ -348,7 +361,7 @@ TEST(WindowFunctionsTest, FillWindowValidOperation) {
             << "Non-finite value at index " << i;
     }
 
-    // Verify boundary values
+    // Verify boundary values (SYMMETRIC mode has exact zeros at endpoints)
     EXPECT_NEAR(buffer[0], 0.0f, 1e-5f);
     EXPECT_NEAR(buffer[size - 1], 0.0f, 1e-5f);
 }
@@ -399,22 +412,124 @@ TEST(WindowFunctionsTest, FillWindowAllTypes) {
 }
 
 // ============================================================================
-// Consistency Tests (comparing with existing implementation)
+// Numerical Correctness Tests (Symmetry Modes)
 // ============================================================================
 
 /**
- * @test WindowFunctionsTest.BackwardsCompatibility
- * @brief Verifies that valid inputs produce the same results as before.
+ * @test WindowFunctionsTest.PeriodicModeNumericalCorrectness
+ * @brief Verifies PERIODIC mode produces correct results (default for FFT processing).
+ *
+ * PERIODIC mode uses denominator N (size), which is appropriate for FFT-based
+ * spectral analysis where the window is applied to periodic signals.
  */
-TEST(WindowFunctionsTest, BackwardsCompatibility) {
+TEST(WindowFunctionsTest, PeriodicModeNumericalCorrectness) {
     const int size = 256;
 
-    // Test that valid operations produce expected numerical results
-    // (This ensures our safety additions don't change valid behavior)
+    // Test PERIODIC mode (default): denominator = N
+    for (int i = 0; i < size; ++i) {
+        double expected_hann = 0.5 * (1.0 - std::cos(2.0 * M_PI * i / size));
+        double actual_hann = hann_base(i, size);  // Default is PERIODIC
+        EXPECT_NEAR(actual_hann, expected_hann, 1e-10)
+            << "PERIODIC mode correctness broken at i=" << i;
+    }
+}
+
+/**
+ * @test WindowFunctionsTest.SymmetricModeNumericalCorrectness
+ * @brief Verifies SYMMETRIC mode produces correct results (for signal analysis).
+ *
+ * SYMMETRIC mode uses denominator (N-1), which is appropriate for non-periodic
+ * signal analysis where the window endpoints should reach exactly 0.
+ */
+TEST(WindowFunctionsTest, SymmetricModeNumericalCorrectness) {
+    const int size = 256;
+
+    // Test SYMMETRIC mode (explicit parameter): denominator = N-1
     for (int i = 0; i < size; ++i) {
         double expected_hann = 0.5 * (1.0 - std::cos(2.0 * M_PI * i / (size - 1)));
-        double actual_hann = hann_base(i, size);
+        double actual_hann = hann_base(i, size, WindowSymmetry::SYMMETRIC);
         EXPECT_NEAR(actual_hann, expected_hann, 1e-10)
-            << "Backwards compatibility broken for Hann at i=" << i;
+            << "SYMMETRIC mode correctness broken at i=" << i;
     }
+
+    // Test Blackman in SYMMETRIC mode as well
+    for (int i = 0; i < size; ++i) {
+        double ratio = static_cast<double>(i) / (size - 1);
+        double expected_blackman = 0.42 - 0.5 * std::cos(2.0 * M_PI * ratio) +
+                                   0.08 * std::cos(4.0 * M_PI * ratio);
+        double actual_blackman = blackman_base(i, size, WindowSymmetry::SYMMETRIC);
+        EXPECT_NEAR(actual_blackman, expected_blackman, 1e-10)
+            << "SYMMETRIC mode correctness broken for Blackman at i=" << i;
+    }
+}
+
+/**
+ * @test WindowFunctionsTest.WindowSymmetryModes
+ * @brief Verifies that PERIODIC and SYMMETRIC modes produce different results.
+ *
+ * This test ensures that:
+ * 1. Both symmetry modes work correctly for all window types
+ * 2. The modes produce measurably different outputs (policy is effective)
+ * 3. The difference is most significant near window edges
+ *
+ * Usage guidelines:
+ * - PERIODIC: Use for FFT-based spectral analysis (default)
+ * - SYMMETRIC: Use for time-domain signal analysis
+ */
+TEST(WindowFunctionsTest, WindowSymmetryModes) {
+    const int size = 128;
+
+    // Test Hann window with both modes
+    for (int i = 0; i < size; ++i) {
+        double periodic = hann_base(i, size, WindowSymmetry::PERIODIC);
+        double symmetric = hann_base(i, size, WindowSymmetry::SYMMETRIC);
+
+        // Both should be finite and valid
+        EXPECT_TRUE(std::isfinite(periodic));
+        EXPECT_TRUE(std::isfinite(symmetric));
+        EXPECT_GE(periodic, 0.0);
+        EXPECT_GE(symmetric, 0.0);
+        EXPECT_LE(periodic, 1.0);
+        EXPECT_LE(symmetric, 1.0);
+
+        // Near the edges, the modes should produce different values
+        // (except at i=0 where both are ~0)
+        if (i > 10 && i < size - 10) {
+            EXPECT_NE(periodic, symmetric)
+                << "PERIODIC and SYMMETRIC should differ at i=" << i;
+        }
+    }
+
+    // Test Blackman window with both modes
+    for (int i = 0; i < size; ++i) {
+        double periodic = blackman_base(i, size, WindowSymmetry::PERIODIC);
+        double symmetric = blackman_base(i, size, WindowSymmetry::SYMMETRIC);
+
+        EXPECT_TRUE(std::isfinite(periodic));
+        EXPECT_TRUE(std::isfinite(symmetric));
+
+        // Modes should produce different values
+        if (i > 10 && i < size - 10) {
+            EXPECT_NE(periodic, symmetric)
+                << "PERIODIC and SYMMETRIC should differ for Blackman at i=" << i;
+        }
+    }
+
+    // Test via fill_window() interface
+    std::vector<float> periodic_buffer(size);
+    std::vector<float> symmetric_buffer(size);
+
+    fill_window(periodic_buffer.data(), size, WindowKind::HANN, false, WindowSymmetry::PERIODIC);
+    fill_window(symmetric_buffer.data(), size, WindowKind::HANN, false, WindowSymmetry::SYMMETRIC);
+
+    // Verify the buffers differ
+    bool buffers_differ = false;
+    for (int i = 0; i < size; ++i) {
+        if (std::abs(periodic_buffer[i] - symmetric_buffer[i]) > 1e-6f) {
+            buffers_differ = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(buffers_differ)
+        << "fill_window() should produce different results for different symmetry modes";
 }

@@ -34,7 +34,13 @@ dependencies:
   - pytest-xdist>=3.5
   - pytest-timeout>=2.3
   - pytest-cov>=4.1
-  - gcovr>=6.0  # C++ code coverage reporting
+  - gcovr>=6.0  # C++ code coverage reporting (Linux/GCC)
+
+  # NOTE: Windows C++ coverage requires OpenCppCoverage (native MSVC tool)
+  # Install separately via Windows package manager (run as administrator):
+  #   choco install opencppcoverage
+  #   OR: winget install OpenCppCoverage.OpenCppCoverage
+  # Cannot be installed via conda/pip (it's a native C++ application)
   
   # Code quality
   - pre-commit>=3.6
