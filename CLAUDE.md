@@ -188,6 +188,86 @@ iprof nsys accuracy -- experiment=profiling +benchmark=accuracy      # 10 iterat
 - Always start with `nsys` before moving to `ncu` (nsys is 10-50× faster)
 - Use `ncu --kernel-name <pattern>` to profile specific kernels only
 
+## Window Function Symmetry Modes
+
+### Overview
+
+The library supports two window symmetry modes that control endpoint behavior and spectral characteristics:
+
+| Mode | Denominator | Endpoints | Primary Use Case | Applications |
+|------|-------------|-----------|------------------|--------------|
+| **PERIODIC** | N | Non-zero (except i=0) | FFT-based spectral analysis | STFT, spectrograms, ionosphere research |
+| **SYMMETRIC** | N-1 | Exactly zero at both ends | Time-domain signal analysis | FIR filter design, signal tapering |
+
+### Configuration
+
+Window symmetry is configured via `StageConfig::window_symmetry`:
+
+```cpp
+StageConfig config;
+config.window_type = StageConfig::WindowType::HANN;
+config.window_symmetry = StageConfig::WindowSymmetry::PERIODIC;  // Default
+```
+
+### Mathematical Formulas
+
+**PERIODIC Mode (default for FFT processing):**
+```
+Hann[i] = 0.5 * (1 - cos(2πi/N))
+Blackman[i] = 0.42 - 0.5*cos(2πi/N) + 0.08*cos(4πi/N)
+```
+
+**SYMMETRIC Mode (for time-domain analysis):**
+```
+Hann[i] = 0.5 * (1 - cos(2πi/(N-1)))
+Blackman[i] = 0.42 - 0.5*cos(2πi/(N-1)) + 0.08*cos(4πi/(N-1))
+```
+
+### When to Use Each Mode
+
+- **Use PERIODIC (default)** for:
+  - FFT-based spectral analysis
+  - Short-Time Fourier Transform (STFT)
+  - Spectrogram generation
+  - All ionosphere research workflows
+
+- **Use SYMMETRIC** for:
+  - FIR filter coefficient windowing
+  - Direct time-domain signal tapering
+  - Applications requiring exact zero endpoints
+
+### Implementation Details
+
+All window functions in `window_functions.hpp` and `window_utils` namespace support both modes:
+
+```cpp
+// Low-level window_functions API
+double coeff = window_functions::hann_base(i, size,
+    window_functions::WindowSymmetry::PERIODIC);
+
+// High-level window_utils API
+window_utils::generate_window(buffer, size,
+    StageConfig::WindowType::HANN,
+    false,  // sqrt_norm
+    StageConfig::WindowSymmetry::PERIODIC);
+```
+
+### Testing
+
+Both modes are validated by comprehensive tests:
+- `WindowFunctionsTest.PeriodicModeNumericalCorrectness` - validates PERIODIC mode IEEE-754 compliance
+- `WindowFunctionsTest.SymmetricModeNumericalCorrectness` - validates SYMMETRIC mode IEEE-754 compliance
+- `WindowFunctionsTest.WindowSymmetryModes` - integration test across all window types
+- `ProcessingStageTest.WindowStageRespectsSymmetryConfig` - validates pipeline integration
+
+Run tests with: `./scripts/cli.ps1 test cpp`
+
+### References
+
+- Full API documentation: `cpp/include/ionosense/core/window_functions.hpp`
+- Pipeline integration: `cpp/include/ionosense/core/processing_stage.hpp`
+- Test examples: `cpp/tests/test_window_functions.cpp`
+
 ## System Reliability Notes
 
 ### Configuration System
@@ -214,4 +294,4 @@ python benchmarks/run_latency.py experiment=ionosphere_multiscale +benchmark=lat
 python benchmarks/run_throughput.py --multirun experiment=ionosphere_resolution
 ```
 
-Last updated: 2025-10-11 (Added C++ code coverage with gcovr)
+Last updated: 2025-10-11 (Added window symmetry modes documentation and C++ code coverage with gcovr)
