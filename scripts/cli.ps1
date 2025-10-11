@@ -138,20 +138,25 @@ function Invoke-Test {
             & python -m pytest tests/ @args
         }
         { $_ -in @("cpp", "c++", "cxx") } {
-            Write-Status "Running C++ tests..."
-            # Check preset-specific build directory first, then fallback to generic
-            $presetBuildDir = Join-Path $script:BuildDir $script:BuildPreset
-            $testExe = if (Test-Path $presetBuildDir) {
-                Join-Path $presetBuildDir "test_engine.exe"
+            if ($Coverage) {
+                Write-Status "Running C++ tests with coverage..."
+                Invoke-Coverage -Verbose:$Verbose
             } else {
-                Join-Path $script:BuildDir "Release/tests/test_runner.exe"
-            }
+                Write-Status "Running C++ tests..."
+                # Check preset-specific build directory first, then fallback to generic
+                $presetBuildDir = Join-Path $script:BuildDir $script:BuildPreset
+                $testExe = if (Test-Path $presetBuildDir) {
+                    Join-Path $presetBuildDir "test_engine.exe"
+                } else {
+                    Join-Path $script:BuildDir "Release/tests/test_runner.exe"
+                }
 
-            if (Test-Path $testExe) {
-                & $testExe
-            } else {
-                Write-Error "C++ test executable not found. Run build first."
-                exit 1
+                if (Test-Path $testExe) {
+                    & $testExe
+                } else {
+                    Write-Error "C++ test executable not found. Run build first."
+                    exit 1
+                }
             }
         }
         "all" {
@@ -183,6 +188,104 @@ function Invoke-Test {
     } else {
         Write-Error "Tests failed"
         exit 1
+    }
+}
+
+function Invoke-Coverage {
+    param(
+        [bool]$Verbose = $false,
+        [bool]$OpenReport = $true
+    )
+
+    Write-Status "Running C++ tests with code coverage..."
+
+    # Step 1: Build with coverage preset
+    Write-Status "Building project with coverage instrumentation..."
+    $buildArgs = @("--preset", "windows-coverage")
+    if ($Verbose) { $buildArgs += "--log-level=VERBOSE" }
+
+    & cmake @buildArgs
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "CMake configuration failed"
+        exit 1
+    }
+
+    & cmake --build --preset windows-coverage
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Build failed"
+        exit 1
+    }
+
+    # Step 2: Run tests
+    Write-Status "Running C++ tests..."
+    $testExe = Join-Path $script:BuildDir "windows-coverage/test_engine.exe"
+    if (-not (Test-Path $testExe)) {
+        Write-Error "Test executable not found at: $testExe"
+        exit 1
+    }
+
+    # Use brief output by default, full output with -Verbose
+    $testArgs = @()
+    if (-not $Verbose) {
+        $testArgs += "--gtest_brief=1"
+    }
+    & $testExe @testArgs
+    $testExitCode = $LASTEXITCODE
+
+    # Step 3: Generate coverage reports
+    Write-Status "Generating coverage reports..."
+    $reportsDir = Join-Path $script:ProjectRoot "artifacts/reports"
+    $coverageDir = Join-Path $reportsDir "coverage-cpp"
+
+    if (-not (Test-Path $reportsDir)) {
+        New-Item -ItemType Directory -Path $reportsDir -Force | Out-Null
+    }
+    if (Test-Path $coverageDir) {
+        Remove-Item $coverageDir -Recurse -Force
+    }
+    New-Item -ItemType Directory -Path $coverageDir -Force | Out-Null
+
+    # Generate HTML report
+    $srcDir = Join-Path $script:ProjectRoot "cpp"
+    $buildCoverageDir = Join-Path $script:BuildDir "windows-coverage"
+
+    Write-Status "Analyzing coverage data with gcovr..."
+
+    # Convert Windows paths to forward slashes for gcovr regex compatibility
+    $rootPath = $script:ProjectRoot -replace '\\', '/'
+    $srcFilter = ($srcDir -replace '\\', '/') + '/.*'
+
+    # Terminal summary
+    & gcovr `
+        --root $rootPath `
+        --filter $srcFilter `
+        --exclude ".*test.*" `
+        --exclude ".*_deps.*" `
+        --print-summary
+
+    # HTML report
+    & gcovr `
+        --root $rootPath `
+        --filter $srcFilter `
+        --exclude ".*test.*" `
+        --exclude ".*_deps.*" `
+        --html-details "$coverageDir/index.html"
+
+    if ($LASTEXITCODE -eq 0) {
+        Write-Success "Coverage report generated: $coverageDir/index.html"
+
+        if ($OpenReport) {
+            Write-Status "Opening coverage report in browser..."
+            Start-Process "$coverageDir/index.html"
+        }
+    } else {
+        Write-Error "Coverage report generation failed"
+    }
+
+    # Return test exit code
+    if ($testExitCode -ne 0) {
+        Write-Error "Tests failed"
+        exit $testExitCode
     }
 }
 
@@ -451,7 +554,9 @@ ESSENTIAL DEVELOPMENT
   build [-Preset <name>] [-Clean] [--debug|--release] [--verbose]
                           Configure and build project with CMake
   test [all|python|cpp] [-Pattern] [-Coverage] [--verbose]
-                          Run tests
+                          Run tests (use -Coverage for C++ coverage)
+  coverage [-NoOpen] [--verbose]
+                          Run C++ tests with code coverage report
   format [paths] [-Check] [--verbose]
                           Format C++ code with clang-format
   lint [all|python|cpp] [-Fix] [--verbose]
@@ -601,6 +706,12 @@ try {
             Invoke-Clean @params
         }
         "doctor"   { Invoke-Doctor }
+        "coverage" {
+            $params = @{}
+            if ($normalizedArgs -contains "-noopen" -or $normalizedArgs -contains "--no-open") { $params.OpenReport = $false }
+            if ($commonVerbose -or $normalizedArgs -contains "-verbose" -or $normalizedArgs -contains "--verbose") { $params.Verbose = $true }
+            Invoke-Coverage @params
+        }
         "analysis" {
             $params = @{}
             if ($CommandArgs -icontains "-DryRun") { $params.DryRun = $true }

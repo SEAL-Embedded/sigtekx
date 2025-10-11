@@ -16,11 +16,12 @@ if(MSVC)
     add_compile_definitions(WIN32_LEAN_AND_MEAN NOMINMAX)
 endif()
 
-option(IONO_WITH_TESTS   "Build tests"            ON)
-option(IONO_WITH_GRAPHS  "Enable CUDA Graphs"     ON)
-option(IONO_WITH_PYTHON  "Build Python bindings"  ON)
-option(IONO_WITH_CUDA    "Enable CUDA components" ON)
-option(IONO_WITH_NVTX    "Enable NVTX profiling"  ON)
+option(IONO_WITH_TESTS      "Build tests"            ON)
+option(IONO_WITH_GRAPHS     "Enable CUDA Graphs"     ON)
+option(IONO_WITH_PYTHON     "Build Python bindings"  ON)
+option(IONO_WITH_CUDA       "Enable CUDA components" ON)
+option(IONO_WITH_NVTX       "Enable NVTX profiling"  ON)
+option(IONO_ENABLE_COVERAGE "Enable code coverage"   OFF)
 
 
 # ============================================================================
@@ -48,10 +49,26 @@ if(MSVC)
   # Flags for Microsoft Visual C++ Compiler (cl.exe)
   set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Zi /Od")
   set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2 /DNDEBUG")
+
+  # Code coverage flags for MSVC (use with windows-coverage preset)
+  if(IONO_ENABLE_COVERAGE)
+    message(STATUS "[ionosense] Enabling code coverage instrumentation (MSVC)")
+    # MSVC: gcovr uses PDB debug symbols for coverage analysis
+    # /Zi and /Od are already set in CMAKE_CXX_FLAGS_DEBUG, just ensure full debug info
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /DEBUG:FULL")
+    set(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} /DEBUG:FULL")
+  endif()
 else()
   # Flags for GCC/Clang
   set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -DNDEBUG")
+  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -DNDEBUG")
+
+  # Code coverage flags for GCC/Clang (gcov/llvm-cov)
+  if(IONO_ENABLE_COVERAGE)
+    message(STATUS "[ionosense] Enabling code coverage instrumentation (GCC/Clang)")
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} --coverage -fprofile-arcs -ftest-coverage")
+    set(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} --coverage")
+  endif()
 endif()
 
 

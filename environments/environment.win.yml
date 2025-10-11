@@ -32,6 +32,7 @@ dependencies:
   - pytest-xdist>=3.5
   - pytest-timeout>=2.3
   - pytest-cov>=4.1
+  - gcovr>=6.0  # C++ code coverage reporting
   
   # Code quality
   - pre-commit>=3.6
