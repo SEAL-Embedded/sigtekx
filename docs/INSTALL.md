@@ -39,8 +39,8 @@ Detailed installation instructions for ionosense-hpc on various platforms using 
 ### Clone Repository
 
 ```bash
-git clone https://github.com/your-org/ionosense-hpc.git
-cd ionosense-hpc
+git clone https://github.com/SEAL-Embedded/ionosense-hpc-lib.git
+cd ionosense-hpc-lib
 ```
 
 ### Linux/WSL2
@@ -60,7 +60,7 @@ cd ionosense-hpc
 
 ```powershell
 # Start enhanced development shell (includes MSVC setup)
-.\scripts\open_dev_pwsh.ps1
+.\scripts\init_pwsh.ps1
 
 # One-command setup using alias
 iono setup
@@ -149,8 +149,8 @@ mamba --version
 
 ```bash
 # Clone repository
-git clone https://github.com/your-org/ionosense-hpc.git
-cd ionosense-hpc
+git clone https://github.com/SEAL-Embedded/ionosense-hpc-lib.git
+cd ionosense-hpc-lib
 
 # Use CLI for complete setup
 ./scripts/cli.sh setup    # Creates conda env, installs dependencies
@@ -182,53 +182,122 @@ Download and install [Visual Studio Build Tools 2022](https://visualstudio.micro
    nvidia-smi
    ```
 
-#### 3. Miniconda Installation
+#### 3. PowerShell 7
 
-Download the [Miniconda installer](https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe) and run it:
+Install PowerShell 7 using Windows Package Manager (winget):
 
-1. **Agree** to the license terms
-2. Select **"Just Me (recommended)"**
-3. Set the destination folder to: `C:\Users\<your-username>\miniconda3`
-4. Check the following options:
-   - **Create shortcuts (supported packages only)**
-   - **Clear the package cache upon completion**
-5. Click **Install** and finish the setup
-
-Once complete, restart PowerShell and run:
 ```powershell
-conda init powershell
+# Install PowerShell 7 (run in Windows PowerShell or Command Prompt)
+winget install --id Microsoft.Powershell --source winget
+
+# Verify installation
+pwsh --version
 ```
 
-#### 4. Install Mamba
+After installation, **close and reopen PowerShell**. For the remaining steps, use PowerShell 7 (pwsh) instead of Windows PowerShell.
+
+To launch PowerShell 7:
+- Search for "PowerShell 7" or "pwsh" in the Start menu, or
+- Run `pwsh` from any terminal
+
+#### 4. Miniconda Installation
+
+Install Miniconda using PowerShell 7:
+
+```powershell
+# Download Miniconda installer
+Invoke-WebRequest -Uri "https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe" -OutFile "$env:TEMP\Miniconda3-installer.exe"
+
+# Install silently with specific options
+Start-Process -FilePath "$env:TEMP\Miniconda3-installer.exe" -ArgumentList @(
+    "/InstallationType=JustMe",
+    "/AddToPath=0",
+    "/RegisterPython=0", 
+    "/ClearPackageCache=1",
+    "/S",
+    "/D=$env:USERPROFILE\miniconda3"
+) -Wait
+
+# Clean up installer
+Remove-Item "$env:TEMP\Miniconda3-installer.exe"
+
+# Initialize conda for PowerShell (call directly from install location)
+& "$env:USERPROFILE\miniconda3\Scripts\conda.exe" init powershell
+```
+
+**Important**: Close and reopen PowerShell 7 for the conda initialization to take effect.
+
+#### 5. Install Mamba
 
 ```powershell
 # Install mamba for faster environment solving
 conda install mamba -n base -c conda-forge
 
-# Configure channels
+# (Optional) Configure global channel settings
+# Note: The environment.yml already specifies channels, but this sets
+# global defaults for manual conda/mamba commands outside the environment
 conda config --set channel_priority strict
 conda config --add channels conda-forge
 conda config --add channels nvidia
 ```
 
-#### 5. Setup with Enhanced Development Shell
+#### 6. Setup with Enhanced Development Shell
+
+**Important**: Before running setup, ensure you're in the ionosense-hpc environment or run setup from the enhanced development shell.
 
 ```powershell
 # Clone repository
-git clone https://github.com/your-org/ionosense-hpc.git
-cd ionosense-hpc
+git clone https://github.com/SEAL-Embedded/ionosense-hpc-lib.git
+cd ionosense-hpc-lib
 
-# Start enhanced development shell (automatically configures MSVC + conda)
-.\scripts\open_dev_pwsh.ps1
+# Option 1: Start enhanced development shell first (recommended)
+.\scripts\init_pwsh.ps1 -Interactive
 
-# Use convenient aliases for setup
-iono setup       # Creates conda env, installs dependencies
+# Then run setup (will create environment if needed)
+iono setup
+
+# Option 2: Direct setup (for automation/CI)
+# The CLI will use conda run to ensure correct environment
+.\scripts\cli.ps1 setup
+
+# Build and test
 ib               # Builds C++ extensions (iono build)
 it               # Verifies installation (iono test)
 
 # Check environment
 iono doctor      # Comprehensive environment verification
 ```
+
+#### 7. OpenCppCoverage (Code Coverage Tool)
+
+Install OpenCppCoverage for C++ code coverage analysis:
+
+```powershell
+# Install using winget (recommended)
+winget install --id OpenCppCoverage.OpenCppCoverage --source winget
+
+# Alternative: Install using Chocolatey
+# First install Chocolatey if needed:
+# winget install --id Chocolatey.Chocolatey --source winget
+# Then install OpenCppCoverage:
+# choco install opencppcoverage -y
+
+# Verify installation
+OpenCppCoverage --version
+```
+
+**Note**: You may need to restart PowerShell 7 or add OpenCppCoverage to your PATH manually if the command is not recognized immediately.
+
+#### 8. Create Development Shell Shortcut (Optional)
+
+For convenience, create a desktop shortcut that launches PowerShell 7 with the development environment pre-configured:
+
+```powershell
+# Run from repo root
+.\scripts\create-dev-shortcut.ps1
+```
+
+This creates a shortcut on your desktop that you can double-click to launch directly into your configured development environment!
 
 ### WSL2 (Windows Subsystem for Linux)
 
@@ -309,7 +378,7 @@ The `cli.sh` script provides comprehensive project management:
 
 ### Windows Development Shell
 
-The enhanced development shell (`open_dev_pwsh.ps1`) provides:
+The enhanced development shell (`init_pwsh.ps1`) provides:
 
 - **Automatic MSVC Configuration**: Sets up 64-bit Visual Studio tools
 - **Conda Environment**: Activates ionosense-hpc environment
@@ -318,7 +387,7 @@ The enhanced development shell (`open_dev_pwsh.ps1`) provides:
 
 ```powershell
 # Start development shell
-.\scripts\open_dev_pwsh.ps1
+.\scripts\init_pwsh.ps1
 
 # Available aliases:
 iono <command>      # Main CLI alias
@@ -434,7 +503,7 @@ chmod +x scripts/cli.sh
 **Solution**:
 ```powershell
 # Ensure you're using the development shell
-.\scripts\open_dev_pwsh.ps1
+.\scripts\init_pwsh.ps1
 
 # Verify 64-bit PowerShell
 [System.Environment]::Is64BitProcess  # Must return True
@@ -474,37 +543,4 @@ Enable verbose logging:
 ```bash
 # Linux/WSL2
 export IONO_LOG_LEVEL=DEBUG
-./scripts/cli.sh <command>
-
-# Windows (in dev shell)
-$env:IONO_LOG_LEVEL="DEBUG"
-iono <command>
-```
-
-### Getting Help
-
-1. **CLI Help**: 
-   - Linux: `./scripts/cli.sh help`
-   - Windows: `iono help` (in dev shell)
-
-2. **Environment Diagnosis**: 
-   - Linux: `./scripts/cli.sh doctor`
-   - Windows: `iono doctor` (in dev shell)
-
-3. **System Information**:
-   - Linux: `./scripts/cli.sh info system`  
-   - Windows: `iono info system` (in dev shell)
-
-4. **GitHub Issues**: [Create an issue](https://github.com/your-org/ionosense-hpc/issues) with output from `doctor` command
-
-## Next Steps
-
-After successful installation:
-
-1. **Explore Examples**: See [examples/](examples/) directory
-2. **Read Documentation**: 
-   - [Development Guide](DEVELOPMENT.md)
-   - [Benchmarking Guide](BENCHMARKING.md)
-   - [API Reference](API.md)
-3. **Run Benchmarks**: `./scripts/cli.sh bench suite` (Linux) or `ibench suite` (Windows)
-4. **Start Development**: See [CONTRIBUTING.md](CONTRIBUTING.md)
+./scripts/cli.sh 

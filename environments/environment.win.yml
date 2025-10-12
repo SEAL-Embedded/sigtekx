@@ -9,9 +9,7 @@ dependencies:
   - cmake>=3.26
   - ninja
 
-  # CUDA toolchain (NVCC + dev libs)
-  - cuda-compiler=13.0
-  - cuda-libraries-dev=13.0
+  # CUDA profiling tool
   - cuda-nvtx-dev=13.0
 
   # Scientific Python stack
