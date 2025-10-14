@@ -7,10 +7,10 @@
  * @brief Defines the abstract IPipelineExecutor interface for executing signal
  * processing pipelines.
  *
- * This header introduces the core abstraction that separates pipeline definition
- * (the "what") from execution strategy (the "how"). Different executors can
- * implement various execution patterns (batch, streaming, low-latency) while
- * using the same pipeline stages.
+ * This header introduces the core abstraction that separates pipeline
+ * definition (the "what") from execution strategy (the "how"). Different
+ * executors can implement various execution patterns (batch, streaming,
+ * low-latency) while using the same pipeline stages.
  */
 
 #pragma once

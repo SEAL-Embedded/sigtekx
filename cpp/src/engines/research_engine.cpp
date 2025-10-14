@@ -12,10 +12,10 @@
 #include <sstream>
 #include <stdexcept>
 
-#include "ionosense/core/pipeline_builder.hpp"
 #include "ionosense/core/cuda_wrappers.hpp"
-#include "ionosense/executors/batch_executor.hpp"
+#include "ionosense/core/pipeline_builder.hpp"
 #include "ionosense/core/profiling_macros.hpp"
+#include "ionosense/executors/batch_executor.hpp"
 
 namespace ionosense {
 
@@ -29,8 +29,7 @@ class ResearchEngine::Impl {
   ~Impl() = default;
 
   void initialize(const EngineConfig& config) {
-    IONO_NVTX_RANGE("ResearchEngine::Initialize",
-                    profiling::colors::DARK_GRAY);
+    IONO_NVTX_RANGE("ResearchEngine::Initialize", profiling::colors::DARK_GRAY);
 
     // Build the default pipeline
     PipelineBuilder builder;
@@ -66,7 +65,7 @@ class ResearchEngine::Impl {
   }
 
   void process_async(const float* input, size_t num_samples,
-                    ResultCallback callback) {
+                     ResultCallback callback) {
     if (!executor_) {
       throw std::runtime_error("Engine not initialized");
     }
@@ -141,8 +140,7 @@ class ResearchEngine::Impl {
 ResearchEngine::ResearchEngine() : pImpl(std::make_unique<Impl>()) {}
 ResearchEngine::~ResearchEngine() = default;
 ResearchEngine::ResearchEngine(ResearchEngine&&) noexcept = default;
-ResearchEngine& ResearchEngine::operator=(ResearchEngine&&) noexcept =
-    default;
+ResearchEngine& ResearchEngine::operator=(ResearchEngine&&) noexcept = default;
 
 void ResearchEngine::initialize(const EngineConfig& config) {
   pImpl->initialize(config);
@@ -154,7 +152,7 @@ void ResearchEngine::process(const float* input, float* output,
 }
 
 void ResearchEngine::process_async(const float* input, size_t num_samples,
-                                  ResultCallback callback) {
+                                   ResultCallback callback) {
   pImpl->process_async(input, num_samples, callback);
 }
 
@@ -162,16 +160,12 @@ void ResearchEngine::synchronize() { pImpl->synchronize(); }
 
 void ResearchEngine::reset() { pImpl->reset(); }
 
-ProcessingStats ResearchEngine::get_stats() const {
-  return pImpl->get_stats();
-}
+ProcessingStats ResearchEngine::get_stats() const { return pImpl->get_stats(); }
 
 RuntimeInfo ResearchEngine::get_runtime_info() const {
   return pImpl->get_runtime_info();
 }
 
-bool ResearchEngine::is_initialized() const {
-  return pImpl->is_initialized();
-}
+bool ResearchEngine::is_initialized() const { return pImpl->is_initialized(); }
 
 }  // namespace ionosense

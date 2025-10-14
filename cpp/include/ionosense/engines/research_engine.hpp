@@ -74,7 +74,7 @@ class ResearchEngine {
   void initialize(const EngineConfig& config);
   void process(const float* input, float* output, size_t num_samples);
   void process_async(const float* input, size_t num_samples,
-                    ResultCallback callback);
+                     ResultCallback callback);
   void synchronize();
   void reset();
   ProcessingStats get_stats() const;

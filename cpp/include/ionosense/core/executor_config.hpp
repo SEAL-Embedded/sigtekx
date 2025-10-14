@@ -30,9 +30,9 @@ struct ExecutorConfig : EngineConfig {
    * @brief Defines the execution strategy for the pipeline.
    */
   enum class ExecutionMode {
-    BATCH,        ///< Process complete batches with maximum throughput
-    STREAMING,    ///< Continuous processing with input accumulation
-    LOW_LATENCY   ///< Minimize latency at the cost of some throughput
+    BATCH,       ///< Process complete batches with maximum throughput
+    STREAMING,   ///< Continuous processing with input accumulation
+    LOW_LATENCY  ///< Minimize latency at the cost of some throughput
   };
 
   // --- Executor-Specific Settings ---
@@ -67,8 +67,11 @@ struct ExecutorConfig : EngineConfig {
       return false;
     }
 
-    if (mode == ExecutionMode::STREAMING && pinned_buffer_count < max_inflight_batches) {
-      error_msg = "pinned_buffer_count must be >= max_inflight_batches for streaming mode.";
+    if (mode == ExecutionMode::STREAMING &&
+        pinned_buffer_count < max_inflight_batches) {
+      error_msg =
+          "pinned_buffer_count must be >= max_inflight_batches for streaming "
+          "mode.";
       return false;
     }
 

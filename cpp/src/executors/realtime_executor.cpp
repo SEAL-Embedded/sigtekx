@@ -56,7 +56,7 @@ class RealtimeExecutor::Impl {
   }
 
   void submit_async(const float* input, size_t num_samples,
-                   ResultCallback callback) {
+                    ResultCallback callback) {
     batch_executor_->submit_async(input, num_samples, callback);
   }
 
@@ -64,7 +64,9 @@ class RealtimeExecutor::Impl {
 
   ProcessingStats get_stats() const { return batch_executor_->get_stats(); }
 
-  size_t get_memory_usage() const { return batch_executor_->get_memory_usage(); }
+  size_t get_memory_usage() const {
+    return batch_executor_->get_memory_usage();
+  }
 
   bool is_initialized() const { return batch_executor_->is_initialized(); }
 
@@ -91,12 +93,12 @@ void RealtimeExecutor::initialize(
 void RealtimeExecutor::reset() { pImpl->reset(); }
 
 void RealtimeExecutor::submit(const float* input, float* output,
-                             size_t num_samples) {
+                              size_t num_samples) {
   pImpl->submit(input, output, num_samples);
 }
 
 void RealtimeExecutor::submit_async(const float* input, size_t num_samples,
-                                   ResultCallback callback) {
+                                    ResultCallback callback) {
   pImpl->submit_async(input, num_samples, callback);
 }
 
