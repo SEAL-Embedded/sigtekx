@@ -343,7 +343,7 @@ function Invoke-Format {
     Write-Status "Formatting C++ code..."
 
     if ($Paths.Count -eq 0) {
-        $Paths = @("src", "tests", "benchmarks")
+        $Paths = @("cpp/src", "cpp/tests", "cpp/include", "cpp/bindings", "examples")
     }
 
     $args = @()

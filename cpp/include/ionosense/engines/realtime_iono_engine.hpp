@@ -15,8 +15,8 @@
 #include <memory>
 
 #include "ionosense/core/executor_config.hpp"
-#include "ionosense/core/processing_stage.hpp"
 #include "ionosense/core/pipeline_executor.hpp"
+#include "ionosense/core/processing_stage.hpp"
 
 namespace ionosense {
 
@@ -124,7 +124,7 @@ class RealtimeIonoEngine {
    * @param callback Function to call when processing completes.
    */
   void process_async(const float* input, size_t num_samples,
-                    ResultCallback callback);
+                     ResultCallback callback);
 
   /**
    * @brief Synchronizes all pending operations.

@@ -48,12 +48,13 @@ class BatchExecutor : public IPipelineExecutor {
   BatchExecutor& operator=(BatchExecutor&&) noexcept;
 
   // IPipelineExecutor interface
-  void initialize(const ExecutorConfig& config,
-                  std::vector<std::unique_ptr<IProcessingStage>> stages) override;
+  void initialize(
+      const ExecutorConfig& config,
+      std::vector<std::unique_ptr<IProcessingStage>> stages) override;
   void reset() override;
   void submit(const float* input, float* output, size_t num_samples) override;
   void submit_async(const float* input, size_t num_samples,
-                   ResultCallback callback) override;
+                    ResultCallback callback) override;
   void synchronize() override;
   ProcessingStats get_stats() const override;
   bool supports_streaming() const override { return false; }

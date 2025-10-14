@@ -66,8 +66,9 @@ class WindowStage::Impl {
                       profiling::colors::DARK_GRAY);
       std::vector<float> host_window(config.nfft);
       bool sqrt_norm = (config.window_norm == StageConfig::WindowNorm::SQRT);
-      window_utils::generate_window(
-          host_window.data(), config.nfft, config.window_type, sqrt_norm, config.window_symmetry);
+      window_utils::generate_window(host_window.data(), config.nfft,
+                                    config.window_type, sqrt_norm,
+                                    config.window_symmetry);
 
       // Allocate device memory and upload the window coefficients.
       d_window_.resize(config.nfft);
@@ -373,7 +374,8 @@ window_functions::WindowKind to_window_kind(StageConfig::WindowType type) {
   return window_functions::WindowKind::RECTANGULAR;
 }
 
-window_functions::WindowSymmetry to_window_symmetry(StageConfig::WindowSymmetry symmetry) {
+window_functions::WindowSymmetry to_window_symmetry(
+    StageConfig::WindowSymmetry symmetry) {
   switch (symmetry) {
     case StageConfig::WindowSymmetry::PERIODIC:
       return window_functions::WindowSymmetry::PERIODIC;

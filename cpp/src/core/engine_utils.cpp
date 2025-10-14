@@ -10,12 +10,11 @@
  * and memory estimation.
  */
 
-#include "ionosense/core/engine_config.hpp"
-
 #include <sstream>
 #include <stdexcept>
 
 #include "ionosense/core/cuda_wrappers.hpp"
+#include "ionosense/core/engine_config.hpp"
 #include "ionosense/core/profiling_macros.hpp"
 
 namespace ionosense {

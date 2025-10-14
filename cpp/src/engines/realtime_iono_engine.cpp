@@ -56,7 +56,7 @@ class RealtimeIonoEngine::Impl {
   }
 
   void process_async(const float* input, size_t num_samples,
-                    ResultCallback callback) {
+                     ResultCallback callback) {
     if (!executor_) {
       throw std::runtime_error("Engine not initialized");
     }
@@ -108,7 +108,7 @@ void RealtimeIonoEngine::process(const float* input, float* output,
 }
 
 void RealtimeIonoEngine::process_async(const float* input, size_t num_samples,
-                                      ResultCallback callback) {
+                                       ResultCallback callback) {
   pImpl->process_async(input, num_samples, callback);
 }
 

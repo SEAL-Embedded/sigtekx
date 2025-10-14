@@ -60,7 +60,8 @@ class BatchExecutor::Impl {
     stages_ = std::move(stages);
 
     if (stages_.empty()) {
-      throw std::runtime_error("Cannot initialize executor with empty pipeline");
+      throw std::runtime_error(
+          "Cannot initialize executor with empty pipeline");
     }
 
     // Set device if specified
@@ -89,8 +90,7 @@ class BatchExecutor::Impl {
 
     // Initialize all pipeline stages
     {
-      IONO_NVTX_RANGE("Initialize Pipeline Stages",
-                      profiling::colors::MAGENTA);
+      IONO_NVTX_RANGE("Initialize Pipeline Stages", profiling::colors::MAGENTA);
       StageConfig stage_config{};
       stage_config.nfft = config_.nfft;
       stage_config.batch = config_.batch;
@@ -115,8 +115,8 @@ class BatchExecutor::Impl {
       const size_t total_bytes =
           (buffer_size + output_buffer_size + complex_buffer_size * 2) *
           static_cast<size_t>(config_.pinned_buffer_count) * sizeof(float);
-      const std::string alloc_msg =
-          profiling::format_memory_range("Allocate Device Buffers", total_bytes);
+      const std::string alloc_msg = profiling::format_memory_range(
+          "Allocate Device Buffers", total_bytes);
       IONO_NVTX_RANGE(alloc_msg.c_str(), profiling::colors::CYAN);
 
       d_input_buffers_.clear();
@@ -197,8 +197,10 @@ class BatchExecutor::Impl {
     // Guard buffer reuse with D2H sync
     // Critical for correctness with round-robin buffer reuse
     if (frame_counter_ >= static_cast<size_t>(config_.pinned_buffer_count)) {
-      IONO_NVTX_RANGE("Wait for Buffer Availability", profiling::colors::YELLOW);
-      IONO_CUDA_CHECK(cudaStreamSynchronize(streams_[compute_stream_idx].get()));
+      IONO_NVTX_RANGE("Wait for Buffer Availability",
+                      profiling::colors::YELLOW);
+      IONO_CUDA_CHECK(
+          cudaStreamSynchronize(streams_[compute_stream_idx].get()));
       IONO_CUDA_CHECK(cudaStreamSynchronize(streams_[d2h_stream_idx].get()));
     }
 
@@ -222,14 +224,14 @@ class BatchExecutor::Impl {
       // Assume 3-stage pipeline: Window → FFT → Magnitude
       if (stages_.size() >= 3) {
         stages_[0]->process(d_input.get(), d_input.get(), num_samples,
-                           streams_[compute_stream_idx].get());
+                            streams_[compute_stream_idx].get());
         stages_[1]->process(d_input.get(), d_intermediate.get(), num_samples,
-                           streams_[compute_stream_idx].get());
+                            streams_[compute_stream_idx].get());
         const size_t complex_elements =
             static_cast<size_t>(config_.num_output_bins()) * config_.batch;
         stages_[2]->process(d_intermediate.get(), d_output.get(),
-                           complex_elements,
-                           streams_[compute_stream_idx].get());
+                            complex_elements,
+                            streams_[compute_stream_idx].get());
       }
       e_compute_done.record(streams_[compute_stream_idx].get());
     }
@@ -245,7 +247,7 @@ class BatchExecutor::Impl {
       IONO_CUDA_CHECK(cudaStreamWaitEvent(streams_[d2h_stream_idx].get(),
                                           e_compute_done.get(), 0));
       d_output.copy_to_host(output, complex_elements,
-                           streams_[d2h_stream_idx].get());
+                            streams_[d2h_stream_idx].get());
     }
 
     // Final synchronization
@@ -260,13 +262,14 @@ class BatchExecutor::Impl {
         std::chrono::duration<float, std::micro>(end_time - start_time);
     stats_.latency_us = duration.count();
     stats_.frames_processed++;
-    stats_.throughput_gbps = calculate_throughput(num_samples, stats_.latency_us);
+    stats_.throughput_gbps =
+        calculate_throughput(num_samples, stats_.latency_us);
 
     frame_counter_++;
   }
 
   void submit_async(const float* input, size_t num_samples,
-                   ResultCallback callback) {
+                    ResultCallback callback) {
     IONO_NVTX_RANGE_FUNCTION(profiling::colors::NVIDIA_BLUE);
     if (!initialized_) {
       throw std::runtime_error("Executor not initialized");
@@ -368,12 +371,12 @@ void BatchExecutor::initialize(
 void BatchExecutor::reset() { pImpl->reset(); }
 
 void BatchExecutor::submit(const float* input, float* output,
-                          size_t num_samples) {
+                           size_t num_samples) {
   pImpl->submit(input, output, num_samples);
 }
 
 void BatchExecutor::submit_async(const float* input, size_t num_samples,
-                                ResultCallback callback) {
+                                 ResultCallback callback) {
   pImpl->submit_async(input, num_samples, callback);
 }
 

@@ -75,10 +75,12 @@ class PipelineBuilder::Impl {
     }
 
     // Check for in-place compatibility issues
-    // Note: This is a basic check. More sophisticated validation could be added.
+    // Note: This is a basic check. More sophisticated validation could be
+    // added.
     for (size_t i = 0; i < stages_.size(); ++i) {
       if (!stages_[i]) {
-        error_msg = "Pipeline contains null stage at index " + std::to_string(i);
+        error_msg =
+            "Pipeline contains null stage at index " + std::to_string(i);
         return false;
       }
     }
