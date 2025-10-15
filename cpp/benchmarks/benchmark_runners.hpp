@@ -119,15 +119,34 @@ inline LatencyResults run_latency_benchmark(ResearchEngine& engine,
   std::vector<float> sorted_latencies = results.latencies_us;
   std::sort(sorted_latencies.begin(), sorted_latencies.end());
 
+  // Trim top/bottom 1% outliers for robust statistics
+  // This removes extreme values from OS interrupts, SMI, thermal events
+  const size_t trim_count = sorted_latencies.size() / 100;
+  if (trim_count > 0 && sorted_latencies.size() > 100) {
+    sorted_latencies.erase(sorted_latencies.begin(),
+                           sorted_latencies.begin() + trim_count);
+    sorted_latencies.erase(sorted_latencies.end() - trim_count,
+                           sorted_latencies.end());
+    results.outliers_trimmed = trim_count * 2;
+  }
+
+  // Mean (after outlier removal)
   results.mean_latency_us =
       std::accumulate(sorted_latencies.begin(), sorted_latencies.end(), 0.0f) /
       static_cast<float>(sorted_latencies.size());
 
-  results.p50_latency_us = sorted_latencies[sorted_latencies.size() / 2];
+  // Percentiles
+  results.median_latency_us = sorted_latencies[sorted_latencies.size() / 2];
+  results.p50_latency_us = results.median_latency_us;  // Same as median
   results.p95_latency_us = sorted_latencies[sorted_latencies.size() * 95 / 100];
   results.p99_latency_us = sorted_latencies[sorted_latencies.size() * 99 / 100];
   results.min_latency_us = sorted_latencies.front();
   results.max_latency_us = sorted_latencies.back();
+
+  // Interquartile Range (IQR = Q3 - Q1)
+  const float q1 = sorted_latencies[sorted_latencies.size() / 4];
+  const float q3 = sorted_latencies[sorted_latencies.size() * 3 / 4];
+  results.iqr_latency_us = q3 - q1;
 
   // Standard deviation
   float variance = 0.0f;

@@ -25,12 +25,14 @@ namespace benchmark {
 struct LatencyResults {
   std::vector<float> latencies_us;
   float mean_latency_us = 0.0f;
+  float median_latency_us = 0.0f;  // Median (more robust than mean)
   float p50_latency_us = 0.0f;
   float p95_latency_us = 0.0f;
   float p99_latency_us = 0.0f;
   float min_latency_us = 0.0f;
   float max_latency_us = 0.0f;
   float std_latency_us = 0.0f;
+  float iqr_latency_us = 0.0f;  // Interquartile Range (robust dispersion metric)
   float throughput_gbps = 0.0f;
   size_t frames_processed = 0;
 
@@ -40,6 +42,9 @@ struct LatencyResults {
   float confidence_interval_95_upper = 0.0f;  // 95% CI upper bound
   bool is_stable = true;  // True if CV < 10%
   float warmup_effectiveness = 0.0f;  // Mean latency reduction after warmup
+
+  // Outlier filtering
+  size_t outliers_trimmed = 0;  // Number of outliers removed (1% each tail)
 };
 
 /**

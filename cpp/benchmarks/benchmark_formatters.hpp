@@ -180,12 +180,14 @@ inline void print_latency_results(const BenchmarkConfig& config,
     std::cout << std::fixed << std::setprecision(2);
     std::cout << "Latency (µs):\n";
     std::cout << "  Mean        : " << results.mean_latency_us << "\n";
+    std::cout << "  Median      : " << results.median_latency_us << "\n";
     std::cout << "  P50         : " << results.p50_latency_us << "\n";
     std::cout << "  P95         : " << results.p95_latency_us << "\n";
     std::cout << "  P99         : " << results.p99_latency_us << "\n";
     std::cout << "  Min         : " << results.min_latency_us << "\n";
     std::cout << "  Max         : " << results.max_latency_us << "\n";
-    std::cout << "  Std Dev     : " << results.std_latency_us << "\n\n";
+    std::cout << "  Std Dev     : " << results.std_latency_us << "\n";
+    std::cout << "  IQR         : " << results.iqr_latency_us << "\n\n";
 
     // Statistical Validation
     std::cout << "Stability:\n";
@@ -193,8 +195,17 @@ inline void print_latency_results(const BenchmarkConfig& config,
     std::cout << "  95% CI      : [" << results.confidence_interval_95_lower
               << ", " << results.confidence_interval_95_upper << "]\n";
     std::cout << "  Stable      : " << (results.is_stable ? "Yes" : "No") << "\n";
+    if (results.outliers_trimmed > 0) {
+      std::cout << "  Outliers    : " << results.outliers_trimmed << " trimmed (1% each tail)\n";
+    }
     if (results.warmup_effectiveness != 0.0f) {
-      std::cout << "  Warmup Eff  : " << results.warmup_effectiveness << " µs\n";
+      std::cout << "  Warmup Eff  : " << results.warmup_effectiveness << " µs";
+      if (results.warmup_effectiveness > 0.0f) {
+        std::cout << " (effective)";
+      } else {
+        std::cout << " (ineffective - increase warmup!)";
+      }
+      std::cout << "\n";
     }
     std::cout << "\n";
 

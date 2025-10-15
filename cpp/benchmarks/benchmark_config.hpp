@@ -124,11 +124,11 @@ inline BenchmarkConfig get_latency_config(RunMode mode = RunMode::FULL) {
       break;
     case RunMode::PROFILE:
       config.iterations = 100;
-      config.warmup_iterations = 10;
+      config.warmup_iterations = 30;  // 30% warmup for stability
       break;
     case RunMode::FULL:
       config.iterations = 5000;
-      config.warmup_iterations = 500;
+      config.warmup_iterations = 1500;  // 30% warmup for production stability
       break;
   }
 
@@ -149,15 +149,15 @@ inline BenchmarkConfig get_throughput_config(RunMode mode = RunMode::FULL) {
   switch (mode) {
     case RunMode::QUICK:
       config.duration_seconds = 3.0f;
-      config.warmup_iterations = 5;
+      config.warmup_iterations = 10;  // More warmup for streaming stability
       break;
     case RunMode::PROFILE:
       config.duration_seconds = 5.0f;
-      config.warmup_iterations = 10;
+      config.warmup_iterations = 30;
       break;
     case RunMode::FULL:
       config.duration_seconds = 10.0f;
-      config.warmup_iterations = 20;
+      config.warmup_iterations = 50;  // Increased for thermal/frequency stabilization
       break;
   }
 
@@ -180,15 +180,15 @@ inline BenchmarkConfig get_realtime_config(RunMode mode = RunMode::FULL) {
   switch (mode) {
     case RunMode::QUICK:
       config.duration_seconds = 3.0f;
-      config.warmup_iterations = 5;
+      config.warmup_iterations = 10;  // More warmup for streaming stability
       break;
     case RunMode::PROFILE:
       config.duration_seconds = 5.0f;
-      config.warmup_iterations = 10;
+      config.warmup_iterations = 30;
       break;
     case RunMode::FULL:
       config.duration_seconds = 10.0f;
-      config.warmup_iterations = 20;
+      config.warmup_iterations = 50;  // Increased for thermal/frequency stabilization
       break;
   }
 
