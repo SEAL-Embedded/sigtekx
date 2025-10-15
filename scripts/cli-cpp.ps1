@@ -48,20 +48,118 @@ function Invoke-Bench {
         exit 1
     }
 
-    Write-Status "Running C++ benchmark..."
+    # Check for --lock-clocks flag
+    $lockClocks = $false
+    $gpuIndex = 0
+    $useRecommended = $true
+    $filteredArgs = @()
 
-    # Pass all arguments directly to benchmark_engine.exe
-    if ($BenchArgs.Length -gt 0) {
-        & $script:BenchmarkExe @BenchArgs
-    } else {
-        & $script:BenchmarkExe
+    for ($i = 0; $i -lt $BenchArgs.Length; $i++) {
+        $arg = $BenchArgs[$i]
+
+        switch ($arg) {
+            "--lock-clocks" {
+                $lockClocks = $true
+            }
+            "--gpu-index" {
+                if ($i + 1 -lt $BenchArgs.Length) {
+                    $gpuIndex = [int]$BenchArgs[$i + 1]
+                    $i++
+                }
+            }
+            "--max-clocks" {
+                $useRecommended = $false
+            }
+            default {
+                # Pass through to benchmark exe
+                $filteredArgs += $arg
+            }
+        }
     }
 
-    if ($LASTEXITCODE -eq 0) {
-        Write-Success "Benchmark completed successfully"
+    if ($lockClocks) {
+        # GPU clock locking path
+        $gpuManagerPath = Join-Path $PSScriptRoot "gpu-manager.ps1"
+
+        if (-not (Test-Path $gpuManagerPath)) {
+            Write-Error "GPU manager not found: $gpuManagerPath"
+            exit 1
+        }
+
+        # Check admin privileges - elevate if needed
+        $currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+        $isAdmin = $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+
+        if (-not $isAdmin) {
+            Write-Host ""
+            Write-Host "⚠️  GPU clock locking requires administrator privileges" -ForegroundColor Yellow
+            Write-Host "    UAC prompt will appear - please approve to continue" -ForegroundColor Yellow
+            Write-Host ""
+            Start-Sleep -Seconds 2
+
+            # Re-launch elevated with same arguments
+            $elevatedArgs = @(
+                "-NoProfile",
+                "-ExecutionPolicy", "Bypass",
+                "-File", $MyInvocation.PSCommandPath,
+                "bench"
+            )
+            $elevatedArgs += $BenchArgs
+
+            $process = Start-Process -FilePath "pwsh" -ArgumentList $elevatedArgs -Verb RunAs -Wait -PassThru
+            exit $process.ExitCode
+        }
+
+        # We're admin - proceed with clock locking
+        Write-Host ""
+        Write-Status "Benchmarking with locked GPU clocks"
+        Write-Host ""
+
+        try {
+            # Lock clocks
+            & $gpuManagerPath -Action Lock -GpuIndex $gpuIndex -UseRecommended:$useRecommended
+            Write-Host ""
+
+            # Run benchmark
+            Write-Status "Running C++ benchmark..."
+            if ($filteredArgs.Length -gt 0) {
+                & $script:BenchmarkExe @filteredArgs
+            } else {
+                & $script:BenchmarkExe
+            }
+
+            $benchmarkExitCode = $LASTEXITCODE
+
+        } finally {
+            # ALWAYS unlock clocks (even on error/Ctrl+C)
+            Write-Host ""
+            & $gpuManagerPath -Action Unlock -GpuIndex $gpuIndex
+        }
+
+        Write-Host ""
+        if ($benchmarkExitCode -eq 0) {
+            Write-Success "Benchmark completed successfully"
+        } else {
+            Write-Error "Benchmark failed with exit code $benchmarkExitCode"
+            exit $benchmarkExitCode
+        }
+
     } else {
-        Write-Error "Benchmark failed with exit code $LASTEXITCODE"
-        exit $LASTEXITCODE
+        # Normal benchmark path (no clock locking)
+        Write-Status "Running C++ benchmark..."
+
+        if ($filteredArgs.Length -gt 0) {
+            & $script:BenchmarkExe @filteredArgs
+        } else {
+            & $script:BenchmarkExe
+        }
+
+        if ($LASTEXITCODE -eq 0) {
+            Write-Success "Benchmark completed successfully"
+        } else {
+            Write-Error "Benchmark failed with exit code $LASTEXITCODE"
+            exit $LASTEXITCODE
+        }
     }
 }
 
@@ -287,6 +385,9 @@ RUN MODES:
 
 MODIFIERS:
   --ionosphere    Apply ionosphere-specific parameters to preset
+  --lock-clocks   Lock GPU clocks for stable benchmarks (requires admin)
+  --gpu-index <N> Select GPU to lock (default: 0, use with --lock-clocks)
+  --max-clocks    Use max clocks instead of recommended (use with --lock-clocks)
 
 BENCHMARK EXAMPLES:
   # Quick development validation (default)
@@ -303,6 +404,9 @@ BENCHMARK EXAMPLES:
 
   # Blank canvas (override everything)
   ionoc bench --nfft 8192 --batch 32 --overlap 0.875 --iterations 100
+
+  # GPU clock locking for stability (CV reduction)
+  ionoc bench --preset latency --full --lock-clocks
 
   # For all options, use:
   ionoc bench --help

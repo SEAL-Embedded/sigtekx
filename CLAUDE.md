@@ -96,6 +96,10 @@ ionoc bench
 # Production latency benchmark
 ionoc bench --preset latency --full
 
+# Stable benchmarking with locked GPU clocks (CV reduction: 20% → 5-10%)
+ionoc bench --preset latency --full --lock-clocks
+ionoc bench --preset realtime --ionosphere --lock-clocks
+
 # Ionosphere realtime profiling
 ionoc bench --preset realtime --ionosphere --profile
 ionoc profile nsys --stats
@@ -187,8 +191,8 @@ ionoc profile ncu --kernel-name "magnitude" --metrics sm__throughput
 
 ### Typical C++ Development Workflow
 ```powershell
-# 1. Save baseline before modifications
-ionoc bench --preset latency --full --save-baseline
+# 1. Save baseline before modifications (with locked clocks for stability)
+ionoc bench --preset latency --full --lock-clocks --save-baseline
 
 # 2. Modify C++ executor/kernel code
 vim cpp\src\executors\batch_executor.cpp
@@ -199,8 +203,8 @@ iono build
 # 4. Quick validation (~10 seconds, compares to baseline)
 ionoc bench
 
-# 5. Full validation if quick looks good
-ionoc bench --preset latency --full
+# 5. Full validation if quick looks good (locked clocks for stable comparison)
+ionoc bench --preset latency --full --lock-clocks
 # Performance card shows: ✓ NO CHANGE / ⚠ SLIGHT REGRESSION / ✗ REGRESSION
 
 # 6. Profile if needed
@@ -387,6 +391,52 @@ iprof nsys accuracy -- experiment=profiling +benchmark=accuracy      # 10 iterat
 - Always start with `nsys` before moving to `ncu` (nsys is 10-50× faster)
 - Use `ncu --kernel-name <pattern>` to profile specific kernels only
 
+## GPU Clock Locking for Benchmark Stability
+
+**Purpose**: Reduce benchmark variability (Coefficient of Variation) from 20-40% → 5-15%
+
+### Quick Start
+
+```powershell
+# Lock GPU clocks for stable benchmarking (requires admin - UAC prompt)
+ionoc bench --preset latency --full --lock-clocks
+```
+
+**What it does:**
+1. Auto-elevates to admin (UAC prompt)
+2. Locks GPU graphics/memory clocks to stable values
+3. Runs benchmark
+4. **Automatically** restores original clocks (even on error/Ctrl+C)
+
+**Expected CV improvement:**
+- Latency: 20% → **5-10%** (50-75% better)
+- Realtime: 40% → **10-15%** (60-75% better)
+
+### Options
+
+```powershell
+# Use recommended clocks (default, conservative)
+ionoc bench --preset latency --full --lock-clocks
+
+# Use max clocks for peak performance
+ionoc bench --preset latency --full --lock-clocks --max-clocks
+
+# Multi-GPU: select GPU 1
+ionoc bench --preset latency --full --lock-clocks --gpu-index 1
+
+# Query GPU info (no locking)
+pwsh scripts/gpu-manager.ps1 -Action Query
+```
+
+**Supported GPUs**: RTX 3090 Ti, RTX 4090, RTX 4080, RTX 4070 Ti, RTX 3080, RTX 3070, A100, V100
+
+**Full documentation**: `docs/gpu-clock-locking.md`
+
+**Safety**: Auto-cleanup always runs (even on Ctrl+C or error). Manual recovery if needed:
+```powershell
+nvidia-smi -pm 0 && nvidia-smi -rgc && nvidia-smi -rmc
+```
+
 ## Window Function Symmetry Modes
 
 ### Overview
@@ -493,4 +543,4 @@ python benchmarks/run_latency.py experiment=ionosphere_multiscale +benchmark=lat
 python benchmarks/run_throughput.py --multirun experiment=ionosphere_resolution
 ```
 
-Last updated: 2025-10-14 (Expanded C++ benchmarking with preset system: latency, throughput, realtime, accuracy benchmarks with ionosphere variants)
+Last updated: 2025-10-15 (Added GPU clock locking for benchmark stability - reduces CV from 20-40% to 5-15%)

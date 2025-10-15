@@ -86,20 +86,32 @@ inline LatencyResults run_latency_benchmark(ResearchEngine& engine,
 
   results.latencies_us.reserve(config.iterations);
 
+  // Create CUDA events for GPU-side timing (more accurate than CPU-side chrono)
+  cudaEvent_t start_event, stop_event;
+  cudaEventCreate(&start_event);
+  cudaEventCreate(&stop_event);
+
   for (int i = 0; i < config.iterations; ++i) {
     const std::string iter_name = "Iteration " + std::to_string(i + 1) + "/" +
                                   std::to_string(config.iterations);
     IONO_NVTX_RANGE(iter_name.c_str(), profiling::colors::NVIDIA_BLUE);
 
-    auto t0 = std::chrono::high_resolution_clock::now();
+    // Use CUDA events to measure GPU execution time directly
+    // This eliminates CPU-side timing overhead and OS scheduler noise
+    cudaEventRecord(start_event);
     engine.process(input.data(), output.data(), input_size);
-    engine.synchronize();  // Ensure GPU work is complete
-    auto t1 = std::chrono::high_resolution_clock::now();
+    cudaEventRecord(stop_event);
+    cudaEventSynchronize(stop_event);  // Wait for GPU work to complete
 
-    float latency_us =
-        std::chrono::duration<float, std::micro>(t1 - t0).count();
+    float latency_ms = 0.0f;
+    cudaEventElapsedTime(&latency_ms, start_event, stop_event);
+    float latency_us = latency_ms * 1000.0f;  // Convert ms to us
     results.latencies_us.push_back(latency_us);
   }
+
+  // Clean up CUDA events
+  cudaEventDestroy(start_event);
+  cudaEventDestroy(stop_event);
 
   // Compute statistics
   IONO_NVTX_RANGE("Compute Statistics", profiling::colors::CYAN);
@@ -275,6 +287,9 @@ inline RealtimeResults run_realtime_benchmark(ResearchEngine& engine,
     const std::string iter_name = "Frame " + std::to_string(frame_count + 1);
     IONO_NVTX_RANGE(iter_name.c_str(), profiling::colors::ORANGE);
 
+    // Use CPU-side timing for realtime benchmark
+    // For high-frequency measurements (>5000 FPS), CPU timing provides better
+    // stability than CUDA events due to lower per-frame overhead
     auto frame_start = std::chrono::high_resolution_clock::now();
     engine.process(input.data(), output.data(), input_size);
     engine.synchronize();

@@ -26,7 +26,13 @@ namespace ionosense {
 
 class RealtimeExecutor::Impl {
  public:
-  Impl() : batch_executor_(std::make_unique<BatchExecutor>()) {}
+  Impl() {
+    // Note: Device initialization (cudaDeviceReset, cudaSetDeviceFlags) is
+    // handled by BatchExecutor's constructor. We don't duplicate it here to
+    // avoid resetting the device state twice.
+    batch_executor_ = std::make_unique<BatchExecutor>();
+  }
+
   ~Impl() = default;
 
   void initialize(const ExecutorConfig& config,
