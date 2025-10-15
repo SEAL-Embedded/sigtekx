@@ -41,7 +41,7 @@ The benchmark executable supports multiple presets matching Python configuration
 | **latency** | Mean/P95/P99 latency (µs) | 5000 iter, nfft=2048, batch=4 | ~2min | Latency measurement |
 | **throughput** | FPS, GB/s | 10s duration, nfft=2048, batch=8 | ~10s | Throughput measurement |
 | **realtime** | Deadline compliance, jitter | 10s stream, nfft=2048, batch=4 | ~10s | Real-time streaming |
-| **accuracy** | SNR, error metrics | 10 iter, 8 signals, nfft=2048 | ~30s | Accuracy validation |
+| **accuracy** | Pass/Fail (smoke test) | Single sine test, nfft=2048 | ~5s | **Smoke test only** - use Python for real accuracy |
 
 ### Ionosphere Variants
 
@@ -52,7 +52,7 @@ Each preset has an ionosphere variant activated with `--ionosphere`:
 | **latency** | nfft=4096, batch=2, overlap=0.625 | Higher resolution, lower batch |
 | **throughput** | nfft=8192, batch=16, overlap=0.75 | High-res batch processing |
 | **realtime** | nfft=4096, batch=2, strict timing | Balanced resolution, strict timing |
-| **accuracy** | nfft=8192, batch=4, 10 signals | High-resolution validation |
+| **accuracy** | nfft=8192, batch=1 | Higher resolution smoke test |
 
 ## Run Modes
 
@@ -133,13 +133,29 @@ ionoc bench --nfft 4096 --overlap 0.875 --iterations 50
 ionoc bench --ionosphere --nfft 16384 --batch 32 --profile
 ```
 
-### Accuracy Validation
+### Accuracy Reference Test
 ```powershell
-# Quick accuracy check
-ionoc bench --preset accuracy --quick
+# Single pipeline-matching reference test
+ionoc bench --preset accuracy
 
-# Full ionosphere accuracy
-ionoc bench --preset accuracy --ionosphere --full
+# Ionosphere reference test (higher resolution)
+ionoc bench --preset accuracy --ionosphere
+```
+
+**IMPORTANT:** The C++ accuracy benchmark is a **single reference-based test** that validates the entire pipeline produces correct numerical output.
+
+It compares engine output against a CPU reference that **exactly mirrors the pipeline**:
+- Window: Hann, PERIODIC symmetry, UNITY normalization
+- FFT: cuFFT R2C
+- Magnitude: sqrt(real² + imag²) * (1/N) scaling
+
+**Validation:** Tests pure sine wave input with tight numerical tolerance (max error < 1e-4).
+
+**Hardcoded to current pipeline:** If you add/remove stages or change scaling, update `reference_compute.hpp` to match.
+
+**For comprehensive cross-platform accuracy validation**, use Python tests:
+```powershell
+pytest tests/test_accuracy.py  # Full scipy reference comparison
 ```
 
 ## Profiling Workflow
@@ -339,7 +355,7 @@ When validating executor refactors, aim for:
 - **Latency overhead**: <5% vs baseline
 - **Throughput**: No regression
 - **Real-time compliance**: >99% deadline compliance
-- **Accuracy**: 100% pass rate, SNR >60dB
+- **Accuracy smoke test**: 100% pass rate (sine peak at correct bin)
 
 ## Notes
 

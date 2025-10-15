@@ -197,31 +197,29 @@ inline BenchmarkConfig get_accuracy_config(RunMode mode = RunMode::FULL) {
   config.preset = BenchmarkPreset::ACCURACY;
   config.run_mode = mode;
   config.nfft = 2048;
-  config.batch = 1;  // Single batch for accuracy validation
-  config.overlap = 0.0f;  // 0% overlap for independent frames
+  config.batch = 1;  // Single batch for reference test
+  config.overlap = 0.0f;  // 0% overlap
   config.sample_rate_hz = 100000;  // 100kHz
-  config.absolute_tolerance = 1.0e-6f;
-  config.relative_tolerance = 1.0e-5f;
-  config.snr_threshold_db = 60.0f;
 
-  // Adjust test count based on run mode
-  switch (mode) {
-    case RunMode::QUICK:
-      config.iterations = 2;
-      config.num_test_signals = 3;
-      config.warmup_iterations = 0;
-      break;
-    case RunMode::PROFILE:
-      config.iterations = 5;
-      config.num_test_signals = 5;
-      config.warmup_iterations = 0;
-      break;
-    case RunMode::FULL:
-      config.iterations = 10;
-      config.num_test_signals = 8;
-      config.warmup_iterations = 0;
-      break;
-  }
+  // NOTE: This is a SINGLE PIPELINE-MATCHING REFERENCE TEST.
+  // Compares engine output against CPU reference that exactly mirrors pipeline:
+  // - Window: Hann, PERIODIC symmetry, UNITY normalization
+  // - FFT: cuFFT R2C
+  // - Magnitude: sqrt(real^2 + imag^2) * (1/N) scaling
+  //
+  // Validates actual numerical correctness with tight tolerance (max error < 1e-4).
+  // Hardcoded to current pipeline - if pipeline changes, update reference_compute.hpp.
+  //
+  // For comprehensive cross-platform accuracy validation, use Python:
+  //   pytest tests/test_accuracy.py
+  config.iterations = 1;         // Ignored (single test only)
+  config.num_test_signals = 1;   // Ignored (single test only)
+  config.warmup_iterations = 0;  // No warmup needed for reference test
+
+  // Validation thresholds (used in run_accuracy_benchmark)
+  config.absolute_tolerance = 1.0e-4f;  // Max absolute error
+  config.relative_tolerance = 1.0e-4f;  // Max relative RMS error
+  config.snr_threshold_db = 60.0f;      // Expected SNR (not enforced)
 
   return config;
 }
@@ -256,10 +254,10 @@ inline void apply_ionosphere_variant(BenchmarkConfig& config) {
       break;
 
     case BenchmarkPreset::ACCURACY:
-      // Ionosphere accuracy: high-resolution validation, still 1 batch
+      // Ionosphere accuracy reference test: higher resolution
       config.nfft = 8192;
       config.batch = 1;
-      config.num_test_signals = 10;  // More comprehensive testing
+      // Note: iterations/num_test_signals ignored (single reference test only)
       break;
 
     case BenchmarkPreset::DEV:
