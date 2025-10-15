@@ -633,6 +633,19 @@ PROFILING EXAMPLES:
   .\scripts\cli.ps1 profile nsys latency -Full -Duration 30
   .\scripts\cli.ps1 profile ncu custom -Script "my_script.py"
 
+C++ DEVELOPMENT (Advanced - Pre-Python Integration):
+  For C++ kernel development before Python integration, use standalone benchmark:
+
+  .\build\windows-rel\benchmark_engine.exe --quick
+
+  # Before profiling, ensure directory exists (use backslashes!):
+  New-Item -ItemType Directory -Path artifacts\profiling -Force | Out-Null
+  nsys profile -o artifacts\profiling\cpp_dev .\build\windows-rel\benchmark_engine.exe --profile
+
+  IMPORTANT: Use backslashes (\) in paths, not forward slashes (/)
+  See CLAUDE.md "C++ Development Workflow" section for full documentation.
+  For production profiling, always use 'profile' command above (Python end-to-end).
+
 PYTHON SCRIPT RUNNER
   run <script.py> [args...]
                           Run Python script with proper environment

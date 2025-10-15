@@ -79,6 +79,177 @@ dvc repro
 ./scripts/cli.ps1 doctor                  # System health check
 ```
 
+## C++ Development Workflow (Pre-Python Integration)
+
+**Use Case:** Developing and validating new C++ kernels/executors BEFORE Python integration.
+
+**Important:** This workflow is for C++ development iteration only. For production profiling, always use `iprof` with Python benchmarks (see GPU Profiling section below).
+
+### Quick Start with `ionoc`
+
+The `ionoc` command provides a dedicated CLI for C++ benchmarking and profiling:
+
+```powershell
+# Quick benchmark (20 iterations, ~10s)
+ionoc bench quick
+
+# Profile with Nsight Systems (auto-creates directories)
+ionoc profile nsys --stats
+
+# Profile with Nsight Compute (kernel analysis)
+ionoc profile ncu --kernel-name "fft_kernel"
+
+# Full help
+ionoc help
+```
+
+### Build C++ Benchmark Executable
+```bash
+# Build both tests and benchmark executable
+iono build   # or: ./scripts/cli.ps1 build
+```
+
+### Benchmark Commands
+
+```powershell
+# Fast validation (20 iterations, ~10s)
+ionoc bench quick
+
+# Profile-ready (100 iterations, ~30s)
+ionoc bench profile
+
+# Full benchmark (5000 iterations, ~2min)
+ionoc bench full
+```
+
+### Profile C++ Directly (Development Only)
+
+**Nsight Systems (Timeline Analysis)**
+```powershell
+# Basic profiling (auto-creates artifacts\profiling directory)
+ionoc profile nsys
+
+# With statistics
+ionoc profile nsys --stats
+
+# Custom mode and traces
+ionoc profile nsys --mode quick --trace cuda,nvtx
+
+# Custom output path
+ionoc profile nsys --output my_profile --stats
+```
+
+**Nsight Compute (Kernel Analysis)**
+```powershell
+# Basic profiling (⚠️ slow - 5-15 minutes)
+ionoc profile ncu
+
+# Roofline analysis
+ionoc profile ncu --set roofline
+
+# Specific kernel only (faster)
+ionoc profile ncu --kernel-name "fft_kernel"
+
+# Full metrics (very slow)
+ionoc profile ncu --set full --mode profile
+```
+
+**Advanced Options:**
+```powershell
+# All ionoc profile commands support:
+# --mode <quick|profile|full>   Benchmark mode
+# --output <path>                Custom output path
+# Plus all native nsys/ncu flags (passthrough)
+
+# Examples:
+ionoc profile nsys --mode quick --duration 5
+ionoc profile ncu --kernel-name "magnitude" --metrics sm__throughput
+```
+
+### Typical C++ Development Workflow
+```powershell
+# 1. Modify C++ executor/kernel code
+vim cpp\src\executors\batch_executor.cpp
+
+# 2. Rebuild
+iono build
+
+# 3. Quick validation (~10 seconds)
+ionoc bench quick
+
+# 4. Profile if results look good (~1 minute)
+ionoc profile nsys --stats
+
+# 5. View results (opens automatically or manually)
+nsys-ui artifacts\profiling\cpp_dev.nsys-rep
+
+# 6. Analyze specific kernel if needed (~10 minutes)
+ionoc profile ncu --kernel-name "fft_kernel" --set roofline
+
+# 7. Iterate until satisfied, then integrate with Python
+
+# 8. Production profiling (end-to-end Python workflow)
+iprof nsys latency    # Now uses full Python end-to-end workflow
+```
+
+### When to Use Each Tool
+
+| Tool | Purpose | Duration | Use When |
+|------|---------|----------|----------|
+| `ionoc bench quick` | Fast validation | 10s | Quick sanity check after code changes |
+| `ionoc bench profile` | Profile-ready benchmark | 30s | Before running profiling |
+| `ionoc profile nsys` | Timeline, API calls, NVTX | 30-60s | Understanding execution flow, finding bottlenecks |
+| `ionoc profile ncu` | Kernel metrics, roofline | 5-15min | Optimizing specific kernel performance |
+| `iprof` (Python) | **Production profiling** | Varies | **Final end-to-end validation** |
+
+### Shortcuts
+
+```powershell
+icbench quick        # Alias for: ionoc bench quick
+icprof nsys --stats  # Alias for: ionoc profile nsys --stats
+```
+
+### Troubleshooting
+
+#### Character Encoding Issues (PowerShell)
+
+**Note:** If you're using `scripts/init_pwsh.ps1` to start your dev session, UTF-8 encoding is **automatically configured** for you.
+
+If you see garbled characters like `┬╡s` instead of `µs` in benchmark output (when NOT using `init_pwsh.ps1`):
+
+```powershell
+# Fix for current PowerShell session
+$OutputEncoding = [System.Text.Encoding]::UTF8
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
+# Then run benchmark
+./build/windows-rel/benchmark_engine.exe --full
+```
+
+**Best solution:** Use `scripts/init_pwsh.ps1` to start your dev session (handles this automatically).
+
+**Alternative:** Use Windows Terminal (has proper UTF-8 support by default) instead of legacy PowerShell console.
+
+#### Profiling Directory Not Found
+
+If `nsys profile` fails with "No such file or directory", the issue is usually:
+1. Directory doesn't exist
+2. Mixed path separators (forward/backslashes)
+
+**Solution - use Windows backslashes consistently:**
+
+```powershell
+# Create directory first (Windows path with backslashes)
+New-Item -ItemType Directory -Path artifacts\profiling -Force | Out-Null
+
+# Then profile (all backslashes)
+nsys profile -o artifacts\profiling\cpp_dev .\build\windows-rel\benchmark_engine.exe --profile
+```
+
+**Important:** On Windows, always use `\` (backslashes) in paths, not `/` (forward slashes).
+
+The `.gitignore` already excludes `artifacts/` from version control.
+
 ## Code Coverage
 
 ### C++ Coverage (gcovr)

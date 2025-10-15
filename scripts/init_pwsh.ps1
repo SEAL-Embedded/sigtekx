@@ -253,6 +253,19 @@ function Invoke-InteractiveEnvironmentSetup {
 
 # ----- Run -----
 
+# Set UTF-8 encoding for proper Unicode support (µ, °, etc.)
+# PowerShell 7 supports UTF-8, but the console encoding needs to be set explicitly.
+# This ensures C++ benchmarks and Python output display correctly.
+if (-not $Quiet) {
+    try {
+        $OutputEncoding = [System.Text.Encoding]::UTF8
+        [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+        Info "Set console encoding to UTF-8 (for proper µs, °C, etc. display)."
+    } catch {
+        Warn "Failed to set UTF-8 encoding: $($_.Exception.Message)"
+    }
+}
+
 # Set a default for colored logging in the Python backend.
 # This allows the user to override it for the session if needed.
 if (-not $env:IONO_LOG_COLOR) {
@@ -307,8 +320,9 @@ try {
 }
 
 # Persist paths for this pwsh session
-$global:IONO_ROOT = "$repoRoot"
-$global:IONO_CLI  = Join-Path $global:IONO_ROOT 'scripts\cli.ps1'
+$global:IONO_ROOT  = "$repoRoot"
+$global:IONO_CLI   = Join-Path $global:IONO_ROOT 'scripts\cli.ps1'
+$global:IONOC_CLI  = Join-Path $global:IONO_ROOT 'scripts\cli-cpp.ps1'
 
 function global:iono {
     [CmdletBinding()]
@@ -327,6 +341,9 @@ function global:iono {
         Write-Host "   python benchmarks/run_throughput.py --multirun experiment=ionosphere_resolution +benchmark=throughput" -ForegroundColor Gray
         Write-Host "   snakemake --cores 4 --snakefile experiments/Snakefile" -ForegroundColor Gray
         Write-Host "   mlflow ui --backend-store-uri artifacts/mlruns" -ForegroundColor Gray
+        Write-Host "💡 For C++ benchmarking/profiling:" -ForegroundColor Cyan
+        Write-Host "   ionoc bench quick" -ForegroundColor Gray
+        Write-Host "   ionoc profile nsys --stats" -ForegroundColor Gray
         return
     }
 
@@ -359,6 +376,23 @@ function global:iono {
     }
 
     & $global:IONO_CLI @processedArgs
+}
+
+function global:ionoc {
+    [CmdletBinding()]
+    param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
+
+    if (-not (Test-Path $global:IONOC_CLI)) {
+        Write-Error "cli-cpp.ps1 not found at $global:IONOC_CLI"
+        return
+    }
+
+    if ($Args.Count -eq 0) {
+        & $global:IONOC_CLI help
+        return
+    }
+
+    & $global:IONOC_CLI @Args
 }
 
 
@@ -478,6 +512,10 @@ function global:iprof {
 function global:itp { it python }         # python tests
 function global:itc { it cpp }            # c++ tests
 
+# C++ benchmarking shortcuts
+function global:icbench { ionoc bench @args }     # C++ benchmark
+function global:icprof  { ionoc profile @args }   # C++ profiling
+
 # Recommended native research workflow:
 # python benchmarks/run_latency.py experiment=baseline +benchmark=latency
 # python benchmarks/run_latency.py --multirun experiment=nfft_scaling +benchmark=latency
@@ -500,6 +538,10 @@ function global:ireload {
 $global:IonoVerbs   = @('setup','build','test','coverage','lint','format','clean','doctor','ui','run','help','profile')
 $global:IonoTargets = @('python','cpp','all','-Clean','--clean','-Verbose','--verbose','--debug','--release','-Fix','-Check','-Coverage','-Pattern','-All','nsys','ncu','latency','throughput','accuracy','realtime','custom','-Full','-NoOpen','-Mode','-Script','-Kernel','-Duration')
 
+# ionoc tab-completion
+$global:IonocVerbs   = @('bench','profile','compare','clean','help')
+$global:IonocTargets = @('quick','profile','full','nsys','ncu','--mode','--output','--stats','--trace','--set','--kernel-name')
+
 Register-ArgumentCompleter -CommandName iono,ib,it,ilint,ifmt,iclean,itp,itc,ihelp,iprof -ScriptBlock {
     param($commandName,$parameterName,$wordToComplete,$commandAst,$fakeBoundParameters)
     $tokens = @()
@@ -510,6 +552,24 @@ Register-ArgumentCompleter -CommandName iono,ib,it,ilint,ifmt,iclean,itp,itc,ihe
         $list = $global:IonoVerbs
     } else {
         $list = $global:IonoTargets + $global:IonoVerbs
+    }
+    foreach ($it in $list) {
+        if ($it -like "$wordToComplete*") {
+            [System.Management.Automation.CompletionResult]::new($it,$it,'ParameterValue',$it)
+        }
+    }
+}
+
+Register-ArgumentCompleter -CommandName ionoc,icbench,icprof -ScriptBlock {
+    param($commandName,$parameterName,$wordToComplete,$commandAst,$fakeBoundParameters)
+    $tokens = @()
+    foreach ($e in $commandAst.CommandElements) {
+        if ($e.Extent.Text -ne $commandName) { $tokens += $e.Extent.Text }
+    }
+    if ($commandName -eq 'ionoc' -and $tokens.Count -eq 0) {
+        $list = $global:IonocVerbs
+    } else {
+        $list = $global:IonocTargets + $global:IonocVerbs
     }
     foreach ($it in $list) {
         if ($it -like "$wordToComplete*") {

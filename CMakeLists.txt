@@ -311,4 +311,26 @@ if(IONO_WITH_TESTS AND IONO_WITH_CUDA)
 
     include(GoogleTest)
     gtest_discover_tests(test_engine)
+
+    # ========================================================================
+    # C++ Standalone Benchmark (Development Only)
+    # ========================================================================
+    # This executable is for C++ kernel development and iteration BEFORE Python
+    # integration. For production profiling, use `iprof` with Python benchmarks.
+    add_executable(benchmark_engine
+        cpp/benchmarks/benchmark_engine.cpp
+    )
+    set_target_properties(benchmark_engine PROPERTIES CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+
+    target_include_directories(benchmark_engine PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/cpp/include)
+
+    target_link_libraries(benchmark_engine PRIVATE
+        "$<TARGET_OBJECTS:ion_engine>"
+        CUDA::cudart_static
+        CUDA::cufft
+    )
+
+    if(IONO_WITH_NVTX)
+        target_compile_definitions(benchmark_engine PRIVATE IONOSENSE_ENABLE_PROFILING)
+    endif()
 endif()

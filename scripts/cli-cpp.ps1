@@ -1,0 +1,406 @@
+#!/usr/bin/env pwsh
+# ============================================================================
+# ionosense-hpc • C++ Benchmarking & Profiling CLI
+# Dedicated tool for C++ kernel development and profiling iteration
+# ============================================================================
+
+#Requires -Version 7.0
+
+param(
+    [Parameter(Position=0)]
+    [string]$Command = "help",
+
+    [Parameter(ValueFromRemainingArguments)]
+    [string[]]$CommandArgs = @()
+)
+
+# --- Configuration & Paths ---------------------------------------------------
+$script:ProjectRoot = (Get-Item -Path (Join-Path $PSScriptRoot "..")).FullName
+$script:BuildDir = Join-Path $ProjectRoot "build"
+$script:BuildPreset = if ($env:BUILD_PRESET) { $env:BUILD_PRESET } else { "windows-rel" }
+$script:ProfilingDir = Join-Path $ProjectRoot "artifacts\profiling"
+$script:BenchmarkExe = Join-Path $BuildDir "$script:BuildPreset\benchmark_engine.exe"
+
+# --- Utility Functions -------------------------------------------------------
+function Write-Status {
+    param([string]$Message, [string]$Color = "Cyan")
+    Write-Host "🔧 $Message" -ForegroundColor $Color
+}
+
+function Write-Error {
+    param([string]$Message)
+    Write-Host "❌ $Message" -ForegroundColor Red
+}
+
+function Write-Success {
+    param([string]$Message)
+    Write-Host "✅ $Message" -ForegroundColor Green
+}
+
+# --- Core Functions ----------------------------------------------------------
+
+function Invoke-Bench {
+    param([string[]]$Args = @())
+
+    # Parse mode
+    $mode = "quick"
+    foreach ($arg in $Args) {
+        if ($arg -in @("quick", "profile", "full")) {
+            $mode = $arg
+            break
+        }
+    }
+
+    if (-not (Test-Path $script:BenchmarkExe)) {
+        Write-Error "C++ benchmark not found at: $script:BenchmarkExe"
+        Write-Host "Run 'iono build' to build the benchmark executable." -ForegroundColor Yellow
+        exit 1
+    }
+
+    Write-Status "Running C++ benchmark (mode: $mode)..."
+    & $script:BenchmarkExe --$mode
+
+    if ($LASTEXITCODE -eq 0) {
+        Write-Success "Benchmark completed successfully"
+    } else {
+        Write-Error "Benchmark failed with exit code $LASTEXITCODE"
+        exit $LASTEXITCODE
+    }
+}
+
+function Invoke-ProfileNsys {
+    param([string[]]$Args = @())
+
+    if (-not (Test-Path $script:BenchmarkExe)) {
+        Write-Error "C++ benchmark not found at: $script:BenchmarkExe"
+        Write-Host "Run 'iono build' to build the benchmark executable." -ForegroundColor Yellow
+        exit 1
+    }
+
+    # Ensure profiling directory exists
+    New-Item -ItemType Directory -Path $script:ProfilingDir -Force | Out-Null
+
+    # Parse arguments
+    $mode = "profile"
+    $outputPath = Join-Path $script:ProfilingDir "cpp_dev"
+    $nsysArgs = @()
+    $stats = $false
+
+    for ($i = 0; $i -lt $Args.Length; $i++) {
+        $arg = $Args[$i]
+
+        switch ($arg) {
+            "--mode" {
+                if ($i + 1 -lt $Args.Length) {
+                    $mode = $Args[$i + 1]
+                    $i++
+                }
+            }
+            "--output" {
+                if ($i + 1 -lt $Args.Length) {
+                    $outputPath = $Args[$i + 1]
+                    $i++
+                }
+            }
+            "--stats" {
+                $stats = $true
+            }
+            default {
+                # Pass through other args to nsys
+                $nsysArgs += $arg
+            }
+        }
+    }
+
+    Write-Status "Profiling with Nsight Systems (mode: $mode)..."
+
+    # Build nsys command
+    $nsysCommand = @("profile")
+    if ($stats) {
+        $nsysCommand += "--stats=true"
+    }
+    $nsysCommand += "-o"
+    $nsysCommand += $outputPath
+    $nsysCommand += $nsysArgs
+    $nsysCommand += $script:BenchmarkExe
+    $nsysCommand += "--$mode"
+
+    Write-Host "Command: nsys $($nsysCommand -join ' ')" -ForegroundColor DarkGray
+    & nsys @nsysCommand
+
+    if ($LASTEXITCODE -eq 0) {
+        Write-Success "Profiling completed: $outputPath.nsys-rep"
+        Write-Host "View with: nsys-ui $outputPath.nsys-rep" -ForegroundColor Cyan
+    } else {
+        Write-Error "Profiling failed with exit code $LASTEXITCODE"
+        exit $LASTEXITCODE
+    }
+}
+
+function Invoke-ProfileNcu {
+    param([string[]]$Args = @())
+
+    if (-not (Test-Path $script:BenchmarkExe)) {
+        Write-Error "C++ benchmark not found at: $script:BenchmarkExe"
+        Write-Host "Run 'iono build' to build the benchmark executable." -ForegroundColor Yellow
+        exit 1
+    }
+
+    # Ensure profiling directory exists
+    New-Item -ItemType Directory -Path $script:ProfilingDir -Force | Out-Null
+
+    # Parse arguments
+    $mode = "profile"
+    $outputPath = Join-Path $script:ProfilingDir "cpp_dev_ncu"
+    $metricSet = "default"
+    $ncuArgs = @()
+
+    for ($i = 0; $i -lt $Args.Length; $i++) {
+        $arg = $Args[$i]
+
+        switch ($arg) {
+            "--mode" {
+                if ($i + 1 -lt $Args.Length) {
+                    $mode = $Args[$i + 1]
+                    $i++
+                }
+            }
+            "--output" {
+                if ($i + 1 -lt $Args.Length) {
+                    $outputPath = $Args[$i + 1]
+                    $i++
+                }
+            }
+            "--set" {
+                if ($i + 1 -lt $Args.Length) {
+                    $metricSet = $Args[$i + 1]
+                    $i++
+                }
+            }
+            default {
+                # Pass through other args to ncu
+                $ncuArgs += $arg
+            }
+        }
+    }
+
+    Write-Status "Profiling with Nsight Compute (mode: $mode, set: $metricSet)..."
+    Write-Host "⚠️  This may take 5-15 minutes depending on metric set..." -ForegroundColor Yellow
+
+    # Build ncu command
+    $ncuCommand = @("--set", $metricSet, "-o", $outputPath)
+    $ncuCommand += $ncuArgs
+    $ncuCommand += $script:BenchmarkExe
+    $ncuCommand += "--$mode"
+
+    Write-Host "Command: ncu $($ncuCommand -join ' ')" -ForegroundColor DarkGray
+    & ncu @ncuCommand
+
+    if ($LASTEXITCODE -eq 0) {
+        Write-Success "Profiling completed: $outputPath.ncu-rep"
+        Write-Host "View with: ncu-ui $outputPath.ncu-rep" -ForegroundColor Cyan
+    } else {
+        Write-Error "Profiling failed with exit code $LASTEXITCODE"
+        exit $LASTEXITCODE
+    }
+}
+
+function Invoke-Compare {
+    param([string[]]$Args = @())
+
+    if ($Args.Length -lt 2) {
+        Write-Error "Usage: ionoc compare <before.csv> <after.csv>"
+        Write-Host "Expected CSV files with benchmark results" -ForegroundColor Yellow
+        exit 1
+    }
+
+    $beforeFile = $Args[0]
+    $afterFile = $Args[1]
+
+    if (-not (Test-Path $beforeFile)) {
+        Write-Error "Before file not found: $beforeFile"
+        exit 1
+    }
+
+    if (-not (Test-Path $afterFile)) {
+        Write-Error "After file not found: $afterFile"
+        exit 1
+    }
+
+    Write-Status "Comparing benchmark results..."
+
+    # Simple CSV comparison (assumes format from benchmark_engine.exe)
+    Write-Host "📊 Benchmark Comparison" -ForegroundColor Cyan
+    Write-Host "Before: $beforeFile" -ForegroundColor DarkGray
+    Write-Host "After:  $afterFile" -ForegroundColor DarkGray
+    Write-Host ""
+    Write-Host "Feature not yet implemented - manual comparison:" -ForegroundColor Yellow
+    Write-Host "  diff $beforeFile $afterFile" -ForegroundColor Gray
+}
+
+function Invoke-Clean {
+    Write-Status "Cleaning profiling artifacts..."
+
+    if (Test-Path $script:ProfilingDir) {
+        $files = Get-ChildItem -Path $script:ProfilingDir -Recurse
+        $count = $files.Count
+
+        if ($count -eq 0) {
+            Write-Host "No profiling artifacts to clean." -ForegroundColor Gray
+            return
+        }
+
+        Remove-Item -Path "$script:ProfilingDir\*" -Recurse -Force
+        Write-Success "Removed $count profiling artifact(s)"
+    } else {
+        Write-Host "Profiling directory does not exist." -ForegroundColor Gray
+    }
+}
+
+function Show-Help {
+    Write-Host @"
+╔════════════════════════════════════════════════════════════════════════╗
+║  IONOC - C++ Benchmarking & Profiling CLI                             ║
+║  Dedicated tool for C++ kernel development and profiling iteration    ║
+╚════════════════════════════════════════════════════════════════════════╝
+
+USAGE: ionoc <command> [options]
+
+COMMANDS:
+  bench [quick|profile|full]    Run C++ benchmark standalone
+  profile nsys [options]        Profile with Nsight Systems
+  profile ncu [options]         Profile with Nsight Compute
+  compare <before> <after>      Compare benchmark results
+  clean                         Clean profiling artifacts
+  help                          Show this help
+
+═══════════════════════════════════════════════════════════════════════════
+
+BENCHMARK MODES:
+  quick     20 iterations (~10s)     Fast validation
+  profile   100 iterations (~30s)    Before profiling (recommended)
+  full      5000 iterations (~2min)  Production equivalent
+
+BENCHMARK EXAMPLES:
+  ionoc bench quick              # Quick sanity check
+  ionoc bench profile            # Before profiling
+  ionoc bench full               # Full benchmark run
+
+═══════════════════════════════════════════════════════════════════════════
+
+NSYS PROFILING:
+  ionoc profile nsys [options]
+
+  Options:
+    --mode <quick|profile|full>  Benchmark mode (default: profile)
+    --output <path>              Output file path (default: artifacts\profiling\cpp_dev)
+    --stats                      Generate statistics
+    --trace <types>              Trace types (e.g., cuda,nvtx,osrt)
+    --duration <seconds>         Time limit
+    [nsys flags]                 Any other nsys flags
+
+  Examples:
+    ionoc profile nsys                              # Basic profile
+    ionoc profile nsys --stats                      # With statistics
+    ionoc profile nsys --trace cuda,nvtx            # Specific traces
+    ionoc profile nsys --mode quick --duration 5    # Quick 5s profile
+
+═══════════════════════════════════════════════════════════════════════════
+
+NCU PROFILING:
+  ionoc profile ncu [options]
+
+  Options:
+    --mode <quick|profile|full>  Benchmark mode (default: profile)
+    --output <path>              Output file path (default: artifacts\profiling\cpp_dev_ncu)
+    --set <metric-set>           Metric set (default, roofline, full)
+    --kernel-name <pattern>      Filter specific kernels
+    --metrics <list>             Custom metrics
+    [ncu flags]                  Any other ncu flags
+
+  Examples:
+    ionoc profile ncu                                      # Basic profile
+    ionoc profile ncu --set roofline                       # Roofline analysis
+    ionoc profile ncu --kernel-name "fft_kernel"           # Specific kernel
+    ionoc profile ncu --set full --mode profile            # Full metrics
+
+  ⚠️  NCU profiling is slow (5-15 minutes). Use nsys first!
+
+═══════════════════════════════════════════════════════════════════════════
+
+TYPICAL WORKFLOW:
+  1. ionoc bench quick                           # Fast validation (~10s)
+  2. ionoc profile nsys --stats                  # Profile with nsys (~1min)
+  3. ionoc profile ncu --kernel-name "..."       # Analyze kernel (~10min)
+  4. ionoc clean                                 # Clean artifacts
+
+FOR PRODUCTION PROFILING:
+  Use 'iono profile nsys latency' for end-to-end Python workflow validation.
+  ionoc is for C++ development iteration only.
+
+═══════════════════════════════════════════════════════════════════════════
+
+ARTIFACTS LOCATION:
+  All profiling results are saved to: artifacts\profiling\
+
+  - cpp_dev.nsys-rep         Nsight Systems reports
+  - cpp_dev_ncu.ncu-rep      Nsight Compute reports
+
+  Clean with: ionoc clean
+
+═══════════════════════════════════════════════════════════════════════════
+"@
+}
+
+# --- Main Execution ----------------------------------------------------------
+try {
+    Set-Location $script:ProjectRoot
+
+    switch ($Command.ToLower()) {
+        "bench" {
+            Invoke-Bench -Args $CommandArgs
+        }
+        "profile" {
+            if ($CommandArgs.Length -eq 0) {
+                Write-Error "Usage: ionoc profile <nsys|ncu> [options]"
+                Write-Host "Run 'ionoc help' for examples" -ForegroundColor Yellow
+                exit 1
+            }
+
+            $tool = $CommandArgs[0].ToLower()
+            $remainingArgs = if ($CommandArgs.Length -gt 1) { $CommandArgs[1..($CommandArgs.Length-1)] } else { @() }
+
+            switch ($tool) {
+                "nsys" {
+                    Invoke-ProfileNsys -Args $remainingArgs
+                }
+                "ncu" {
+                    Invoke-ProfileNcu -Args $remainingArgs
+                }
+                default {
+                    Write-Error "Unknown profiling tool: $tool"
+                    Write-Host "Use 'nsys' or 'ncu'" -ForegroundColor Yellow
+                    exit 1
+                }
+            }
+        }
+        "compare" {
+            Invoke-Compare -Args $CommandArgs
+        }
+        "clean" {
+            Invoke-Clean
+        }
+        "help" {
+            Show-Help
+        }
+        default {
+            Write-Error "Unknown command: $Command"
+            Write-Host "Run 'ionoc help' for available commands" -ForegroundColor Yellow
+            exit 1
+        }
+    }
+
+} catch {
+    Write-Error "Command failed: $($_.Exception.Message)"
+    exit 1
+}
