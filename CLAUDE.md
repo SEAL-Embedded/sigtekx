@@ -430,7 +430,9 @@ pwsh scripts/gpu-manager.ps1 -Action Query
 
 **Supported GPUs**: RTX 3090 Ti, RTX 4090, RTX 4080, RTX 4070 Ti, RTX 3080, RTX 3070, A100, V100
 
-**Full documentation**: `docs/gpu-clock-locking.md`
+**Full documentation**: `docs/performance/gpu-clock-locking.md`
+
+**Quick reference**: `docs/performance/stability-improvements.md` for executive summary
 
 **Safety**: Auto-cleanup always runs (even on Ctrl+C or error). Manual recovery if needed:
 ```powershell
