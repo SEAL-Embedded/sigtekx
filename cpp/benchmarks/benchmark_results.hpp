@@ -33,6 +33,13 @@ struct LatencyResults {
   float std_latency_us = 0.0f;
   float throughput_gbps = 0.0f;
   size_t frames_processed = 0;
+
+  // Statistical validation
+  float coefficient_of_variation = 0.0f;  // CV = std_dev / mean
+  float confidence_interval_95_lower = 0.0f;  // 95% CI lower bound
+  float confidence_interval_95_upper = 0.0f;  // 95% CI upper bound
+  bool is_stable = true;  // True if CV < 10%
+  float warmup_effectiveness = 0.0f;  // Mean latency reduction after warmup
 };
 
 /**
@@ -44,6 +51,9 @@ struct ThroughputResults {
   float samples_per_second = 0.0f;
   size_t total_frames = 0;
   float test_duration_s = 0.0f;
+
+  // Statistical validation
+  bool is_stable = true;  // Always stable for throughput (time-based)
 };
 
 /**
@@ -57,6 +67,10 @@ struct RealtimeResults {
   size_t frames_processed = 0;
   size_t deadline_misses = 0;
   size_t frames_dropped = 0;
+
+  // Statistical validation
+  float coefficient_of_variation = 0.0f;  // CV for jitter
+  bool is_stable = true;  // True if jitter CV < 15%
 };
 
 /**

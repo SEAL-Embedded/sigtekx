@@ -94,6 +94,71 @@ Control iteration count or duration independent of preset:
 --quiet                  # Minimal output
 ```
 
+### Baseline Tracking
+```powershell
+--save-baseline          # Save results as baseline for future comparison
+```
+
+## Statistical Validation & Baseline Tracking
+
+The benchmark system automatically computes statistical validation metrics and supports baseline tracking for performance regression detection.
+
+### Statistical Metrics
+
+**Latency Benchmarks:**
+- Coefficient of Variation (CV): Measures stability (CV < 10% = stable)
+- 95% Confidence Interval: Statistical range for mean latency
+- Warmup Effectiveness: Latency reduction after warmup
+- Performance Tier: EXCELLENT / GOOD / ADEQUATE / POOR
+
+**Throughput Benchmarks:**
+- Performance Tier: Based on FPS relative to target
+
+**Realtime Benchmarks:**
+- Deadline Compliance Rate: % of frames meeting deadline
+- Jitter CV: Variability in frame latencies
+- Performance Tier: Based on compliance rate (>99.9% = EXCELLENT)
+
+### Baseline Tracking
+
+Track performance over time and detect regressions:
+
+```powershell
+# Save a baseline (first time)
+ionoc bench --preset latency --full --save-baseline
+
+# Run benchmark (automatically compares to baseline)
+ionoc bench --preset latency --full
+
+# Update baseline after intentional changes
+ionoc bench --preset latency --full --save-baseline
+```
+
+**Baseline Storage:**
+- Location: `artifacts/benchmarks/baselines/`
+- Format: `<preset>_<variant>_<mode>.json`
+- Example: `latency_ionosphere_full.json`
+
+**Comparison Thresholds:**
+- ±2%: No change
+- 2-5%: Slight regression (warning)
+- >5%: Regression (error)
+- Negative: Improvement (good)
+
+### Performance Card
+
+Every benchmark displays a concise performance card:
+
+```
+────────────────────────────────
+Performance Card
+────────────────────────────────
+Latency (P95):   114.30 µs  [✓ GOOD]
+Stability:     CV= 4.2%   [✓ EXCELLENT]
+vs Baseline:   +2.3%      [⚠ SLIGHT REGRESSION]
+────────────────────────────────
+```
+
 ## Usage Examples
 
 ### Quick Development Workflow
@@ -225,32 +290,34 @@ iprof nsys latency    # Full end-to-end Python workflow
 
 ### Comparing Configurations
 ```powershell
-# Baseline
-ionoc bench --preset latency --full --csv > baseline.csv
+# Save baseline before changes
+ionoc bench --preset latency --full --save-baseline
 
-# After changes
-ionoc bench --preset latency --full --csv > optimized.csv
+# Make code changes...
 
-# Compare
-ionoc compare baseline.csv optimized.csv
+# Run again (automatically shows comparison)
+ionoc bench --preset latency --full
 ```
 
 ### Testing Executor Refactor
 ```powershell
-# 1. Baseline with current implementation
-ionoc bench --preset latency --full > before.txt
+# 1. Save baseline with current implementation
+ionoc bench --preset latency --full --save-baseline
 
 # 2. Modify executor code
 # (swap in new BatchExecutor or RealtimeExecutor)
 
-# 3. Rebuild and test
+# 3. Rebuild and test (automatically compares to baseline)
 iono build
-ionoc bench --preset latency --full > after.txt
+ionoc bench --preset latency --full
 
-# 4. Compare
-diff before.txt after.txt
+# 4. Performance card will show regression status
+# ✓ GOOD = No regression (<2%)
+# ⚠ ADEQUATE = Slight regression (2-5%)
+# ✗ POOR = Regression (>5%)
 
-# 5. Validate no performance regression (<5% overhead target)
+# 5. If satisfied, update baseline
+ionoc bench --preset latency --full --save-baseline
 ```
 
 ## Output Formats

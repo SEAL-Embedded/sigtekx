@@ -35,6 +35,7 @@
 // Benchmark infrastructure
 #include "benchmark_config.hpp"
 #include "benchmark_formatters.hpp"
+#include "benchmark_persistence.hpp"
 #include "benchmark_results.hpp"
 #include "benchmark_runners.hpp"
 #include "cli_parser.hpp"
@@ -117,24 +118,56 @@ int main(int argc, char* argv[]) {
       case BenchmarkPreset::DEV: {
         auto results = run_latency_benchmark(engine, config);
         print_latency_results(config, results, runtime_info);
+
+        // Save baseline if requested
+        if (config.save_baseline) {
+          save_latency_baseline(config, results);
+          if (!config.quiet) {
+            std::cout << "Baseline saved to: " << get_baseline_path(config) << "\n";
+          }
+        }
         break;
       }
 
       case BenchmarkPreset::THROUGHPUT: {
         auto results = run_throughput_benchmark(engine, config);
         print_throughput_results(config, results, runtime_info);
+
+        // Save baseline if requested
+        if (config.save_baseline) {
+          save_throughput_baseline(config, results);
+          if (!config.quiet) {
+            std::cout << "Baseline saved to: " << get_baseline_path(config) << "\n";
+          }
+        }
         break;
       }
 
       case BenchmarkPreset::REALTIME: {
         auto results = run_realtime_benchmark(engine, config);
         print_realtime_results(config, results, runtime_info);
+
+        // Save baseline if requested
+        if (config.save_baseline) {
+          save_realtime_baseline(config, results);
+          if (!config.quiet) {
+            std::cout << "Baseline saved to: " << get_baseline_path(config) << "\n";
+          }
+        }
         break;
       }
 
       case BenchmarkPreset::ACCURACY: {
         auto results = run_accuracy_benchmark(engine, config);
         print_accuracy_results(config, results, runtime_info);
+
+        // Save baseline if requested
+        if (config.save_baseline) {
+          save_accuracy_baseline(config, results);
+          if (!config.quiet) {
+            std::cout << "Baseline saved to: " << get_baseline_path(config) << "\n";
+          }
+        }
         break;
       }
     }

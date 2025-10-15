@@ -84,6 +84,9 @@ struct BenchmarkConfig {
   OutputFormat output_format = OutputFormat::TABLE;
   bool quiet = false;
   int random_seed = 42;
+
+  // Baseline control
+  bool save_baseline = false;
 };
 
 // ============================================================================

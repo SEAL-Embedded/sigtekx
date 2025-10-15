@@ -40,6 +40,7 @@ inline BenchmarkConfig parse_args(int argc, char* argv[]) {
   bool ionosphere = false;
   OutputFormat output_format = OutputFormat::TABLE;
   bool quiet = false;
+  bool save_baseline = false;
 
   // Also collect parameter overrides
   struct Override {
@@ -103,6 +104,9 @@ OUTPUT CONTROL:
   --csv                 Output CSV only (no formatting)
   --json                Output JSON format
   --quiet               Minimal output
+
+BASELINE TRACKING:
+  --save-baseline       Save results as baseline for future comparison
 
 EXAMPLES:
   # Quick development validation (default)
@@ -187,6 +191,11 @@ EXAMPLES:
       quiet = true;
     }
 
+    // Baseline control
+    else if (arg == "--save-baseline") {
+      save_baseline = true;
+    }
+
     // Unknown argument
     else {
       std::cerr << "Unknown argument: " << arg << "\n";
@@ -225,6 +234,9 @@ EXAMPLES:
   // Apply output settings
   config.output_format = output_format;
   config.quiet = quiet;
+
+  // Apply baseline settings
+  config.save_baseline = save_baseline;
 
   // Apply parameter overrides
   if (overrides.has_nfft) config.nfft = overrides.nfft;

@@ -126,6 +126,38 @@ inline LatencyResults run_latency_benchmark(ResearchEngine& engine,
   results.std_latency_us =
       std::sqrt(variance / static_cast<float>(sorted_latencies.size()));
 
+  // Coefficient of variation (CV)
+  if (results.mean_latency_us > 0.0f) {
+    results.coefficient_of_variation = results.std_latency_us / results.mean_latency_us;
+  }
+
+  // 95% Confidence interval (assuming normal distribution)
+  // CI = mean ± (1.96 * std / sqrt(n))
+  const float n = static_cast<float>(sorted_latencies.size());
+  const float margin = 1.96f * (results.std_latency_us / std::sqrt(n));
+  results.confidence_interval_95_lower = results.mean_latency_us - margin;
+  results.confidence_interval_95_upper = results.mean_latency_us + margin;
+
+  // Stability check (CV < 10% is considered stable)
+  results.is_stable = (results.coefficient_of_variation < 0.10f);
+
+  // Warmup effectiveness (compare first 10% vs last 10% of samples)
+  if (sorted_latencies.size() >= 20) {
+    const size_t segment_size = sorted_latencies.size() / 10;
+    float first_10_mean = 0.0f;
+    float last_10_mean = 0.0f;
+
+    for (size_t i = 0; i < segment_size; ++i) {
+      first_10_mean += results.latencies_us[i];
+      last_10_mean += results.latencies_us[results.latencies_us.size() - 1 - i];
+    }
+    first_10_mean /= static_cast<float>(segment_size);
+    last_10_mean /= static_cast<float>(segment_size);
+
+    // Positive value means latency decreased (warmup was effective)
+    results.warmup_effectiveness = first_10_mean - last_10_mean;
+  }
+
   // Get throughput from engine stats
   auto stats = engine.get_stats();
   results.throughput_gbps = stats.throughput_gbps;
@@ -286,6 +318,14 @@ inline RealtimeResults run_realtime_benchmark(ResearchEngine& engine,
     }
     results.mean_jitter_ms =
         std::sqrt(variance / static_cast<float>(frame_latencies_ms.size()));
+
+    // Coefficient of variation for jitter (stability metric)
+    if (results.mean_latency_ms > 0.0f) {
+      results.coefficient_of_variation = results.mean_jitter_ms / results.mean_latency_ms;
+    }
+
+    // Realtime stability check (CV < 15% is considered stable for realtime)
+    results.is_stable = (results.coefficient_of_variation < 0.15f);
   }
 
   return results;

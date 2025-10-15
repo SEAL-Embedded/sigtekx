@@ -13,11 +13,130 @@
 #include <string>
 
 #include "benchmark_config.hpp"
+#include "benchmark_persistence.hpp"
 #include "benchmark_results.hpp"
 #include "ionosense/engines/research_engine.hpp"
 
 namespace ionosense {
 namespace benchmark {
+
+// ============================================================================
+// Performance Tier Classification
+// ============================================================================
+
+enum class PerformanceTier {
+  EXCELLENT,  // Well above target
+  GOOD,       // Meets target
+  ADEQUATE,   // Close to target
+  POOR        // Below target
+};
+
+/**
+ * @brief Classify latency performance tier.
+ *
+ * @param latency_us P95 latency in microseconds
+ * @param target_us Target latency (default: 200µs for ionosphere)
+ * @return Performance tier
+ */
+inline PerformanceTier classify_latency_tier(float latency_us, float target_us = 200.0f) {
+  if (latency_us < target_us * 0.5f) return PerformanceTier::EXCELLENT;
+  if (latency_us < target_us * 0.75f) return PerformanceTier::GOOD;
+  if (latency_us < target_us) return PerformanceTier::ADEQUATE;
+  return PerformanceTier::POOR;
+}
+
+/**
+ * @brief Classify throughput performance tier.
+ *
+ * @param fps Frames per second
+ * @param target_fps Target FPS (default: 1000)
+ * @return Performance tier
+ */
+inline PerformanceTier classify_throughput_tier(float fps, float target_fps = 1000.0f) {
+  if (fps > target_fps * 2.0f) return PerformanceTier::EXCELLENT;
+  if (fps > target_fps * 1.5f) return PerformanceTier::GOOD;
+  if (fps > target_fps) return PerformanceTier::ADEQUATE;
+  return PerformanceTier::POOR;
+}
+
+/**
+ * @brief Classify realtime compliance tier.
+ *
+ * @param compliance_rate Deadline compliance rate (0-1)
+ * @return Performance tier
+ */
+inline PerformanceTier classify_realtime_tier(float compliance_rate) {
+  if (compliance_rate >= 0.999f) return PerformanceTier::EXCELLENT;
+  if (compliance_rate >= 0.99f) return PerformanceTier::GOOD;
+  if (compliance_rate >= 0.95f) return PerformanceTier::ADEQUATE;
+  return PerformanceTier::POOR;
+}
+
+/**
+ * @brief Get performance tier symbol.
+ *
+ * @param tier Performance tier
+ * @return Symbol (✓/⚠/✗)
+ */
+inline const char* get_tier_symbol(PerformanceTier tier) {
+  switch (tier) {
+    case PerformanceTier::EXCELLENT:
+    case PerformanceTier::GOOD:
+      return "\xE2\x9C\x93";  // ✓ (UTF-8)
+    case PerformanceTier::ADEQUATE:
+      return "\xE2\x9A\xA0";  // ⚠ (UTF-8)
+    case PerformanceTier::POOR:
+      return "\xE2\x9C\x97";  // ✗ (UTF-8)
+    default:
+      return "?";
+  }
+}
+
+/**
+ * @brief Get performance tier label.
+ *
+ * @param tier Performance tier
+ * @return Label string
+ */
+inline const char* get_tier_label(PerformanceTier tier) {
+  switch (tier) {
+    case PerformanceTier::EXCELLENT:
+      return "EXCELLENT";
+    case PerformanceTier::GOOD:
+      return "GOOD";
+    case PerformanceTier::ADEQUATE:
+      return "ADEQUATE";
+    case PerformanceTier::POOR:
+      return "POOR";
+    default:
+      return "UNKNOWN";
+  }
+}
+
+/**
+ * @brief Classify stability tier.
+ *
+ * @param cv Coefficient of variation
+ * @return Performance tier
+ */
+inline PerformanceTier classify_stability_tier(float cv) {
+  if (cv < 0.03f) return PerformanceTier::EXCELLENT;  // <3% CV
+  if (cv < 0.07f) return PerformanceTier::GOOD;       // <7% CV
+  if (cv < 0.10f) return PerformanceTier::ADEQUATE;   // <10% CV
+  return PerformanceTier::POOR;
+}
+
+/**
+ * @brief Compute percent change from baseline.
+ *
+ * @param current Current value
+ * @param baseline Baseline value
+ * @return Percent change (positive = improvement for latency, regression for throughput)
+ */
+inline float compute_percent_change(float current, float baseline) {
+  if (baseline == 0.0f) return 0.0f;
+  return ((current - baseline) / baseline) * 100.0f;
+}
 
 // ============================================================================
 // Latency Results Formatting
@@ -33,6 +152,10 @@ namespace benchmark {
 inline void print_latency_results(const BenchmarkConfig& config,
                                    const LatencyResults& results,
                                    const RuntimeInfo& runtime_info) {
+  // Load baseline if it exists
+  LatencyResults baseline;
+  bool has_baseline = load_latency_baseline(config, baseline);
+
   if (config.output_format == OutputFormat::TABLE && !config.quiet) {
     std::cout << "\n";
     std::cout << "========================================\n";
@@ -64,7 +187,55 @@ inline void print_latency_results(const BenchmarkConfig& config,
     std::cout << "  Max         : " << results.max_latency_us << "\n";
     std::cout << "  Std Dev     : " << results.std_latency_us << "\n\n";
 
-    std::cout << "========================================\n\n";
+    // Statistical Validation
+    std::cout << "Stability:\n";
+    std::cout << "  CV          : " << (results.coefficient_of_variation * 100.0f) << "%\n";
+    std::cout << "  95% CI      : [" << results.confidence_interval_95_lower
+              << ", " << results.confidence_interval_95_upper << "]\n";
+    std::cout << "  Stable      : " << (results.is_stable ? "Yes" : "No") << "\n";
+    if (results.warmup_effectiveness != 0.0f) {
+      std::cout << "  Warmup Eff  : " << results.warmup_effectiveness << " µs\n";
+    }
+    std::cout << "\n";
+
+    // Performance Card
+    std::cout << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
+              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
+              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
+              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\n";
+    std::cout << "Performance Card\n";
+    std::cout << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
+              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
+              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
+              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\n";
+
+    auto latency_tier = classify_latency_tier(results.p95_latency_us);
+    auto stability_tier = classify_stability_tier(results.coefficient_of_variation);
+
+    std::cout << "Latency (P95): " << std::setw(8) << results.p95_latency_us << " µs  ["
+              << get_tier_symbol(latency_tier) << " " << get_tier_label(latency_tier) << "]\n";
+    std::cout << "Stability:     CV=" << std::setw(5) << (results.coefficient_of_variation * 100.0f) << "%  ["
+              << get_tier_symbol(stability_tier) << " " << get_tier_label(stability_tier) << "]\n";
+
+    if (has_baseline) {
+      float change = compute_percent_change(results.p95_latency_us, baseline.p95_latency_us);
+      std::cout << "vs Baseline:   " << std::setw(6) << std::showpos << change << std::noshowpos << "%     [";
+      if (std::abs(change) < 2.0f) {
+        std::cout << get_tier_symbol(PerformanceTier::GOOD) << " NO CHANGE";
+      } else if (change < 0.0f) {
+        std::cout << get_tier_symbol(PerformanceTier::EXCELLENT) << " IMPROVED";
+      } else if (change < 5.0f) {
+        std::cout << get_tier_symbol(PerformanceTier::ADEQUATE) << " SLIGHT REGRESSION";
+      } else {
+        std::cout << get_tier_symbol(PerformanceTier::POOR) << " REGRESSION";
+      }
+      std::cout << "]\n";
+    }
+
+    std::cout << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
+              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
+              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
+              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\n\n";
   }
 
   if (config.output_format == OutputFormat::CSV ||
@@ -99,6 +270,10 @@ inline void print_latency_results(const BenchmarkConfig& config,
 inline void print_throughput_results(const BenchmarkConfig& config,
                                       const ThroughputResults& results,
                                       const RuntimeInfo& runtime_info) {
+  // Load baseline if it exists
+  ThroughputResults baseline;
+  bool has_baseline = load_throughput_baseline(config, baseline);
+
   if (config.output_format == OutputFormat::TABLE && !config.quiet) {
     std::cout << "\n";
     std::cout << "========================================\n";
@@ -126,7 +301,42 @@ inline void print_throughput_results(const BenchmarkConfig& config,
     std::cout << "  Samples/s   : " << results.samples_per_second << "\n";
     std::cout << "  Frames      : " << results.total_frames << "\n\n";
 
-    std::cout << "========================================\n\n";
+    // Performance Card
+    std::cout << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
+              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
+              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
+              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\n";
+    std::cout << "Performance Card\n";
+    std::cout << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
+              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
+              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
+              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\n";
+
+    auto throughput_tier = classify_throughput_tier(results.frames_per_second);
+
+    std::cout << "Throughput:    " << std::setw(8) << results.frames_per_second << " FPS  ["
+              << get_tier_symbol(throughput_tier) << " " << get_tier_label(throughput_tier) << "]\n";
+    std::cout << "Bandwidth:     " << std::setw(8) << results.gb_per_second << " GB/s\n";
+
+    if (has_baseline) {
+      float change = compute_percent_change(results.frames_per_second, baseline.frames_per_second);
+      std::cout << "vs Baseline:   " << std::setw(6) << std::showpos << change << std::noshowpos << "%     [";
+      if (std::abs(change) < 2.0f) {
+        std::cout << get_tier_symbol(PerformanceTier::GOOD) << " NO CHANGE";
+      } else if (change > 0.0f) {
+        std::cout << get_tier_symbol(PerformanceTier::EXCELLENT) << " IMPROVED";
+      } else if (change > -5.0f) {
+        std::cout << get_tier_symbol(PerformanceTier::ADEQUATE) << " SLIGHT REGRESSION";
+      } else {
+        std::cout << get_tier_symbol(PerformanceTier::POOR) << " REGRESSION";
+      }
+      std::cout << "]\n";
+    }
+
+    std::cout << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
+              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
+              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
+              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\n\n";
   }
 
   if (config.output_format == OutputFormat::CSV ||
@@ -161,6 +371,10 @@ inline void print_throughput_results(const BenchmarkConfig& config,
 inline void print_realtime_results(const BenchmarkConfig& config,
                                     const RealtimeResults& results,
                                     const RuntimeInfo& runtime_info) {
+  // Load baseline if it exists
+  RealtimeResults baseline;
+  bool has_baseline = load_realtime_baseline(config, baseline);
+
   if (config.output_format == OutputFormat::TABLE && !config.quiet) {
     std::cout << "\n";
     std::cout << "========================================\n";
@@ -183,15 +397,50 @@ inline void print_realtime_results(const BenchmarkConfig& config,
 
     std::cout << std::fixed << std::setprecision(2);
     std::cout << "Real-time Performance:\n";
-    std::cout << "  Compliance  : " << (results.compliance_rate * 100.0f)
-              << "%\n";
+    std::cout << "  Compliance  : " << (results.compliance_rate * 100.0f) << "%\n";
     std::cout << "  Mean Lat    : " << results.mean_latency_ms << " ms\n";
     std::cout << "  P99 Lat     : " << results.p99_latency_ms << " ms\n";
     std::cout << "  Mean Jitter : " << results.mean_jitter_ms << " ms\n";
+    std::cout << "  CV          : " << (results.coefficient_of_variation * 100.0f) << "%\n";
     std::cout << "  Frames      : " << results.frames_processed << "\n";
     std::cout << "  Misses      : " << results.deadline_misses << "\n\n";
 
-    std::cout << "========================================\n\n";
+    // Performance Card
+    std::cout << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
+              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
+              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
+              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\n";
+    std::cout << "Performance Card\n";
+    std::cout << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
+              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
+              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
+              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\n";
+
+    auto compliance_tier = classify_realtime_tier(results.compliance_rate);
+    auto stability_tier = classify_stability_tier(results.coefficient_of_variation);
+
+    std::cout << "Compliance:    " << std::setw(8) << (results.compliance_rate * 100.0f) << "%   ["
+              << get_tier_symbol(compliance_tier) << " " << get_tier_label(compliance_tier) << "]\n";
+    std::cout << "Stability:     CV=" << std::setw(5) << (results.coefficient_of_variation * 100.0f) << "%  ["
+              << get_tier_symbol(stability_tier) << " " << get_tier_label(stability_tier) << "]\n";
+
+    if (has_baseline) {
+      float change = compute_percent_change(results.compliance_rate, baseline.compliance_rate);
+      std::cout << "vs Baseline:   " << std::setw(6) << std::showpos << change << std::noshowpos << "%     [";
+      if (std::abs(change) < 1.0f) {
+        std::cout << get_tier_symbol(PerformanceTier::GOOD) << " NO CHANGE";
+      } else if (change > 0.0f) {
+        std::cout << get_tier_symbol(PerformanceTier::EXCELLENT) << " IMPROVED";
+      } else {
+        std::cout << get_tier_symbol(PerformanceTier::POOR) << " REGRESSION";
+      }
+      std::cout << "]\n";
+    }
+
+    std::cout << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
+              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
+              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
+              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\n\n";
   }
 
   if (config.output_format == OutputFormat::CSV ||

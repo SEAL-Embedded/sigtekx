@@ -103,6 +103,9 @@ ionoc profile nsys --stats
 # Custom experimentation
 ionoc bench --preset throughput --nfft 4096 --batch 16 --quick
 
+# Save baseline for regression tracking
+ionoc bench --preset latency --full --save-baseline
+
 # Full help
 ionoc bench --help
 ```
@@ -184,30 +187,35 @@ ionoc profile ncu --kernel-name "magnitude" --metrics sm__throughput
 
 ### Typical C++ Development Workflow
 ```powershell
-# 1. Modify C++ executor/kernel code
+# 1. Save baseline before modifications
+ionoc bench --preset latency --full --save-baseline
+
+# 2. Modify C++ executor/kernel code
 vim cpp\src\executors\batch_executor.cpp
 
-# 2. Rebuild
+# 3. Rebuild
 iono build
 
-# 3. Quick validation (~10 seconds)
+# 4. Quick validation (~10 seconds, compares to baseline)
 ionoc bench
 
-# 4. Profile-ready run if results look good (~30s)
-ionoc bench --preset latency --profile
+# 5. Full validation if quick looks good
+ionoc bench --preset latency --full
+# Performance card shows: ✓ NO CHANGE / ⚠ SLIGHT REGRESSION / ✗ REGRESSION
 
-# 5. Profile with nsys (~1 minute)
+# 6. Profile if needed
+ionoc bench --preset latency --profile
 ionoc profile nsys --stats
 
-# 6. View results
+# 7. View results
 nsys-ui artifacts\profiling\cpp_dev.nsys-rep
 
-# 7. Deep kernel analysis if needed (~5-15 minutes)
+# 8. Deep kernel analysis if needed (~5-15 minutes)
 ionoc profile ncu --kernel-name "fft_kernel" --set roofline
 
-# 8. Iterate until satisfied, then integrate with Python
+# 9. Iterate until satisfied, then integrate with Python
 
-# 9. Production profiling (end-to-end Python workflow)
+# 10. Production profiling (end-to-end Python workflow)
 iprof nsys latency    # Full Python end-to-end workflow
 ```
 
