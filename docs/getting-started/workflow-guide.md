@@ -1,245 +1,154 @@
-# 🧪 Complete Ionosphere Experiment Workflow Guide
+# Complete Ionosphere Experiment Workflow Guide
 
-**From Config → Experiments → Analysis → Charts → Reports**
+This guide walks through the supported path for running end-to-end ionosphere studies. The workflow relies on direct Python entry points for experimentation and Snakemake for orchestration. Use the `iono` CLI only for environment setup, formatting, linting, builds, profiling, and other maintenance tasks.
 
-This guide shows you exactly how to run complete ionosphere experiments without needing to understand the complex configuration system.
+## Quick Start (Recommended)
 
-## 🚀 Quick Start (Recommended)
-
-The easiest way to run a complete study:
+Run the full benchmark -> analysis -> reporting pipeline with Snakemake:
 
 ```bash
-# Show available experiment presets
-python run_complete_study.py --list-presets
-
-# Run a complete ionosphere resolution study (config → charts → report)
-python run_complete_study.py --preset ionosphere_resolution
-
-# Run a quick test to validate your setup
-python run_complete_study.py --preset quick_test
-```
-
-That's it! The script will:
-1. ✅ Validate your environment and configuration
-2. 🧪 Run the experiments with proper parameters
-3. 📊 Analyze the results and generate statistics
-4. 📈 Create charts and visualizations
-5. 📋 Generate a final HTML report
-6. 🌐 Tell you where to find everything
-
-## 📋 Available Experiment Presets
-
-| Preset | Purpose | Runtime | Output Focus |
-|--------|---------|---------|--------------|
-| `ionosphere_resolution` | High-resolution frequency analysis | 20-30 min | Frequency resolution vs computational cost |
-| `ionosphere_temporal` | Temporal characteristics optimization | 30-45 min | Temporal resolution and scintillation detection |
-| `ionosphere_multiscale` | Comprehensive multi-scale analysis | 60+ min | Complete performance characterization |
-| `quick_test` | Fast validation test | 5-10 min | System validation and basic functionality |
-| `baseline` | Standard performance baseline | 15-25 min | Baseline metrics across parameter ranges |
-
-## 🛠️ Manual Workflow (Advanced)
-
-If you want to run steps manually or customize the process:
-
-### Step 1: Run Individual Experiments
-
-```bash
-# Throughput analysis
-python benchmarks/run_throughput.py --multirun experiment=ionosphere_resolution +benchmark=throughput
-
-# Latency analysis
-python benchmarks/run_latency.py --multirun experiment=ionosphere_temporal +benchmark=latency
-
-# Accuracy analysis
-python benchmarks/run_accuracy.py --multirun experiment=baseline +benchmark=accuracy
-```
-
-### Step 2: Run Analysis Pipeline
-
-```bash
-# Generate analysis and figures using Snakemake
 snakemake --cores 4 --snakefile experiments/Snakefile
+```
 
-# Or run individual analysis steps
+- Adjust `--cores` to match available CPU resources.
+- Snakemake will execute all benchmark sweeps, derive summary statistics, generate figures (PNG and SVG), and build the final HTML report under `artifacts/`.
+- Use `snakemake --cores 4 --snakefile experiments/Snakefile --dry-run` to preview the steps without executing them.
+
+![Experiment and Analysis Workflow Overview](../diagrams/figures/exp-analysis-workflow.svg)
+
+### Useful Snakemake targets
+
+```bash
+# Minimal smoke test of the pipeline
+snakemake --cores 1 --snakefile experiments/Snakefile test
+
+# Clean generated artifacts (uses the Snakefile rule, not the iono CLI)
+snakemake --cores 1 --snakefile experiments/Snakefile clean
+```
+
+## Benchmarks and Analysis (Direct Commands)
+
+Each benchmark script is a Hydra application that accepts configuration overrides. The Snakemake rules call these same commands under the hood. You can run them manually for iterative development:
+
+![Manual Workflow Sequence](../diagrams/figures/exp-workflow-sequence.svg)
+
+```bash
+# Throughput sweep
+python benchmarks/run_throughput.py --multirun \
+    experiment=baseline \
+    +benchmark=throughput \
+    "engine.batch=1,2,4,8,16,32,64"
+
+# Latency sweep
+python benchmarks/run_latency.py --multirun \
+    experiment=baseline \
+    +benchmark=latency \
+    "engine.nfft=256,512,1024,2048,4096,8192"
+
+# Accuracy sweep
+python benchmarks/run_accuracy.py --multirun \
+    experiment=baseline \
+    +benchmark=accuracy \
+    "engine.nfft=1024,2048,4096" \
+    "benchmark.iterations=100"
+
+# Analysis pipeline steps
 python experiments/scripts/analyze.py
 python experiments/scripts/generate_figures.py
-python experiments/scripts/generate_report.py
+python experiments/scripts/generate_report.py \
+    --input artifacts/data/summary_statistics.csv \
+    --figures-dir artifacts/figures \
+    --output artifacts/reports/final_report.html
 ```
 
-### Step 3: View Results
+These commands respect the configuration defined in `experiments/conf/` and write all outputs under `artifacts/` (or the directory pointed to by `IONO_OUTPUT_ROOT`).
+
+## Experiment Presets
+
+Hydra experiment presets live in `experiments/conf/experiment/`. Select a preset by overriding the `experiment=` parameter:
+
+| Preset | Purpose | Runtime | Command Snippet |
+|--------|---------|---------|-----------------|
+| `ionosphere_resolution` | High-resolution frequency analysis | 20-30 min | `python benchmarks/run_throughput.py --multirun experiment=ionosphere_resolution +benchmark=throughput` |
+| `ionosphere_temporal` | Temporal characteristics optimisation | 30-45 min | `python benchmarks/run_latency.py --multirun experiment=ionosphere_temporal +benchmark=latency` |
+| `ionosphere_multiscale` | Comprehensive multi-scale analysis | 60+ min | `python benchmarks/run_accuracy.py --multirun experiment=ionosphere_multiscale +benchmark=accuracy` |
+| `quick_test` | Fast validation sweep | 5-10 min | `python benchmarks/run_latency.py experiment=quick_test +benchmark=latency benchmark.iterations=10` |
+| `baseline` | Standard comparison point | 15-25 min | `python benchmarks/run_throughput.py --multirun experiment=baseline +benchmark=throughput` |
+
+Combine presets with additional Hydra overrides (e.g., `engine.nfft=2048,4096` or `benchmark.iterations=50`) to explore parameter space.
+
+## Custom Experiments
+
+1. Create a new experiment config in `experiments/conf/experiment/my_custom.yaml`:
+
+    ```yaml
+    # @package _global_
+    defaults:
+      - override /engine: ionosphere_hires
+
+    experiment:
+      name: my_custom_study
+      description: Custom ionosphere analysis
+      tags: [custom, ionosphere]
+
+    hydra:
+      mode: MULTIRUN
+      sweeper:
+        params:
+          engine.nfft: 2048,4096,8192
+          engine.overlap: 0.5,0.75
+          engine.batch: 8,16,32
+    ```
+
+2. Run the desired benchmark directly with Hydra overrides:
+
+    ```bash
+    python benchmarks/run_throughput.py --multirun \
+        experiment=my_custom_study \
+        +benchmark=throughput
+
+    ```
+
+   To fold the preset into the Snakemake pipeline, update the Hydra overrides inside `experiments/Snakefile` so the `experiment=` argument references `my_custom_study`.
+
+## Viewing Results
 
 ```bash
-# Interactive MLflow tracking UI
+# Launch the MLflow tracking UI to compare runs
 mlflow ui --backend-store-uri file://./artifacts/mlruns
 
-# Open the final HTML report
-start artifacts/reports/final_report.html  # Windows
-open artifacts/reports/final_report.html   # macOS
+# Open the generated HTML report (Windows / macOS examples)
+start artifacts/reports/final_report.html
+open artifacts/reports/final_report.html
 ```
 
-## 📊 Understanding Your Results
+Outputs are organised as follows:
 
-After running an experiment, you'll find:
+- `artifacts/mlruns/` - MLflow tracking data for every Hydra sweep.
+- `artifacts/data/` - Raw measurements and derived summary statistics.
+- `artifacts/figures/` - PNG and SVG figures produced by the analysis scripts.
+- `artifacts/reports/` - Human-readable HTML report summarising each study.
 
-### 📁 **artifacts/mlruns/**
-- Interactive MLflow experiment tracking
-- Compare different parameter combinations
-- Drill down into individual runs
+## Troubleshooting
 
-### 📁 **artifacts/data/**
-- Raw experimental data (CSV/Parquet files)
-- Summary statistics
-- Performance metrics
+- **Environment validation**: run `python benchmarks/run_latency.py --help` to confirm dependencies resolve and Hydra loads correctly.
+- **Dry-run the pipeline**: `snakemake --cores 1 --snakefile experiments/Snakefile --dry-run` shows the planned steps without executing them.
+- **Configuration validation**: `python experiments/conf/validation.py experiments/conf/experiment/ionosphere_resolution.yaml`.
+- **MLflow port conflicts**: `mlflow ui --backend-store-uri file://./artifacts/mlruns --port 5000`.
+- **Missing Python packages**: `pip install hydra-core mlflow snakemake pandas matplotlib seaborn plotly`.
 
-### 📁 **artifacts/figures/**
-- `latency_vs_nfft.png` - Latency scaling with FFT size
-- `throughput_scaling.png` - Throughput vs batch size
-- `accuracy_heatmap.png` - Accuracy across parameter space
-- `combined_analysis.png` - Multi-metric overview
+## Typical Journeys
 
-### 📁 **artifacts/reports/**
-- `final_report.html` - Complete analysis report
-- Includes all figures, statistics, and recommendations
+- **Quick smoke test**: `snakemake --cores 1 --snakefile experiments/Snakefile test`.
+- **Frequency resolution comparison**: `python benchmarks/run_throughput.py --multirun experiment=ionosphere_resolution +benchmark=throughput`.
+- **Temporal optimisation**: `python benchmarks/run_latency.py --multirun experiment=ionosphere_temporal +benchmark=latency`.
+- **Comprehensive study**: `snakemake --cores 8 --snakefile experiments/Snakefile` (ensure the Snakefile rules target `experiment=ionosphere_multiscale`).
 
-## ⚙️ Configuration System (Optional Deep Dive)
+## Next Steps
 
-If you want to understand or customize the configuration system:
+1. Execute the Snakemake quick start to generate baseline figures and reports.
+2. Inspect the HTML report and MLflow UI for initial insights.
+3. Iterate with targeted benchmark commands to explore alternative presets or overrides.
+4. Capture adjustments to experiment configs under version control for reproducibility.
 
-### Configuration Structure
-```
-experiments/conf/
-├── config.yaml              # Main configuration
-├── engine/                  # Engine configurations
-│   ├── ionosphere_realtime.yaml
-│   ├── ionosphere_hires.yaml
-│   └── ionosphere_longterm.yaml
-├── experiment/              # Experiment definitions
-│   ├── ionosphere_resolution.yaml
-│   ├── ionosphere_temporal.yaml
-│   └── ionosphere_multiscale.yaml
-└── benchmark/               # Benchmark settings
-    ├── throughput.yaml
-    ├── latency.yaml
-    └── accuracy.yaml
-```
-
-### Creating Custom Experiments
-
-Create a new file in `experiments/conf/experiment/my_custom.yaml`:
-
-```yaml
-# @package _global_
-defaults:
-  - override /engine: ionosphere_hires
-
-experiment:
-  name: my_custom_study
-  description: Custom ionosphere analysis
-  tags: [custom, ionosphere]
-
-hydra:
-  mode: MULTIRUN
-  sweeper:
-    params:
-      engine.nfft: 2048,4096,8192
-      engine.overlap: 0.5,0.75
-      engine.batch: 8,16,32
-```
-
-Then run it:
-```bash
-python run_complete_study.py --preset my_custom_study
-```
-
-## 🔧 Troubleshooting
-
-### Environment Issues
-```bash
-# Check if everything is properly installed
-python run_complete_study.py --list-presets
-```
-
-### Configuration Validation
-```bash
-# Validate a specific config file
-python experiments/conf/validation.py experiments/conf/experiment/ionosphere_resolution.yaml
-```
-
-### MLflow Issues
-```bash
-# If MLflow UI won't start, check the tracking URI
-mlflow ui --backend-store-uri file://./artifacts/mlruns --port 5000
-```
-
-### Missing Dependencies
-```bash
-# Install missing packages
-pip install hydra-core mlflow snakemake pandas matplotlib seaborn plotly
-```
-
-## 🎯 Common Use Cases
-
-### "I want to find the best parameters for real-time ionosphere monitoring"
-```bash
-python run_complete_study.py --preset ionosphere_temporal
-```
-→ Focus on temporal resolution and latency optimization
-
-### "I need comprehensive performance characterization"
-```bash
-python run_complete_study.py --preset ionosphere_multiscale
-```
-→ Complete analysis across all engines and parameter ranges
-
-### "I want to validate my setup quickly"
-```bash
-python run_complete_study.py --preset quick_test
-```
-→ Fast validation with minimal parameters
-
-### "I want to compare different FFT sizes for frequency resolution"
-```bash
-python run_complete_study.py --preset ionosphere_resolution
-```
-→ High-resolution frequency analysis study
-
-## 💡 Tips & Best Practices
-
-### Performance Tips
-- Start with `quick_test` to validate your setup
-- Use `baseline` for standard comparisons
-- Reserve `ionosphere_multiscale` for comprehensive studies
-
-### Resource Management
-- Large experiments can take 1+ hours
-- Monitor GPU memory usage with large NFFT values
-- Use smaller parameter ranges for initial exploration
-
-### Analysis Tips
-- Always check the HTML report first for overview
-- Use MLflow UI for detailed parameter exploration
-- Look at individual figures for specific insights
-
-### Reproducibility
-- All experiments are automatically seeded for reproducibility
-- Config files are version controlled
-- MLflow tracks all parameters and metrics
-
-## 📈 Next Steps
-
-1. **Start Simple**: Run `python run_complete_study.py --preset quick_test`
-2. **Explore Results**: Open the HTML report and MLflow UI
-3. **Scale Up**: Try `ionosphere_resolution` or `ionosphere_temporal`
-4. **Customize**: Create your own experiment configs
-5. **Analyze**: Use the generated data for your research
-
-## 🆘 Need Help?
-
-- Check the validation output for parameter issues
-- Look at the HTML report for automated recommendations
-- Use MLflow UI to compare different experiments
-- Examine individual figures in `artifacts/figures/`
-
----
-
-**Remember**: You don't need to understand the complex config system to get great results. Just use the presets and focus on your research! 🚀
+Need help? Review the output logs produced in `artifacts/logs/`, consult `docs/DEVELOPMENT.md` for debugging tips, or open an issue with the exact command and configuration details.
