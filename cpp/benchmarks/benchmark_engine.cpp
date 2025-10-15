@@ -45,6 +45,13 @@
 #include "ionosense/core/profiling_macros.hpp"
 #include "ionosense/engines/research_engine.hpp"
 
+#include <cuda_runtime.h>
+#include <cufft.h>
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 using namespace ionosense;
 using namespace ionosense::benchmark;
 
@@ -86,8 +93,10 @@ struct RealtimeResults {
 struct AccuracyResults {
   float pass_rate = 0.0f;
   float mean_snr_db = 0.0f;
-  float mean_error = 0.0f;
-  float max_error = 0.0f;
+  float mean_mae = 0.0f;         // Mean Absolute Error
+  float mean_rmse = 0.0f;        // Root Mean Square Error
+  float max_error = 0.0f;        // Peak Error
+  float mean_relative_error = 0.0f;  // Mean relative error
   int tests_passed = 0;
   int tests_total = 0;
 };
@@ -96,15 +105,193 @@ struct AccuracyResults {
 // Test Signal Generation
 // ============================================================================
 
-std::vector<float> generate_test_signal(int nfft, int batch, int seed = 42) {
+enum class SignalType {
+  WHITE_NOISE,
+  PURE_SINE,
+  MULTI_TONE,
+  CHIRP
+};
+
+std::vector<float> generate_test_signal(int nfft, int batch, int seed = 42,
+                                         SignalType type = SignalType::WHITE_NOISE) {
   IONO_NVTX_RANGE("Generate Test Signal", profiling::colors::CYAN);
   std::vector<float> signal(static_cast<size_t>(nfft) * batch);
   std::mt19937 gen(seed);
-  std::normal_distribution<float> dist(0.0f, 1.0f);
-  for (auto& s : signal) {
-    s = dist(gen);
+
+  switch (type) {
+    case SignalType::WHITE_NOISE: {
+      std::normal_distribution<float> dist(0.0f, 1.0f);
+      for (auto& s : signal) {
+        s = dist(gen);
+      }
+      break;
+    }
+
+    case SignalType::PURE_SINE: {
+      // Generate a pure sine wave at a known frequency
+      // Frequency bin 10 (arbitrary choice in lower third of spectrum)
+      const float freq_bin = 10.0f;
+      const float amplitude = 1.0f;
+      for (int b = 0; b < batch; ++b) {
+        for (int i = 0; i < nfft; ++i) {
+          const int idx = b * nfft + i;
+          signal[idx] = amplitude * std::sin(2.0f * M_PI * freq_bin * i / nfft);
+        }
+      }
+      break;
+    }
+
+    case SignalType::MULTI_TONE: {
+      // Generate sum of 3 sine waves at known frequencies
+      const std::vector<float> freq_bins = {5.0f, 15.0f, 25.0f};
+      const std::vector<float> amplitudes = {0.8f, 0.6f, 0.4f};
+      for (int b = 0; b < batch; ++b) {
+        for (int i = 0; i < nfft; ++i) {
+          const int idx = b * nfft + i;
+          signal[idx] = 0.0f;
+          for (size_t t = 0; t < freq_bins.size(); ++t) {
+            signal[idx] += amplitudes[t] *
+                          std::sin(2.0f * M_PI * freq_bins[t] * i / nfft);
+          }
+        }
+      }
+      break;
+    }
+
+    case SignalType::CHIRP: {
+      // Linear frequency sweep
+      const float f0 = 5.0f / nfft;   // Start frequency
+      const float f1 = 50.0f / nfft;  // End frequency
+      const float amplitude = 1.0f;
+      for (int b = 0; b < batch; ++b) {
+        for (int i = 0; i < nfft; ++i) {
+          const int idx = b * nfft + i;
+          const float t = static_cast<float>(i) / nfft;
+          const float phase = 2.0f * M_PI * (f0 * t + (f1 - f0) * t * t / 2.0f) * nfft;
+          signal[idx] = amplitude * std::sin(phase);
+        }
+      }
+      break;
+    }
   }
+
   return signal;
+}
+
+// ============================================================================
+// Reference FFT (using cuFFT CPU-side for validation)
+// ============================================================================
+
+std::vector<float> compute_reference_fft(const std::vector<float>& input,
+                                         int nfft, int batch) {
+  IONO_NVTX_RANGE("Reference FFT Computation", profiling::colors::PURPLE);
+
+  const size_t num_bins = static_cast<size_t>(nfft / 2 + 1);
+  const size_t complex_output_size = num_bins * batch;
+  const size_t magnitude_output_size = complex_output_size;
+
+  // Allocate device memory for reference computation
+  float* d_input = nullptr;
+  cufftComplex* d_complex_output = nullptr;
+  float* d_magnitude_output = nullptr;
+
+  cudaMalloc(&d_input, input.size() * sizeof(float));
+  cudaMalloc(&d_complex_output, complex_output_size * sizeof(cufftComplex));
+  cudaMalloc(&d_magnitude_output, magnitude_output_size * sizeof(float));
+
+  // Copy input to device
+  cudaMemcpy(d_input, input.data(), input.size() * sizeof(float),
+             cudaMemcpyHostToDevice);
+
+  // Create cuFFT plan for reference
+  cufftHandle plan;
+  int n[1] = {nfft};
+  cufftPlanMany(&plan, 1, n, nullptr, 1, nfft, nullptr, 1, num_bins,
+                CUFFT_R2C, batch);
+
+  // Execute FFT
+  cufftExecR2C(plan, d_input, d_complex_output);
+
+  // Copy complex result back to host and compute magnitude on CPU
+  // (This is reference code, so CPU computation is acceptable for simplicity)
+  std::vector<cufftComplex> complex_output(complex_output_size);
+  cudaMemcpy(complex_output.data(), d_complex_output,
+             complex_output_size * sizeof(cufftComplex),
+             cudaMemcpyDeviceToHost);
+
+  // Compute magnitude on host
+  std::vector<float> output(magnitude_output_size);
+  for (size_t i = 0; i < complex_output_size; ++i) {
+    const float real = complex_output[i].x;
+    const float imag = complex_output[i].y;
+    output[i] = std::hypot(real, imag);
+  }
+
+  // Cleanup
+  cufftDestroy(plan);
+  cudaFree(d_input);
+  cudaFree(d_complex_output);
+
+  return output;
+}
+
+// ============================================================================
+// Error Metrics
+// ============================================================================
+
+struct ErrorMetrics {
+  float mae = 0.0f;          // Mean Absolute Error
+  float rmse = 0.0f;         // Root Mean Square Error
+  float peak_error = 0.0f;   // Maximum absolute error
+  float snr_db = 0.0f;       // Signal-to-Noise Ratio in dB
+  float relative_error = 0.0f;  // Relative error (normalized by reference magnitude)
+};
+
+ErrorMetrics compute_error_metrics(const std::vector<float>& output,
+                                    const std::vector<float>& reference) {
+  ErrorMetrics metrics;
+
+  if (output.size() != reference.size()) {
+    return metrics;  // Return zeros if size mismatch
+  }
+
+  const size_t n = output.size();
+  double sum_abs_error = 0.0;
+  double sum_sq_error = 0.0;
+  double sum_sq_signal = 0.0;
+  float max_error = 0.0f;
+
+  for (size_t i = 0; i < n; ++i) {
+    const float error = std::abs(output[i] - reference[i]);
+    const float signal = std::abs(reference[i]);
+
+    sum_abs_error += error;
+    sum_sq_error += error * error;
+    sum_sq_signal += signal * signal;
+    max_error = std::max(max_error, error);
+  }
+
+  metrics.mae = static_cast<float>(sum_abs_error / n);
+  metrics.rmse = std::sqrt(static_cast<float>(sum_sq_error / n));
+  metrics.peak_error = max_error;
+
+  // Compute SNR: 10 * log10(signal_power / noise_power)
+  const double noise_power = sum_sq_error / n;
+  const double signal_power = sum_sq_signal / n;
+
+  if (noise_power > 1e-20) {  // Avoid division by zero
+    metrics.snr_db = 10.0f * std::log10(static_cast<float>(signal_power / noise_power));
+  } else {
+    metrics.snr_db = 200.0f;  // Effectively perfect match
+  }
+
+  // Compute relative error
+  const double ref_magnitude = std::sqrt(signal_power);
+  if (ref_magnitude > 1e-10) {
+    metrics.relative_error = static_cast<float>(std::sqrt(sum_sq_error / n) / ref_magnitude);
+  }
+
+  return metrics;
 }
 
 // ============================================================================
@@ -557,45 +744,50 @@ AccuracyResults run_accuracy_benchmark(ResearchEngine& engine,
   int tests_passed = 0;
   int tests_total = config.num_test_signals * config.iterations;
 
-  std::vector<float> errors;
-  std::vector<float> snr_values;
+  std::vector<ErrorMetrics> all_metrics;
+  all_metrics.reserve(tests_total);
+
+  // Define signal types to test
+  const std::vector<SignalType> signal_types = {
+      SignalType::WHITE_NOISE, SignalType::PURE_SINE,
+      SignalType::MULTI_TONE, SignalType::CHIRP
+  };
 
   for (int sig = 0; sig < config.num_test_signals; ++sig) {
     for (int iter = 0; iter < config.iterations; ++iter) {
+      const SignalType sig_type = signal_types[sig % signal_types.size()];
       const std::string test_name =
           "Signal " + std::to_string(sig + 1) + " Iter " +
           std::to_string(iter + 1);
       IONO_NVTX_RANGE(test_name.c_str(), profiling::colors::PURPLE);
 
-      // Generate test signal with different seed for each test
+      // Generate test signal with specific type
       std::vector<float> input = generate_test_signal(
-          config.nfft, config.batch, config.random_seed + sig * 100 + iter);
+          config.nfft, config.batch, config.random_seed + sig * 100 + iter,
+          sig_type);
       std::vector<float> output(output_size);
 
+      // Run engine processing
       engine.process(input.data(), output.data(), input_size);
       engine.synchronize();
 
-      // Simplified validation: check output is non-zero and finite
+      // Compute reference FFT output for comparison
+      std::vector<float> reference = compute_reference_fft(input, config.nfft, config.batch);
+
+      // Compute error metrics by comparing against reference
+      ErrorMetrics metrics = compute_error_metrics(output, reference);
+
+      // Check if test passed (based on tolerance thresholds)
       bool test_passed = true;
-      float max_val = 0.0f;
-      for (float val : output) {
-        if (!std::isfinite(val)) {
-          test_passed = false;
-          break;
-        }
-        max_val = std::max(max_val, std::abs(val));
+      test_passed &= metrics.snr_db >= config.snr_threshold_db;
+      test_passed &= metrics.relative_error <= config.relative_tolerance;
+      test_passed &= std::isfinite(metrics.mae) && std::isfinite(metrics.rmse);
+
+      if (test_passed) {
+        tests_passed++;
       }
 
-      if (test_passed && max_val > 0.0f) {
-        tests_passed++;
-        // Simplified SNR estimate (placeholder)
-        float snr_db = 60.0f + (std::rand() % 10);  // Simplified
-        snr_values.push_back(snr_db);
-        errors.push_back(config.absolute_tolerance * 0.5f);  // Simplified
-      } else {
-        errors.push_back(1.0f);  // Failed test
-        snr_values.push_back(0.0f);
-      }
+      all_metrics.push_back(metrics);
     }
   }
 
@@ -604,17 +796,25 @@ AccuracyResults run_accuracy_benchmark(ResearchEngine& engine,
   results.pass_rate =
       static_cast<float>(tests_passed) / static_cast<float>(tests_total);
 
-  if (!snr_values.empty()) {
-    results.mean_snr_db =
-        std::accumulate(snr_values.begin(), snr_values.end(), 0.0f) /
-        static_cast<float>(snr_values.size());
-  }
+  // Aggregate metrics across all tests
+  if (!all_metrics.empty()) {
+    double sum_snr = 0.0, sum_mae = 0.0, sum_rmse = 0.0, sum_rel = 0.0;
+    float max_peak = 0.0f;
 
-  if (!errors.empty()) {
-    results.mean_error =
-        std::accumulate(errors.begin(), errors.end(), 0.0f) /
-        static_cast<float>(errors.size());
-    results.max_error = *std::max_element(errors.begin(), errors.end());
+    for (const auto& m : all_metrics) {
+      sum_snr += m.snr_db;
+      sum_mae += m.mae;
+      sum_rmse += m.rmse;
+      sum_rel += m.relative_error;
+      max_peak = std::max(max_peak, m.peak_error);
+    }
+
+    const size_t n = all_metrics.size();
+    results.mean_snr_db = static_cast<float>(sum_snr / n);
+    results.mean_mae = static_cast<float>(sum_mae / n);
+    results.mean_rmse = static_cast<float>(sum_rmse / n);
+    results.mean_relative_error = static_cast<float>(sum_rel / n);
+    results.max_error = max_peak;
   }
 
   return results;
@@ -813,8 +1013,12 @@ void print_accuracy_results(const BenchmarkConfig& config,
     std::cout << "  Tests Pass  : " << results.tests_passed << "/"
               << results.tests_total << "\n";
     std::cout << "  Mean SNR    : " << results.mean_snr_db << " dB\n";
-    std::cout << "  Mean Error  : " << results.mean_error << "\n";
-    std::cout << "  Max Error   : " << results.max_error << "\n\n";
+    std::cout << std::fixed << std::setprecision(6);
+    std::cout << "  Mean MAE    : " << results.mean_mae << "\n";
+    std::cout << "  Mean RMSE   : " << results.mean_rmse << "\n";
+    std::cout << "  Rel Error   : " << results.mean_relative_error << "\n";
+    std::cout << std::fixed << std::setprecision(2);
+    std::cout << "  Peak Error  : " << results.max_error << "\n\n";
 
     std::cout << "========================================\n\n";
   }
@@ -825,14 +1029,15 @@ void print_accuracy_results(const BenchmarkConfig& config,
       std::cout << "CSV Output:\n";
     }
     std::cout << "preset,mode,ionosphere,nfft,signals,pass_rate,tests_passed,"
-                 "tests_total,mean_snr_db,mean_error,max_error\n";
+                 "tests_total,mean_snr_db,mean_mae,mean_rmse,mean_rel_error,peak_error\n";
     std::cout << preset_to_string(config.preset) << ","
               << mode_to_string(config.run_mode) << ","
               << (config.ionosphere_variant ? "yes" : "no") << ","
               << config.nfft << "," << config.num_test_signals << ","
               << results.pass_rate << "," << results.tests_passed << ","
               << results.tests_total << "," << results.mean_snr_db << ","
-              << results.mean_error << "," << results.max_error << "\n";
+              << results.mean_mae << "," << results.mean_rmse << ","
+              << results.mean_relative_error << "," << results.max_error << "\n";
   }
 }
 
