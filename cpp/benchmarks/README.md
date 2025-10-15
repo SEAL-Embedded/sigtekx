@@ -2,23 +2,27 @@
 
 ## Quick Start with `ionoc`
 
-The `ionoc` CLI provides a streamlined interface for C++ benchmarking and profiling:
+The `ionoc` CLI provides a comprehensive interface for C++ benchmarking and profiling with preset configurations:
 
 ```powershell
 # Build the benchmark
 iono build
 
 # Quick validation (~10 seconds)
-ionoc bench quick
+ionoc bench
 
-# Profile with Nsight Systems (auto-creates directories)
+# Production latency benchmark
+ionoc bench --preset latency --full
+
+# Ionosphere realtime profiling
+ionoc bench --preset realtime --ionosphere --profile
 ionoc profile nsys --stats
 
-# View results
-nsys-ui artifacts\profiling\cpp_dev.nsys-rep
+# Custom experimentation
+ionoc bench --preset throughput --nfft 4096 --batch 16 --quick
 
-# Full help
-ionoc help
+# View all options
+ionoc bench --help
 ```
 
 ## Purpose
@@ -27,92 +31,154 @@ This standalone C++ benchmark is designed for **development-time iteration** whe
 
 **This is NOT for production profiling.** For production profiling, always use `iprof` with Python benchmarks to validate the entire end-to-end workflow.
 
-## Commands Overview
+## Benchmark Presets
 
-| Command | Purpose | Duration |
-|---------|---------|----------|
-| `ionoc bench quick` | Fast validation | ~10s |
-| `ionoc bench profile` | Profile-ready benchmark | ~30s |
-| `ionoc bench full` | Production equivalent | ~2min |
-| `ionoc profile nsys` | Timeline profiling | ~1min |
-| `ionoc profile ncu` | Kernel analysis | ~5-15min |
+The benchmark executable supports multiple presets matching Python configurations:
 
-## Usage Modes
+| Preset | Primary Metric | Default Config | Duration | Use Case |
+|--------|---------------|----------------|----------|----------|
+| **dev** (default) | Latency stats | 20 iter, nfft=2048, batch=4 | ~10s | Quick validation |
+| **latency** | Mean/P95/P99 latency (µs) | 5000 iter, nfft=2048, batch=4 | ~2min | Latency measurement |
+| **throughput** | FPS, GB/s | 10s duration, nfft=2048, batch=8 | ~10s | Throughput measurement |
+| **realtime** | Deadline compliance, jitter | 10s stream, nfft=2048, batch=4 | ~10s | Real-time streaming |
+| **accuracy** | SNR, error metrics | 10 iter, 8 signals, nfft=2048 | ~30s | Accuracy validation |
 
-| Mode | Iterations | Duration | Use Case |
-|------|-----------|----------|----------|
-| `--quick` | 20 | ~10s | Quick sanity check after code changes |
-| `--profile` | 100 | ~30s | Before running nsys/ncu profiling |
-| `--full` | 5000 | ~2min | Production-equivalent benchmark |
+### Ionosphere Variants
 
-## Configuration
+Each preset has an ionosphere variant activated with `--ionosphere`:
 
-The benchmark uses hardcoded configuration matching the Python `profiling` experiment:
-- NFFT: 2048
-- Batch: 4
-- Overlap: 0.625
-- Sample Rate: 48000 Hz
-- Warmup: 5 iterations
+| Preset | Ionosphere Parameters | Use Case |
+|--------|----------------------|----------|
+| **latency** | nfft=4096, batch=2, overlap=0.625 | Higher resolution, lower batch |
+| **throughput** | nfft=8192, batch=16, overlap=0.75 | High-res batch processing |
+| **realtime** | nfft=4096, batch=2, strict timing | Balanced resolution, strict timing |
+| **accuracy** | nfft=8192, batch=4, 10 signals | High-resolution validation |
 
-## Output
+## Run Modes
 
-The benchmark outputs:
-1. **Console statistics**: Mean, P50, P95, P99, Min, Max, Std Dev latencies
-2. **CSV line**: For scripting/automation
-3. **NVTX markers**: For profiling tools to visualize phases
+Control iteration count or duration independent of preset:
+
+| Mode | Effect | Duration | Use Case |
+|------|--------|----------|----------|
+| **--quick** | 20 iter / 3s | ~10-30s | Fast validation during development |
+| **--profile** | 100 iter / 5s | ~30s-1min | Before running nsys/ncu profiling |
+| **--full** | Full iterations/duration | 1-10min | Production-equivalent benchmarking |
+
+## CLI Flags Reference
+
+### Core Flags
+```powershell
+--preset <name>           # dev, latency, throughput, realtime, accuracy
+--ionosphere             # Apply ionosphere variant
+--quick                  # Fast run mode
+--profile                # Profile-ready run mode
+--full                   # Full production run (default)
+```
+
+### Parameter Overrides
+```powershell
+--nfft <value>           # FFT size
+--batch <value>          # Batch size
+--overlap <value>        # Overlap ratio (0-1)
+--sample-rate <hz>       # Sample rate in Hz
+--iterations <n>         # Number of iterations
+--duration <seconds>     # Test duration (time-based benchmarks)
+--warmup <n>             # Warmup iterations
+--seed <n>               # Random seed
+```
+
+### Output Control
+```powershell
+--csv                    # CSV output only
+--json                   # JSON output
+--quiet                  # Minimal output
+```
+
+## Usage Examples
+
+### Quick Development Workflow
+```powershell
+# Default: quick dev validation
+ionoc bench
+
+# With specific preset
+ionoc bench --preset latency --quick
+
+# Profile-ready
+ionoc bench --preset realtime --profile
+ionoc profile nsys --stats
+```
+
+### Production Benchmarks
+```powershell
+# Full latency benchmark (matches Python)
+ionoc bench --preset latency --full
+
+# Ionosphere throughput
+ionoc bench --preset throughput --ionosphere --full
+
+# Real-time compliance testing
+ionoc bench --preset realtime --ionosphere --full
+```
+
+### Rapid Experimentation
+```powershell
+# Override preset parameters
+ionoc bench --preset latency --nfft 8192 --batch 16 --quick
+
+# Blank canvas (no preset)
+ionoc bench --nfft 4096 --overlap 0.875 --iterations 50
+
+# Custom ionosphere config
+ionoc bench --ionosphere --nfft 16384 --batch 32 --profile
+```
+
+### Accuracy Validation
+```powershell
+# Quick accuracy check
+ionoc bench --preset accuracy --quick
+
+# Full ionosphere accuracy
+ionoc bench --preset accuracy --ionosphere --full
+```
 
 ## Profiling Workflow
 
-All profiling is now handled through the `ionoc` CLI, which automatically creates directories and handles path conversions.
+All profiling is handled through the `ionoc` CLI, which automatically creates directories and handles path conversions.
 
 ### Nsight Systems (Timeline Analysis)
 ```powershell
-# Basic profile (auto-creates artifacts\profiling)
-ionoc profile nsys
+# Run profile-ready benchmark first
+ionoc bench --preset latency --profile
 
-# With statistics
+# Profile with nsys
 ionoc profile nsys --stats
-
-# Custom mode and traces
-ionoc profile nsys --mode quick --trace cuda,nvtx
 
 # View results
 nsys-ui artifacts\profiling\cpp_dev.nsys-rep
+
+# Custom traces
+ionoc profile nsys --trace cuda,nvtx,osrt --stats
 ```
 
 ### Nsight Compute (Kernel Analysis)
 ```powershell
-# Basic profile (⚠️ slow - 5-15 minutes)
-ionoc profile ncu
+# Run profile-ready benchmark first
+ionoc bench --preset throughput --profile
 
-# Roofline analysis
+# Profile with ncu (⚠️ slow - 5-15 minutes)
 ionoc profile ncu --set roofline
 
 # Specific kernel only (faster)
 ionoc profile ncu --kernel-name "fft_kernel"
 
-# Full metrics (very slow)
-ionoc profile ncu --set full --mode profile
-
 # View results
 ncu-ui artifacts\profiling\cpp_dev_ncu.ncu-rep
 ```
 
-### Advanced Profiling Options
-
-```powershell
-# All profiling commands support:
-# --mode <quick|profile|full>   Benchmark mode
-# --output <path>                Custom output path
-# Plus all native nsys/ncu flags
-
-# Examples:
-ionoc profile nsys --mode quick --duration 5
-ionoc profile ncu --kernel-name "magnitude_kernel" --metrics sm__throughput
-```
-
 ## Development Workflow
 
+### Typical Iteration Cycle
 ```powershell
 # 1. Modify C++ code
 vim cpp\src\executors\batch_executor.cpp
@@ -121,43 +187,102 @@ vim cpp\src\executors\batch_executor.cpp
 iono build
 
 # 3. Quick validation
-ionoc bench quick
+ionoc bench
 
-# 4. Profile if results look good
+# 4. Profile-ready run if changes look good
+ionoc bench --preset latency --profile
+
+# 5. Profile with nsys
 ionoc profile nsys --stats
 
-# 5. Analyze in GUI
+# 6. Analyze in GUI
 nsys-ui artifacts\profiling\cpp_dev.nsys-rep
 
-# 6. Analyze specific kernel if needed
+# 7. Deep kernel analysis if needed
 ionoc profile ncu --kernel-name "fft_kernel" --set roofline
 
-# 7. Iterate until satisfied
+# 8. Iterate until satisfied
 
-# 8. Integrate with Python and do production profiling
+# 9. Integrate with Python and do production profiling
 iprof nsys latency    # Full end-to-end Python workflow
 ```
 
-## Integration with Executor Refactor
+### Comparing Configurations
+```powershell
+# Baseline
+ionoc bench --preset latency --full --csv > baseline.csv
 
-When testing your new executor architecture:
-
-1. **Baseline**: Profile with current `ResearchEngine` implementation
-2. **Modify**: Swap in new `BatchExecutor` or `RealtimeExecutor`
-3. **Compare**: Run benchmark and compare latency/throughput metrics
-4. **Validate**: Ensure no performance regression (<5% overhead target)
-
-Example comparison:
-```bash
-# Before refactor
-./build/windows-rel/benchmark_engine.exe --full > results_before.txt
-
-# After refactor (modify engine code)
-./scripts/cli.ps1 build
-./build/windows-rel/benchmark_engine.exe --full > results_after.txt
+# After changes
+ionoc bench --preset latency --full --csv > optimized.csv
 
 # Compare
-diff results_before.txt results_after.txt
+ionoc compare baseline.csv optimized.csv
+```
+
+### Testing Executor Refactor
+```powershell
+# 1. Baseline with current implementation
+ionoc bench --preset latency --full > before.txt
+
+# 2. Modify executor code
+# (swap in new BatchExecutor or RealtimeExecutor)
+
+# 3. Rebuild and test
+iono build
+ionoc bench --preset latency --full > after.txt
+
+# 4. Compare
+diff before.txt after.txt
+
+# 5. Validate no performance regression (<5% overhead target)
+```
+
+## Output Formats
+
+### Default (Table Output)
+```
+========================================
+  Latency Benchmark Results
+========================================
+
+Configuration:
+  Preset      : latency (ionosphere)
+  Run Mode    : profile
+  NFFT        : 4096
+  Batch       : 2
+  Overlap     : 0.625
+  Iterations  : 100
+
+Runtime:
+  Device      : NVIDIA RTX 4090
+  CUDA        : 12.3
+
+Latency (µs):
+  Mean        : 125.43
+  P50         : 124.22
+  P95         : 132.18
+  P99         : 138.92
+  Min         : 119.84
+  Max         : 145.67
+  Std Dev     : 6.23
+
+========================================
+```
+
+### CSV Output
+```powershell
+ionoc bench --preset latency --csv
+
+# Output:
+# preset,mode,ionosphere,nfft,batch,iterations,mean_us,p50_us,p95_us,p99_us,min_us,max_us,std_us
+# latency,full,yes,4096,2,5000,125.43,124.22,132.18,138.92,119.84,145.67,6.23
+```
+
+### JSON Output
+```powershell
+ionoc bench --preset latency --json
+
+# Output: (not yet implemented, reserved for future use)
 ```
 
 ## Troubleshooting
@@ -174,7 +299,7 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 # Then run benchmark
-./build/windows-rel/benchmark_engine.exe --full
+ionoc bench
 ```
 
 **Best solution:** Use `scripts/init_pwsh.ps1` to start dev sessions (handles this automatically).
@@ -185,7 +310,7 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 
 **Note:** `ionoc` automatically creates the `artifacts\profiling` directory, so this error should not occur when using the CLI.
 
-If you're running nsys/ncu directly (not through `ionoc`) and see "No such file or directory":
+If you're running benchmark_engine.exe directly (not through `ionoc`) and encounter path issues:
 
 ```powershell
 # Solution: Use ionoc instead (recommended)
@@ -195,6 +320,27 @@ ionoc profile nsys --stats
 New-Item -ItemType Directory -Path artifacts\profiling -Force | Out-Null
 ```
 
+### Build Errors
+
+If benchmark_engine.exe is not found:
+
+```powershell
+# Rebuild the project
+iono build
+
+# Check if executable exists
+ls build\windows-rel\benchmark_engine.exe
+```
+
+## Performance Targets
+
+When validating executor refactors, aim for:
+
+- **Latency overhead**: <5% vs baseline
+- **Throughput**: No regression
+- **Real-time compliance**: >99% deadline compliance
+- **Accuracy**: 100% pass rate, SNR >60dB
+
 ## Notes
 
 - **No Python dependencies**: This executable is pure C++/CUDA
@@ -202,9 +348,11 @@ New-Item -ItemType Directory -Path artifacts\profiling -Force | Out-Null
 - **Deterministic**: Uses fixed random seed for reproducibility
 - **Quick iteration**: Fast rebuild-test cycle for C++ development
 - **UTF-8 output**: Uses proper scientific notation (µs), may need encoding fix in legacy consoles
+- **Preset system**: Matches Python benchmark configurations exactly
 
 ## See Also
 
 - Full documentation: `CLAUDE.md` → "C++ Development Workflow"
 - Python profiling: `iprof nsys latency` (production workflow)
 - Test suite: `./scripts/cli.ps1 test cpp`
+- Preset definitions: `cpp/benchmarks/benchmark_config.hpp`

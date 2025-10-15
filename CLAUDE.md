@@ -87,20 +87,24 @@ dvc repro
 
 ### Quick Start with `ionoc`
 
-The `ionoc` command provides a dedicated CLI for C++ benchmarking and profiling:
+The `ionoc` command provides a dedicated CLI for C++ benchmarking with preset configurations:
 
 ```powershell
-# Quick benchmark (20 iterations, ~10s)
-ionoc bench quick
+# Quick validation (default: dev preset, 20 iter, ~10s)
+ionoc bench
 
-# Profile with Nsight Systems (auto-creates directories)
+# Production latency benchmark
+ionoc bench --preset latency --full
+
+# Ionosphere realtime profiling
+ionoc bench --preset realtime --ionosphere --profile
 ionoc profile nsys --stats
 
-# Profile with Nsight Compute (kernel analysis)
-ionoc profile ncu --kernel-name "fft_kernel"
+# Custom experimentation
+ionoc bench --preset throughput --nfft 4096 --batch 16 --quick
 
 # Full help
-ionoc help
+ionoc bench --help
 ```
 
 ### Build C++ Benchmark Executable
@@ -109,17 +113,29 @@ ionoc help
 iono build   # or: ./scripts/cli.ps1 build
 ```
 
-### Benchmark Commands
+### Benchmark Presets
+
+Multiple presets matching Python configurations:
 
 ```powershell
-# Fast validation (20 iterations, ~10s)
-ionoc bench quick
+# dev (default): Quick validation
+ionoc bench                                    # 20 iter, ~10s
 
-# Profile-ready (100 iterations, ~30s)
-ionoc bench profile
+# latency: Latency measurement
+ionoc bench --preset latency --full            # 5000 iter, ~2min
+ionoc bench --preset latency --ionosphere      # Higher resolution
 
-# Full benchmark (5000 iterations, ~2min)
-ionoc bench full
+# throughput: Throughput measurement
+ionoc bench --preset throughput --full         # 10s duration
+ionoc bench --preset throughput --ionosphere   # High-res batch processing
+
+# realtime: Real-time streaming
+ionoc bench --preset realtime --full           # 10s stream
+ionoc bench --preset realtime --ionosphere     # Balanced, strict timing
+
+# accuracy: Accuracy validation
+ionoc bench --preset accuracy --full           # 10 iter, 8 signals
+ionoc bench --preset accuracy --ionosphere     # High-res validation
 ```
 
 ### Profile C++ Directly (Development Only)
@@ -175,30 +191,34 @@ vim cpp\src\executors\batch_executor.cpp
 iono build
 
 # 3. Quick validation (~10 seconds)
-ionoc bench quick
+ionoc bench
 
-# 4. Profile if results look good (~1 minute)
+# 4. Profile-ready run if results look good (~30s)
+ionoc bench --preset latency --profile
+
+# 5. Profile with nsys (~1 minute)
 ionoc profile nsys --stats
 
-# 5. View results (opens automatically or manually)
+# 6. View results
 nsys-ui artifacts\profiling\cpp_dev.nsys-rep
 
-# 6. Analyze specific kernel if needed (~10 minutes)
+# 7. Deep kernel analysis if needed (~5-15 minutes)
 ionoc profile ncu --kernel-name "fft_kernel" --set roofline
 
-# 7. Iterate until satisfied, then integrate with Python
+# 8. Iterate until satisfied, then integrate with Python
 
-# 8. Production profiling (end-to-end Python workflow)
-iprof nsys latency    # Now uses full Python end-to-end workflow
+# 9. Production profiling (end-to-end Python workflow)
+iprof nsys latency    # Full Python end-to-end workflow
 ```
 
 ### When to Use Each Tool
 
 | Tool | Purpose | Duration | Use When |
 |------|---------|----------|----------|
-| `ionoc bench quick` | Fast validation | 10s | Quick sanity check after code changes |
-| `ionoc bench profile` | Profile-ready benchmark | 30s | Before running profiling |
-| `ionoc profile nsys` | Timeline, API calls, NVTX | 30-60s | Understanding execution flow, finding bottlenecks |
+| `ionoc bench` | Fast validation (dev preset) | 10s | Quick sanity check after code changes |
+| `ionoc bench --preset <name> --profile` | Profile-ready benchmark | 30s-1min | Before running nsys/ncu profiling |
+| `ionoc bench --preset <name> --full` | Production equivalent | 1-10min | Matching Python benchmark results |
+| `ionoc profile nsys` | Timeline, API calls, NVTX | 30-60s | Understanding execution flow, bottlenecks |
 | `ionoc profile ncu` | Kernel metrics, roofline | 5-15min | Optimizing specific kernel performance |
 | `iprof` (Python) | **Production profiling** | Varies | **Final end-to-end validation** |
 
@@ -465,4 +485,4 @@ python benchmarks/run_latency.py experiment=ionosphere_multiscale +benchmark=lat
 python benchmarks/run_throughput.py --multirun experiment=ionosphere_resolution
 ```
 
-Last updated: 2025-10-11 (Added window symmetry modes documentation and C++ code coverage with gcovr)
+Last updated: 2025-10-14 (Expanded C++ benchmarking with preset system: latency, throughput, realtime, accuracy benchmarks with ionosphere variants)

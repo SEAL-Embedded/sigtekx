@@ -40,16 +40,7 @@ function Write-Success {
 # --- Core Functions ----------------------------------------------------------
 
 function Invoke-Bench {
-    param([string[]]$Args = @())
-
-    # Parse mode
-    $mode = "quick"
-    foreach ($arg in $Args) {
-        if ($arg -in @("quick", "profile", "full")) {
-            $mode = $arg
-            break
-        }
-    }
+    param([string[]]$BenchArgs = @())
 
     if (-not (Test-Path $script:BenchmarkExe)) {
         Write-Error "C++ benchmark not found at: $script:BenchmarkExe"
@@ -57,8 +48,14 @@ function Invoke-Bench {
         exit 1
     }
 
-    Write-Status "Running C++ benchmark (mode: $mode)..."
-    & $script:BenchmarkExe --$mode
+    Write-Status "Running C++ benchmark..."
+
+    # Pass all arguments directly to benchmark_engine.exe
+    if ($BenchArgs.Length -gt 0) {
+        & $script:BenchmarkExe @BenchArgs
+    } else {
+        & $script:BenchmarkExe
+    }
 
     if ($LASTEXITCODE -eq 0) {
         Write-Success "Benchmark completed successfully"
@@ -267,7 +264,7 @@ function Show-Help {
 USAGE: ionoc <command> [options]
 
 COMMANDS:
-  bench [quick|profile|full]    Run C++ benchmark standalone
+  bench [options]               Run C++ benchmark with presets
   profile nsys [options]        Profile with Nsight Systems
   profile ncu [options]         Profile with Nsight Compute
   compare <before> <after>      Compare benchmark results
@@ -276,15 +273,39 @@ COMMANDS:
 
 ═══════════════════════════════════════════════════════════════════════════
 
-BENCHMARK MODES:
-  quick     20 iterations (~10s)     Fast validation
-  profile   100 iterations (~30s)    Before profiling (recommended)
-  full      5000 iterations (~2min)  Production equivalent
+BENCHMARK PRESETS:
+  dev (default)   Quick validation (20 iter, ~10s)
+  latency         Latency measurement (5000 iter, ~2min)
+  throughput      Throughput measurement (10s duration)
+  realtime        Real-time streaming (10s duration)
+  accuracy        Accuracy validation (10 iter, 8 signals)
+
+RUN MODES:
+  --quick         Fast validation (reduced iterations/duration)
+  --profile       Profile-ready (moderate iterations/duration)
+  --full          Production equivalent (default)
+
+MODIFIERS:
+  --ionosphere    Apply ionosphere-specific parameters to preset
 
 BENCHMARK EXAMPLES:
-  ionoc bench quick              # Quick sanity check
-  ionoc bench profile            # Before profiling
-  ionoc bench full               # Full benchmark run
+  # Quick development validation (default)
+  ionoc bench
+
+  # Production latency benchmark
+  ionoc bench --preset latency --full
+
+  # Ionosphere realtime profiling
+  ionoc bench --preset realtime --ionosphere --profile
+
+  # Custom experimentation
+  ionoc bench --preset throughput --nfft 4096 --batch 16 --quick
+
+  # Blank canvas (override everything)
+  ionoc bench --nfft 8192 --batch 32 --overlap 0.875 --iterations 100
+
+  # For all options, use:
+  ionoc bench --help
 
 ═══════════════════════════════════════════════════════════════════════════
 
@@ -329,13 +350,14 @@ NCU PROFILING:
 ═══════════════════════════════════════════════════════════════════════════
 
 TYPICAL WORKFLOW:
-  1. ionoc bench quick                           # Fast validation (~10s)
-  2. ionoc profile nsys --stats                  # Profile with nsys (~1min)
-  3. ionoc profile ncu --kernel-name "..."       # Analyze kernel (~10min)
-  4. ionoc clean                                 # Clean artifacts
+  1. ionoc bench                                 # Quick dev validation (~10s)
+  2. ionoc bench --preset latency --profile      # Profile-ready run (~30s)
+  3. ionoc profile nsys --stats                  # Profile with nsys (~1min)
+  4. ionoc profile ncu --kernel-name "fft..."    # Analyze kernel (~10min)
+  5. ionoc clean                                 # Clean artifacts
 
 FOR PRODUCTION PROFILING:
-  Use 'iono profile nsys latency' for end-to-end Python workflow validation.
+  Use 'iprof nsys latency' for end-to-end Python workflow validation.
   ionoc is for C++ development iteration only.
 
 ═══════════════════════════════════════════════════════════════════════════
@@ -358,7 +380,7 @@ try {
 
     switch ($Command.ToLower()) {
         "bench" {
-            Invoke-Bench -Args $CommandArgs
+            Invoke-Bench -BenchArgs $CommandArgs
         }
         "profile" {
             if ($CommandArgs.Length -eq 0) {
