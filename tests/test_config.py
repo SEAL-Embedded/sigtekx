@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from pydantic import ValidationError
 
-from ionosense_hpc.config import EngineConfig, Presets, validate_input_array
+from ionosense_hpc.config import EngineConfig, get_preset, list_presets, validate_input_array
 from ionosense_hpc.exceptions import ValidationError as IonoValidationError
 
 
@@ -66,45 +66,45 @@ class TestEngineConfig:
 class TestPresets:
     """Test configuration presets."""
 
-    def test_realtime_preset(self):
-        """Test realtime preset configuration."""
-        config = Presets.realtime()
+    def test_default_preset(self):
+        """Test default preset configuration."""
+        config = get_preset('default')
         assert config.nfft == 1024
         assert config.batch == 2
-        assert config.warmup_iters == 10
-        assert config.timeout_ms == 100
+        assert config.overlap == 0.5
+        assert config.warmup_iters == 1
 
-    def test_throughput_preset(self):
-        """Test throughput preset configuration."""
-        config = Presets.throughput()
+    def test_iono_preset(self):
+        """Test ionosphere preset configuration."""
+        config = get_preset('iono')
         assert config.nfft == 4096
-        assert config.batch == 32
+        assert config.batch == 8
+        assert config.overlap == 0.75
         assert config.pinned_buffer_count == 4
 
-    def test_validation_preset(self):
-        """Test validation preset configuration."""
-        config = Presets.validation()
-        assert config.nfft == 256
-        assert config.batch == 1
-        assert config.overlap == 0.0
-        assert config.warmup_iters == 0
+    def test_ionox_preset(self):
+        """Test extreme ionosphere preset configuration."""
+        config = get_preset('ionox')
+        assert config.nfft == 8192
+        assert config.batch == 16
+        assert config.overlap == 0.9
+        assert config.warmup_iters == 10
 
     def test_custom_preset(self):
-        """Test custom preset creation."""
-        config = Presets.custom(nfft=2048, batch=4)
+        """Test custom preset creation with overrides."""
+        config = EngineConfig.from_preset('default', nfft=2048, batch=4)
         assert config.nfft == 2048
         assert config.batch == 4
 
-        # Should preserve other defaults from realtime
+        # Should preserve other defaults
         assert config.overlap == 0.5
 
     def test_list_presets(self):
         """Test listing all presets."""
-        presets = Presets.list_presets()
-        assert 'realtime' in presets
-        assert 'throughput' in presets
-        assert 'validation' in presets
-        assert 'profiling' in presets
+        presets = list_presets()
+        assert 'default' in presets
+        assert 'iono' in presets
+        assert 'ionox' in presets
 
 
 class TestValidation:
