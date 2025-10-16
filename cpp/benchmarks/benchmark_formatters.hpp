@@ -205,8 +205,10 @@ inline void print_latency_results(const BenchmarkConfig& config,
 
     std::cout << "Configuration:\n";
     std::cout << "  Preset      : " << preset_to_string(config.preset);
-    if (config.ionosphere_variant)
-      std::cout << " (ionosphere)";
+    if (config.iono_variant == IonoVariant::IONO)
+      std::cout << " (iono)";
+    else if (config.iono_variant == IonoVariant::IONOX)
+      std::cout << " (ionox)";
     std::cout << "\n";
     std::cout << "  Run Mode    : " << mode_to_string(config.run_mode) << "\n";
     std::cout << "  NFFT        : " << config.nfft << "\n";
@@ -294,7 +296,7 @@ inline void print_latency_results(const BenchmarkConfig& config,
                  "us,p95_us,p99_us,min_us,max_us,std_us\n";
     std::cout << preset_to_string(config.preset) << ","
               << mode_to_string(config.run_mode) << ","
-              << (config.ionosphere_variant ? "yes" : "no") << ","
+              << (config.iono_variant == IonoVariant::IONO ? "iono" : config.iono_variant == IonoVariant::IONOX ? "ionox" : "none") << ","
               << config.nfft << "," << config.batch << "," << config.iterations
               << "," << results.mean_latency_us << "," << results.p50_latency_us
               << "," << results.p95_latency_us << "," << results.p99_latency_us
@@ -329,8 +331,10 @@ inline void print_throughput_results(const BenchmarkConfig& config,
 
     std::cout << "Configuration:\n";
     std::cout << "  Preset      : " << preset_to_string(config.preset);
-    if (config.ionosphere_variant)
-      std::cout << " (ionosphere)";
+    if (config.iono_variant == IonoVariant::IONO)
+      std::cout << " (iono)";
+    else if (config.iono_variant == IonoVariant::IONOX)
+      std::cout << " (ionox)";
     std::cout << "\n";
     std::cout << "  Run Mode    : " << mode_to_string(config.run_mode) << "\n";
     std::cout << "  NFFT        : " << config.nfft << "\n";
@@ -390,7 +394,7 @@ inline void print_throughput_results(const BenchmarkConfig& config,
                  "samples_per_s,total_frames\n";
     std::cout << preset_to_string(config.preset) << ","
               << mode_to_string(config.run_mode) << ","
-              << (config.ionosphere_variant ? "yes" : "no") << ","
+              << (config.iono_variant == IonoVariant::IONO ? "iono" : config.iono_variant == IonoVariant::IONOX ? "ionox" : "none") << ","
               << config.nfft << "," << config.batch << ","
               << results.test_duration_s << "," << results.frames_per_second
               << "," << results.gb_per_second << ","
@@ -425,8 +429,10 @@ inline void print_realtime_results(const BenchmarkConfig& config,
 
     std::cout << "Configuration:\n";
     std::cout << "  Preset      : " << preset_to_string(config.preset);
-    if (config.ionosphere_variant)
-      std::cout << " (ionosphere)";
+    if (config.iono_variant == IonoVariant::IONO)
+      std::cout << " (iono)";
+    else if (config.iono_variant == IonoVariant::IONOX)
+      std::cout << " (ionox)";
     std::cout << "\n";
     std::cout << "  Run Mode    : " << mode_to_string(config.run_mode) << "\n";
     std::cout << "  NFFT        : " << config.nfft << "\n";
@@ -489,7 +495,7 @@ inline void print_realtime_results(const BenchmarkConfig& config,
                  "ms,p99_lat_ms,jitter_ms,frames,misses\n";
     std::cout << preset_to_string(config.preset) << ","
               << mode_to_string(config.run_mode) << ","
-              << (config.ionosphere_variant ? "yes" : "no") << ","
+              << (config.iono_variant == IonoVariant::IONO ? "iono" : config.iono_variant == IonoVariant::IONOX ? "ionox" : "none") << ","
               << config.nfft << "," << config.batch << ","
               << results.compliance_rate << "," << results.mean_latency_ms
               << "," << results.p99_latency_ms << "," << results.mean_jitter_ms
@@ -520,8 +526,10 @@ inline void print_accuracy_results(const BenchmarkConfig& config,
 
     std::cout << "Configuration:\n";
     std::cout << "  Preset      : " << preset_to_string(config.preset);
-    if (config.ionosphere_variant)
-      std::cout << " (ionosphere)";
+    if (config.iono_variant == IonoVariant::IONO)
+      std::cout << " (iono)";
+    else if (config.iono_variant == IonoVariant::IONOX)
+      std::cout << " (ionox)";
     std::cout << "\n";
     std::cout << "  Run Mode    : " << mode_to_string(config.run_mode) << "\n";
     std::cout << "  NFFT        : " << config.nfft << "\n";
@@ -557,7 +565,7 @@ inline void print_accuracy_results(const BenchmarkConfig& config,
                  "tests_total,mean_snr_db,mean_mae,mean_rmse,mean_rel_error,peak_error\n";
     std::cout << preset_to_string(config.preset) << ","
               << mode_to_string(config.run_mode) << ","
-              << (config.ionosphere_variant ? "yes" : "no") << ","
+              << (config.iono_variant == IonoVariant::IONO ? "iono" : config.iono_variant == IonoVariant::IONOX ? "ionox" : "none") << ","
               << config.nfft << "," << config.num_test_signals << ","
               << results.pass_rate << "," << results.tests_passed << ","
               << results.tests_total << "," << results.mean_snr_db << ","

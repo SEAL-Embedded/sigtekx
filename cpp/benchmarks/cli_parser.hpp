@@ -34,10 +34,10 @@ namespace benchmark {
 inline BenchmarkConfig parse_args(int argc, char* argv[]) {
   // Two-pass approach: first collect preset/mode/ionosphere, then apply overrides
 
-  // Pass 1: Determine preset, mode, and ionosphere flag
+  // Pass 1: Determine preset, mode, and iono variant
   BenchmarkPreset preset = BenchmarkPreset::DEV;
   RunMode mode = RunMode::FULL;
-  bool ionosphere = false;
+  IonoVariant iono_variant = IonoVariant::NONE;
   OutputFormat output_format = OutputFormat::TABLE;
   bool quiet = false;
   bool safe_print = false;
@@ -71,7 +71,7 @@ inline BenchmarkConfig parse_args(int argc, char* argv[]) {
     // Help
     if (arg == "--help" || arg == "-h") {
       std::cout << R"(
-Usage: benchmark_engine [--preset <name>] [--ionosphere] [options...]
+Usage: benchmark_engine [--preset <name>] [--iono|--ionox] [options...]
 
 PRESETS:
   --preset dev          Quick validation (20 iter, ~10s) [default]
@@ -85,8 +85,9 @@ RUN MODES:
   --profile             Profile-ready (moderate iterations/duration)
   --full                Production equivalent (default)
 
-MODIFIERS:
-  --ionosphere          Apply ionosphere-specific parameters
+IONOSPHERE VARIANTS (mutually exclusive):
+  --iono                Standard ionosphere (48kHz, 4096/16384 NFFT, 0.75 overlap)
+  --ionox               Extreme ionosphere (48kHz, 8192/32768 NFFT, 0.9/0.9375 overlap)
 
 ENGINE PARAMETERS:
   --nfft <value>        FFT size (default: preset-dependent)
@@ -117,14 +118,27 @@ EXAMPLES:
   # Production latency benchmark
   benchmark_engine --preset latency --full
 
-  # Ionosphere realtime profiling
-  benchmark_engine --preset realtime --ionosphere --profile
+  # Standard ionosphere realtime profiling
+  benchmark_engine --preset realtime --iono --profile
+
+  # Extreme ionosphere throughput (missile detection)
+  benchmark_engine --preset throughput --ionox --full
 
   # Custom experimentation
   benchmark_engine --preset throughput --nfft 4096 --batch 16 --quick
 
   # Blank canvas (override everything)
   benchmark_engine --nfft 8192 --batch 32 --overlap 0.875 --iterations 100
+
+IONOSPHERE PARAMETER REFERENCE:
+  Preset      | --iono (standard)        | --ionox (extreme)
+  ------------|--------------------------|---------------------------
+  latency     | 4096 NFFT, 0.75 overlap  | 8192 NFFT, 0.9 overlap
+  throughput  | 16384 NFFT, 0.75 overlap | 32768 NFFT, 0.9375 overlap
+  realtime    | 4096 NFFT, 0.75 overlap  | 8192 NFFT, 0.9 overlap
+  accuracy    | 4096 NFFT, 0.75 overlap  | 8192 NFFT, 0.9 overlap
+
+  Both variants use 48kHz sample rate for ionosphere research.
 )";
       std::exit(0);
     }
@@ -146,9 +160,11 @@ EXAMPLES:
       mode = RunMode::FULL;
     }
 
-    // Ionosphere variant
-    else if (arg == "--ionosphere") {
-      ionosphere = true;
+    // Ionosphere variants (mutually exclusive)
+    else if (arg == "--iono") {
+      iono_variant = IonoVariant::IONO;
+    } else if (arg == "--ionox") {
+      iono_variant = IonoVariant::IONOX;
     }
 
     // Engine parameters (overrides)
@@ -230,9 +246,11 @@ EXAMPLES:
   }
 
   // Apply ionosphere variant if requested
-  if (ionosphere) {
-    config.ionosphere_variant = true;
-    apply_ionosphere_variant(config);
+  config.iono_variant = iono_variant;
+  if (iono_variant == IonoVariant::IONO) {
+    apply_iono_variant(config);
+  } else if (iono_variant == IonoVariant::IONOX) {
+    apply_ionox_variant(config);
   }
 
   // Apply output settings

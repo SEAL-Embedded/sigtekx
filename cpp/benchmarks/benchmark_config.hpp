@@ -40,6 +40,16 @@ enum class OutputFormat {
 };
 
 // ============================================================================
+// Ionosphere Variant Types
+// ============================================================================
+
+enum class IonoVariant {
+  NONE,   // Standard benchmarks (100kHz)
+  IONO,   // Ionosphere standard (48kHz, 4096/16384 NFFT, 0.75 overlap)
+  IONOX   // Ionosphere extreme (48kHz, 8192/32768 NFFT, 0.9/0.9375 overlap)
+};
+
+// ============================================================================
 // Core Configuration Structure
 // ============================================================================
 
@@ -47,7 +57,7 @@ struct BenchmarkConfig {
   // Preset and mode
   BenchmarkPreset preset = BenchmarkPreset::DEV;
   RunMode run_mode = RunMode::FULL;
-  bool ionosphere_variant = false;
+  IonoVariant iono_variant = IonoVariant::NONE;
 
   // Engine parameters
   int nfft = 2048;
@@ -232,40 +242,79 @@ inline BenchmarkConfig get_accuracy_config(RunMode mode = RunMode::FULL) {
 // Ionosphere Variants
 // ============================================================================
 
-inline void apply_ionosphere_variant(BenchmarkConfig& config) {
-  // Ionosphere: 48kHz sample rate, 90% overlap
+inline void apply_iono_variant(BenchmarkConfig& config) {
+  // Iono standard: 48kHz sample rate, 75% overlap, 4096/16384 NFFT
   config.sample_rate_hz = 48000;
-  config.overlap = 0.9f;
+  config.overlap = 0.75f;
 
   switch (config.preset) {
     case BenchmarkPreset::LATENCY:
-      // Ionosphere latency: higher resolution, still 2 batch
+      // Iono latency: 4096 NFFT, low batch for minimal latency
       config.nfft = 4096;
       config.batch = 2;
       break;
 
     case BenchmarkPreset::THROUGHPUT:
-      // Ionosphere throughput: high-resolution batch processing
+      // Iono throughput: 16384 NFFT, large batch for ULF/VLF detection
       config.nfft = 16384;
-      config.batch = 32;  // Keep large batch for throughput
+      config.batch = 32;
       break;
 
     case BenchmarkPreset::REALTIME:
-      // Ionosphere realtime: balanced resolution, still 2 batch
+      // Iono realtime: 4096 NFFT, low batch for streaming latency
       config.nfft = 4096;
       config.batch = 2;
       config.strict_timing = true;
       break;
 
     case BenchmarkPreset::ACCURACY:
-      // Ionosphere accuracy reference test: higher resolution
-      config.nfft = 8192;
+      // Iono accuracy: 4096 NFFT, single batch
+      config.nfft = 4096;
       config.batch = 1;
-      // Note: iterations/num_test_signals ignored (single reference test only)
       break;
 
     case BenchmarkPreset::DEV:
-      // Dev mode doesn't have ionosphere variant
+      // Dev mode doesn't have iono variant
+      break;
+  }
+}
+
+inline void apply_ionox_variant(BenchmarkConfig& config) {
+  // Ionox extreme: 48kHz sample rate, extreme overlap, 8192/32768 NFFT
+  config.sample_rate_hz = 48000;
+
+  switch (config.preset) {
+    case BenchmarkPreset::LATENCY:
+      // Ionox latency: 8192 NFFT, 90% overlap, low batch
+      config.nfft = 8192;
+      config.batch = 2;
+      config.overlap = 0.9f;
+      break;
+
+    case BenchmarkPreset::THROUGHPUT:
+      // Ionox throughput: 32768 NFFT, 93.75% overlap for extreme missile detection
+      config.nfft = 32768;
+      config.batch = 32;
+      config.overlap = 0.9375f;
+      break;
+
+    case BenchmarkPreset::REALTIME:
+      // Ionox realtime: 8192 NFFT, 90% overlap, low batch
+      config.nfft = 8192;
+      config.batch = 2;
+      config.overlap = 0.9f;
+      config.strict_timing = true;
+      break;
+
+    case BenchmarkPreset::ACCURACY:
+      // Ionox accuracy: 8192 NFFT, 90% overlap, single batch
+      config.nfft = 8192;
+      config.batch = 1;
+      config.overlap = 0.9f;
+      break;
+
+    case BenchmarkPreset::DEV:
+      // Dev mode doesn't have ionox variant
       break;
   }
 }

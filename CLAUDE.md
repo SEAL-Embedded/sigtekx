@@ -98,11 +98,14 @@ ionoc bench --preset latency --full
 
 # Stable benchmarking with locked GPU clocks (CV reduction: 20% → 5-10%)
 ionoc bench --preset latency --full --lock-clocks
-ionoc bench --preset realtime --ionosphere --lock-clocks
+ionoc bench --preset realtime --iono --lock-clocks
 
-# Ionosphere realtime profiling
-ionoc bench --preset realtime --ionosphere --profile
+# Standard ionosphere realtime profiling
+ionoc bench --preset realtime --iono --profile
 ionoc profile nsys --stats
+
+# Extreme ionosphere throughput (missile detection)
+ionoc bench --preset throughput --ionox --full
 
 # Custom experimentation
 ionoc bench --preset throughput --nfft 4096 --batch 16 --quick
@@ -130,19 +133,23 @@ ionoc bench                                    # 20 iter, ~10s
 
 # latency: Latency measurement
 ionoc bench --preset latency --full            # 5000 iter, ~2min
-ionoc bench --preset latency --ionosphere      # Higher resolution
+ionoc bench --preset latency --iono            # Standard ionosphere (4096, 0.75)
+ionoc bench --preset latency --ionox           # Extreme ionosphere (8192, 0.9)
 
 # throughput: Throughput measurement
 ionoc bench --preset throughput --full         # 10s duration
-ionoc bench --preset throughput --ionosphere   # High-res batch processing
+ionoc bench --preset throughput --iono         # Ionosphere ULF/VLF (16384, 0.75)
+ionoc bench --preset throughput --ionox        # Extreme missile detection (32768, 0.9375)
 
 # realtime: Real-time streaming
 ionoc bench --preset realtime --full           # 10s stream
-ionoc bench --preset realtime --ionosphere     # Balanced, strict timing
+ionoc bench --preset realtime --iono           # Standard ionosphere (4096, 0.75)
+ionoc bench --preset realtime --ionox          # Extreme ionosphere (8192, 0.9)
 
 # accuracy: Accuracy validation
-ionoc bench --preset accuracy --full           # 10 iter, 8 signals
-ionoc bench --preset accuracy --ionosphere     # High-res validation
+ionoc bench --preset accuracy --full           # Single reference test
+ionoc bench --preset accuracy --iono           # Iono reference (4096, 0.75)
+ionoc bench --preset accuracy --ionox          # Ionox reference (8192, 0.9)
 ```
 
 ### Profile C++ Directly (Development Only)

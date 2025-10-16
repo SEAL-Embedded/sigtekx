@@ -27,15 +27,17 @@ namespace benchmark {
  * @brief Generate baseline filename from config.
  *
  * Format: <preset>_<variant>_<mode>.json
- * Example: "latency_ionosphere_full.json"
+ * Examples: "latency_iono_full.json", "throughput_ionox_full.json"
  *
  * @param config Benchmark configuration
  * @return Baseline filename
  */
 inline std::string get_baseline_filename(const BenchmarkConfig& config) {
   std::string filename = preset_to_string(config.preset);
-  if (config.ionosphere_variant) {
-    filename += "_ionosphere";
+  if (config.iono_variant == IonoVariant::IONO) {
+    filename += "_iono";
+  } else if (config.iono_variant == IonoVariant::IONOX) {
+    filename += "_ionox";
   }
   filename += "_" + mode_to_string(config.run_mode);
   filename += ".json";

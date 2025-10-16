@@ -387,8 +387,11 @@ RUN MODES:
   --profile       Profile-ready (moderate iterations/duration)
   --full          Production equivalent (default)
 
-MODIFIERS:
-  --ionosphere    Apply ionosphere-specific parameters to preset
+IONOSPHERE VARIANTS:
+  --iono          Standard ionosphere (48kHz, 4096/16384 NFFT, 0.75 overlap)
+  --ionox         Extreme ionosphere (48kHz, 8192/32768 NFFT, 0.9/0.9375 overlap)
+
+GPU CLOCK CONTROL:
   --lock-clocks   Lock GPU clocks for stable benchmarks (requires admin)
   --gpu-index <N> Select GPU to lock (default: 0, use with --lock-clocks)
   --max-clocks    Use max clocks instead of recommended (use with --lock-clocks)
@@ -400,8 +403,11 @@ BENCHMARK EXAMPLES:
   # Production latency benchmark
   ionoc bench --preset latency --full
 
-  # Ionosphere realtime profiling
-  ionoc bench --preset realtime --ionosphere --profile
+  # Standard ionosphere realtime profiling
+  ionoc bench --preset realtime --iono --profile
+
+  # Extreme ionosphere throughput (missile detection)
+  ionoc bench --preset throughput --ionox --full
 
   # Custom experimentation
   ionoc bench --preset throughput --nfft 4096 --batch 16 --quick

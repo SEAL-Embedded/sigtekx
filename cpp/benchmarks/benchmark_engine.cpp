@@ -73,8 +73,10 @@ int main(int argc, char* argv[]) {
     if (!config.quiet) {
       std::cout << "Ionosense HPC - C++ Benchmark\n";
       std::cout << "Preset: " << preset_to_string(config.preset);
-      if (config.ionosphere_variant) {
-        std::cout << " (ionosphere)";
+      if (config.iono_variant == IonoVariant::IONO) {
+        std::cout << " (iono)";
+      } else if (config.iono_variant == IonoVariant::IONOX) {
+        std::cout << " (ionox)";
       }
       std::cout << " | Mode: " << mode_to_string(config.run_mode) << "\n";
       std::cout << "NFFT: " << config.nfft << " | Batch: " << config.batch
