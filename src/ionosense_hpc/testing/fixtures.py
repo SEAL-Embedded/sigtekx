@@ -69,19 +69,20 @@ def temp_benchmark_dir(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def validation_config() -> EngineConfig:
-    """Provides a small, controlled configuration for validation and debugging."""
-    config = get_preset('default')
-    config.batch = 1  # Minimal batch for validation
-    return config
+    """Provides a small, controlled configuration for validation and debugging (matches old 'validation' preset)."""
+    return EngineConfig(
+        nfft=256,
+        batch=1,
+        overlap=0.0,
+        sample_rate_hz=1000,
+        warmup_iters=0
+    )
 
 
 @pytest.fixture
 def realtime_config() -> EngineConfig:
-    """Provides a production-ready configuration for real-time processing tests."""
-    from ionosense_hpc.config import ExecutionMode
-    config = get_preset('default')
-    config.mode = ExecutionMode.REALTIME
-    return config
+    """Provides a production-ready configuration for real-time processing tests (matches 'default' preset)."""
+    return get_preset('default')
 
 
 @pytest.fixture
