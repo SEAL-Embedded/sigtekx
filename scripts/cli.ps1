@@ -138,20 +138,25 @@ function Invoke-Test {
             & python -m pytest tests/ @args
         }
         { $_ -in @("cpp", "c++", "cxx") } {
-            Write-Status "Running C++ tests..."
-            # Check preset-specific build directory first, then fallback to generic
-            $presetBuildDir = Join-Path $script:BuildDir $script:BuildPreset
-            $testExe = if (Test-Path $presetBuildDir) {
-                Join-Path $presetBuildDir "test_engine.exe"
+            if ($Coverage) {
+                Write-Status "Running C++ tests with coverage..."
+                Invoke-Coverage -Verbose:$Verbose
             } else {
-                Join-Path $script:BuildDir "Release/tests/test_runner.exe"
-            }
+                Write-Status "Running C++ tests..."
+                # Check preset-specific build directory first, then fallback to generic
+                $presetBuildDir = Join-Path $script:BuildDir $script:BuildPreset
+                $testExe = if (Test-Path $presetBuildDir) {
+                    Join-Path $presetBuildDir "test_engine.exe"
+                } else {
+                    Join-Path $script:BuildDir "Release/tests/test_runner.exe"
+                }
 
-            if (Test-Path $testExe) {
-                & $testExe
-            } else {
-                Write-Error "C++ test executable not found. Run build first."
-                exit 1
+                if (Test-Path $testExe) {
+                    & $testExe
+                } else {
+                    Write-Error "C++ test executable not found. Run build first."
+                    exit 1
+                }
             }
         }
         "all" {
@@ -186,6 +191,148 @@ function Invoke-Test {
     }
 }
 
+function Invoke-Coverage {
+    param(
+        [bool]$Verbose = $false,
+        [bool]$OpenReport = $true
+    )
+
+    Write-Status "Running C++ tests with code coverage..."
+
+    # Step 1: Build with coverage preset
+    Write-Status "Building project with coverage instrumentation..."
+    $buildArgs = @("--preset", "windows-coverage")
+    if ($Verbose) { $buildArgs += "--log-level=VERBOSE" }
+
+    & cmake @buildArgs
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "CMake configuration failed"
+        exit 1
+    }
+
+    & cmake --build --preset windows-coverage
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Build failed"
+        exit 1
+    }
+
+    # Step 2: Run tests with coverage
+    Write-Status "Running C++ tests with coverage analysis..."
+    $testExe = Join-Path $script:BuildDir "windows-coverage/test_engine.exe"
+    if (-not (Test-Path $testExe)) {
+        Write-Error "Test executable not found at: $testExe"
+        exit 1
+    }
+
+    # Step 3: Setup coverage report directories
+    $reportsDir = Join-Path $script:ProjectRoot "artifacts/reports"
+    $coverageDir = Join-Path $reportsDir "coverage-cpp"
+
+    if (-not (Test-Path $reportsDir)) {
+        New-Item -ItemType Directory -Path $reportsDir -Force | Out-Null
+    }
+    if (Test-Path $coverageDir) {
+        Remove-Item $coverageDir -Recurse -Force
+    }
+    New-Item -ItemType Directory -Path $coverageDir -Force | Out-Null
+
+    # Detect platform and use appropriate coverage tool
+    # $IsWindows is a built-in read-only variable in PowerShell Core (v6+)
+    $onWindows = if ($PSVersionTable.PSVersion.Major -ge 6) { $IsWindows } else { $true }
+
+    if ($onWindows) {
+        # Windows: Use OpenCppCoverage (MSVC native)
+        Write-Status "Using OpenCppCoverage for MSVC coverage analysis..."
+
+        if (-not (Get-Command OpenCppCoverage -ErrorAction SilentlyContinue)) {
+            Write-Error "OpenCppCoverage not found. Install via: choco install opencppcoverage"
+            Write-Host "See: https://github.com/OpenCppCoverage/OpenCppCoverage" -ForegroundColor Yellow
+            exit 1
+        }
+
+        # Build test arguments
+        $testArgs = @()
+        if (-not $Verbose) {
+            $testArgs += "--gtest_brief=1"
+        }
+
+        # OpenCppCoverage arguments
+        $coverageArgs = @(
+            "--sources", "cpp\src",
+            "--sources", "cpp\include",
+            "--excluded_sources", "cpp\tests",
+            "--excluded_sources", "*\googletest*",
+            "--excluded_sources", "*\_deps\*",
+            "--export_type", "html:$coverageDir",
+            "--",
+            $testExe
+        )
+        if ($testArgs.Count -gt 0) {
+            $coverageArgs += $testArgs
+        }
+
+        & OpenCppCoverage @coverageArgs
+        $testExitCode = $LASTEXITCODE
+
+    } else {
+        # Linux: Use gcovr (GCC/Clang coverage)
+        Write-Status "Using gcovr for GCC/Clang coverage analysis..."
+
+        # Run tests first
+        $testArgs = @()
+        if (-not $Verbose) {
+            $testArgs += "--gtest_brief=1"
+        }
+        & $testExe @testArgs
+        $testExitCode = $LASTEXITCODE
+
+        # Analyze coverage with gcovr
+        $srcDir = Join-Path $script:ProjectRoot "cpp"
+        $rootPath = $script:ProjectRoot -replace '\\', '/'
+        $srcFilter = ($srcDir -replace '\\', '/') + '/.*'
+
+        # Terminal summary
+        & gcovr `
+            --root $rootPath `
+            --filter $srcFilter `
+            --exclude ".*test.*" `
+            --exclude ".*_deps.*" `
+            --print-summary
+
+        # HTML report
+        & gcovr `
+            --root $rootPath `
+            --filter $srcFilter `
+            --exclude ".*test.*" `
+            --exclude ".*_deps.*" `
+            --html-details "$coverageDir/index.html"
+    }
+
+    # Check coverage report generation (separate from test success)
+    $coverageReportExists = Test-Path "$coverageDir/index.html"
+
+    if ($coverageReportExists) {
+        Write-Success "Coverage report generated: $coverageDir/index.html"
+
+        if ($OpenReport) {
+            Write-Status "Opening coverage report in browser..."
+            Start-Process "$coverageDir/index.html"
+        }
+    } else {
+        Write-Error "Coverage report generation failed"
+        Write-Host "This indicates a problem with OpenCppCoverage itself, not the tests." -ForegroundColor Yellow
+    }
+
+    # Report test results (separate from coverage generation)
+    if ($testExitCode -eq 0) {
+        Write-Success "All tests passed"
+    } else {
+        Write-Error "Tests failed with exit code: $testExitCode"
+        Write-Host "Coverage report was still generated - check it to see which code paths were tested." -ForegroundColor Yellow
+        exit $testExitCode
+    }
+}
+
 function Invoke-Format {
     param(
         [string[]]$Paths = @(),
@@ -196,7 +343,7 @@ function Invoke-Format {
     Write-Status "Formatting C++ code..."
 
     if ($Paths.Count -eq 0) {
-        $Paths = @("src", "tests", "benchmarks")
+        $Paths = @("cpp/src", "cpp/tests", "cpp/include", "cpp/bindings", "examples")
     }
 
     $args = @()
@@ -250,6 +397,45 @@ function Invoke-Lint {
         Write-Success "Linting completed"
     } else {
         Write-Error "Linting failed"
+        exit 1
+    }
+}
+
+function Invoke-TypeCheck {
+    param(
+        [string[]]$Paths = @(),
+        [bool]$Strict = $false,
+        [bool]$Verbose = $false
+    )
+
+    Write-Status "Running mypy type checking..."
+
+    # Default paths
+    if ($Paths.Count -eq 0) {
+        $Paths = @("src/ionosense_hpc")
+    }
+
+    # Verify mypy is available
+    $mypy = Get-Command mypy -ErrorAction SilentlyContinue
+    if (-not $mypy) {
+        Write-Error "mypy not found. Install via: pip install mypy"
+        exit 1
+    }
+
+    # Build arguments
+    $args = @()
+    if ($Verbose) { $args += "-v" }
+    if ($Strict) { $args += "--strict" }
+
+    # mypy reads configuration from pyproject.toml [tool.mypy]
+    $args += $Paths
+
+    & mypy @args
+
+    if ($LASTEXITCODE -eq 0) {
+        Write-Success "Type checking completed"
+    } else {
+        Write-Error "Type checking failed"
         exit 1
     }
 }
@@ -310,6 +496,17 @@ function Invoke-Doctor {
             Write-Host "  ✅ ${tool}: Available" -ForegroundColor Green
         } else {
             Write-Host "  ❌ ${tool}: Not found" -ForegroundColor Red
+        }
+    }
+
+    # Check C++ coverage tool (Windows only)
+    if ($IsWindows -or ($PSVersionTable.PSVersion.Major -lt 6)) {
+        $opencppcov = Get-Command OpenCppCoverage -ErrorAction SilentlyContinue
+        if ($opencppcov) {
+            Write-Host "  ✅ OpenCppCoverage: Available (C++ coverage)" -ForegroundColor Green
+        } else {
+            Write-Host "  ⚠️  OpenCppCoverage: Not found (C++ coverage unavailable)" -ForegroundColor Yellow
+            Write-Host "     Install via: choco install opencppcoverage" -ForegroundColor DarkGray
         }
     }
 
@@ -451,7 +648,9 @@ ESSENTIAL DEVELOPMENT
   build [-Preset <name>] [-Clean] [--debug|--release] [--verbose]
                           Configure and build project with CMake
   test [all|python|cpp] [-Pattern] [-Coverage] [--verbose]
-                          Run tests
+                          Run tests (use -Coverage for C++ coverage)
+  coverage [-NoOpen] [--verbose]
+                          Run C++ tests with code coverage report
   format [paths] [-Check] [--verbose]
                           Format C++ code with clang-format
   lint [all|python|cpp] [-Fix] [--verbose]
@@ -472,6 +671,19 @@ PROFILING EXAMPLES:
   .\scripts\cli.ps1 profile                   # Interactive mode
   .\scripts\cli.ps1 profile nsys latency -Full -Duration 30
   .\scripts\cli.ps1 profile ncu custom -Script "my_script.py"
+
+C++ DEVELOPMENT (Advanced - Pre-Python Integration):
+  For C++ kernel development before Python integration, use standalone benchmark:
+
+  .\build\windows-rel\benchmark_engine.exe --quick
+
+  # Before profiling, ensure directory exists (use backslashes!):
+  New-Item -ItemType Directory -Path artifacts\profiling -Force | Out-Null
+  nsys profile -o artifacts\profiling\cpp_dev .\build\windows-rel\benchmark_engine.exe --profile
+
+  IMPORTANT: Use backslashes (\) in paths, not forward slashes (/)
+  See CLAUDE.md "C++ Development Workflow" section for full documentation.
+  For production profiling, always use 'profile' command above (Python end-to-end).
 
 PYTHON SCRIPT RUNNER
   run <script.py> [args...]
@@ -601,6 +813,12 @@ try {
             Invoke-Clean @params
         }
         "doctor"   { Invoke-Doctor }
+        "coverage" {
+            $params = @{}
+            if ($normalizedArgs -contains "-noopen" -or $normalizedArgs -contains "--no-open") { $params.OpenReport = $false }
+            if ($commonVerbose -or $normalizedArgs -contains "-verbose" -or $normalizedArgs -contains "--verbose") { $params.Verbose = $true }
+            Invoke-Coverage @params
+        }
         "analysis" {
             $params = @{}
             if ($CommandArgs -icontains "-DryRun") { $params.DryRun = $true }
@@ -618,7 +836,8 @@ try {
         }
         "typecheck" {
             $params = @{}
-            if ($CommandArgs -icontains "-Verbose") { $params.Verbose = $true }
+            if ($normalizedArgs -contains "-strict" -or $normalizedArgs -contains "--strict") { $params.Strict = $true }
+            if ($commonVerbose -or $normalizedArgs -contains "-verbose" -or $normalizedArgs -contains "--verbose") { $params.Verbose = $true }
 
             $paths = $CommandArgs | Where-Object { $_ -and $_ -notlike "-*" }
             if ($paths) { $params.Paths = $paths }

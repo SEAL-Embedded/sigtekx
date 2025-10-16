@@ -16,11 +16,12 @@ if(MSVC)
     add_compile_definitions(WIN32_LEAN_AND_MEAN NOMINMAX)
 endif()
 
-option(IONO_WITH_TESTS   "Build tests"            ON)
-option(IONO_WITH_GRAPHS  "Enable CUDA Graphs"     ON)
-option(IONO_WITH_PYTHON  "Build Python bindings"  ON)
-option(IONO_WITH_CUDA    "Enable CUDA components" ON)
-option(IONO_WITH_NVTX    "Enable NVTX profiling"  ON)
+option(IONO_WITH_TESTS      "Build tests"            ON)
+option(IONO_WITH_GRAPHS     "Enable CUDA Graphs"     ON)
+option(IONO_WITH_PYTHON     "Build Python bindings"  ON)
+option(IONO_WITH_CUDA       "Enable CUDA components" ON)
+option(IONO_WITH_NVTX       "Enable NVTX profiling"  ON)
+option(IONO_ENABLE_COVERAGE "Enable code coverage"   OFF)
 
 
 # ============================================================================
@@ -48,10 +49,26 @@ if(MSVC)
   # Flags for Microsoft Visual C++ Compiler (cl.exe)
   set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Zi /Od")
   set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2 /DNDEBUG")
+
+  # Code coverage flags for MSVC (use with windows-coverage preset)
+  if(IONO_ENABLE_COVERAGE)
+    message(STATUS "[ionosense] Enabling code coverage instrumentation (MSVC)")
+    # MSVC: gcovr uses PDB debug symbols for coverage analysis
+    # /Zi and /Od are already set in CMAKE_CXX_FLAGS_DEBUG, just ensure full debug info
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /DEBUG:FULL")
+    set(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} /DEBUG:FULL")
+  endif()
 else()
   # Flags for GCC/Clang
   set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -DNDEBUG")
+  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -DNDEBUG")
+
+  # Code coverage flags for GCC/Clang (gcov/llvm-cov)
+  if(IONO_ENABLE_COVERAGE)
+    message(STATUS "[ionosense] Enabling code coverage instrumentation (GCC/Clang)")
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} --coverage -fprofile-arcs -ftest-coverage")
+    set(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} --coverage")
+  endif()
 endif()
 
 
@@ -133,10 +150,22 @@ FetchContent_Declare(
 # ============================================================================
 if(IONO_WITH_CUDA)
 add_library(ion_engine OBJECT
+    # CUDA kernels
     cpp/src/ops_fft.cu
-    cpp/src/research_engine.cpp
-    cpp/src/processing_stage.cpp
     cpp/src/profiling_nvtx.cu
+
+    # Core infrastructure
+    cpp/src/core/processing_stage.cpp
+    cpp/src/core/pipeline_builder.cpp
+    cpp/src/core/engine_utils.cpp
+
+    # Executors
+    cpp/src/executors/batch_executor.cpp
+    cpp/src/executors/realtime_executor.cpp
+
+    # Engines
+    cpp/src/engines/research_engine.cpp
+    cpp/src/engines/realtime_iono_engine.cpp
 )
 target_include_directories(ion_engine PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/cpp/include
@@ -259,13 +288,13 @@ if(IONO_WITH_TESTS AND IONO_WITH_CUDA)
 
     FetchContent_MakeAvailable(googletest)
 
-    add_executable(test_engine
-        cpp/tests/test_research_engine.cpp
-        cpp/tests/test_processing_stage.cpp
-        cpp/tests/test_cuda_wrappers.cpp
-        cpp/tests/test_nvtx_profiling.cpp
-        cpp/tests/test_window_functions.cpp
+    # Automatically include all unit test sources so coverage stays in sync
+    file(GLOB TEST_ENGINE_SOURCES CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/cpp/tests/*.cpp"
     )
+    list(SORT TEST_ENGINE_SOURCES)
+
+    add_executable(test_engine ${TEST_ENGINE_SOURCES})
     set_target_properties(test_engine PROPERTIES CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 
     # Add include dirs and set CUDA properties for the test executable - Important!
@@ -282,4 +311,26 @@ if(IONO_WITH_TESTS AND IONO_WITH_CUDA)
 
     include(GoogleTest)
     gtest_discover_tests(test_engine)
+
+    # ========================================================================
+    # C++ Standalone Benchmark (Development Only)
+    # ========================================================================
+    # This executable is for C++ kernel development and iteration BEFORE Python
+    # integration. For production profiling, use `iprof` with Python benchmarks.
+    add_executable(benchmark_engine
+        cpp/benchmarks/benchmark_engine.cpp
+    )
+    set_target_properties(benchmark_engine PROPERTIES CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+
+    target_include_directories(benchmark_engine PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/cpp/include)
+
+    target_link_libraries(benchmark_engine PRIVATE
+        "$<TARGET_OBJECTS:ion_engine>"
+        CUDA::cudart_static
+        CUDA::cufft
+    )
+
+    if(IONO_WITH_NVTX)
+        target_compile_definitions(benchmark_engine PRIVATE IONOSENSE_ENABLE_PROFILING)
+    endif()
 endif()

@@ -9,6 +9,7 @@ ionosense-hpc-lib/
 |-- .github/                # CI workflows, composite actions, issue templates
 |-- .guide/                 # Reference PDFs and legacy CUDA samples for context
 |-- .ionosense/             # Tooling state (ruff reports, session logs)
+|-- benchmarks/             # Standalone benchmarking utilities and scenarios
 |-- build/                  # Generated artefacts (benchmarks, reports, build presets)
 |-- cpp/                    # C++17/CUDA sources, bindings, and tests
 |   |-- bindings/           # pybind11 bridge exposing the research engine
@@ -17,11 +18,12 @@ ionosense-hpc-lib/
 |   `-- tests/              # C++ test suite (gtest/CTest presets)
 |-- docs/                   # Project documentation (API, development, benchmarking)
 |-- environments/           # Conda environment definitions per workflow
-|-- python/                 # Python package and tests
-|   |-- src/ionosense_hpc/  # User facing package (benchmarks, config, core, utils)
-|   `-- tests/              # Pytest suite (unit, integration, gpu markers)
-|-- research/               # Reproducible experiments, notebooks, data management
-|-- scripts/                # Cross platform CLI wrappers and profiling helpers
+|-- experiments/            # Snakemake rules and analysis scripts
+|-- notebooks/              # Exploratory analysis (Jupyter)
+|-- scripts/                # PowerShell helpers, profiling utilities, GPU management
+|-- src/                    # Python package source tree
+|   `-- ionosense_hpc/      # User facing package (benchmarks, config, core, utils)
+|-- tests/                  # Pytest suite (unit, integration, GPU markers)
 |-- AGENTS.md               # Agent operations guide
 |-- accuracy_debug_plan.md  # Investigation notes for current performance work
 |-- CMakeLists.txt          # Top level CMake configuration
@@ -68,18 +70,30 @@ src/ionosense_hpc/
 `-- py.typed                # Marks package as PEP 561 typed
 ```
 
-### Research Assets (research/)
+### Benchmarks (benchmarks/)
 ```
-research/
-|-- configs/                # Experiment YAML configurations
-|-- data/
-|   |-- raw/                # Immutable source datasets
-|   `-- processed/          # Derived data products committed to experiments
-|-- dsp_course/             # Reference material and courseware experiments
-|-- experiments/            # Reproducible scripts coordinating CLI + notebooks
-|-- notebooks/              # Exploratory analysis (Jupyter)
-`-- results/                # Generated figures, tables, and reports
+benchmarks/
+|-- run_accuracy.py         # Hydra entry point for accuracy sweeps
+|-- run_latency.py          # Latency benchmarking harness
+|-- run_realtime.py         # Real-time pipeline evaluation
+`-- run_throughput.py       # Throughput benchmarking harness
 ```
+
+Each script is a Hydra-driven application used directly or orchestrated through Snakemake.
+
+### Experiments & Analysis (experiments/)
+```
+experiments/
+|-- Snakefile               # Snakemake workflow for end-to-end studies
+|-- conf/
+|   |-- config.yaml         # Global Hydra configuration
+|   |-- engine/             # Engine presets
+|   |-- experiment/         # Experiment definitions (ionosphere_*)
+|   `-- benchmark/          # Benchmark parameter grids
+`-- scripts/                # Analysis, figure generation, report assembly
+```
+
+Snakemake coordinates benchmark execution, analysis, and report generation using these assets.
 
 ### Artifacts (artifacts/)
 
@@ -108,104 +122,23 @@ build/
 ### Python Module Artefacts
 Shared objects produced by builds land in `src/ionosense_hpc/core/`. Expect `_engine.pyd` on Windows and `_engine.so` on Linux/WSL.
 
-## Development Workflow
-
-### 1. Environment Setup
-```bash
-# Linux / WSL2
-./scripts/cli.sh setup
-conda activate ionosense-hpc
-
-# Windows (PowerShell)
-./scripts/cli.ps1 setup
-conda activate ionosense-hpc
-
-# Windows with enhanced shell
-./scripts/open_dev_pwsh.ps1
-iono setup
-```
-
-### 2. Build
-```bash
-# Default release build
-./scripts/cli.sh build
-
-# Debug preset
-./scripts/cli.sh build linux-debug
-
-# Clean rebuild
-./scripts/cli.sh rebuild
-```
-
-### 3. Test
-```bash
-# Full suite (Python + C++)
-./scripts/cli.sh test
-
-# Python only
-./scripts/cli.sh test py
-
-# C++ only (CTest preset)
-./scripts/cli.sh test cpp
-```
-
-### 4. Quality Gates
-```bash
-# Format C++ code (clang-format)
-./scripts/cli.sh format
-
-# Lint Python + C++
-./scripts/cli.sh lint
-
-# Type-check Python (mypy)
-./scripts/cli.sh typecheck
-
-# Aggregate quality checks
-./scripts/cli.sh check
-```
-
-### 5. Benchmark & Profile
-```bash
-# Run benchmark suite
-./scripts/cli.sh bench suite
-
-# Launch Nsight Systems profile (example target)
-./scripts/cli.sh profile nsys latency
-
-# Parameter sweep experiment
-./scripts/cli.sh sweep research/configs/sweep_experiment.yaml
-```
 
 ## Documentation Index
 
 | Document | Audience | Purpose |
 |----------|----------|---------|
-| [README.md](README.md) | Everyone | Overview, requirements, quick start |
-| [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) | Contributors | Repository map (this file) |
-| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Contributors | Detailed development workflow |
-| [docs/BENCHMARKING.md](docs/BENCHMARKING.md) | Researchers | Benchmark methodology and KPIs |
-| [docs/API.md](docs/API.md) | Integrators | Python API reference |
-| [cpp/include/ionosense/README.md](cpp/include/ionosense/README.md) | C++ Developers | Public API design |
-| [cpp/src/README.md](cpp/src/README.md) | C++ Developers | Implementation notes |
-| [cpp/bindings/README.md](cpp/bindings/README.md) | Binding Engineers | Python bridge specifics |
-| [python/README.md](python/README.md) | Python Users | Package usage and tips |
+| [README.md](README.md) | Everyone | High-level overview, supported platforms, quick links |
+| [docs/README.md](docs/README.md) | Everyone | Documentation entry point and navigation |
+| [docs/getting-started/install.md](docs/getting-started/install.md) | Contributors | Environment provisioning on Windows and Ubuntu |
+| [docs/getting-started/workflow-guide.md](docs/getting-started/workflow-guide.md) | Researchers | Snakemake-driven experiment workflow |
+| [docs/guides/development.md](docs/guides/development.md) | Contributors | Day-to-day development practices and checklists |
+| [docs/guides/benchmarking.md](docs/guides/benchmarking.md) | Researchers | Benchmark methodology, datasets, and KPIs |
+| [docs/guides/api-reference.md](docs/guides/api-reference.md) | Integrators | Python package surface and binding details |
+| [docs/guides/creating-issues.md](docs/guides/creating-issues.md) | Maintainers | Requirements capture templates and review cues |
+| [docs/architecture/overview.md](docs/architecture/overview.md) | Contributors | System architecture diagrams and rationale |
+| [docs/performance/gpu-clock-locking.md](docs/performance/gpu-clock-locking.md) | Performance engineers | GPU clock management for reproducible runs |
+| [docs/technical-notes/ieee754-compliance.md](docs/technical-notes/ieee754-compliance.md) | Numerics team | IEEE 754 compliance expectations |
 
-## Git Workflow
-
-### Branch Structure
-```
-main            # Stable releases
-`-- feature/*   # Feature, fix, perf, and docs branches (named with purpose)
-```
-
-### Commit Convention
-```
-type(scope): description
-
-Accepted types: feat, fix, perf, docs, test, build, ci, chore
-```
-
-Reference issues or research tickets in commit messages when applicable to maintain traceability.
 
 ## Dependencies
 
@@ -251,10 +184,11 @@ Reference issues or research tickets in commit messages when applicable to maint
 - CLI research logs: `artifacts/logs/`
 
 ## Tooling Notes
-- Use `./scripts/cli.sh doctor` or `iono doctor` to validate environments.
-- GPU heavy pytest marked with `gpu`; enable via `./scripts/cli.sh test py -- --gpu`.
-- Clear caches with CLI helpers: `./scripts/cli.sh clean --caches`.
-- CTest presets defined in `CMakePresets.json` (`linux-debug`, `linux-rel`, `windows-rel`).
+- Run `cmake --list-presets` and `ctest --list-presets` to discover configured build and test targets.
+- Confirm the active Conda environment with `conda info --envs`; all developer tooling resolves from `ionosense-hpc`.
+- Execute GPU-specific tests on demand via `python -m pytest -m gpu --maxfail=1`.
+- Clear analysis caches manually when stale by deleting `.mypy_cache/`, `.ruff_cache/`, and `.pytest_cache/`.
+- Nsight CLI tools (`nsys`, `ncu`) store reports under `artifacts/profiling/`; set `IONO_OUTPUT_ROOT` to redirect outputs per experiment.
 
 ## Related Standards & Practices
 - Research Software Engineering (RSE) guidelines govern documentation, testing, and reproducibility.
@@ -263,4 +197,5 @@ Reference issues or research tickets in commit messages when applicable to maint
 - IEEE 754 considerations documented in benchmarking + validation routines; avoid precision regressions without review.
 
 ## Update History
+- 2025-10-15: Removed deprecated CLI wrapper references, refreshed documentation index, and aligned directory descriptions with current tooling.
 - 2025-09-15: Synchronized structure with `cpp/`, refreshed dependency constraints, and aligned workflow commands with CLI scripts.

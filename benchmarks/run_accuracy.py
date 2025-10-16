@@ -6,14 +6,14 @@ This script is Hydra-aware and logs results to MLflow.
 Communication with other scripts happens through artifact files.
 """
 
+import warnings
+from pathlib import Path
+
 import hydra
 import mlflow
 import pandas as pd
 from omegaconf import DictConfig, OmegaConf
-from pathlib import Path
-import warnings
 
-from ionosense_hpc import Engine
 from ionosense_hpc.benchmarks import AccuracyBenchmark, AccuracyBenchmarkConfig
 from ionosense_hpc.config import EngineConfig
 
@@ -38,7 +38,10 @@ def run_accuracy_benchmark(cfg: DictConfig) -> float:
     # ===== END ROBUSTNESS FIX =====
 
     # Convert OmegaConf to Pydantic models for validation
-    engine_config = EngineConfig(**cfg.engine)
+    # Filter out metadata fields that aren't part of EngineConfig
+    engine_dict = dict(cfg.engine)
+    engine_dict.pop("name", None)  # Remove metadata field
+    engine_config = EngineConfig(**engine_dict)
     benchmark_config = AccuracyBenchmarkConfig(**cfg.benchmark, engine_config=engine_config.model_dump())
 
     # Setup MLflow
@@ -59,7 +62,7 @@ def run_accuracy_benchmark(cfg: DictConfig) -> float:
         # Run benchmark
         benchmark = AccuracyBenchmark(benchmark_config)
         result = benchmark.run()
-        
+
         # Helper function to extract float from potentially nested dict
         def extract_float(value, default=0.0):
             if isinstance(value, dict):
@@ -73,11 +76,11 @@ def run_accuracy_benchmark(cfg: DictConfig) -> float:
             "accuracy.mean_error": extract_float(result.statistics.get('mean_error', 0)),
             "accuracy.max_error": extract_float(result.statistics.get('max_error', 0)),
         })
-        
+
         # Save results to CSV (for downstream analysis)
         output_dir = Path(cfg.paths.data)
         output_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Save test results with enhanced diagnostics
         if hasattr(benchmark, 'test_results'):
             results_data = []
@@ -104,7 +107,7 @@ def run_accuracy_benchmark(cfg: DictConfig) -> float:
             output_path = output_dir / f"accuracy_details_{engine_config.nfft}_{engine_config.batch}.csv"
             df.to_csv(output_path, index=False)
             mlflow.log_artifact(str(output_path))
-        
+
         # Save summary
         summary = {
             'engine_nfft': engine_config.nfft,
@@ -113,12 +116,12 @@ def run_accuracy_benchmark(cfg: DictConfig) -> float:
             'mean_snr_db': extract_float(result.statistics.get('mean_snr_db', 0)),
             'mean_error': extract_float(result.statistics.get('mean_error', 0)),
         }
-        
+
         summary_df = pd.DataFrame([summary])
         summary_path = output_dir / f"accuracy_summary_{engine_config.nfft}_{engine_config.batch}.csv"
         summary_df.to_csv(summary_path, index=False)
         mlflow.log_artifact(str(summary_path))
-        
+
     # Return error rate for minimization
     pass_rate_value = extract_float(result.statistics.get('pass_rate', 0))
     return 1.0 - pass_rate_value

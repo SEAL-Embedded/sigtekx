@@ -71,9 +71,250 @@ dvc repro
 ./scripts/cli.ps1 setup                   # Environment setup
 ./scripts/cli.ps1 build                   # Build project
 ./scripts/cli.ps1 test                    # Run tests
+./scripts/cli.ps1 test python -Coverage   # Run Python tests with coverage
+./scripts/cli.ps1 test cpp -Coverage      # Run C++ tests with coverage
+./scripts/cli.ps1 coverage                # Run C++ tests with coverage (standalone)
 ./scripts/cli.ps1 format                  # Format code
 ./scripts/cli.ps1 lint                    # Lint code
 ./scripts/cli.ps1 doctor                  # System health check
+```
+
+## C++ Development Workflow (Pre-Python Integration)
+
+**Use Case:** Developing and validating new C++ kernels/executors BEFORE Python integration.
+
+**Important:** This workflow is for C++ development iteration only. For production profiling, always use `iprof` with Python benchmarks (see GPU Profiling section below).
+
+### Quick Start with `ionoc`
+
+The `ionoc` command provides a dedicated CLI for C++ benchmarking with preset configurations:
+
+```powershell
+# Quick validation (default: dev preset, 20 iter, ~10s)
+ionoc bench
+
+# Production latency benchmark
+ionoc bench --preset latency --full
+
+# Stable benchmarking with locked GPU clocks (CV reduction: 20% → 5-10%)
+ionoc bench --preset latency --full --lock-clocks
+ionoc bench --preset realtime --iono --lock-clocks
+
+# Standard ionosphere realtime profiling
+ionoc bench --preset realtime --iono --profile
+ionoc profile nsys --stats
+
+# Extreme ionosphere throughput (missile detection)
+ionoc bench --preset throughput --ionox --full
+
+# Custom experimentation
+ionoc bench --preset throughput --nfft 4096 --batch 16 --quick
+
+# Save baseline for regression tracking
+ionoc bench --preset latency --full --save-baseline
+
+# Full help
+ionoc bench --help
+```
+
+### Build C++ Benchmark Executable
+```bash
+# Build both tests and benchmark executable
+iono build   # or: ./scripts/cli.ps1 build
+```
+
+### Benchmark Presets
+
+Multiple presets matching Python configurations:
+
+```powershell
+# dev (default): Quick validation
+ionoc bench                                    # 20 iter, ~10s
+
+# latency: Latency measurement
+ionoc bench --preset latency --full            # 5000 iter, ~2min
+ionoc bench --preset latency --iono            # Standard ionosphere (4096, 0.75)
+ionoc bench --preset latency --ionox           # Extreme ionosphere (8192, 0.9)
+
+# throughput: Throughput measurement
+ionoc bench --preset throughput --full         # 10s duration
+ionoc bench --preset throughput --iono         # Ionosphere ULF/VLF (16384, 0.75)
+ionoc bench --preset throughput --ionox        # Extreme missile detection (32768, 0.9375)
+
+# realtime: Real-time streaming
+ionoc bench --preset realtime --full           # 10s stream
+ionoc bench --preset realtime --iono           # Standard ionosphere (4096, 0.75)
+ionoc bench --preset realtime --ionox          # Extreme ionosphere (8192, 0.9)
+
+# accuracy: Accuracy validation
+ionoc bench --preset accuracy --full           # Single reference test
+ionoc bench --preset accuracy --iono           # Iono reference (4096, 0.75)
+ionoc bench --preset accuracy --ionox          # Ionox reference (8192, 0.9)
+```
+
+### Profile C++ Directly (Development Only)
+
+**Nsight Systems (Timeline Analysis)**
+```powershell
+# Basic profiling (auto-creates artifacts\profiling directory)
+ionoc profile nsys
+
+# With statistics
+ionoc profile nsys --stats
+
+# Custom mode and traces
+ionoc profile nsys --mode quick --trace cuda,nvtx
+
+# Custom output path
+ionoc profile nsys --output my_profile --stats
+```
+
+**Nsight Compute (Kernel Analysis)**
+```powershell
+# Basic profiling (⚠️ slow - 5-15 minutes)
+ionoc profile ncu
+
+# Roofline analysis
+ionoc profile ncu --set roofline
+
+# Specific kernel only (faster)
+ionoc profile ncu --kernel-name "fft_kernel"
+
+# Full metrics (very slow)
+ionoc profile ncu --set full --mode profile
+```
+
+**Advanced Options:**
+```powershell
+# All ionoc profile commands support:
+# --mode <quick|profile|full>   Benchmark mode
+# --output <path>                Custom output path
+# Plus all native nsys/ncu flags (passthrough)
+
+# Examples:
+ionoc profile nsys --mode quick --duration 5
+ionoc profile ncu --kernel-name "magnitude" --metrics sm__throughput
+```
+
+### Typical C++ Development Workflow
+```powershell
+# 1. Save baseline before modifications (with locked clocks for stability)
+ionoc bench --preset latency --full --lock-clocks --save-baseline
+
+# 2. Modify C++ executor/kernel code
+vim cpp\src\executors\batch_executor.cpp
+
+# 3. Rebuild
+iono build
+
+# 4. Quick validation (~10 seconds, compares to baseline)
+ionoc bench
+
+# 5. Full validation if quick looks good (locked clocks for stable comparison)
+ionoc bench --preset latency --full --lock-clocks
+# Performance card shows: ✓ NO CHANGE / ⚠ SLIGHT REGRESSION / ✗ REGRESSION
+
+# 6. Profile if needed
+ionoc bench --preset latency --profile
+ionoc profile nsys --stats
+
+# 7. View results
+nsys-ui artifacts\profiling\cpp_dev.nsys-rep
+
+# 8. Deep kernel analysis if needed (~5-15 minutes)
+ionoc profile ncu --kernel-name "fft_kernel" --set roofline
+
+# 9. Iterate until satisfied, then integrate with Python
+
+# 10. Production profiling (end-to-end Python workflow)
+iprof nsys latency    # Full Python end-to-end workflow
+```
+
+### When to Use Each Tool
+
+| Tool | Purpose | Duration | Use When |
+|------|---------|----------|----------|
+| `ionoc bench` | Fast validation (dev preset) | 10s | Quick sanity check after code changes |
+| `ionoc bench --preset <name> --profile` | Profile-ready benchmark | 30s-1min | Before running nsys/ncu profiling |
+| `ionoc bench --preset <name> --full` | Production equivalent | 1-10min | Matching Python benchmark results |
+| `ionoc profile nsys` | Timeline, API calls, NVTX | 30-60s | Understanding execution flow, bottlenecks |
+| `ionoc profile ncu` | Kernel metrics, roofline | 5-15min | Optimizing specific kernel performance |
+| `iprof` (Python) | **Production profiling** | Varies | **Final end-to-end validation** |
+
+### Shortcuts
+
+```powershell
+icbench quick        # Alias for: ionoc bench quick
+icprof nsys --stats  # Alias for: ionoc profile nsys --stats
+```
+
+### Troubleshooting
+
+#### Character Encoding Issues (PowerShell)
+
+**Note:** If you're using `scripts/init_pwsh.ps1` to start your dev session, UTF-8 encoding is **automatically configured** for you.
+
+If you see garbled characters like `┬╡s` instead of `µs` in benchmark output (when NOT using `init_pwsh.ps1`):
+
+```powershell
+# Fix for current PowerShell session
+$OutputEncoding = [System.Text.Encoding]::UTF8
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
+# Then run benchmark
+./build/windows-rel/benchmark_engine.exe --full
+```
+
+**Best solution:** Use `scripts/init_pwsh.ps1` to start your dev session (handles this automatically).
+
+**Alternative:** Use Windows Terminal (has proper UTF-8 support by default) instead of legacy PowerShell console.
+
+#### Profiling Directory Not Found
+
+If `nsys profile` fails with "No such file or directory", the issue is usually:
+1. Directory doesn't exist
+2. Mixed path separators (forward/backslashes)
+
+**Solution - use Windows backslashes consistently:**
+
+```powershell
+# Create directory first (Windows path with backslashes)
+New-Item -ItemType Directory -Path artifacts\profiling -Force | Out-Null
+
+# Then profile (all backslashes)
+nsys profile -o artifacts\profiling\cpp_dev .\build\windows-rel\benchmark_engine.exe --profile
+```
+
+**Important:** On Windows, always use `\` (backslashes) in paths, not `/` (forward slashes).
+
+The `.gitignore` already excludes `artifacts/` from version control.
+
+## Code Coverage
+
+### C++ Coverage (gcovr)
+```bash
+# Run C++ tests with coverage report (builds with windows-coverage preset)
+./scripts/cli.ps1 test cpp -Coverage      # Runs tests and opens HTML report
+./scripts/cli.ps1 coverage                # Alternative standalone command
+
+# Coverage report location
+# Terminal: Color-coded coverage summary
+# HTML: artifacts/reports/coverage-cpp/index.html
+
+# Manual coverage workflow (if needed)
+./scripts/cli.ps1 build -Preset windows-coverage    # Build with coverage
+./build/windows-coverage/test_engine.exe            # Run tests
+gcovr --root . --filter "cpp/.*" --html-details artifacts/reports/coverage-cpp/index.html
+```
+
+### Python Coverage (pytest-cov)
+```bash
+# Run Python tests with coverage (like you're used to)
+./scripts/cli.ps1 test python -Coverage   # Runs tests with coverage report
+
+# Coverage report location
+# Terminal: Coverage summary
+# HTML: artifacts/reports/coverage/index.html
 ```
 
 ## Tool-Specific Quick Commands
@@ -157,6 +398,134 @@ iprof nsys accuracy -- experiment=profiling +benchmark=accuracy      # 10 iterat
 - Always start with `nsys` before moving to `ncu` (nsys is 10-50× faster)
 - Use `ncu --kernel-name <pattern>` to profile specific kernels only
 
+## GPU Clock Locking for Benchmark Stability
+
+**Purpose**: Reduce benchmark variability (Coefficient of Variation) from 20-40% → 5-15%
+
+### Quick Start
+
+```powershell
+# Lock GPU clocks for stable benchmarking (requires admin - UAC prompt)
+ionoc bench --preset latency --full --lock-clocks
+```
+
+**What it does:**
+1. Auto-elevates to admin (UAC prompt)
+2. Locks GPU graphics/memory clocks to stable values
+3. Runs benchmark
+4. **Automatically** restores original clocks (even on error/Ctrl+C)
+
+**Expected CV improvement:**
+- Latency: 20% → **5-10%** (50-75% better)
+- Realtime: 40% → **10-15%** (60-75% better)
+
+### Options
+
+```powershell
+# Use recommended clocks (default, conservative)
+ionoc bench --preset latency --full --lock-clocks
+
+# Use max clocks for peak performance
+ionoc bench --preset latency --full --lock-clocks --max-clocks
+
+# Multi-GPU: select GPU 1
+ionoc bench --preset latency --full --lock-clocks --gpu-index 1
+
+# Query GPU info (no locking)
+pwsh scripts/gpu-manager.ps1 -Action Query
+```
+
+**Supported GPUs**: RTX 3090 Ti, RTX 4090, RTX 4080, RTX 4070 Ti, RTX 3080, RTX 3070, A100, V100
+
+**Full documentation**: `docs/performance/gpu-clock-locking.md`
+
+**Quick reference**: `docs/performance/stability-improvements.md` for executive summary
+
+**Safety**: Auto-cleanup always runs (even on Ctrl+C or error). Manual recovery if needed:
+```powershell
+nvidia-smi -pm 0 && nvidia-smi -rgc && nvidia-smi -rmc
+```
+
+## Window Function Symmetry Modes
+
+### Overview
+
+The library supports two window symmetry modes that control endpoint behavior and spectral characteristics:
+
+| Mode | Denominator | Endpoints | Primary Use Case | Applications |
+|------|-------------|-----------|------------------|--------------|
+| **PERIODIC** | N | Non-zero (except i=0) | FFT-based spectral analysis | STFT, spectrograms, ionosphere research |
+| **SYMMETRIC** | N-1 | Exactly zero at both ends | Time-domain signal analysis | FIR filter design, signal tapering |
+
+### Configuration
+
+Window symmetry is configured via `StageConfig::window_symmetry`:
+
+```cpp
+StageConfig config;
+config.window_type = StageConfig::WindowType::HANN;
+config.window_symmetry = StageConfig::WindowSymmetry::PERIODIC;  // Default
+```
+
+### Mathematical Formulas
+
+**PERIODIC Mode (default for FFT processing):**
+```
+Hann[i] = 0.5 * (1 - cos(2πi/N))
+Blackman[i] = 0.42 - 0.5*cos(2πi/N) + 0.08*cos(4πi/N)
+```
+
+**SYMMETRIC Mode (for time-domain analysis):**
+```
+Hann[i] = 0.5 * (1 - cos(2πi/(N-1)))
+Blackman[i] = 0.42 - 0.5*cos(2πi/(N-1)) + 0.08*cos(4πi/(N-1))
+```
+
+### When to Use Each Mode
+
+- **Use PERIODIC (default)** for:
+  - FFT-based spectral analysis
+  - Short-Time Fourier Transform (STFT)
+  - Spectrogram generation
+  - All ionosphere research workflows
+
+- **Use SYMMETRIC** for:
+  - FIR filter coefficient windowing
+  - Direct time-domain signal tapering
+  - Applications requiring exact zero endpoints
+
+### Implementation Details
+
+All window functions in `window_functions.hpp` and `window_utils` namespace support both modes:
+
+```cpp
+// Low-level window_functions API
+double coeff = window_functions::hann_base(i, size,
+    window_functions::WindowSymmetry::PERIODIC);
+
+// High-level window_utils API
+window_utils::generate_window(buffer, size,
+    StageConfig::WindowType::HANN,
+    false,  // sqrt_norm
+    StageConfig::WindowSymmetry::PERIODIC);
+```
+
+### Testing
+
+Both modes are validated by comprehensive tests:
+- `WindowFunctionsTest.PeriodicModeNumericalCorrectness` - validates PERIODIC mode IEEE-754 compliance
+- `WindowFunctionsTest.SymmetricModeNumericalCorrectness` - validates SYMMETRIC mode IEEE-754 compliance
+- `WindowFunctionsTest.WindowSymmetryModes` - integration test across all window types
+- `ProcessingStageTest.WindowStageRespectsSymmetryConfig` - validates pipeline integration
+
+Run tests with: `./scripts/cli.ps1 test cpp`
+
+### References
+
+- Full API documentation: `cpp/include/ionosense/core/window_functions.hpp`
+- Pipeline integration: `cpp/include/ionosense/core/processing_stage.hpp`
+- Test examples: `cpp/tests/test_window_functions.cpp`
+
 ## System Reliability Notes
 
 ### Configuration System
@@ -183,4 +552,4 @@ python benchmarks/run_latency.py experiment=ionosphere_multiscale +benchmark=lat
 python benchmarks/run_throughput.py --multirun experiment=ionosphere_resolution
 ```
 
-Last updated: 2025-10-01 (Added profiling benchmark config and timing guidance)
+Last updated: 2025-10-15 (Added GPU clock locking for benchmark stability - reduces CV from 20-40% to 5-15%)

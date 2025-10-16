@@ -13,7 +13,7 @@
  * the header, promoting cleaner architecture and faster compile times.
  */
 
-#include "ionosense/processing_stage.hpp"
+#include "ionosense/core/processing_stage.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -21,9 +21,9 @@
 #include <string>
 #include <vector>
 
-#include "ionosense/cuda_wrappers.hpp"
-#include "ionosense/profiling_macros.hpp"
-#include "ionosense/window_functions.hpp"
+#include "ionosense/core/cuda_wrappers.hpp"
+#include "ionosense/core/profiling_macros.hpp"
+#include "ionosense/core/window_functions.hpp"
 
 // --- External Kernel Launch Function Declarations (from ops_fft.cu) ---
 namespace ionosense {
@@ -66,8 +66,18 @@ class WindowStage::Impl {
                       profiling::colors::DARK_GRAY);
       std::vector<float> host_window(config.nfft);
       bool sqrt_norm = (config.window_norm == StageConfig::WindowNorm::SQRT);
-      window_utils::generate_window(
-          host_window.data(), config.nfft, config.window_type, sqrt_norm, config.window_symmetry);
+      window_utils::generate_window(host_window.data(), config.nfft,
+                                    config.window_type, sqrt_norm,
+                                    config.window_symmetry);
+
+      // Apply window normalization (UNITY or SQRT)
+      // Note: SQRT normalization is already applied during generation
+      // UNITY normalization needs to be applied here
+      if (config.window_norm == StageConfig::WindowNorm::UNITY) {
+        IONO_NVTX_RANGE("Apply UNITY Normalization", profiling::colors::CYAN);
+        window_utils::normalize_window(host_window.data(), config.nfft,
+                                       config.window_norm);
+      }
 
       // Allocate device memory and upload the window coefficients.
       d_window_.resize(config.nfft);
@@ -373,7 +383,8 @@ window_functions::WindowKind to_window_kind(StageConfig::WindowType type) {
   return window_functions::WindowKind::RECTANGULAR;
 }
 
-window_functions::WindowSymmetry to_window_symmetry(StageConfig::WindowSymmetry symmetry) {
+window_functions::WindowSymmetry to_window_symmetry(
+    StageConfig::WindowSymmetry symmetry) {
   switch (symmetry) {
     case StageConfig::WindowSymmetry::PERIODIC:
       return window_functions::WindowSymmetry::PERIODIC;

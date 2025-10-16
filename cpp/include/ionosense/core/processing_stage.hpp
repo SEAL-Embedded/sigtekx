@@ -52,16 +52,40 @@ struct StageConfig {
   WindowType window_type = WindowType::HANN;  ///< The window function to apply.
 
   enum class WindowNorm {
-    UNITY,
-    SQRT
+    UNITY,  ///< Normalize to unity power/energy gain
+    SQRT    ///< Apply square root normalization
   };  ///< Normalization type for the window.
   WindowNorm window_norm = WindowNorm::UNITY;  ///< The normalization scheme.
 
+  /**
+   * @enum WindowSymmetry
+   * @brief Defines window endpoint behavior for different use cases.
+   *
+   * Window symmetry controls the denominator in window coefficient
+   * calculations, affecting endpoint values and spectral characteristics:
+   *
+   * - **PERIODIC (N)**: For FFT-based spectral analysis (default)
+   *   - Denominator: N (window size)
+   *   - Endpoints: Non-zero (except at i=0)
+   *   - Use case: Spectral analysis, STFT, ionosphere research
+   *   - Example: Hann[i] = 0.5 * (1 - cos(2πi/N))
+   *
+   * - **SYMMETRIC (N-1)**: For time-domain signal analysis
+   *   - Denominator: N-1
+   *   - Endpoints: Exactly zero at both ends
+   *   - Use case: FIR filter design, signal windowing
+   *   - Example: Hann[i] = 0.5 * (1 - cos(2πi/(N-1)))
+   *
+   * **Default**: PERIODIC is appropriate for FFT processing where the window
+   * is applied to periodic signals in the frequency domain.
+   */
   enum class WindowSymmetry {
-    PERIODIC,   ///< Periodic window (FFT processing, denominator N)
-    SYMMETRIC   ///< Symmetric window (signal analysis, denominator N-1)
-  };  ///< Window symmetry type.
-  WindowSymmetry window_symmetry = WindowSymmetry::PERIODIC;  ///< Default to periodic for FFT processing.
+    PERIODIC,  ///< Periodic window (FFT processing, denominator N)
+    SYMMETRIC  ///< Symmetric window (signal analysis, denominator N-1)
+  };
+  WindowSymmetry window_symmetry =
+      WindowSymmetry::PERIODIC;  ///< Default to PERIODIC for FFT-based
+                                 ///< ionosphere analysis.
 
   bool preload_window = true;  ///< If true, window coefficients are uploaded to
                                ///< GPU once at initialization.
@@ -257,10 +281,13 @@ namespace window_utils {
  * @param size The size of the window (number of coefficients).
  * @param type The type of window to generate.
  * @param sqrt_norm If true, applies a square root normalization.
- * @param symmetry Window symmetry type (PERIODIC for FFT, SYMMETRIC for analysis).
+ * @param symmetry Window symmetry mode (see window_functions.hpp for detailed
+ * documentation).
  */
 void generate_window(float* window, int size, StageConfig::WindowType type,
-                     bool sqrt_norm = false, StageConfig::WindowSymmetry symmetry = StageConfig::WindowSymmetry::PERIODIC);
+                     bool sqrt_norm = false,
+                     StageConfig::WindowSymmetry symmetry =
+                         StageConfig::WindowSymmetry::PERIODIC);
 
 /**
  * @brief Normalizes a window to have a specific property (e.g., unity gain).

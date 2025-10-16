@@ -18,14 +18,12 @@ Examples:
 """
 
 import argparse
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-import numpy as np
-from pathlib import Path
-from datetime import datetime
-import glob
 import warnings
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
 
 # Suppress warnings for cleaner output
 warnings.filterwarnings('ignore')
@@ -315,7 +313,7 @@ def print_data_summary(df: pd.DataFrame):
         print("No data found")
         return
 
-    print(f"\n** Data Summary **")
+    print("\n** Data Summary **")
     print(f"Total measurements: {len(df)}")
 
     if 'benchmark_type' in df.columns:

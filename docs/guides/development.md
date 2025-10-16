@@ -19,11 +19,11 @@ This guide is for developers contributing to ionosense-hpc. It covers the CLI-ba
 
 ### Prerequisites
 
-- **Operating System**: Linux (Ubuntu 20.04+), Windows 10/11 with WSL2, or Windows native
-- **Python**: 3.8 or higher
-- **CUDA Toolkit**: 11.0 or higher
-- **Compiler**: GCC 9+ (Linux), MSVC 2019+ (Windows)
-- **CMake**: 3.18 or higher
+- **Operating System**: Windows 11 or Ubuntu 24.04 LTS (WSL2 supported)
+- **Python**: 3.11 or higher
+- **CUDA Toolkit**: 13.0 or higher
+- **Compiler**: GCC 14.x (Linux), MSVC 2022 (Windows)
+- **CMake**: 3.26 or higher
 - **Git**: 2.25 or higher
 
 ### Setting Up Development Environment

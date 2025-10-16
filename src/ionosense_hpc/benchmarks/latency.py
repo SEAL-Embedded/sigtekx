@@ -12,7 +12,7 @@ import numpy as np
 
 from ionosense_hpc import Engine
 from ionosense_hpc.benchmarks.base import BaseBenchmark, BenchmarkConfig, BenchmarkResult
-from ionosense_hpc.config import EngineConfig, Presets
+from ionosense_hpc.config import EngineConfig, ExecutionMode, get_preset
 from ionosense_hpc.utils import logger, make_test_batch
 from ionosense_hpc.utils.paths import get_benchmark_run_dir, normalize_benchmark_name
 from ionosense_hpc.utils.profiling import (
@@ -72,11 +72,12 @@ class LatencyBenchmark(BaseBenchmark):
             if self.config.engine_config:
                 engine_config = EngineConfig(**self.config.engine_config)
             else:
-                engine_config = Presets.realtime()
+                engine_config = get_preset('default')
+                engine_config.mode = ExecutionMode.REALTIME
 
             # Initialize engine
             with nvtx_range("InitializeEngine", color=ProfileColor.DARK_GRAY):
-                self.engine = Engine(engine_config)
+                self.engine = Engine(config=engine_config)
 
             # Prepare deterministic test data
             with nvtx_range("PrepareTestData", color=ProfileColor.ORANGE):

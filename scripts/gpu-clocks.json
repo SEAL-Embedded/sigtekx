@@ -1,0 +1,115 @@
+{
+  "gpu_models": {
+    "RTX_3090_Ti": {
+      "name": "NVIDIA GeForce RTX 3090 Ti",
+      "architecture": "Ampere",
+      "max_graphics_clock_mhz": 1950,
+      "max_memory_clock_mhz": 10501,
+      "recommended_graphics_clock_mhz": 1920,
+      "recommended_memory_clock_mhz": 10251,
+      "notes": "Conservative clocks for stability. Can try up to 1950 MHz if cooling is adequate."
+    },
+    "RTX_4090": {
+      "name": "NVIDIA GeForce RTX 4090",
+      "architecture": "Ada Lovelace",
+      "max_graphics_clock_mhz": 2730,
+      "max_memory_clock_mhz": 10501,
+      "recommended_graphics_clock_mhz": 2640,
+      "recommended_memory_clock_mhz": 10251,
+      "notes": "Conservative clocks. RTX 4090 can boost higher but may throttle under sustained load."
+    },
+    "RTX_4080": {
+      "name": "NVIDIA GeForce RTX 4080",
+      "architecture": "Ada Lovelace",
+      "max_graphics_clock_mhz": 2610,
+      "max_memory_clock_mhz": 11400,
+      "recommended_graphics_clock_mhz": 2520,
+      "recommended_memory_clock_mhz": 11000,
+      "notes": "GDDR6X memory runs hot - conservative memory clock recommended."
+    },
+    "RTX_4070_Ti": {
+      "name": "NVIDIA GeForce RTX 4070 Ti",
+      "architecture": "Ada Lovelace",
+      "max_graphics_clock_mhz": 2610,
+      "max_memory_clock_mhz": 10501,
+      "recommended_graphics_clock_mhz": 2520,
+      "recommended_memory_clock_mhz": 10251,
+      "notes": "Good balance of performance and power efficiency."
+    },
+    "RTX_3080": {
+      "name": "NVIDIA GeForce RTX 3080",
+      "architecture": "Ampere",
+      "max_graphics_clock_mhz": 1815,
+      "max_memory_clock_mhz": 9751,
+      "recommended_graphics_clock_mhz": 1755,
+      "recommended_memory_clock_mhz": 9501,
+      "notes": "Conservative clocks for 10GB model. 12GB model may handle slightly higher."
+    },
+    "RTX_3070": {
+      "name": "NVIDIA GeForce RTX 3070",
+      "architecture": "Ampere",
+      "max_graphics_clock_mhz": 1785,
+      "max_memory_clock_mhz": 7001,
+      "recommended_graphics_clock_mhz": 1725,
+      "recommended_memory_clock_mhz": 6801,
+      "notes": "Efficient GPU - recommended clocks provide good stability."
+    },
+    "A100": {
+      "name": "NVIDIA A100-SXM4-40GB",
+      "architecture": "Ampere",
+      "max_graphics_clock_mhz": 1410,
+      "max_memory_clock_mhz": 1215,
+      "recommended_graphics_clock_mhz": 1410,
+      "recommended_memory_clock_mhz": 1215,
+      "notes": "Data center GPU - clocks are already stable. Locking mainly helps with consistency."
+    },
+    "V100": {
+      "name": "Tesla V100-SXM2-16GB",
+      "architecture": "Volta",
+      "max_graphics_clock_mhz": 1530,
+      "max_memory_clock_mhz": 877,
+      "recommended_graphics_clock_mhz": 1530,
+      "recommended_memory_clock_mhz": 877,
+      "notes": "Data center GPU - stable clocks by default."
+    }
+  },
+  "matching_rules": {
+    "description": "Rules for matching nvidia-smi GPU names to clock profiles",
+    "rules": [
+      {
+        "pattern": "RTX 3090 Ti",
+        "profile": "RTX_3090_Ti"
+      },
+      {
+        "pattern": "RTX 4090",
+        "profile": "RTX_4090"
+      },
+      {
+        "pattern": "RTX 4080",
+        "profile": "RTX_4080"
+      },
+      {
+        "pattern": "RTX 4070 Ti",
+        "profile": "RTX_4070_Ti"
+      },
+      {
+        "pattern": "RTX 3080",
+        "profile": "RTX_3080"
+      },
+      {
+        "pattern": "RTX 3070",
+        "profile": "RTX_3070"
+      },
+      {
+        "pattern": "A100",
+        "profile": "A100"
+      },
+      {
+        "pattern": "V100",
+        "profile": "V100"
+      }
+    ]
+  },
+  "version": "1.0.0",
+  "last_updated": "2025-10-15"
+}

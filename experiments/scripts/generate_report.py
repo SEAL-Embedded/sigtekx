@@ -16,24 +16,23 @@ Output:
     - artifacts/reports/final_report.html
 """
 
-import pandas as pd
-import numpy as np
-from pathlib import Path
-from datetime import datetime
-from typing import Dict, List, Optional
 import base64
 import warnings
+from datetime import datetime
+from pathlib import Path
+
+import pandas as pd
 
 # Suppress warnings for cleaner output
 warnings.filterwarnings('ignore')
 
 
-def encode_image_to_base64(image_path: Path) -> Optional[str]:
+def encode_image_to_base64(image_path: Path) -> str | None:
     """Convert image file to base64 string for embedding in HTML."""
     try:
         if image_path.suffix.lower() == '.svg':
             # SVG files can be read as text and embedded directly
-            with open(image_path, 'r', encoding='utf-8') as svg_file:
+            with open(image_path, encoding='utf-8') as svg_file:
                 svg_content = svg_file.read()
                 encoded = base64.b64encode(svg_content.encode('utf-8')).decode('utf-8')
                 return f"data:image/svg+xml;base64,{encoded}"
@@ -58,7 +57,7 @@ def load_summary_data(data_path: str = "artifacts/data/summary_statistics.csv") 
         return pd.DataFrame()
 
 
-def find_generated_figures(figures_dir: str = "artifacts/figures") -> Dict[str, Path]:
+def find_generated_figures(figures_dir: str = "artifacts/figures") -> dict[str, Path]:
     """Find all generated figure files, preferring SVG over PNG."""
     figures_path = Path(figures_dir)
 
@@ -238,7 +237,7 @@ def generate_detailed_tables(df: pd.DataFrame) -> str:
     return '\n'.join(tables_html)
 
 
-def generate_figures_section(figure_files: Dict[str, Path]) -> str:
+def generate_figures_section(figure_files: dict[str, Path]) -> str:
     """Generate figures section with embedded images."""
     if not figure_files:
         return "<p>No figures available.</p>"
@@ -281,7 +280,7 @@ def generate_figures_section(figure_files: Dict[str, Path]) -> str:
     return '\n'.join(figures_html)
 
 
-def generate_html_report(df: pd.DataFrame, figure_files: Dict[str, Path]) -> str:
+def generate_html_report(df: pd.DataFrame, figure_files: dict[str, Path]) -> str:
     """Generate complete HTML report."""
 
     executive_summary = generate_executive_summary(df)
@@ -448,7 +447,7 @@ def main():
         f.write(html_content)
 
     print(f">> Report saved to: {output_path}")
-    print(f">> Report includes:")
+    print(">> Report includes:")
     print(f"   - {len(df)} measurements" if not df.empty else "   - No measurement data")
     print(f"   - {len(figure_files)} figures" if figure_files else "   - No figures")
 

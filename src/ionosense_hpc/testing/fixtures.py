@@ -20,7 +20,7 @@ from ionosense_hpc.benchmarks.base import (
     BenchmarkContext,
     BenchmarkResult,
 )
-from ionosense_hpc.config import EngineConfig, Presets
+from ionosense_hpc.config import EngineConfig, get_preset
 from ionosense_hpc.utils import (
     make_chirp,
     make_multitone,
@@ -69,14 +69,20 @@ def temp_benchmark_dir(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def validation_config() -> EngineConfig:
-    """Provides a small, controlled configuration for validation and debugging."""
-    return Presets.validation()
+    """Provides a small, controlled configuration for validation and debugging (matches old 'validation' preset)."""
+    return EngineConfig(
+        nfft=256,
+        batch=1,
+        overlap=0.0,
+        sample_rate_hz=1000,
+        warmup_iters=0
+    )
 
 
 @pytest.fixture
 def realtime_config() -> EngineConfig:
-    """Provides a production-ready configuration for real-time processing tests."""
-    return Presets.realtime()
+    """Provides a production-ready configuration for real-time processing tests (matches 'default' preset)."""
+    return get_preset('default')
 
 
 @pytest.fixture
@@ -96,8 +102,9 @@ def benchmark_base_config() -> BenchmarkConfig:
 @pytest.fixture
 def benchmark_config() -> EngineConfig:
     """Provides an EngineConfig tailored for benchmarking."""
-    config = Presets.profiling()
+    config = get_preset('default')
     config.enable_profiling = True
+    config.warmup_iters = 5
     return config
 
 @pytest.fixture
@@ -164,7 +171,7 @@ def yaml_benchmark_config(temp_data_dir: Path) -> Path:
 @pytest.fixture
 def test_engine(validation_config: EngineConfig) -> Generator[Engine, None, None]:
     """Yields an initialized Engine instance with automatic resource cleanup."""
-    engine = Engine(validation_config)
+    engine = Engine(config=validation_config)
     try:
         yield engine
     finally:
@@ -177,7 +184,12 @@ def mock_engine(monkeypatch) -> Engine:
 
     class MockEngine:
         def __init__(self, config=None, **_):
-            self.config = config or Presets.validation()
+            if config is None:
+                default_config = get_preset('default')
+                default_config.batch = 1
+                self.config = default_config
+            else:
+                self.config = config
             self.is_initialized = True
 
         def process(self, data):

@@ -6,14 +6,14 @@ This script is Hydra-aware and logs results to MLflow.
 Communication with other scripts happens through artifact files.
 """
 
+import warnings
+from pathlib import Path
+
 import hydra
 import mlflow
 import pandas as pd
 from omegaconf import DictConfig, OmegaConf
-from pathlib import Path
-import warnings
 
-from ionosense_hpc import Engine
 from ionosense_hpc.benchmarks import ThroughputBenchmark, ThroughputBenchmarkConfig
 from ionosense_hpc.config import EngineConfig
 
@@ -55,7 +55,10 @@ def run_throughput_benchmark(cfg: DictConfig) -> float:
             pass  # Validation module not available
 
         # Convert OmegaConf to Pydantic models for validation
-        engine_config = EngineConfig(**cfg.engine)
+        # Filter out metadata fields that aren't part of EngineConfig
+        engine_dict = dict(cfg.engine)
+        engine_dict.pop("name", None)  # Remove metadata field
+        engine_config = EngineConfig(**engine_dict)
         benchmark_config = ThroughputBenchmarkConfig(**cfg.benchmark, engine_config=engine_config.model_dump())
 
     except Exception as e:
@@ -80,7 +83,7 @@ def run_throughput_benchmark(cfg: DictConfig) -> float:
         # Run benchmark
         benchmark = ThroughputBenchmark(benchmark_config)
         result = benchmark.run()
-        
+
         # Log metrics
         fps = 0.0
         if 'frames_per_second' in result.statistics:
@@ -91,11 +94,11 @@ def run_throughput_benchmark(cfg: DictConfig) -> float:
                 "throughput.gb_per_second": result.statistics.get('gb_per_second', {}).get('mean', 0),
                 "throughput.samples_per_second": result.statistics.get('samples_per_second', {}).get('mean', 0),
             })
-            
+
         # Save results to parquet (for downstream analysis)
         output_dir = Path(cfg.paths.data)
         output_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Save summary
         summary = {
             'engine_nfft': engine_config.nfft,
@@ -104,12 +107,12 @@ def run_throughput_benchmark(cfg: DictConfig) -> float:
             'gb_per_second': result.statistics.get('gb_per_second', {}).get('mean', 0),
             'gpu_utilization': result.statistics.get('gpu_utilization_mean', 0),
         }
-        
+
         summary_df = pd.DataFrame([summary])
         summary_path = output_dir / f"throughput_summary_{engine_config.nfft}_{engine_config.batch}.csv"
         summary_df.to_csv(summary_path, index=False)
         mlflow.log_artifact(str(summary_path))
-        
+
     # Return negative FPS for minimization (Hydra sweeper minimizes by default)
     return -fps
 

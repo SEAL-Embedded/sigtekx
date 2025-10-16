@@ -13,13 +13,12 @@ Input: artifacts/data/summary_statistics.csv
 Output: Multiple PNG files in artifacts/figures/
 """
 
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 import warnings
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
 
 # Suppress warnings for cleaner output
 warnings.filterwarnings('ignore')
@@ -387,7 +386,7 @@ def plot_combined_analysis(df: pd.DataFrame, output_dir: Path) -> None:
             if not valid_throughput.empty:
                 best_idx = valid_throughput['frames_per_second'].idxmax()
                 best_row = valid_throughput.loc[best_idx]
-                best_configs_text += f"Best Throughput:\n"
+                best_configs_text += "Best Throughput:\n"
                 best_configs_text += f"  NFFT: {int(best_row['engine_nfft'])}\n"
                 best_configs_text += f"  Batch: {int(best_row['engine_batch'])}\n"
                 best_configs_text += f"  FPS: {best_row['frames_per_second']:.1f}\n\n"
@@ -400,7 +399,7 @@ def plot_combined_analysis(df: pd.DataFrame, output_dir: Path) -> None:
             if not valid_latency.empty:
                 best_idx = valid_latency['mean_latency_us'].idxmin()
                 best_row = valid_latency.loc[best_idx]
-                best_configs_text += f"Best Latency:\n"
+                best_configs_text += "Best Latency:\n"
                 best_configs_text += f"  NFFT: {int(best_row['engine_nfft'])}\n"
                 best_configs_text += f"  Batch: {int(best_row['engine_batch'])}\n"
                 best_configs_text += f"  Latency: {best_row['mean_latency_us']:.1f}μs\n\n"
@@ -437,7 +436,7 @@ def plot_accuracy_analysis(df: pd.DataFrame, output_dir: Path) -> None:
 
         output_path = output_dir / "accuracy_heatmap"
         save_figure_dual_format(fig, output_path, close_fig=True)
-        print(f"Created placeholder for accuracy analysis")
+        print("Created placeholder for accuracy analysis")
         return
 
     # Create a simple accuracy plot if we have data
@@ -491,7 +490,7 @@ def main():
             print("No data available for visualization")
             return
 
-        print(f"\nGenerating figures...")
+        print("\nGenerating figures...")
 
         # Generate all visualizations
         plot_throughput_scaling(df, output_dir)
@@ -499,13 +498,13 @@ def main():
         plot_accuracy_analysis(df, output_dir)
         plot_combined_analysis(df, output_dir)
 
-        print(f"\nFigure generation complete!")
+        print("\nFigure generation complete!")
         print(f"All figures saved to: {output_dir}")
 
         # List generated files
         figure_files = list(output_dir.glob("*.png"))
         if figure_files:
-            print(f"\nGenerated figures:")
+            print("\nGenerated figures:")
             for fig_file in sorted(figure_files):
                 print(f"  {fig_file.name}")
 

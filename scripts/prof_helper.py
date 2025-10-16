@@ -4,20 +4,15 @@ Robust GPU Profiling Helper for ionosense-hpc
 Provides clean progress tracking and smart profiling modes
 """
 
-import subprocess
-import sys
-import time
 import argparse
-import json
-from pathlib import Path
-from datetime import datetime
-import re
-import shutil
-from typing import Optional, List, Dict, Any
-import threading
-import queue
 import platform
-import webbrowser
+import queue
+import re
+import subprocess
+import threading
+import time
+from datetime import datetime
+from pathlib import Path
 
 
 class Colors:
@@ -36,7 +31,7 @@ class Colors:
 
 class ProfileSession:
     """Manages a profiling session with progress tracking"""
-    
+
     def __init__(self, tool: str, target: str, mode: str = "quick"):
         self.tool = tool.lower()
         self.target = target
@@ -46,7 +41,7 @@ class ProfileSession:
         self.kernel_progress = {}
         self.current_kernel = None
         self.total_passes = 0
-        
+
         # Setup paths
         self.project_root = Path(__file__).parent.parent
         self.artifacts_dir = self.project_root / "artifacts"
@@ -57,7 +52,7 @@ class ProfileSession:
         self.ncu_dir = self.reports_dir / "ncu"
         self.nsys_dir.mkdir(parents=True, exist_ok=True)
         self.ncu_dir.mkdir(parents=True, exist_ok=True)
-    
+
     def print_header(self):
         """Print a clean session header"""
         print(f"\n{Colors.CYAN}+-------------------------------------------------------------+{Colors.RESET}")
@@ -67,7 +62,7 @@ class ProfileSession:
         print(f"{Colors.CYAN}|{Colors.RESET}  Target:   {Colors.YELLOW}{self.target}{Colors.RESET}")
         print(f"{Colors.CYAN}|{Colors.RESET}  Time:     {Colors.WHITE}{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}{Colors.RESET}")
         print(f"{Colors.CYAN}+-------------------------------------------------------------+{Colors.RESET}\n")
-    
+
     def format_time(self, seconds: float) -> str:
         """Format elapsed time nicely"""
         if seconds < 60:
@@ -76,7 +71,7 @@ class ProfileSession:
             return f"{seconds/60:.1f}m"
         else:
             return f"{seconds/3600:.1f}h"
-    
+
     def format_size(self, bytes: int) -> str:
         """Format file size nicely"""
         for unit in ['B', 'KB', 'MB', 'GB']:
@@ -84,24 +79,24 @@ class ProfileSession:
                 return f"{bytes:.1f}{unit}"
             bytes /= 1024.0
         return f"{bytes:.1f}TB"
-    
+
     def monitor_ncu_progress(self, process):
         """Monitor NCU output and show progress"""
         kernel_count = 0
         current_kernel = ""
         current_passes = 0
         max_passes = 43 if self.mode == "full" else 15
-        
+
         for line in iter(process.stdout.readline, ''):
             if process.poll() is not None:
                 break
-                
+
             # Parse NCU progress lines
             if "Profiling" in line:
                 match = re.search(r'Profiling "([^"]+)" - (\d+):', line)
                 if match:
                     kernel_name = match.group(1)
-                    
+
                     if kernel_name != current_kernel:
                         if current_kernel:
                             print(f"\r  {Colors.GREEN}[OK]{Colors.RESET} [{kernel_count}] {current_kernel[:40]:<40} ({current_passes} passes)")
@@ -110,7 +105,7 @@ class ProfileSession:
                         current_passes = 0
                         self.kernel_progress[kernel_name] = 0
                         print(f"\n  {Colors.YELLOW}[*]{Colors.RESET} [{kernel_count}] Profiling: {Colors.CYAN}{kernel_name[:40]}{Colors.RESET}")
-            
+
             # Update progress bar
             if "%" in line:
                 match = re.search(r'(\d+)%', line)
@@ -119,24 +114,24 @@ class ProfileSession:
                     bar_width = 30
                     filled = int(bar_width * pct / 100)
                     bar = '█' * filled + '░' * (bar_width - filled)
-                    
+
                     # Track passes
                     if pct == 100:
                         current_passes += 1
-                    
+
                     # Show progress with pass counter
                     elapsed = time.time() - self.start_time
                     pass_info = f"Pass {current_passes}/{max_passes}" if self.mode == "full" else ""
                     print(f"\r     {Colors.BLUE}{bar}{Colors.RESET} {pct:3d}% {pass_info} [{self.format_time(elapsed)}]", end='', flush=True)
-            
+
             # Show any important messages
             elif "==WARNING==" in line or "==ERROR==" in line:
                 print(f"\n  {Colors.YELLOW}[WARN]{Colors.RESET}  {line.strip()}")
-        
+
         # Final kernel summary
         if current_kernel:
             print(f"\r  {Colors.GREEN}[OK]{Colors.RESET} [{kernel_count}] {current_kernel[:40]:<40} ({current_passes} passes)")
-        
+
         print(f"\n{Colors.GREEN}[OK] Profiled {kernel_count} unique kernel(s) in {self.format_time(time.time() - self.start_time)}{Colors.RESET}")
 
     def open_file_location(self, file_path: str):
@@ -157,7 +152,7 @@ class ProfileSession:
             print(f"  {Colors.YELLOW}[WARN] Could not open file location: {e}{Colors.RESET}")
             return False
 
-    def discover_gui_tool_path(self, tool: str) -> Optional[str]:
+    def discover_gui_tool_path(self, tool: str) -> str | None:
         """Discover the actual path to the GUI tool executable"""
         print(f"  {Colors.CYAN}[DISCOVERY] Searching for {tool} GUI executable...{Colors.RESET}")
 
@@ -252,10 +247,10 @@ class ProfileSession:
                 print(f"  {Colors.RED}[ERROR] {tool.upper()} GUI tool not found. Please install NVIDIA Nsight tools.{Colors.RESET}")
                 print(f"  {Colors.YELLOW}[HINT] Expected locations:{Colors.RESET}")
                 if tool == "nsys":
-                    print(f"    • C:/Program Files/NVIDIA Corporation/Nsight Systems*/host-*/nsys-ui.exe")
+                    print("    • C:/Program Files/NVIDIA Corporation/Nsight Systems*/host-*/nsys-ui.exe")
                 elif tool == "ncu":
-                    print(f"    • C:/Program Files/NVIDIA Corporation/Nsight Compute*/ncu-ui.bat")
-                    print(f"    • C:/Program Files/NVIDIA Corporation/Nsight Compute*/host/*/ncu-ui.exe")
+                    print("    • C:/Program Files/NVIDIA Corporation/Nsight Compute*/ncu-ui.bat")
+                    print("    • C:/Program Files/NVIDIA Corporation/Nsight Compute*/host/*/ncu-ui.exe")
                 return False
 
             print(f"  {Colors.CYAN}[LAUNCH] Starting {tool} GUI...{Colors.RESET}")
@@ -312,25 +307,25 @@ class ProfileSession:
         except Exception:
             # Fallback to regular path
             print(f"  {Colors.CYAN}[PATH] File location:{Colors.RESET} {file_path}")
-    
+
     def monitor_nsys_progress(self, process):
         """Monitor nsys output and show progress"""
         spinner = ['|', '/', '-', '\\', '|', '/', '-', '\\']
         spin_idx = 0
-        
+
         # Start a thread to read output
         output_queue = queue.Queue()
-        
+
         def read_output():
             for line in iter(process.stdout.readline, ''):
                 if line:
                     output_queue.put(line.strip())
             output_queue.put(None)  # Signal end
-        
+
         thread = threading.Thread(target=read_output)
         thread.daemon = True
         thread.start()
-        
+
         # Monitor progress
         while True:
             # Check for output
@@ -342,7 +337,7 @@ class ProfileSession:
                     print(f"\r  {Colors.CYAN}[INFO]{Colors.RESET} {line[:60]:<60}", end='', flush=True)
             except queue.Empty:
                 pass
-            
+
             # Update spinner
             if process.poll() is None:
                 elapsed = time.time() - self.start_time
@@ -351,16 +346,16 @@ class ProfileSession:
                 time.sleep(0.1)
             else:
                 break
-        
+
         thread.join(timeout=1)
         print(f"\r  {Colors.GREEN}[OK] Profiling complete! [{self.format_time(time.time() - self.start_time)}]{Colors.RESET}          ")
-    
-    def run_nsys(self, target_cmd: List[str], output_name: str, **kwargs):
+
+    def run_nsys(self, target_cmd: list[str], output_name: str, **kwargs):
         """Run Nsight Systems profiling"""
         report_path = self.nsys_dir / output_name
-        
+
         cmd = ["nsys", "profile", "-o", str(report_path), "-f", "true"]
-        
+
         if self.mode == "full":
             print(f"  {Colors.CYAN}🔬 Full mode:{Colors.RESET} All GPU traces + OS runtime")
             cmd.extend(["--trace=cuda,cublas,cusolver,cusparse,nvtx,osrt"])
@@ -369,22 +364,22 @@ class ProfileSession:
         else:
             print(f"  {Colors.CYAN}[*] Quick mode:{Colors.RESET} Essential CUDA + NVTX traces")
             cmd.extend(["--trace=cuda,nvtx"])
-        
+
         # Add duration limit if specified
         if kwargs.get('duration'):
             cmd.extend([f"--duration={kwargs['duration']}"])
             print(f"  {Colors.CYAN}⏱  Duration:{Colors.RESET} {kwargs['duration']} seconds")
-        
+
         cmd.extend(target_cmd)
-        
+
         print(f"\n  {Colors.YELLOW}[>]{Colors.RESET} Starting Nsight Systems...")
         self.start_time = time.time()
-        
+
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
         self.monitor_nsys_progress(process)
-        
+
         return_code = process.wait()
-        
+
         # Check results
         expected_file = f"{report_path}.nsys-rep"
         if Path(expected_file).exists():
@@ -403,8 +398,8 @@ class ProfileSession:
         else:
             print(f"\n  {Colors.RED}[ERROR] Report not found at expected location{Colors.RESET}")
             return None
-    
-    def run_ncu(self, target_cmd: List[str], output_name: str, **kwargs):
+
+    def run_ncu(self, target_cmd: list[str], output_name: str, **kwargs):
         """Run Nsight Compute profiling"""
         report_path = self.ncu_dir / output_name
 
@@ -434,15 +429,15 @@ class ProfileSession:
         cmd.extend(["--target-processes", "all"])
         cmd.extend(["-o", str(report_path)])
         cmd.extend(target_cmd)
-        
+
         print(f"\n  {Colors.YELLOW}[>]{Colors.RESET} Starting Nsight Compute...")
         self.start_time = time.time()
-        
+
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
         self.monitor_ncu_progress(process)
-        
+
         return_code = process.wait()
-        
+
         # Check results
         expected_file = f"{report_path}.ncu-rep"
         if Path(expected_file).exists():
@@ -472,9 +467,9 @@ def main():
     parser.add_argument("--duration", type=int, help="Duration limit in seconds (nsys only)")
     parser.add_argument("--export", action="store_true", help="Export to CSV/SQLite")
     parser.add_argument("args", nargs=argparse.REMAINDER, help="Arguments for target")
-    
+
     args = parser.parse_args()
-    
+
     # Setup session
     session = ProfileSession(args.tool, args.target, args.mode)
     session.print_header()
@@ -546,12 +541,12 @@ def main():
         for i, error in enumerate(validation_errors, 1):
             print(f"    {i}. {error}")
         print(f"\n  {Colors.YELLOW}[ACTION] Please fix these issues before profiling:{Colors.RESET}")
-        print(f"    • Install NVIDIA drivers and CUDA toolkit")
-        print(f"    • Install NVIDIA Nsight tools (nsys, ncu)")
-        print(f"    • Ensure sufficient disk space and permissions")
-        print(f"    • Check system stability (no hanging processes)")
+        print("    • Install NVIDIA drivers and CUDA toolkit")
+        print("    • Install NVIDIA Nsight tools (nsys, ncu)")
+        print("    • Ensure sufficient disk space and permissions")
+        print("    • Check system stability (no hanging processes)")
         exit(1)
-    
+
     # Build target command
     preset_targets = ["latency", "throughput", "accuracy", "realtime"]
 
@@ -611,19 +606,19 @@ def main():
     # Generate output name
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_name = f"{args.target}_{args.mode}_{timestamp}"
-    
+
     # Run profiling
     if args.tool == "nsys":
         report = session.run_nsys(target_cmd, output_name, duration=args.duration)
     else:
         report = session.run_ncu(target_cmd, output_name, kernel_filter=args.kernel)
-    
+
     # Export if requested
     if args.export and report:
         print(f"\n  {Colors.CYAN}📊 Exporting data...{Colors.RESET}")
         if args.tool == "nsys":
             sqlite_out = str(report).replace('.nsys-rep', '.sqlite')
-            subprocess.run(["nsys", "export", "-t", "sqlite", "-o", sqlite_out, report], 
+            subprocess.run(["nsys", "export", "-t", "sqlite", "-o", sqlite_out, report],
                          capture_output=True)
             print(f"     SQLite: {sqlite_out}")
         else:
@@ -638,7 +633,7 @@ def main():
 
         # Offer to open file location
         try:
-            response = input(f"Open file location in explorer? (y/N): ").strip().lower()
+            response = input("Open file location in explorer? (y/N): ").strip().lower()
             if response in ['y', 'yes']:
                 print(f"  {Colors.CYAN}[DEBUG] Calling open_file_location() for: {report}{Colors.RESET}")
                 success = session.open_file_location(report)

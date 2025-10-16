@@ -29,7 +29,7 @@ Detailed installation instructions for ionosense-hpc on various platforms using 
 | Component | Linux | Windows | WSL2 |
 |-----------|-------|---------|------|
 | OS | Ubuntu 22.04/24.04 LTS | Windows 11 | Ubuntu 24.04 LTS |
-| CUDA Driver | ≥525 | ≥525 | Host driver |
+| CUDA Driver | ≥550 | ≥550 | Host driver |
 | Build Tools | GCC 11+ | VS Build Tools 2022 | GCC 11+ |
 | Python | 3.11 | 3.11 | 3.11 |
 | CMake | ≥3.26 | ≥3.26 | ≥3.26 |

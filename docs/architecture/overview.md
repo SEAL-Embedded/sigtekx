@@ -36,7 +36,7 @@ Ionosense HPC is a high-performance research platform designed for GPU-accelerat
 
 ### 1.2 High-Level Platform Overview
 
-![Research Platform Overview](diagrams/figures/research-platform.svg)
+![Research Platform Overview](../diagrams/figures/research-platform.svg)
 
 The platform serves three primary research applications:
 
@@ -73,7 +73,7 @@ The platform serves three primary research applications:
 
 ### 2.1 Component Architecture
 
-![Component Architecture](diagrams/figures/component-arch.svg)
+![Component Architecture](../diagrams/figures/component-arch.svg)
 
 The system is organized into distinct architectural layers:
 
@@ -161,7 +161,7 @@ The system is organized into distinct architectural layers:
 
 ### 3.1 C++ Class Architecture
 
-![C++ Class Architecture](diagrams/figures/class-arch.svg)
+![C++ Class Architecture](../diagrams/figures/class-arch.svg)
 
 ### 3.2 Key Design Elements
 
@@ -265,7 +265,7 @@ struct StageConfig {
 
 ### 4.1 Package Structure
 
-![Python Package Architecture](diagrams/figures/py-pkg-arch.svg)
+![Python Package Architecture](../diagrams/figures/py-pkg-arch.svg)
 
 ### 4.2 Core Modules
 
@@ -415,7 +415,7 @@ All exceptions include:
 
 ### 5.1 Memory Architecture
 
-![Memory Management](diagrams/figures/memory-management.svg)
+![Memory Management](../diagrams/figures/memory-management.svg)
 
 ### 5.2 Memory Spaces
 
@@ -518,7 +518,7 @@ Typical memory usage (nfft=1024, batch=2): **~10 MB**
 
 ### 6.1 Synchronous Pipeline
 
-![Processing Pipeline Sequence](diagrams/figures/sequence-pipeline.svg)
+![Processing Pipeline Sequence](../diagrams/figures/sequence-pipeline.svg)
 
 ### 6.2 Pipeline Stages
 
@@ -636,7 +636,7 @@ Exceptions include:
 
 ### 7.1 Workflow Architecture
 
-![Experiment Workflow Architecture](diagrams/figures/exp-analysis-workflow.svg)
+![Experiment Workflow Architecture](../diagrams/figures/exp-analysis-workflow.svg)
 
 ### 7.2 Configuration Layer (Hydra)
 
@@ -859,7 +859,7 @@ dvc push
 
 ### 7.7 Workflow Sequence
 
-![Workflow Sequence](diagrams/figures/exp-workflow-sequence.svg)
+![Workflow Sequence](../diagrams/figures/exp-workflow-sequence.svg)
 
 **Typical Workflow:**
 

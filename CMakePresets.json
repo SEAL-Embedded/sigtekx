@@ -75,6 +75,22 @@
       }
     },
     {
+      "name": "windows-coverage",
+      "inherits": "base",
+      "displayName": "Windows Coverage",
+      "description": "Windows debug build with code coverage enabled",
+      "binaryDir": "${sourceDir}/build/windows-coverage",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "IONO_WITH_TESTS": "ON",
+        "IONO_WITH_GRAPHS": "ON",
+        "IONO_WITH_PYTHON": "OFF",
+        "IONO_WITH_NVTX": "ON",
+        "IONO_WITH_TIDY": "OFF",
+        "IONO_ENABLE_COVERAGE": "ON"
+      }
+    },
+    {
       "name": "windows-vs",
       "displayName": "Windows Visual Studio",
       "description": "Windows release build with Visual Studio 2022",
@@ -122,6 +138,11 @@
     {
       "name": "windows-debug",
       "configurePreset": "windows-debug",
+      "configuration": "Debug"
+    },
+    {
+      "name": "windows-coverage",
+      "configurePreset": "windows-coverage",
       "configuration": "Debug"
     },
     {

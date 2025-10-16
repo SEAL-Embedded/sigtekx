@@ -1,7 +1,7 @@
 # Ionosense-HPC
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![CUDA 13.0+](https://img.shields.io/badge/CUDA-12.0+-green.svg)](https://developer.nvidia.com/cuda-toolkit)
+[![CUDA 13.0+](https://img.shields.io/badge/CUDA-13.0+-green.svg)](https://developer.nvidia.com/cuda-toolkit)
 
 High-performance CUDA FFT engine and research-grade benchmarking suite for real-time signal processing and ionospheric physics research.
 
@@ -57,7 +57,7 @@ Ionosense-HPC provides a Python interface to a high-performance CUDA-based signa
 - **Python**: 3.11 or higher
 - **CUDA Toolkit**: 13.0 or higher
 - **Visual Studio 2022**: with C++ build tools
-- **CMake**: 3.25+
+- **CMake**: 3.26+
 - **PowerShell**: 7.0+ (Windows)
 - **Conda/Miniconda**: For environment management
 
@@ -92,17 +92,16 @@ See [INSTALL.md](docs/INSTALL.md) for platform-specific instructions, troublesho
 
 ```python
 from ionosense_hpc import Engine
-from ionosense_hpc.config import Presets
 import numpy as np
 
-# Create engine with real-time preset (sub-200μs latency)
-with Engine(Presets.realtime()) as engine:
+# Create engine with default preset (1024 FFT, sub-200μs latency)
+with Engine(preset='default') as engine:
     # Generate or load signal data
-    signal = np.random.randn(2048).astype(np.float32)
-    
+    signal = np.random.randn(engine.config.nfft * engine.config.batch).astype(np.float32)
+
     # Process signal (GPU-accelerated FFT)
     spectrum = engine.process(signal)
-    
+
     # Access performance metrics
     stats = engine.stats
     print(f"Latency: {stats['latency_us']:.1f} μs")
@@ -113,13 +112,15 @@ with Engine(Presets.realtime()) as engine:
 ### Configuration Presets
 
 ```python
-from ionosense_hpc.config import Presets
+from ionosense_hpc import Engine
 
 # Available presets for different use cases
-engine_realtime = Engine(Presets.realtime())      # Low latency (<200μs)
-engine_throughput = Engine(Presets.throughput())  # High throughput
-engine_validation = Engine(Presets.validation())  # Accuracy testing
-engine_profiling = Engine(Presets.profiling())    # Performance analysis
+engine_default = Engine(preset='default')  # General-purpose (1024 FFT)
+engine_iono = Engine(preset='iono')        # Ionosphere research (4096 FFT, 0.75 overlap)
+engine_ionox = Engine(preset='ionox')      # Extreme ionosphere (8192 FFT, 0.9 overlap)
+
+# Override preset parameters
+engine = Engine(preset='iono', nfft=8192, mode='realtime')
 ```
 
 ### Custom Configuration
@@ -127,15 +128,22 @@ engine_profiling = Engine(Presets.profiling())    # Performance analysis
 ```python
 from ionosense_hpc import Engine, EngineConfig
 
+# Full custom configuration
 config = EngineConfig(
-    nfft=4096,              # FFT size
-    batch=8,                # Parallel processing
-    overlap=0.75,           # Window overlap
-    sample_rate_hz=48000,   # Sampling rate
-    enable_profiling=True   # NVTX markers
+    nfft=4096,                 # FFT size
+    batch=8,                   # Parallel processing
+    overlap=0.75,              # Window overlap
+    sample_rate_hz=48000,      # Sampling rate
+    window='blackman',         # Window function
+    mode='batch',              # Execution mode
+    enable_profiling=True      # NVTX markers
 )
 
-engine = Engine(config)
+engine = Engine(config=config)
+
+# Or use factory method from preset
+config = EngineConfig.from_preset('iono', nfft=8192, overlap=0.875)
+engine = Engine(config=config)
 ```
 
 ## Development Commands
@@ -484,7 +492,7 @@ iono doctor
 iono setup                      # Recreate environment
 
 # 2. CUDA not found
-# Install CUDA Toolkit 12.0+ from NVIDIA
+# Install CUDA Toolkit 13.0+ from NVIDIA
 
 # 3. Visual Studio tools not found
 # Install VS 2022 with C++ build tools

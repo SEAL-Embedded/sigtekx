@@ -20,9 +20,9 @@
 #include <numeric>
 #include <vector>
 
-#include "ionosense/cuda_wrappers.hpp"
-#include "ionosense/processing_stage.hpp"
-#include "ionosense/window_functions.hpp"
+#include "ionosense/core/cuda_wrappers.hpp"
+#include "ionosense/core/processing_stage.hpp"
+#include "ionosense/core/window_functions.hpp"
 
 // IEEE Std 1003.1-2001 compliance for mathematical constants
 #ifndef M_PI
@@ -34,33 +34,54 @@ using namespace ionosense;
 namespace {
 
 window_functions::WindowKind ToWindowKind(StageConfig::WindowType type) {
-    switch (type) {
-        case StageConfig::WindowType::RECTANGULAR:
-            return window_functions::WindowKind::RECTANGULAR;
-        case StageConfig::WindowType::HANN:
-            return window_functions::WindowKind::HANN;
-        case StageConfig::WindowType::BLACKMAN:
-            return window_functions::WindowKind::BLACKMAN;
-    }
-    return window_functions::WindowKind::RECTANGULAR;
+  switch (type) {
+    case StageConfig::WindowType::RECTANGULAR:
+      return window_functions::WindowKind::RECTANGULAR;
+    case StageConfig::WindowType::HANN:
+      return window_functions::WindowKind::HANN;
+    case StageConfig::WindowType::BLACKMAN:
+      return window_functions::WindowKind::BLACKMAN;
+  }
+  return window_functions::WindowKind::RECTANGULAR;
 }
 
-void ExpectWindowParity(StageConfig::WindowType type, bool sqrt_norm, int size) {
-    std::vector<float> generated(size);
-    std::vector<float> reference(size);
+window_functions::WindowSymmetry ToWindowSymmetry(
+    StageConfig::WindowSymmetry symmetry) {
+  switch (symmetry) {
+    case StageConfig::WindowSymmetry::PERIODIC:
+      return window_functions::WindowSymmetry::PERIODIC;
+    case StageConfig::WindowSymmetry::SYMMETRIC:
+      return window_functions::WindowSymmetry::SYMMETRIC;
+  }
+  return window_functions::WindowSymmetry::PERIODIC;
+}
 
-    if (size > 0) {
-        ionosense::window_utils::generate_window(generated.data(), size, type, sqrt_norm);
-        window_functions::fill_window(reference.data(), size, ToWindowKind(type), sqrt_norm);
-    }
+/**
+ * @brief Verifies parity between window_utils and window_functions APIs.
+ *
+ * This helper ensures both window generation paths produce identical results,
+ * which is critical for consistency between CPU preprocessing and GPU
+ * execution.
+ */
+void ExpectWindowParity(StageConfig::WindowType type, bool sqrt_norm, int size,
+                        StageConfig::WindowSymmetry symmetry =
+                            StageConfig::WindowSymmetry::PERIODIC) {
+  std::vector<float> generated(size);
+  std::vector<float> reference(size);
 
-    for (int idx = 0; idx < size; ++idx) {
-        EXPECT_FLOAT_EQ(generated[idx], reference[idx])
-            << "type=" << static_cast<int>(type)
-            << ", size=" << size
-            << ", sqrt=" << sqrt_norm
-            << ", idx=" << idx;
-    }
+  if (size > 0) {
+    ionosense::window_utils::generate_window(generated.data(), size, type,
+                                             sqrt_norm, symmetry);
+    window_functions::fill_window(reference.data(), size, ToWindowKind(type),
+                                  sqrt_norm, ToWindowSymmetry(symmetry));
+  }
+
+  for (int idx = 0; idx < size; ++idx) {
+    EXPECT_FLOAT_EQ(generated[idx], reference[idx])
+        << "type=" << static_cast<int>(type) << ", size=" << size
+        << ", sqrt=" << sqrt_norm << ", symmetry=" << static_cast<int>(symmetry)
+        << ", idx=" << idx;
+  }
 }
 
 }  // namespace
@@ -397,38 +418,105 @@ TEST_F(ProcessingStageTest, StageFactoryDefaultPipeline) {
 // ============================================================================
 
 /**
- * @test ProcessingStageTest.WindowUtilsHannGeneration
- * @brief Validates the correctness of the Hann window generation utility.
+ * @test WindowUtilsTest.WindowParityWithReference
+ * @brief Validates parity between window_utils and window_functions APIs.
+ *
+ * Tests all combinations of window types, normalization modes, and symmetry
+ * modes to ensure both generation paths produce identical results.
  */
 TEST(WindowUtilsTest, WindowParityWithReference) {
-    const std::vector<int> sizes{0, 1, 2, 16, 1024};
-    const std::vector<StageConfig::WindowType> types{
-        StageConfig::WindowType::RECTANGULAR,
-        StageConfig::WindowType::HANN,
-        StageConfig::WindowType::BLACKMAN};
+  const std::vector<int> sizes{0, 1, 2, 16, 1024};
+  const std::vector<StageConfig::WindowType> types{
+      StageConfig::WindowType::RECTANGULAR, StageConfig::WindowType::HANN,
+      StageConfig::WindowType::BLACKMAN};
+  const std::vector<StageConfig::WindowSymmetry> symmetries{
+      StageConfig::WindowSymmetry::PERIODIC,
+      StageConfig::WindowSymmetry::SYMMETRIC};
 
-    for (const auto type : types) {
-        for (const int size : sizes) {
-            ExpectWindowParity(type, false, size);
-            ExpectWindowParity(type, true, size);
-        }
+  for (const auto type : types) {
+    for (const int size : sizes) {
+      for (const auto symmetry : symmetries) {
+        // Test without sqrt normalization
+        ExpectWindowParity(type, false, size, symmetry);
+        // Test with sqrt normalization
+        ExpectWindowParity(type, true, size, symmetry);
+      }
     }
+  }
 }
 
 TEST_F(ProcessingStageTest, WindowUtilsHannGeneration) {
   const int size = 64;
   std::vector<float> window(size);
 
-  window_utils::generate_window(window.data(), size, StageConfig::WindowType::HANN, false);
+  // Test SYMMETRIC mode explicitly (original test expected SYMMETRIC behavior)
+  window_utils::generate_window(window.data(), size,
+                                StageConfig::WindowType::HANN, false,
+                                StageConfig::WindowSymmetry::SYMMETRIC);
 
   for (int i = 0; i < size; ++i) {
     float expected = 0.5f * (1.0f - std::cos(2.0f * M_PI * i / (size - 1)));
     EXPECT_NEAR(window[i], expected, 1e-5f);
   }
 
+  // SYMMETRIC mode has exact zeros at endpoints
   EXPECT_NEAR(window[0], 0.0f, 1e-6f);
   EXPECT_NEAR(window[size - 1], 0.0f, 1e-6f);
   EXPECT_NEAR(window[size / 2], 1.0f, 0.1f);
+}
+
+/**
+ * @test ProcessingStageTest.WindowStageRespectsSymmetryConfig
+ * @brief Verifies that WindowStage correctly applies configured window
+ * symmetry.
+ *
+ * This integration test ensures the symmetry configuration flows through from
+ * StageConfig to the actual windowing operation on the GPU.
+ */
+TEST_F(ProcessingStageTest, WindowStageRespectsSymmetryConfig) {
+  const int size = 64;
+
+  // Test SYMMETRIC mode configuration
+  config_.nfft = size;
+  config_.batch = 1;
+  config_.window_type = StageConfig::WindowType::HANN;
+  config_.window_symmetry = StageConfig::WindowSymmetry::SYMMETRIC;
+
+  WindowStage stage;
+  stage.initialize(config_, stream_->get());
+
+  // Create constant input signal
+  std::vector<float> host_input(size, 1.0f);
+  DeviceBuffer<float> d_input(size);
+  DeviceBuffer<float> d_output(size);
+
+  d_input.copy_from_host(host_input.data(), size, stream_->get());
+  stage.process(d_input.get(), d_output.get(), size, stream_->get());
+
+  std::vector<float> host_output(size);
+  d_output.copy_to_host(host_output.data(), size, stream_->get());
+  stream_->synchronize();
+
+  // SYMMETRIC mode should produce zeros at both endpoints
+  EXPECT_NEAR(host_output[0], 0.0f, 1e-5f)
+      << "SYMMETRIC mode should have zero at start";
+  EXPECT_NEAR(host_output[size - 1], 0.0f, 1e-5f)
+      << "SYMMETRIC mode should have zero at end";
+
+  // Compare with reference SYMMETRIC window
+  // NOTE: WindowStage applies UNITY normalization by default, so we must
+  // apply the same normalization to our reference for accurate comparison
+  std::vector<float> reference(size);
+  window_utils::generate_window(reference.data(), size,
+                                StageConfig::WindowType::HANN, false,
+                                StageConfig::WindowSymmetry::SYMMETRIC);
+  window_utils::normalize_window(reference.data(), size,
+                                 StageConfig::WindowNorm::UNITY);
+
+  for (int i = 0; i < size; ++i) {
+    EXPECT_NEAR(host_output[i], reference[i], 1e-4f)
+        << "Mismatch at index " << i << " - config symmetry not respected";
+  }
 }
 
 // ============================================================================
@@ -496,6 +584,7 @@ TEST_F(ProcessingStageTest, FullPipelineIntegration) {
     }
 
     EXPECT_EQ(peak_bin, test_freq_bin);
-    EXPECT_GT(max_mag, 0.1f);  // Expect a noticeable peak with normalized scaling
+    EXPECT_GT(max_mag,
+              0.1f);  // Expect a noticeable peak with normalized scaling
   }
 }

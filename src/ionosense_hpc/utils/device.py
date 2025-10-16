@@ -99,7 +99,6 @@ def device_info(device_id: int | None = None) -> dict[str, Any]:
         try:
             # Add timeout for NVML operations to prevent hanging
             import threading
-            import time
 
             def nvml_with_timeout():
                 pynvml.nvmlInit()
