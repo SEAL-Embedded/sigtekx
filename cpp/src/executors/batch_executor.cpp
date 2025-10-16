@@ -28,9 +28,9 @@ namespace ionosense {
 class BatchExecutor::Impl {
  public:
   Impl() {
-    // Set blocking sync scheduling policy BEFORE any device-specific CUDA calls.
-    // This eliminates CPU spin-waiting and OS scheduler interference during
-    // synchronization calls, critical for reproducible benchmarking.
+    // Set blocking sync scheduling policy BEFORE any device-specific CUDA
+    // calls. This eliminates CPU spin-waiting and OS scheduler interference
+    // during synchronization calls, critical for reproducible benchmarking.
     // CUDA Programming Guide: "cudaSetDeviceFlags must be called before device
     // is initialized". This reduces CV from 57-84% to <10%.
     //
@@ -115,11 +115,16 @@ class BatchExecutor::Impl {
       stage_config.warmup_iters = config_.warmup_iters;
 
       // Map pipeline parameters from EngineConfig to StageConfig enums
-      stage_config.window_type = static_cast<StageConfig::WindowType>(config_.window_type);
-      stage_config.window_symmetry = static_cast<StageConfig::WindowSymmetry>(config_.window_symmetry);
-      stage_config.window_norm = static_cast<StageConfig::WindowNorm>(config_.window_norm);
-      stage_config.scale_policy = static_cast<StageConfig::ScalePolicy>(config_.scale_policy);
-      stage_config.output_mode = static_cast<StageConfig::OutputMode>(config_.output_mode);
+      stage_config.window_type =
+          static_cast<StageConfig::WindowType>(config_.window_type);
+      stage_config.window_symmetry =
+          static_cast<StageConfig::WindowSymmetry>(config_.window_symmetry);
+      stage_config.window_norm =
+          static_cast<StageConfig::WindowNorm>(config_.window_norm);
+      stage_config.scale_policy =
+          static_cast<StageConfig::ScalePolicy>(config_.scale_policy);
+      stage_config.output_mode =
+          static_cast<StageConfig::OutputMode>(config_.output_mode);
 
       for (auto& stage : stages_) {
         IONO_NVTX_RANGE("Init Stage", profiling::colors::DARK_GRAY);
@@ -297,7 +302,8 @@ class BatchExecutor::Impl {
         // Update size for NEXT stage based on what THIS stage outputs
         if (stage_name == "FFTStage") {
           // FFT outputs (nfft/2 + 1) * batch complex pairs
-          // MagnitudeStage expects element count (complex pairs), not float count
+          // MagnitudeStage expects element count (complex pairs), not float
+          // count
           current_size =
               static_cast<size_t>(config_.num_output_bins()) * config_.batch;
         } else if (stage_name == "MagnitudeStage") {

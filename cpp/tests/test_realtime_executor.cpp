@@ -77,10 +77,10 @@ TEST_F(RealtimeExecutorTest, InitializationWithStreamingMode) {
 
   PipelineBuilder builder;
   auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
-                     .add_window(StageConfig::WindowType::HANN)
-                     .add_fft()
-                     .add_magnitude()
-                     .build();
+                    .add_window(StageConfig::WindowType::HANN)
+                    .add_fft()
+                    .add_magnitude()
+                    .build();
 
   EXPECT_NO_THROW(executor.initialize(config_, std::move(stages)));
   EXPECT_TRUE(executor.is_initialized());
@@ -94,8 +94,8 @@ TEST_F(RealtimeExecutorTest, InitializationWithLowLatencyMode) {
 
   PipelineBuilder builder;
   auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
-                     .add_fft()
-                     .build();
+                    .add_fft()
+                    .build();
 
   EXPECT_NO_THROW(executor.initialize(low_latency_config, std::move(stages)));
   EXPECT_TRUE(executor.is_initialized());
@@ -112,8 +112,8 @@ TEST_F(RealtimeExecutorTest, InitializationWithBatchModeExpectedException) {
 
   PipelineBuilder builder;
   auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
-                     .add_fft()
-                     .build();
+                    .add_fft()
+                    .build();
 
   // Current implementation requires STREAMING or LOW_LATENCY
   EXPECT_THROW(executor.initialize(batch_config, std::move(stages)),
@@ -125,8 +125,8 @@ TEST_F(RealtimeExecutorTest, Reset) {
 
   PipelineBuilder builder;
   auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
-                     .add_fft()
-                     .build();
+                    .add_fft()
+                    .build();
   executor.initialize(config_, std::move(stages));
   EXPECT_TRUE(executor.is_initialized());
 
@@ -143,10 +143,10 @@ TEST_F(RealtimeExecutorTest, BasicProcessing) {
 
   PipelineBuilder builder;
   auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
-                     .add_window(StageConfig::WindowType::HANN)
-                     .add_fft()
-                     .add_magnitude()
-                     .build();
+                    .add_window(StageConfig::WindowType::HANN)
+                    .add_fft()
+                    .add_magnitude()
+                    .build();
   executor.initialize(config_, std::move(stages));
 
   const size_t input_size = config_.nfft * config_.batch;
@@ -172,10 +172,10 @@ TEST_F(RealtimeExecutorTest, SubmitAsync) {
 
   PipelineBuilder builder;
   auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
-                     .add_window(StageConfig::WindowType::HANN)
-                     .add_fft()
-                     .add_magnitude()
-                     .build();
+                    .add_window(StageConfig::WindowType::HANN)
+                    .add_fft()
+                    .add_magnitude()
+                    .build();
   executor.initialize(config_, std::move(stages));
 
   const size_t input_size = config_.nfft * config_.batch;
@@ -198,8 +198,8 @@ TEST_F(RealtimeExecutorTest, StatsReporting) {
 
   PipelineBuilder builder;
   auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
-                     .add_fft()
-                     .build();
+                    .add_fft()
+                    .build();
   executor.initialize(config_, std::move(stages));
 
   const size_t input_size = config_.nfft * config_.batch;
@@ -229,8 +229,8 @@ TEST_F(RealtimeExecutorTest, MemoryUsage) {
 
   PipelineBuilder builder;
   auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
-                     .add_fft()
-                     .build();
+                    .add_fft()
+                    .build();
 
   // Before initialization
   EXPECT_EQ(executor.get_memory_usage(), 0);
@@ -251,8 +251,8 @@ TEST_F(RealtimeExecutorTest, MoveConstruction) {
 
   PipelineBuilder builder;
   auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
-                     .add_fft()
-                     .build();
+                    .add_fft()
+                    .build();
   executor1.initialize(config_, std::move(stages));
 
   RealtimeExecutor executor2(std::move(executor1));
@@ -264,8 +264,8 @@ TEST_F(RealtimeExecutorTest, MoveAssignment) {
 
   PipelineBuilder builder;
   auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
-                     .add_fft()
-                     .build();
+                    .add_fft()
+                    .build();
   executor1.initialize(config_, std::move(stages));
 
   RealtimeExecutor executor2;

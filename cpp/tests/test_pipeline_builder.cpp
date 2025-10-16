@@ -179,8 +179,8 @@ TEST_F(PipelineBuilderTest, EstimateMemoryUsageMultipleStages) {
 
   // Memory should be reasonable for this config
   // nfft=512, batch=2 -> ~few KB to few MB range
-  EXPECT_GT(estimated, 1024);                    // > 1 KB
-  EXPECT_LT(estimated, 1024 * 1024 * 1024);      // < 1 GB
+  EXPECT_GT(estimated, 1024);                // > 1 KB
+  EXPECT_LT(estimated, 1024 * 1024 * 1024);  // < 1 GB
 }
 
 TEST_F(PipelineBuilderTest, EstimateMemoryScalesWithConfig) {

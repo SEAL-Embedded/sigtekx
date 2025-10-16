@@ -83,12 +83,12 @@ class TestProfilingAPIs:
             p.nvtx = types.SimpleNamespace()
         monkeypatch.setattr(p.nvtx, "annotate", fake_annotate, raising=False)
 
-        kwargs = dict(
-            color=p.ProfileColor.PURPLE,
-            domain=p.ProfilingDomain.CORE,
-            category=p.ProfileCategory.GPU_COMPUTE,
-            payload=7,
-        )
+        kwargs = {
+            "color": p.ProfileColor.PURPLE,
+            "domain": p.ProfilingDomain.CORE,
+            "category": p.ProfileCategory.GPU_COMPUTE,
+            "payload": 7,
+        }
 
         with p.nvtx_range("X", **kwargs):
             pass

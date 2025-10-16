@@ -75,7 +75,8 @@ class WindowStage::Impl {
       // UNITY normalization needs to be applied here
       if (config.window_norm == StageConfig::WindowNorm::UNITY) {
         IONO_NVTX_RANGE("Apply UNITY Normalization", profiling::colors::CYAN);
-        window_utils::normalize_window(host_window.data(), config.nfft, config.window_norm);
+        window_utils::normalize_window(host_window.data(), config.nfft,
+                                       config.window_norm);
       }
 
       // Allocate device memory and upload the window coefficients.

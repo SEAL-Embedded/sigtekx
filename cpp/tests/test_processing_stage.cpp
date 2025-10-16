@@ -504,10 +504,14 @@ TEST_F(ProcessingStageTest, WindowStageRespectsSymmetryConfig) {
       << "SYMMETRIC mode should have zero at end";
 
   // Compare with reference SYMMETRIC window
+  // NOTE: WindowStage applies UNITY normalization by default, so we must
+  // apply the same normalization to our reference for accurate comparison
   std::vector<float> reference(size);
   window_utils::generate_window(reference.data(), size,
                                 StageConfig::WindowType::HANN, false,
                                 StageConfig::WindowSymmetry::SYMMETRIC);
+  window_utils::normalize_window(reference.data(), size,
+                                 StageConfig::WindowNorm::UNITY);
 
   for (int i = 0; i < size; ++i) {
     EXPECT_NEAR(host_output[i], reference[i], 1e-4f)

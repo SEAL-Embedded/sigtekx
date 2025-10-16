@@ -146,7 +146,8 @@ PYBIND11_MODULE(_engine, m) {
       .value("BLACKMAN", ionosense::StageConfig::WindowType::BLACKMAN)
       .export_values();
 
-  py::enum_<ionosense::StageConfig::WindowSymmetry>(m, "WindowSymmetry",
+  py::enum_<ionosense::StageConfig::WindowSymmetry>(
+      m, "WindowSymmetry",
       "Window symmetry mode (PERIODIC for FFT, SYMMETRIC for time-domain)")
       .value("PERIODIC", ionosense::StageConfig::WindowSymmetry::PERIODIC,
              "Periodic window (FFT processing, denominator N)")
@@ -155,7 +156,7 @@ PYBIND11_MODULE(_engine, m) {
       .export_values();
 
   py::enum_<ionosense::StageConfig::WindowNorm>(m, "WindowNorm",
-      "Window normalization scheme")
+                                                "Window normalization scheme")
       .value("UNITY", ionosense::StageConfig::WindowNorm::UNITY,
              "Unity power/energy gain normalization")
       .value("SQRT", ionosense::StageConfig::WindowNorm::SQRT,
@@ -170,7 +171,7 @@ PYBIND11_MODULE(_engine, m) {
       .export_values();
 
   py::enum_<ionosense::StageConfig::OutputMode>(m, "OutputMode",
-      "Pipeline output format")
+                                                "Pipeline output format")
       .value("MAGNITUDE", ionosense::StageConfig::OutputMode::MAGNITUDE,
              "Real magnitude spectrum")
       .value("COMPLEX_PASSTHROUGH",
@@ -180,8 +181,8 @@ PYBIND11_MODULE(_engine, m) {
 
   // --- Bind ExecutorConfig Enums (v0.9.3 architecture) ---
   py::enum_<ionosense::ExecutorConfig::ExecutionMode>(m, "ExecutionMode",
-                                                       "Execution strategy for "
-                                                       "pipeline executors")
+                                                      "Execution strategy for "
+                                                      "pipeline executors")
       .value("BATCH", ionosense::ExecutorConfig::ExecutionMode::BATCH,
              "Process complete batches with maximum throughput")
       .value("STREAMING", ionosense::ExecutorConfig::ExecutionMode::STREAMING,
@@ -199,7 +200,8 @@ PYBIND11_MODULE(_engine, m) {
       .def_readwrite("overlap", &ionosense::EngineConfig::overlap)
       .def_readwrite("sample_rate_hz", &ionosense::EngineConfig::sample_rate_hz)
       .def_readwrite("window_type", &ionosense::EngineConfig::window_type)
-      .def_readwrite("window_symmetry", &ionosense::EngineConfig::window_symmetry)
+      .def_readwrite("window_symmetry",
+                     &ionosense::EngineConfig::window_symmetry)
       .def_readwrite("window_norm", &ionosense::EngineConfig::window_norm)
       .def_readwrite("scale_policy", &ionosense::EngineConfig::scale_policy)
       .def_readwrite("output_mode", &ionosense::EngineConfig::output_mode)

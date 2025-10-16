@@ -171,7 +171,7 @@ def yaml_benchmark_config(temp_data_dir: Path) -> Path:
 @pytest.fixture
 def test_engine(validation_config: EngineConfig) -> Generator[Engine, None, None]:
     """Yields an initialized Engine instance with automatic resource cleanup."""
-    engine = Engine(validation_config)
+    engine = Engine(config=validation_config)
     try:
         yield engine
     finally:

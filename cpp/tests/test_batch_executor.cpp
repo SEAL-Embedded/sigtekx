@@ -74,10 +74,10 @@ TEST_F(BatchExecutorTest, InitializationWithStandardPipeline) {
 
   PipelineBuilder builder;
   auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
-                     .add_window(StageConfig::WindowType::HANN)
-                     .add_fft()
-                     .add_magnitude()
-                     .build();
+                    .add_window(StageConfig::WindowType::HANN)
+                    .add_fft()
+                    .add_magnitude()
+                    .build();
 
   EXPECT_NO_THROW(executor.initialize(config_, std::move(stages)));
   EXPECT_TRUE(executor.is_initialized());
@@ -97,13 +97,18 @@ TEST_F(BatchExecutorTest, InitializeWithInvalidConfigFails) {
   ExecutorConfig bad_config = config_;
   bad_config.nfft = 1000;  // Not a power of 2
 
-  PipelineBuilder builder;
-  auto stages = builder.with_config(StageConfig{bad_config.nfft, bad_config.batch})
-                     .add_fft()
-                     .build();
-
-  EXPECT_THROW(executor.initialize(bad_config, std::move(stages)),
-               std::runtime_error);
+  // The PipelineBuilder validates nfft during build(), so we need to catch
+  // the exception from build() itself, not from executor.initialize()
+  EXPECT_THROW(
+      {
+        PipelineBuilder builder;
+        auto stages =
+            builder.with_config(StageConfig{bad_config.nfft, bad_config.batch})
+                .add_fft()
+                .build();
+        executor.initialize(bad_config, std::move(stages));
+      },
+      std::runtime_error);
 }
 
 TEST_F(BatchExecutorTest, DoubleInitialization) {
@@ -111,16 +116,16 @@ TEST_F(BatchExecutorTest, DoubleInitialization) {
 
   PipelineBuilder builder1;
   auto stages1 = builder1.with_config(StageConfig{config_.nfft, config_.batch})
-                      .add_fft()
-                      .build();
+                     .add_fft()
+                     .build();
   executor.initialize(config_, std::move(stages1));
   EXPECT_TRUE(executor.is_initialized());
 
   // Re-initialize should work (triggers reset first)
   PipelineBuilder builder2;
   auto stages2 = builder2.with_config(StageConfig{config_.nfft, config_.batch})
-                      .add_fft()
-                      .build();
+                     .add_fft()
+                     .build();
   EXPECT_NO_THROW(executor.initialize(config_, std::move(stages2)));
   EXPECT_TRUE(executor.is_initialized());
 }
@@ -130,8 +135,8 @@ TEST_F(BatchExecutorTest, Reset) {
 
   PipelineBuilder builder;
   auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
-                     .add_fft()
-                     .build();
+                    .add_fft()
+                    .build();
   executor.initialize(config_, std::move(stages));
   EXPECT_TRUE(executor.is_initialized());
 
@@ -148,8 +153,8 @@ TEST_F(BatchExecutorTest, SingleStagePipeline) {
 
   PipelineBuilder builder;
   auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
-                     .add_window(StageConfig::WindowType::HANN)
-                     .build();
+                    .add_window(StageConfig::WindowType::HANN)
+                    .build();
   executor.initialize(config_, std::move(stages));
 
   const size_t input_size = config_.nfft * config_.batch;
@@ -164,9 +169,9 @@ TEST_F(BatchExecutorTest, TwoStagePipeline) {
 
   PipelineBuilder builder;
   auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
-                     .add_window(StageConfig::WindowType::HANN)
-                     .add_fft()
-                     .build();
+                    .add_window(StageConfig::WindowType::HANN)
+                    .add_fft()
+                    .build();
   executor.initialize(config_, std::move(stages));
 
   const size_t input_size = config_.nfft * config_.batch;
@@ -182,10 +187,10 @@ TEST_F(BatchExecutorTest, ThreeStagePipeline) {
 
   PipelineBuilder builder;
   auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
-                     .add_window(StageConfig::WindowType::HANN)
-                     .add_fft()
-                     .add_magnitude()
-                     .build();
+                    .add_window(StageConfig::WindowType::HANN)
+                    .add_fft()
+                    .add_magnitude()
+                    .build();
   executor.initialize(config_, std::move(stages));
 
   const size_t input_size = config_.nfft * config_.batch;
@@ -213,11 +218,11 @@ TEST_F(BatchExecutorTest, FourStagePipeline) {
 
   PipelineBuilder builder;
   auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
-                     .add_window(StageConfig::WindowType::HANN)
-                     .add_fft()
-                     .add_magnitude()
-                     .add_magnitude()  // Extra stage
-                     .build();
+                    .add_window(StageConfig::WindowType::HANN)
+                    .add_fft()
+                    .add_magnitude()
+                    .add_magnitude()  // Extra stage
+                    .build();
   executor.initialize(config_, std::move(stages));
 
   const size_t input_size = config_.nfft * config_.batch;
@@ -237,10 +242,10 @@ TEST_F(BatchExecutorTest, BasicProcessing) {
 
   PipelineBuilder builder;
   auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
-                     .add_window(StageConfig::WindowType::HANN)
-                     .add_fft()
-                     .add_magnitude()
-                     .build();
+                    .add_window(StageConfig::WindowType::HANN)
+                    .add_fft()
+                    .add_magnitude()
+                    .build();
   executor.initialize(config_, std::move(stages));
 
   const size_t input_size = config_.nfft * config_.batch;
@@ -262,10 +267,10 @@ TEST_F(BatchExecutorTest, MultipleFrameProcessing) {
 
   PipelineBuilder builder;
   auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
-                     .add_window(StageConfig::WindowType::HANN)
-                     .add_fft()
-                     .add_magnitude()
-                     .build();
+                    .add_window(StageConfig::WindowType::HANN)
+                    .add_fft()
+                    .add_magnitude()
+                    .build();
   executor.initialize(config_, std::move(stages));
 
   const size_t input_size = config_.nfft * config_.batch;
@@ -287,8 +292,8 @@ TEST_F(BatchExecutorTest, StatsProgression) {
 
   PipelineBuilder builder;
   auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
-                     .add_fft()
-                     .build();
+                    .add_fft()
+                    .build();
   executor.initialize(config_, std::move(stages));
 
   const size_t input_size = config_.nfft * config_.batch;
@@ -314,10 +319,10 @@ TEST_F(BatchExecutorTest, SubmitAsync) {
 
   PipelineBuilder builder;
   auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
-                     .add_window(StageConfig::WindowType::HANN)
-                     .add_fft()
-                     .add_magnitude()
-                     .build();
+                    .add_window(StageConfig::WindowType::HANN)
+                    .add_fft()
+                    .add_magnitude()
+                    .build();
   executor.initialize(config_, std::move(stages));
 
   const size_t input_size = config_.nfft * config_.batch;
@@ -344,8 +349,8 @@ TEST_F(BatchExecutorTest, Synchronize) {
 
   PipelineBuilder builder;
   auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
-                     .add_fft()
-                     .build();
+                    .add_fft()
+                    .build();
   executor.initialize(config_, std::move(stages));
 
   const size_t input_size = config_.nfft * config_.batch;
@@ -366,10 +371,10 @@ TEST_F(BatchExecutorTest, MemoryUsage) {
 
   PipelineBuilder builder;
   auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
-                     .add_window(StageConfig::WindowType::HANN)
-                     .add_fft()
-                     .add_magnitude()
-                     .build();
+                    .add_window(StageConfig::WindowType::HANN)
+                    .add_fft()
+                    .add_magnitude()
+                    .build();
 
   // Before initialization
   EXPECT_EQ(executor.get_memory_usage(), 0);
@@ -396,8 +401,8 @@ TEST_F(BatchExecutorTest, MoveConstruction) {
 
   PipelineBuilder builder;
   auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
-                     .add_fft()
-                     .build();
+                    .add_fft()
+                    .build();
   executor1.initialize(config_, std::move(stages));
 
   BatchExecutor executor2(std::move(executor1));
@@ -409,8 +414,8 @@ TEST_F(BatchExecutorTest, MoveAssignment) {
 
   PipelineBuilder builder;
   auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
-                     .add_fft()
-                     .build();
+                    .add_fft()
+                    .build();
   executor1.initialize(config_, std::move(stages));
 
   BatchExecutor executor2;

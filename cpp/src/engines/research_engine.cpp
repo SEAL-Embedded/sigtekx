@@ -41,11 +41,16 @@ class ResearchEngine::Impl {
     stage_config.warmup_iters = config.warmup_iters;
 
     // Copy pipeline parameters from config
-    stage_config.window_type = static_cast<StageConfig::WindowType>(config.window_type);
-    stage_config.window_symmetry = static_cast<StageConfig::WindowSymmetry>(config.window_symmetry);
-    stage_config.window_norm = static_cast<StageConfig::WindowNorm>(config.window_norm);
-    stage_config.scale_policy = static_cast<StageConfig::ScalePolicy>(config.scale_policy);
-    stage_config.output_mode = static_cast<StageConfig::OutputMode>(config.output_mode);
+    stage_config.window_type =
+        static_cast<StageConfig::WindowType>(config.window_type);
+    stage_config.window_symmetry =
+        static_cast<StageConfig::WindowSymmetry>(config.window_symmetry);
+    stage_config.window_norm =
+        static_cast<StageConfig::WindowNorm>(config.window_norm);
+    stage_config.scale_policy =
+        static_cast<StageConfig::ScalePolicy>(config.scale_policy);
+    stage_config.output_mode =
+        static_cast<StageConfig::OutputMode>(config.output_mode);
 
     auto stages = builder.with_config(stage_config)
                       .add_window(stage_config.window_type)
@@ -57,8 +62,8 @@ class ResearchEngine::Impl {
     ExecutorConfig exec_config;
     static_cast<EngineConfig&>(exec_config) = config;  // Copy base config
     exec_config.mode = ExecutorConfig::ExecutionMode::BATCH;
-    // NOTE: prefer_cuda_graphs removed in v0.9.3 - config.use_cuda_graphs ignored
-    // CUDA graph optimization will be added in v0.10.0+
+    // NOTE: prefer_cuda_graphs removed in v0.9.3 - config.use_cuda_graphs
+    // ignored CUDA graph optimization will be added in v0.10.0+
 
     // Initialize executor
     executor_ = std::make_unique<BatchExecutor>();
