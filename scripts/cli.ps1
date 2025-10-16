@@ -401,6 +401,45 @@ function Invoke-Lint {
     }
 }
 
+function Invoke-TypeCheck {
+    param(
+        [string[]]$Paths = @(),
+        [bool]$Strict = $false,
+        [bool]$Verbose = $false
+    )
+
+    Write-Status "Running mypy type checking..."
+
+    # Default paths
+    if ($Paths.Count -eq 0) {
+        $Paths = @("src/ionosense_hpc")
+    }
+
+    # Verify mypy is available
+    $mypy = Get-Command mypy -ErrorAction SilentlyContinue
+    if (-not $mypy) {
+        Write-Error "mypy not found. Install via: pip install mypy"
+        exit 1
+    }
+
+    # Build arguments
+    $args = @()
+    if ($Verbose) { $args += "-v" }
+    if ($Strict) { $args += "--strict" }
+
+    # mypy reads configuration from pyproject.toml [tool.mypy]
+    $args += $Paths
+
+    & mypy @args
+
+    if ($LASTEXITCODE -eq 0) {
+        Write-Success "Type checking completed"
+    } else {
+        Write-Error "Type checking failed"
+        exit 1
+    }
+}
+
 function Invoke-Clean {
     param([bool]$All = $false)
 
@@ -797,7 +836,8 @@ try {
         }
         "typecheck" {
             $params = @{}
-            if ($CommandArgs -icontains "-Verbose") { $params.Verbose = $true }
+            if ($normalizedArgs -contains "-strict" -or $normalizedArgs -contains "--strict") { $params.Strict = $true }
+            if ($commonVerbose -or $normalizedArgs -contains "-verbose" -or $normalizedArgs -contains "--verbose") { $params.Verbose = $true }
 
             $paths = $CommandArgs | Where-Object { $_ -and $_ -notlike "-*" }
             if ($paths) { $params.Paths = $paths }
