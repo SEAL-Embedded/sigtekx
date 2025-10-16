@@ -83,6 +83,7 @@ struct BenchmarkConfig {
   // Output control
   OutputFormat output_format = OutputFormat::TABLE;
   bool quiet = false;
+  bool safe_print = false;  // Use ASCII-only output (for profiling/redirect)
   int random_seed = 42;
 
   // Baseline control

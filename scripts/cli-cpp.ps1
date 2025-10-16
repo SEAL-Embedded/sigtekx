@@ -214,11 +214,14 @@ function Invoke-ProfileNsys {
     if ($stats) {
         $nsysCommand += "--stats=true"
     }
+    $nsysCommand += "--force-overwrite"
+    $nsysCommand += "true"
     $nsysCommand += "-o"
     $nsysCommand += $outputPath
     $nsysCommand += $nsysArgs
     $nsysCommand += $script:BenchmarkExe
     $nsysCommand += "--$mode"
+    $nsysCommand += "--safe-print"
 
     Write-Host "Command: nsys $($nsysCommand -join ' ')" -ForegroundColor DarkGray
     & nsys @nsysCommand
@@ -287,6 +290,7 @@ function Invoke-ProfileNcu {
     $ncuCommand += $ncuArgs
     $ncuCommand += $script:BenchmarkExe
     $ncuCommand += "--$mode"
+    $ncuCommand += "--safe-print"
 
     Write-Host "Command: ncu $($ncuCommand -join ' ')" -ForegroundColor DarkGray
     & ncu @ncuCommand

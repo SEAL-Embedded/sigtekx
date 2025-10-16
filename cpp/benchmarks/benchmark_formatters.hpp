@@ -21,6 +21,30 @@ namespace ionosense {
 namespace benchmark {
 
 // ============================================================================
+// Safe Print Helpers (ASCII fallback for profiling/redirects)
+// ============================================================================
+
+/**
+ * @brief Get microsecond unit string (safe for profiling).
+ *
+ * @param safe_print If true, returns ASCII "us"; otherwise UTF-8 "µs"
+ * @return Unit string
+ */
+inline const char* get_us_unit(bool safe_print) {
+  return safe_print ? "us" : "\xC2\xB5s";  // µs in UTF-8
+}
+
+/**
+ * @brief Get box drawing horizontal line (safe for profiling).
+ *
+ * @param safe_print If true, returns ASCII "="; otherwise UTF-8 box drawing
+ * @return Line character string (repeated to form line)
+ */
+inline const char* get_hline_char(bool safe_print) {
+  return safe_print ? "=" : "\xE2\x94\x80";  // ─ in UTF-8
+}
+
+// ============================================================================
 // Performance Tier Classification
 // ============================================================================
 
@@ -76,19 +100,36 @@ inline PerformanceTier classify_realtime_tier(float compliance_rate) {
  * @brief Get performance tier symbol.
  *
  * @param tier Performance tier
- * @return Symbol (✓/⚠/✗)
+ * @param safe_print If true, returns ASCII; otherwise UTF-8 symbols
+ * @return Symbol (✓/⚠/✗ or OK/WARN/FAIL)
  */
-inline const char* get_tier_symbol(PerformanceTier tier) {
-  switch (tier) {
-    case PerformanceTier::EXCELLENT:
-    case PerformanceTier::GOOD:
-      return "\xE2\x9C\x93";  // ✓ (UTF-8)
-    case PerformanceTier::ADEQUATE:
-      return "\xE2\x9A\xA0";  // ⚠ (UTF-8)
-    case PerformanceTier::POOR:
-      return "\xE2\x9C\x97";  // ✗ (UTF-8)
-    default:
-      return "?";
+inline const char* get_tier_symbol(PerformanceTier tier, bool safe_print = false) {
+  if (safe_print) {
+    // ASCII fallback for profiling/redirect
+    switch (tier) {
+      case PerformanceTier::EXCELLENT:
+      case PerformanceTier::GOOD:
+        return "OK";
+      case PerformanceTier::ADEQUATE:
+        return "WARN";
+      case PerformanceTier::POOR:
+        return "FAIL";
+      default:
+        return "?";
+    }
+  } else {
+    // UTF-8 symbols for normal output
+    switch (tier) {
+      case PerformanceTier::EXCELLENT:
+      case PerformanceTier::GOOD:
+        return "\xE2\x9C\x93";  // ✓ (UTF-8)
+      case PerformanceTier::ADEQUATE:
+        return "\xE2\x9A\xA0";  // ⚠ (UTF-8)
+      case PerformanceTier::POOR:
+        return "\xE2\x9C\x97";  // ✗ (UTF-8)
+      default:
+        return "?";
+    }
   }
 }
 
@@ -178,7 +219,7 @@ inline void print_latency_results(const BenchmarkConfig& config,
     std::cout << "  CUDA        : " << runtime_info.cuda_version << "\n\n";
 
     std::cout << std::fixed << std::setprecision(2);
-    std::cout << "Latency (µs):\n";
+    std::cout << "Latency (" << get_us_unit(config.safe_print) << "):\n";
     std::cout << "  Mean        : " << results.mean_latency_us << "\n";
     std::cout << "  Median      : " << results.median_latency_us << "\n";
     std::cout << "  P50         : " << results.p50_latency_us << "\n";
@@ -199,7 +240,7 @@ inline void print_latency_results(const BenchmarkConfig& config,
       std::cout << "  Outliers    : " << results.outliers_trimmed << " trimmed (1% each tail)\n";
     }
     if (results.warmup_effectiveness != 0.0f) {
-      std::cout << "  Warmup Eff  : " << results.warmup_effectiveness << " µs";
+      std::cout << "  Warmup Eff  : " << results.warmup_effectiveness << " " << get_us_unit(config.safe_print);
       if (results.warmup_effectiveness > 0.0f) {
         std::cout << " (effective)";
       } else {
@@ -209,44 +250,39 @@ inline void print_latency_results(const BenchmarkConfig& config,
     }
     std::cout << "\n";
 
-    // Performance Card
-    std::cout << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
-              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
-              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
-              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\n";
+    // Performance Card - draw horizontal lines
+    const char* hline = get_hline_char(config.safe_print);
+    for (int i = 0; i < 32; ++i) std::cout << hline;
+    std::cout << "\n";
     std::cout << "Performance Card\n";
-    std::cout << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
-              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
-              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
-              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\n";
+    for (int i = 0; i < 32; ++i) std::cout << hline;
+    std::cout << "\n";
 
     auto latency_tier = classify_latency_tier(results.p95_latency_us);
     auto stability_tier = classify_stability_tier(results.coefficient_of_variation);
 
-    std::cout << "Latency (P95): " << std::setw(8) << results.p95_latency_us << " µs  ["
-              << get_tier_symbol(latency_tier) << " " << get_tier_label(latency_tier) << "]\n";
+    std::cout << "Latency (P95): " << std::setw(8) << results.p95_latency_us << " " << get_us_unit(config.safe_print) << "  ["
+              << get_tier_symbol(latency_tier, config.safe_print) << " " << get_tier_label(latency_tier) << "]\n";
     std::cout << "Stability:     CV=" << std::setw(5) << (results.coefficient_of_variation * 100.0f) << "%  ["
-              << get_tier_symbol(stability_tier) << " " << get_tier_label(stability_tier) << "]\n";
+              << get_tier_symbol(stability_tier, config.safe_print) << " " << get_tier_label(stability_tier) << "]\n";
 
     if (has_baseline) {
       float change = compute_percent_change(results.p95_latency_us, baseline.p95_latency_us);
       std::cout << "vs Baseline:   " << std::setw(6) << std::showpos << change << std::noshowpos << "%     [";
       if (std::abs(change) < 2.0f) {
-        std::cout << get_tier_symbol(PerformanceTier::GOOD) << " NO CHANGE";
+        std::cout << get_tier_symbol(PerformanceTier::GOOD, config.safe_print) << " NO CHANGE";
       } else if (change < 0.0f) {
-        std::cout << get_tier_symbol(PerformanceTier::EXCELLENT) << " IMPROVED";
+        std::cout << get_tier_symbol(PerformanceTier::EXCELLENT, config.safe_print) << " IMPROVED";
       } else if (change < 5.0f) {
-        std::cout << get_tier_symbol(PerformanceTier::ADEQUATE) << " SLIGHT REGRESSION";
+        std::cout << get_tier_symbol(PerformanceTier::ADEQUATE, config.safe_print) << " SLIGHT REGRESSION";
       } else {
-        std::cout << get_tier_symbol(PerformanceTier::POOR) << " REGRESSION";
+        std::cout << get_tier_symbol(PerformanceTier::POOR, config.safe_print) << " REGRESSION";
       }
       std::cout << "]\n";
     }
 
-    std::cout << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
-              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
-              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
-              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\n\n";
+    for (int i = 0; i < 32; ++i) std::cout << hline;
+    std::cout << "\n\n";
   }
 
   if (config.output_format == OutputFormat::CSV ||
@@ -312,42 +348,37 @@ inline void print_throughput_results(const BenchmarkConfig& config,
     std::cout << "  Samples/s   : " << results.samples_per_second << "\n";
     std::cout << "  Frames      : " << results.total_frames << "\n\n";
 
-    // Performance Card
-    std::cout << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
-              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
-              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
-              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\n";
+    // Performance Card - draw horizontal lines
+    const char* hline = get_hline_char(config.safe_print);
+    for (int i = 0; i < 32; ++i) std::cout << hline;
+    std::cout << "\n";
     std::cout << "Performance Card\n";
-    std::cout << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
-              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
-              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
-              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\n";
+    for (int i = 0; i < 32; ++i) std::cout << hline;
+    std::cout << "\n";
 
     auto throughput_tier = classify_throughput_tier(results.frames_per_second);
 
     std::cout << "Throughput:    " << std::setw(8) << results.frames_per_second << " FPS  ["
-              << get_tier_symbol(throughput_tier) << " " << get_tier_label(throughput_tier) << "]\n";
+              << get_tier_symbol(throughput_tier, config.safe_print) << " " << get_tier_label(throughput_tier) << "]\n";
     std::cout << "Bandwidth:     " << std::setw(8) << results.gb_per_second << " GB/s\n";
 
     if (has_baseline) {
       float change = compute_percent_change(results.frames_per_second, baseline.frames_per_second);
       std::cout << "vs Baseline:   " << std::setw(6) << std::showpos << change << std::noshowpos << "%     [";
       if (std::abs(change) < 2.0f) {
-        std::cout << get_tier_symbol(PerformanceTier::GOOD) << " NO CHANGE";
+        std::cout << get_tier_symbol(PerformanceTier::GOOD, config.safe_print) << " NO CHANGE";
       } else if (change > 0.0f) {
-        std::cout << get_tier_symbol(PerformanceTier::EXCELLENT) << " IMPROVED";
+        std::cout << get_tier_symbol(PerformanceTier::EXCELLENT, config.safe_print) << " IMPROVED";
       } else if (change > -5.0f) {
-        std::cout << get_tier_symbol(PerformanceTier::ADEQUATE) << " SLIGHT REGRESSION";
+        std::cout << get_tier_symbol(PerformanceTier::ADEQUATE, config.safe_print) << " SLIGHT REGRESSION";
       } else {
-        std::cout << get_tier_symbol(PerformanceTier::POOR) << " REGRESSION";
+        std::cout << get_tier_symbol(PerformanceTier::POOR, config.safe_print) << " REGRESSION";
       }
       std::cout << "]\n";
     }
 
-    std::cout << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
-              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
-              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
-              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\n\n";
+    for (int i = 0; i < 32; ++i) std::cout << hline;
+    std::cout << "\n\n";
   }
 
   if (config.output_format == OutputFormat::CSV ||
@@ -416,42 +447,37 @@ inline void print_realtime_results(const BenchmarkConfig& config,
     std::cout << "  Frames      : " << results.frames_processed << "\n";
     std::cout << "  Misses      : " << results.deadline_misses << "\n\n";
 
-    // Performance Card
-    std::cout << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
-              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
-              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
-              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\n";
+    // Performance Card - draw horizontal lines
+    const char* hline = get_hline_char(config.safe_print);
+    for (int i = 0; i < 32; ++i) std::cout << hline;
+    std::cout << "\n";
     std::cout << "Performance Card\n";
-    std::cout << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
-              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
-              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
-              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\n";
+    for (int i = 0; i < 32; ++i) std::cout << hline;
+    std::cout << "\n";
 
     auto compliance_tier = classify_realtime_tier(results.compliance_rate);
     auto stability_tier = classify_stability_tier(results.coefficient_of_variation);
 
     std::cout << "Compliance:    " << std::setw(8) << (results.compliance_rate * 100.0f) << "%   ["
-              << get_tier_symbol(compliance_tier) << " " << get_tier_label(compliance_tier) << "]\n";
+              << get_tier_symbol(compliance_tier, config.safe_print) << " " << get_tier_label(compliance_tier) << "]\n";
     std::cout << "Stability:     CV=" << std::setw(5) << (results.coefficient_of_variation * 100.0f) << "%  ["
-              << get_tier_symbol(stability_tier) << " " << get_tier_label(stability_tier) << "]\n";
+              << get_tier_symbol(stability_tier, config.safe_print) << " " << get_tier_label(stability_tier) << "]\n";
 
     if (has_baseline) {
       float change = compute_percent_change(results.compliance_rate, baseline.compliance_rate);
       std::cout << "vs Baseline:   " << std::setw(6) << std::showpos << change << std::noshowpos << "%     [";
       if (std::abs(change) < 1.0f) {
-        std::cout << get_tier_symbol(PerformanceTier::GOOD) << " NO CHANGE";
+        std::cout << get_tier_symbol(PerformanceTier::GOOD, config.safe_print) << " NO CHANGE";
       } else if (change > 0.0f) {
-        std::cout << get_tier_symbol(PerformanceTier::EXCELLENT) << " IMPROVED";
+        std::cout << get_tier_symbol(PerformanceTier::EXCELLENT, config.safe_print) << " IMPROVED";
       } else {
-        std::cout << get_tier_symbol(PerformanceTier::POOR) << " REGRESSION";
+        std::cout << get_tier_symbol(PerformanceTier::POOR, config.safe_print) << " REGRESSION";
       }
       std::cout << "]\n";
     }
 
-    std::cout << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
-              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
-              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80"
-              << "\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\n\n";
+    for (int i = 0; i < 32; ++i) std::cout << hline;
+    std::cout << "\n\n";
   }
 
   if (config.output_format == OutputFormat::CSV ||

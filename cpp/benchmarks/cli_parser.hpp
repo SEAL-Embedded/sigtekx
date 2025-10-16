@@ -40,6 +40,7 @@ inline BenchmarkConfig parse_args(int argc, char* argv[]) {
   bool ionosphere = false;
   OutputFormat output_format = OutputFormat::TABLE;
   bool quiet = false;
+  bool safe_print = false;
   bool save_baseline = false;
 
   // Also collect parameter overrides
@@ -104,6 +105,7 @@ OUTPUT CONTROL:
   --csv                 Output CSV only (no formatting)
   --json                Output JSON format
   --quiet               Minimal output
+  --safe-print          Use ASCII-only output (for profiling/redirect)
 
 BASELINE TRACKING:
   --save-baseline       Save results as baseline for future comparison
@@ -189,6 +191,8 @@ EXAMPLES:
       output_format = OutputFormat::JSON;
     } else if (arg == "--quiet") {
       quiet = true;
+    } else if (arg == "--safe-print") {
+      safe_print = true;
     }
 
     // Baseline control
@@ -234,6 +238,7 @@ EXAMPLES:
   // Apply output settings
   config.output_format = output_format;
   config.quiet = quiet;
+  config.safe_print = safe_print;
 
   // Apply baseline settings
   config.save_baseline = save_baseline;
