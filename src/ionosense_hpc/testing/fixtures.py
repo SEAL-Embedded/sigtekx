@@ -20,7 +20,7 @@ from ionosense_hpc.benchmarks.base import (
     BenchmarkContext,
     BenchmarkResult,
 )
-from ionosense_hpc.config import EngineConfig, Presets
+from ionosense_hpc.config import EngineConfig, get_preset
 from ionosense_hpc.utils import (
     make_chirp,
     make_multitone,
@@ -70,13 +70,18 @@ def temp_benchmark_dir(tmp_path: Path) -> Path:
 @pytest.fixture
 def validation_config() -> EngineConfig:
     """Provides a small, controlled configuration for validation and debugging."""
-    return Presets.validation()
+    config = get_preset('default')
+    config.batch = 1  # Minimal batch for validation
+    return config
 
 
 @pytest.fixture
 def realtime_config() -> EngineConfig:
     """Provides a production-ready configuration for real-time processing tests."""
-    return Presets.realtime()
+    from ionosense_hpc.config import ExecutionMode
+    config = get_preset('default')
+    config.mode = ExecutionMode.REALTIME
+    return config
 
 
 @pytest.fixture
@@ -96,8 +101,9 @@ def benchmark_base_config() -> BenchmarkConfig:
 @pytest.fixture
 def benchmark_config() -> EngineConfig:
     """Provides an EngineConfig tailored for benchmarking."""
-    config = Presets.profiling()
+    config = get_preset('default')
     config.enable_profiling = True
+    config.warmup_iters = 5
     return config
 
 @pytest.fixture
@@ -177,7 +183,12 @@ def mock_engine(monkeypatch) -> Engine:
 
     class MockEngine:
         def __init__(self, config=None, **_):
-            self.config = config or Presets.validation()
+            if config is None:
+                default_config = get_preset('default')
+                default_config.batch = 1
+                self.config = default_config
+            else:
+                self.config = config
             self.is_initialized = True
 
         def process(self, data):

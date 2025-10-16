@@ -6,14 +6,14 @@ This script is Hydra-aware and logs results to MLflow.
 Communication with other scripts happens through artifact files.
 """
 
+import warnings
+from pathlib import Path
+
 import hydra
 import mlflow
 import pandas as pd
 from omegaconf import DictConfig, OmegaConf
-from pathlib import Path
-import warnings
 
-from ionosense_hpc import Engine
 from ionosense_hpc.benchmarks import LatencyBenchmark, LatencyBenchmarkConfig
 from ionosense_hpc.config import EngineConfig
 
@@ -38,7 +38,10 @@ def run_latency_benchmark(cfg: DictConfig) -> float:
     # ===== END ROBUSTNESS FIX =====
 
     # Convert OmegaConf to Pydantic models for validation
-    engine_config = EngineConfig(**cfg.engine)
+    # Filter out metadata fields that aren't part of EngineConfig
+    engine_dict = dict(cfg.engine)
+    engine_dict.pop("name", None)  # Remove metadata field
+    engine_config = EngineConfig(**engine_dict)
     benchmark_config = LatencyBenchmarkConfig(**cfg.benchmark, engine_config=engine_config.model_dump())
 
     # Setup MLflow
@@ -58,7 +61,7 @@ def run_latency_benchmark(cfg: DictConfig) -> float:
         # Run benchmark
         benchmark = LatencyBenchmark(benchmark_config)
         result = benchmark.run()
-        
+
         # Log metrics
         if 'latency_us' in result.statistics:
             stats = result.statistics['latency_us']
@@ -71,11 +74,11 @@ def run_latency_benchmark(cfg: DictConfig) -> float:
             mean_latency = stats.get('mean', float('inf'))
         else:
             mean_latency = float('inf')
-            
+
         # Save results to parquet (for downstream analysis)
         output_dir = Path(cfg.paths.data)
         output_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Convert measurements to DataFrame
         if hasattr(result, 'measurements') and result.measurements is not None:
             df = pd.DataFrame({
@@ -83,13 +86,13 @@ def run_latency_benchmark(cfg: DictConfig) -> float:
                 'engine_nfft': engine_config.nfft,
                 'engine_batch': engine_config.batch,
             })
-            
+
             output_path = output_dir / f"latency_{engine_config.nfft}_{engine_config.batch}.parquet"
             df.to_parquet(output_path, index=False)
-            
+
             # Log artifact to MLflow
             mlflow.log_artifact(str(output_path))
-        
+
         # Also save summary
         summary = {
             'engine_nfft': engine_config.nfft,
@@ -98,12 +101,12 @@ def run_latency_benchmark(cfg: DictConfig) -> float:
             'p95_latency_us': result.statistics.get('latency_us', {}).get('p95', 0),
             'p99_latency_us': result.statistics.get('latency_us', {}).get('p99', 0),
         }
-        
+
         summary_df = pd.DataFrame([summary])
         summary_path = output_dir / f"latency_summary_{engine_config.nfft}_{engine_config.batch}.csv"
         summary_df.to_csv(summary_path, index=False)
         mlflow.log_artifact(str(summary_path))
-        
+
     return mean_latency
 
 

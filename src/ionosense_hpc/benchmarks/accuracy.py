@@ -13,7 +13,7 @@ from scipy.fft import rfft
 
 from ionosense_hpc import Engine
 from ionosense_hpc.benchmarks.base import BaseBenchmark, BenchmarkConfig, BenchmarkResult
-from ionosense_hpc.config import EngineConfig, Presets
+from ionosense_hpc.config import EngineConfig, get_preset
 from ionosense_hpc.utils import logger, make_chirp, make_multitone, make_noise, make_sine
 from ionosense_hpc.utils.paths import get_benchmark_run_dir, normalize_benchmark_name
 from ionosense_hpc.utils.profiling import (
@@ -94,7 +94,9 @@ class AccuracyBenchmark(BaseBenchmark):
             if self.config.engine_config:
                 self.engine_config = EngineConfig(**self.config.engine_config)
             else:
-                self.engine_config = Presets.validation()
+                # Use default preset with minimal batch for validation
+                self.engine_config = get_preset('default')
+                self.engine_config.batch = 1
 
             # Accuracy validation is single-frame; force zero overlap for determinism.
             if self.engine_config.overlap != 0.0:
@@ -108,7 +110,7 @@ class AccuracyBenchmark(BaseBenchmark):
 
             # Initialize engine
             with nvtx_range("InitializeEngine", color=ProfileColor.DARK_GRAY):
-                self.engine = Engine(self.engine_config)
+                self.engine = Engine(config=self.engine_config)
 
             self._signal_rng.reset()
 
@@ -356,7 +358,7 @@ class AccuracyBenchmark(BaseBenchmark):
                 snr_db = float(-self.config.snr_threshold_db - 120.0)
         else:
             denom = max(noise_power, eps)
-            snr_db = float(10.0 * np.log10(signal_power / denom))
+            snr_db = float(10.0 * np.log10(signal_power / denom))  # type: ignore[operator]
 
         # Check pass criteria
         max_rel_error = np.max(rel_error)

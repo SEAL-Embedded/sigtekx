@@ -146,11 +146,36 @@ PYBIND11_MODULE(_engine, m) {
       .value("BLACKMAN", ionosense::StageConfig::WindowType::BLACKMAN)
       .export_values();
 
+  py::enum_<ionosense::StageConfig::WindowSymmetry>(m, "WindowSymmetry",
+      "Window symmetry mode (PERIODIC for FFT, SYMMETRIC for time-domain)")
+      .value("PERIODIC", ionosense::StageConfig::WindowSymmetry::PERIODIC,
+             "Periodic window (FFT processing, denominator N)")
+      .value("SYMMETRIC", ionosense::StageConfig::WindowSymmetry::SYMMETRIC,
+             "Symmetric window (time-domain, denominator N-1)")
+      .export_values();
+
+  py::enum_<ionosense::StageConfig::WindowNorm>(m, "WindowNorm",
+      "Window normalization scheme")
+      .value("UNITY", ionosense::StageConfig::WindowNorm::UNITY,
+             "Unity power/energy gain normalization")
+      .value("SQRT", ionosense::StageConfig::WindowNorm::SQRT,
+             "Square root normalization")
+      .export_values();
+
   py::enum_<ionosense::StageConfig::ScalePolicy>(m, "ScalePolicy")
       .value("NONE", ionosense::StageConfig::ScalePolicy::NONE)
       .value("ONE_OVER_N", ionosense::StageConfig::ScalePolicy::ONE_OVER_N)
       .value("ONE_OVER_SQRT_N",
              ionosense::StageConfig::ScalePolicy::ONE_OVER_SQRT_N)
+      .export_values();
+
+  py::enum_<ionosense::StageConfig::OutputMode>(m, "OutputMode",
+      "Pipeline output format")
+      .value("MAGNITUDE", ionosense::StageConfig::OutputMode::MAGNITUDE,
+             "Real magnitude spectrum")
+      .value("COMPLEX_PASSTHROUGH",
+             ionosense::StageConfig::OutputMode::COMPLEX_PASSTHROUGH,
+             "Complex FFT output")
       .export_values();
 
   // --- Bind ExecutorConfig Enums (v0.9.3 architecture) ---

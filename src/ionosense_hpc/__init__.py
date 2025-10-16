@@ -81,7 +81,20 @@ _bootstrap_windows_dlls()
 
 # Import exceptions first (no dependencies)
 # Import configuration (minimal dependencies)
-from .config import EngineConfig, Presets
+from .config import (
+    EngineConfig,
+    ExecutionMode,
+    OutputMode,
+    ScalePolicy,
+    WindowNorm,
+    WindowSymmetry,
+    WindowType,
+    compare_presets,
+    describe_preset,
+    get_preset,
+    list_presets,
+)
+from .core.builder import Pipeline, PipelineBuilder
 from .core.engine import benchmark_latency, process_signal
 from .exceptions import (
     ConfigError,
@@ -153,13 +166,30 @@ __all__ = [
     # -- Core Engine --
     "Engine",
 
+    # -- Pipeline Builder --
+    "PipelineBuilder",
+    "Pipeline",
+
     # -- Convenience --
     "process_signal",
     "benchmark_latency",
 
     # -- Config --
     "EngineConfig",
-    "Presets",
+
+    # -- Presets --
+    "get_preset",
+    "list_presets",
+    "describe_preset",
+    "compare_presets",
+
+    # -- Enums --
+    "WindowType",
+    "WindowSymmetry",
+    "WindowNorm",
+    "ScalePolicy",
+    "OutputMode",
+    "ExecutionMode",
 
     # -- Core Exceptions --
     "IonosenseError",
@@ -207,7 +237,9 @@ def show_versions(verbose: bool = True) -> dict:
     # Try to get CUDA version
     if _ENGINE_AVAILABLE:
         try:
-            engine = Engine(Presets.validation())
+            config = get_preset('default')
+            config.batch = 1  # Minimal config for version check
+            engine = Engine(config=config)
             try:
                 info = engine.device_info
                 versions['cuda'] = info.get('cuda_version', 'Unknown')
@@ -285,7 +317,9 @@ def self_test(verbose: bool = True) -> bool:
         print("3. Testing engine initialization...")
     engine = None
     try:
-        engine = Engine(Presets.validation())
+        config = get_preset('default')
+        config.batch = 1  # Minimal config for testing
+        engine = Engine(config=config)
         if verbose:
             print("   OK: Engine initialized")
     except Exception as e:

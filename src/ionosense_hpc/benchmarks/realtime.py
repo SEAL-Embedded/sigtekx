@@ -12,7 +12,7 @@ import numpy as np
 
 from ionosense_hpc import Engine
 from ionosense_hpc.benchmarks.base import BaseBenchmark, BenchmarkConfig, BenchmarkResult
-from ionosense_hpc.config import EngineConfig, Presets
+from ionosense_hpc.config import EngineConfig, ExecutionMode, get_preset
 from ionosense_hpc.utils import logger, make_test_batch
 from ionosense_hpc.utils.paths import get_benchmark_run_dir, normalize_benchmark_name
 from ionosense_hpc.utils.profiling import (
@@ -70,7 +70,8 @@ class RealtimeBenchmark(BaseBenchmark):
             if self.config.engine_config:
                 self.engine_config = EngineConfig(**self.config.engine_config)
             else:
-                self.engine_config = Presets.realtime()
+                self.engine_config = get_preset('default')
+                self.engine_config.mode = ExecutionMode.REALTIME
 
             # Calculate frame deadline
             if self.config.frame_deadline_ms is None:
@@ -78,7 +79,7 @@ class RealtimeBenchmark(BaseBenchmark):
 
             # Initialize engine
             with nvtx_range("InitializeEngine", color=ProfileColor.DARK_GRAY):
-                self.engine = Engine(self.engine_config)
+                self.engine = Engine(config=self.engine_config)
 
             # Pre-generate test data for consistent frames
             with nvtx_range("GenerateTestData", color=ProfileColor.ORANGE):
@@ -365,7 +366,12 @@ if __name__ == '__main__':
     )
 
     # Load engine preset
-    config.engine_config = getattr(Presets, args.preset)().model_dump()
+    if args.preset == 'realtime':
+        preset_config = get_preset('default')
+        preset_config.mode = ExecutionMode.REALTIME
+        config.engine_config = preset_config.model_dump()
+    else:
+        config.engine_config = get_preset(args.preset).model_dump()
 
     # Run benchmark
     benchmark = RealtimeBenchmark(config)

@@ -13,7 +13,7 @@ import numpy as np
 
 from ionosense_hpc import Engine
 from ionosense_hpc.benchmarks.base import BaseBenchmark, BenchmarkConfig
-from ionosense_hpc.config import EngineConfig, Presets
+from ionosense_hpc.config import EngineConfig, ExecutionMode, get_preset
 from ionosense_hpc.utils import get_memory_usage, logger, make_test_batch
 from ionosense_hpc.utils.paths import get_benchmark_run_dir, normalize_benchmark_name
 from ionosense_hpc.utils.profiling import (
@@ -79,10 +79,11 @@ class ThroughputBenchmark(BaseBenchmark):
             if self.config.engine_config:
                 self.engine_config = EngineConfig(**self.config.engine_config)
             else:
-                self.engine_config = Presets.throughput()
+                self.engine_config = get_preset('default')
+                self.engine_config.mode = ExecutionMode.BATCH
 
             with nvtx_range("InitializeEngine", color=ProfileColor.DARK_GRAY):
-                self.engine = Engine(self.engine_config)
+                self.engine = Engine(config=self.engine_config)
 
             # Pre-generate test data
             with nvtx_range("GenerateTestData", color=ProfileColor.ORANGE):
@@ -320,7 +321,7 @@ class ScalingBenchmark(ThroughputBenchmark):
             )
 
             # Run throughput test
-            engine = Engine(test_config)
+            engine = Engine(config=test_config)
 
             test_data = make_test_batch(
                 'noise',
@@ -368,7 +369,7 @@ class ScalingBenchmark(ThroughputBenchmark):
             )
 
             # Run throughput test
-            engine = Engine(test_config)
+            engine = Engine(config=test_config)
 
             test_data = make_test_batch(
                 'noise',
@@ -420,7 +421,7 @@ class ScalingBenchmark(ThroughputBenchmark):
                 warmup_iters=5
             )
 
-            engine = Engine(test_config)
+            engine = Engine(config=test_config)
 
             test_data = make_test_batch(
                 'noise',

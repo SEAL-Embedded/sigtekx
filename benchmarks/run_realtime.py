@@ -6,14 +6,14 @@ This script is Hydra-aware and logs results to MLflow.
 It integrates with the modern artifacts layout (artifacts/experiments + artifacts/data).
 """
 
+import warnings
+from pathlib import Path
+
 import hydra
 import mlflow
 import pandas as pd
 from omegaconf import DictConfig, OmegaConf
-from pathlib import Path
-import warnings
 
-from ionosense_hpc import Engine
 from ionosense_hpc.benchmarks import RealtimeBenchmark, RealtimeBenchmarkConfig
 from ionosense_hpc.config import EngineConfig
 
@@ -38,7 +38,10 @@ def run_realtime_benchmark(cfg: DictConfig) -> float:
     # ===== END ROBUSTNESS FIX =====
 
     # Convert OmegaConf to Pydantic models for validation
-    engine_config = EngineConfig(**cfg.engine)
+    # Filter out metadata fields that aren't part of EngineConfig
+    engine_dict = dict(cfg.engine)
+    engine_dict.pop("name", None)  # Remove metadata field
+    engine_config = EngineConfig(**engine_dict)
     benchmark_config = RealtimeBenchmarkConfig(**cfg.benchmark, engine_config=engine_config.model_dump())
 
     # Setup MLflow

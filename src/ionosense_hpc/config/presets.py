@@ -1,120 +1,209 @@
-"""Pre-configured engine settings for common use cases."""
+"""Built-in engine configuration presets.
 
-from typing import Any
+This module defines the three core presets:
+- default: General-purpose configuration
+- iono: Standard ionosphere monitoring (4096 FFT, 0.75 overlap, Blackman window)
+- ionox: Extreme ionosphere (8192 FFT, 0.9 overlap, Blackman window)
 
-from .schemas import EngineConfig
+Following API design principles:
+- Simple, memorable names
+- Clear purpose for each preset
+- No magic - explicit configuration values
+"""
+
+from .schemas import (
+    EngineConfig,
+    ExecutionMode,
+    ScalePolicy,
+    WindowNorm,
+    WindowSymmetry,
+    WindowType,
+)
+
+# ============================================================================
+# Built-in Presets
+# ============================================================================
+
+_PRESETS = {
+    'default': EngineConfig(
+        # Signal parameters
+        nfft=1024,
+        batch=2,
+        overlap=0.5,
+        sample_rate_hz=48000,
+
+        # Pipeline parameters
+        window=WindowType.HANN,
+        window_symmetry=WindowSymmetry.PERIODIC,
+        window_norm=WindowNorm.UNITY,
+        scale=ScalePolicy.ONE_OVER_N,
+
+        # Execution parameters
+        mode=ExecutionMode.BATCH,
+        stream_count=3,
+        pinned_buffer_count=2,
+
+        # Performance
+        warmup_iters=1,
+        enable_profiling=False
+    ),
+
+    'iono': EngineConfig(
+        # Signal parameters - Ionosphere monitoring
+        nfft=4096,  # Good frequency resolution for HF/VLF
+        batch=8,    # Process multiple channels
+        overlap=0.75,  # High overlap for temporal resolution
+        sample_rate_hz=48000,
+
+        # Pipeline parameters - Optimized for ionosphere
+        window=WindowType.BLACKMAN,  # Better sidelobe suppression
+        window_symmetry=WindowSymmetry.PERIODIC,
+        window_norm=WindowNorm.UNITY,
+        scale=ScalePolicy.ONE_OVER_N,
+
+        # Execution parameters
+        mode=ExecutionMode.BATCH,
+        stream_count=4,
+        pinned_buffer_count=4,
+
+        # Performance
+        warmup_iters=5,
+        enable_profiling=False
+    ),
+
+    'ionox': EngineConfig(
+        # Signal parameters - Extreme ionosphere (missile detection, etc.)
+        nfft=8192,  # Ultra-high frequency resolution
+        batch=16,   # Large batch for throughput
+        overlap=0.9,  # Very high overlap for detailed temporal analysis
+        sample_rate_hz=48000,
+
+        # Pipeline parameters - Maximum quality
+        window=WindowType.BLACKMAN,
+        window_symmetry=WindowSymmetry.PERIODIC,
+        window_norm=WindowNorm.UNITY,
+        scale=ScalePolicy.ONE_OVER_N,
+
+        # Execution parameters - High throughput
+        mode=ExecutionMode.BATCH,
+        stream_count=4,
+        pinned_buffer_count=4,
+
+        # Performance
+        warmup_iters=10,
+        enable_profiling=False
+    ),
+}
 
 
-class Presets:
-    """Collection of pre-configured engine settings."""
+# ============================================================================
+# Public API
+# ============================================================================
 
-    @staticmethod
-    def realtime() -> EngineConfig:
-        """Configuration for real-time processing with minimal latency.
+def get_preset(name: str) -> EngineConfig:
+    """Get a preset configuration by name.
 
-        Optimized for <200μs latency with dual-channel ULF/VLF signals.
-        """
-        return EngineConfig(
-            nfft=1024,
-            batch=2,  # Dual-channel
-            overlap=0.5,
-            sample_rate_hz=48000,
-            stream_count=3,  # H2D, compute, D2H
-            pinned_buffer_count=2,  # Double buffering
-            warmup_iters=10,  # Stabilize clocks
-            timeout_ms=100,  # Tight timeout for real-time
-            use_cuda_graphs=False,  # Future optimization
-            enable_profiling=False  # Minimize overhead
+    Args:
+        name: Preset name ('default', 'iono', 'ionox')
+
+    Returns:
+        Deep copy of the preset EngineConfig
+
+    Raises:
+        ValueError: If preset name is unknown
+
+    Examples:
+        >>> config = get_preset('iono')
+        >>> config = get_preset('ionox')
+    """
+    if name not in _PRESETS:
+        available = ', '.join(_PRESETS.keys())
+        raise ValueError(
+            f"Unknown preset '{name}'. Available presets: {available}"
         )
 
-    @staticmethod
-    def throughput() -> EngineConfig:
-        """Configuration for maximum throughput batch processing.
+    # Return a deep copy so modifications don't affect the original
+    return _PRESETS[name].model_copy(deep=True)
 
-        Optimized for processing large datasets offline.
-        """
-        return EngineConfig(
-            nfft=4096,
-            batch=32,  # Large batch
-            overlap=0.5,
-            sample_rate_hz=48000,
-            stream_count=4,
-            pinned_buffer_count=4,  # More buffers for pipelining
-            warmup_iters=1,
-            timeout_ms=5000,
-            use_cuda_graphs=False,
-            enable_profiling=False
+
+def list_presets() -> list[str]:
+    """Get list of available preset names.
+
+    Returns:
+        List of preset names
+
+    Examples:
+        >>> presets = list_presets()
+        >>> print(presets)
+        ['default', 'iono', 'ionox']
+    """
+    return list(_PRESETS.keys())
+
+
+def describe_preset(name: str) -> str:
+    """Get a description of a preset.
+
+    Args:
+        name: Preset name
+
+    Returns:
+        Human-readable description
+
+    Examples:
+        >>> print(describe_preset('iono'))
+        Ionosphere Monitoring Preset:
+          FFT: 4096, Batch: 8, Overlap: 75.0%
+          Window: BLACKMAN (PERIODIC)
+          Mode: BATCH
+    """
+    if name not in _PRESETS:
+        available = ', '.join(_PRESETS.keys())
+        raise ValueError(f"Unknown preset '{name}'. Available: {available}")
+
+    config = _PRESETS[name]
+
+    descriptions = {
+        'default': 'General Purpose',
+        'iono': 'Ionosphere Monitoring',
+        'ionox': 'Extreme Ionosphere (High Resolution)'
+    }
+
+    title = descriptions.get(name, name.capitalize())
+
+    return f"""{title} Preset:
+  FFT: {config.nfft}, Batch: {config.batch}, Overlap: {config.overlap:.1%}
+  Window: {config.window.value.upper()} ({config.window_symmetry.value.upper()})
+  Mode: {config.mode.value.upper()}
+  Sample Rate: {config.sample_rate_hz} Hz"""
+
+
+# ============================================================================
+# Preset Comparison
+# ============================================================================
+
+def compare_presets() -> str:
+    """Generate a comparison table of all presets.
+
+    Returns:
+        Formatted comparison table
+
+    Examples:
+        >>> print(compare_presets())
+    """
+    header = f"{'Preset':<10} | {'NFFT':<6} | {'Batch':<6} | {'Overlap':<8} | {'Window':<10}"
+    separator = "-" * len(header)
+
+    lines = [header, separator]
+
+    for name in _PRESETS:
+        cfg = _PRESETS[name]
+        line = (
+            f"{name:<10} | "
+            f"{cfg.nfft:<6} | "
+            f"{cfg.batch:<6} | "
+            f"{cfg.overlap:<8.1%} | "
+            f"{cfg.window.value:<10}"
         )
+        lines.append(line)
 
-    @staticmethod
-    def validation() -> EngineConfig:
-        """Configuration for accuracy validation and testing.
-
-        Small sizes for debugging and numerical validation.
-        """
-        return EngineConfig(
-            nfft=256,
-            batch=1,
-            overlap=0.0,  # No overlap for simple validation
-            sample_rate_hz=1000,  # Simple rate for testing
-            stream_count=1,  # Single stream for determinism
-            pinned_buffer_count=2,
-            warmup_iters=0,  # No warmup for testing
-            timeout_ms=10000,
-            use_cuda_graphs=False,
-            enable_profiling=True  # Enable for debugging
-        )
-
-    @staticmethod
-    def profiling() -> EngineConfig:
-        """Configuration optimized for profiling and benchmarking.
-
-        Balanced settings to expose both compute and memory patterns.
-        """
-        return EngineConfig(
-            nfft=2048,
-            batch=8,
-            overlap=0.5,
-            sample_rate_hz=48000,
-            stream_count=3,
-            pinned_buffer_count=3,
-            warmup_iters=5,
-            timeout_ms=2000,
-            use_cuda_graphs=False,
-            enable_profiling=True
-        )
-
-    @staticmethod
-    def custom(**kwargs: Any) -> EngineConfig:
-        """Create a custom configuration starting from realtime preset.
-
-        Args:
-            **kwargs: Parameters to override
-
-        Returns:
-            Custom EngineConfig
-
-        Example:
-            >>> config = Presets.custom(nfft=2048, batch=4)
-        """
-        base = Presets.realtime()
-        for key, value in kwargs.items():
-            if hasattr(base, key):
-                setattr(base, key, value)
-            else:
-                raise ValueError(f"Unknown parameter: {key}")
-        return base
-
-    @classmethod
-    def list_presets(cls) -> dict[str, EngineConfig]:
-        """Get all available presets.
-
-        Returns:
-            Dictionary mapping preset names to configurations
-        """
-        return {
-            'realtime': cls.realtime(),
-            'throughput': cls.throughput(),
-            'validation': cls.validation(),
-            'profiling': cls.profiling()
-        }
+    return "\n".join(lines)

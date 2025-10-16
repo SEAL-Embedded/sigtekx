@@ -2,6 +2,8 @@
 
 This guide walks through the supported path for running end-to-end ionosphere studies. The workflow relies on direct Python entry points for experimentation and Snakemake for orchestration. Use the `iono` CLI only for environment setup, formatting, linting, builds, profiling, and other maintenance tasks.
 
+**Note:** This guide uses the unified API (v0.9.3+). All experiment configurations use Hydra YAML files which are fully compatible with the new `EngineConfig`. For direct Python API usage, see `docs/guides/api-reference.md`.
+
 ## Quick Start (Recommended)
 
 Run the full benchmark -> analysis -> reporting pipeline with Snakemake:
