@@ -113,11 +113,37 @@ class PyResearchEngine {
  * classes, methods, and enumerations to make them accessible from Python.
  */
 PYBIND11_MODULE(_engine, m) {
-  m.doc() = "Ionosense HPC CUDA FFT Engine - C++ Core Module";
+  m.doc() = R"pbdoc(
+        Ionosense HPC CUDA FFT Engine - C++ Core Module (v0.9.3)
+
+        This module provides high-performance CUDA-accelerated signal processing
+        with a composable pipeline/executor architecture.
+
+        Architecture (v0.9.3 - cpp-abs):
+        - PipelineBuilder: Construct processing pipelines from stages
+        - BatchExecutor: High-throughput batch processing
+        - RealtimeExecutor: Placeholder for streaming (v0.10.0+)
+
+        Key classes:
+        - ResearchEngine: Main user-facing engine (wrapper over executors)
+        - ExecutorConfig: Configuration for pipeline executors
+        - EngineConfig: Base configuration for signal processing
+
+        Example:
+            >>> import _engine
+            >>> config = _engine.EngineConfig()
+            >>> config.nfft = 1024
+            >>> config.batch = 4
+            >>> engine = _engine.ResearchEngine()
+            >>> engine.initialize(config)
+            >>> output = engine.process(input_data)
+    )pbdoc";
 
   // --- Bind Enums for StageConfig ---
   py::enum_<ionosense::StageConfig::WindowType>(m, "WindowType")
+      .value("RECTANGULAR", ionosense::StageConfig::WindowType::RECTANGULAR)
       .value("HANN", ionosense::StageConfig::WindowType::HANN)
+      .value("BLACKMAN", ionosense::StageConfig::WindowType::BLACKMAN)
       .export_values();
 
   py::enum_<ionosense::StageConfig::ScalePolicy>(m, "ScalePolicy")
@@ -127,15 +153,63 @@ PYBIND11_MODULE(_engine, m) {
              ionosense::StageConfig::ScalePolicy::ONE_OVER_SQRT_N)
       .export_values();
 
+  // --- Bind ExecutorConfig Enums (v0.9.3 architecture) ---
+  py::enum_<ionosense::ExecutorConfig::ExecutionMode>(m, "ExecutionMode",
+                                                       "Execution strategy for "
+                                                       "pipeline executors")
+      .value("BATCH", ionosense::ExecutorConfig::ExecutionMode::BATCH,
+             "Process complete batches with maximum throughput")
+      .value("STREAMING", ionosense::ExecutorConfig::ExecutionMode::STREAMING,
+             "Continuous processing with input accumulation (v0.10.0+)")
+      .value("LOW_LATENCY",
+             ionosense::ExecutorConfig::ExecutionMode::LOW_LATENCY,
+             "Minimize latency at cost of throughput")
+      .export_values();
+
   // --- Bind Configuration Structs ---
   py::class_<ionosense::EngineConfig>(m, "EngineConfig")
       .def(py::init<>())
       .def_readwrite("nfft", &ionosense::EngineConfig::nfft)
       .def_readwrite("batch", &ionosense::EngineConfig::batch)
-      // ... Bind other EngineConfig members
+      .def_readwrite("overlap", &ionosense::EngineConfig::overlap)
+      .def_readwrite("sample_rate_hz", &ionosense::EngineConfig::sample_rate_hz)
+      .def_readwrite("stream_count", &ionosense::EngineConfig::stream_count)
+      .def_readwrite("pinned_buffer_count",
+                     &ionosense::EngineConfig::pinned_buffer_count)
+      .def_readwrite("warmup_iters", &ionosense::EngineConfig::warmup_iters)
       .def("num_output_bins", &ionosense::EngineConfig::num_output_bins)
       .def("__repr__", [](const ionosense::EngineConfig& c) {
         return "<EngineConfig nfft=" + std::to_string(c.nfft) +
+               ", batch=" + std::to_string(c.batch) + ">";
+      });
+
+  // --- Bind ExecutorConfig (v0.9.3 architecture) ---
+  py::class_<ionosense::ExecutorConfig, ionosense::EngineConfig>(
+      m, "ExecutorConfig",
+      "Configuration for pipeline executors (extends EngineConfig)")
+      .def(py::init<>())
+      .def_readwrite("mode", &ionosense::ExecutorConfig::mode,
+                     "Execution strategy (BATCH/STREAMING/LOW_LATENCY)")
+      .def_readwrite("max_inflight_batches",
+                     &ionosense::ExecutorConfig::max_inflight_batches,
+                     "Maximum concurrent batches (streaming mode, v0.10.0+)")
+      .def_readwrite("device_id", &ionosense::ExecutorConfig::device_id,
+                     "CUDA device ID (-1 for auto-select)")
+      .def("__repr__", [](const ionosense::ExecutorConfig& c) {
+        std::string mode_str;
+        switch (c.mode) {
+          case ionosense::ExecutorConfig::ExecutionMode::BATCH:
+            mode_str = "BATCH";
+            break;
+          case ionosense::ExecutorConfig::ExecutionMode::STREAMING:
+            mode_str = "STREAMING";
+            break;
+          case ionosense::ExecutorConfig::ExecutionMode::LOW_LATENCY:
+            mode_str = "LOW_LATENCY";
+            break;
+        }
+        return "<ExecutorConfig mode=" + mode_str +
+               ", nfft=" + std::to_string(c.nfft) +
                ", batch=" + std::to_string(c.batch) + ">";
       });
 
@@ -184,5 +258,6 @@ PYBIND11_MODULE(_engine, m) {
   m.def("select_best_device", &ionosense::engine_utils::select_best_device,
         "Selects the best available CUDA device.");
 
-  m.attr("__version__") = "0.8.0";
+  m.attr("__version__") = "0.9.3";
+  m.attr("__architecture_version__") = "cpp-abs (pipeline/executor split)";
 }

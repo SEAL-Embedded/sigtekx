@@ -28,16 +28,21 @@ namespace ionosense {
 class BatchExecutor::Impl {
  public:
   Impl() {
-    // Clear any existing device state from previous runs
-    // This ensures a clean slate for device flags
-    cudaDeviceReset();
-
     // Set blocking sync scheduling policy BEFORE any device-specific CUDA calls.
     // This eliminates CPU spin-waiting and OS scheduler interference during
     // synchronization calls, critical for reproducible benchmarking.
     // CUDA Programming Guide: "cudaSetDeviceFlags must be called before device
     // is initialized". This reduces CV from 57-84% to <10%.
-    IONO_CUDA_CHECK(cudaSetDeviceFlags(cudaDeviceScheduleBlockingSync));
+    //
+    // NOTE: cudaDeviceReset() was removed from here because it destroys ALL
+    // CUDA state globally (across all executors), causing crashes in tests
+    // that create multiple executor instances. Device flags can be set without
+    // a full reset if they're configured before first CUDA API call.
+    cudaError_t err = cudaSetDeviceFlags(cudaDeviceScheduleBlockingSync);
+    if (err != cudaSuccess && err != cudaErrorSetOnActiveProcess) {
+      IONO_CUDA_CHECK(err);  // Throw if it's a real error
+    }
+    // cudaErrorSetOnActiveProcess is expected if CUDA was already initialized
 
     // Select best device
     int device_count = 0;
@@ -232,18 +237,73 @@ class BatchExecutor::Impl {
 
     {
       IONO_NVTX_RANGE("Compute Pipeline", profiling::colors::PURPLE);
-      // Assume 3-stage pipeline: Window → FFT → Magnitude
-      if (stages_.size() >= 3) {
-        stages_[0]->process(d_input.get(), d_input.get(), num_samples,
-                            streams_[compute_stream_idx].get());
-        stages_[1]->process(d_input.get(), d_intermediate.get(), num_samples,
-                            streams_[compute_stream_idx].get());
-        const size_t complex_elements =
-            static_cast<size_t>(config_.num_output_bins()) * config_.batch;
-        stages_[2]->process(d_intermediate.get(), d_output.get(),
-                            complex_elements,
-                            streams_[compute_stream_idx].get());
+      // Generalized stage execution with dynamic buffer routing
+      // Strategy:
+      // - First stage: always operates on d_input (may be in-place)
+      // - Middle stages: ping-pong between d_intermediate and d_output
+      // - Last stage: always writes to d_output
+      //
+      // Buffer sizing:
+      // - Input space: nfft * batch samples
+      // - Complex space (post-FFT): (nfft/2 + 1) * batch * 2 floats
+      // - Output space: (nfft/2 + 1) * batch floats (magnitude)
+
+      if (stages_.empty()) {
+        throw std::runtime_error("Empty pipeline in submit()");
       }
+
+      void* current_input = d_input.get();
+      void* current_output = nullptr;
+      size_t current_size = num_samples;
+
+      for (size_t stage_idx = 0; stage_idx < stages_.size(); ++stage_idx) {
+        const auto& stage = stages_[stage_idx];
+        const std::string stage_name = stage->name();
+
+        // Determine output buffer for this stage
+        if (stage_idx == 0) {
+          // First stage: Window is typically in-place
+          if (stage->supports_inplace()) {
+            current_output = d_input.get();
+          } else {
+            current_output = d_intermediate.get();
+          }
+        } else if (stage_name == "FFTStage") {
+          // FFT: real → complex, output to intermediate buffer
+          current_output = d_intermediate.get();
+        } else if (stage_idx == stages_.size() - 1) {
+          // Last stage: always write to final output buffer
+          current_output = d_output.get();
+        } else {
+          // Middle stages: use intermediate buffer
+          current_output = d_intermediate.get();
+        }
+
+        // Process this stage with CURRENT input size
+        {
+          const std::string stage_msg = "Stage: " + stage_name;
+          IONO_NVTX_RANGE(stage_msg.c_str(), profiling::colors::MAGENTA);
+          stage->process(current_input, current_output, current_size,
+                         streams_[compute_stream_idx].get());
+        }
+
+        // Update size for NEXT stage based on what THIS stage outputs
+        if (stage_name == "FFTStage") {
+          // FFT outputs (nfft/2 + 1) * batch complex pairs
+          // MagnitudeStage expects element count (complex pairs), not float count
+          current_size =
+              static_cast<size_t>(config_.num_output_bins()) * config_.batch;
+        } else if (stage_name == "MagnitudeStage") {
+          // Magnitude: complex → real, halves size
+          current_size =
+              static_cast<size_t>(config_.num_output_bins()) * config_.batch;
+        }
+        // For other stages (Window, etc.), size stays the same
+
+        // Next stage's input is this stage's output
+        current_input = current_output;
+      }
+
       e_compute_done.record(streams_[compute_stream_idx].get());
     }
 
@@ -286,6 +346,12 @@ class BatchExecutor::Impl {
       throw std::runtime_error("Executor not initialized");
     }
 
+    // NOTE: Despite the "async" name, this implementation is SYNCHRONOUS
+    // (blocks until completion). True async behavior with non-blocking
+    // submission and deferred callback invocation is deferred to v0.9.4+.
+    //
+    // This approach avoids complex lifetime management of output buffers
+    // while maintaining API consistency with the executor interface.
     std::vector<float> output(config_.num_output_bins() * config_.batch);
     submit(input, output.data(), num_samples);
 

@@ -50,7 +50,8 @@ class ResearchEngine::Impl {
     ExecutorConfig exec_config;
     static_cast<EngineConfig&>(exec_config) = config;  // Copy base config
     exec_config.mode = ExecutorConfig::ExecutionMode::BATCH;
-    exec_config.prefer_cuda_graphs = config.use_cuda_graphs;
+    // NOTE: prefer_cuda_graphs removed in v0.9.3 - config.use_cuda_graphs ignored
+    // CUDA graph optimization will be added in v0.10.0+
 
     // Initialize executor
     executor_ = std::make_unique<BatchExecutor>();

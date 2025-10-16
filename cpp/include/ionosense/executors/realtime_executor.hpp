@@ -21,22 +21,28 @@ namespace ionosense {
 
 /**
  * @class RealtimeExecutor
- * @brief Executor optimized for low-latency continuous streaming.
+ * @brief Placeholder executor for low-latency continuous streaming.
  *
- * This executor is designed for realtime applications where:
- * - Input arrives continuously in small chunks
- * - Low latency is critical
- * - Callback-based notification is preferred over blocking
+ * @warning **STUB IMPLEMENTATION (v0.9.3)**
+ * This executor is currently a thin wrapper around BatchExecutor and does NOT
+ * implement true streaming capabilities. It is provided as an architectural
+ * placeholder for v0.10.0+ where full streaming features will be added.
  *
- * Key features:
+ * **Current behavior:**
+ * - Delegates all operations to BatchExecutor
+ * - Does NOT accumulate input in ring buffers
+ * - Does NOT process frames as they arrive
+ * - Does NOT support true streaming (supports_streaming() returns false)
+ *
+ * **Planned features for v0.9.4+:**
  * - Ring buffer for input accumulation
  * - Frame-by-frame processing as data arrives
- * - Callback invocation upon completion
+ * - Overlap handling for continuous streams
+ * - Callback invocation upon frame completion
  * - Optional CUDA graph optimization for minimal overhead
  *
- * Note: This is a simplified implementation for v0.9.3. Full features
- * like ring buffer management and overlap handling will be added in
- * future versions.
+ * For now, use BatchExecutor directly for batch processing, or wait for
+ * v0.10.0 for true realtime streaming support.
  */
 class RealtimeExecutor : public IPipelineExecutor {
  public:
@@ -59,7 +65,12 @@ class RealtimeExecutor : public IPipelineExecutor {
                     ResultCallback callback) override;
   void synchronize() override;
   ProcessingStats get_stats() const override;
-  bool supports_streaming() const override { return true; }
+
+  /**
+   * @brief Reports streaming capability (currently false).
+   * @return false - streaming not implemented in v0.9.3 stub.
+   */
+  bool supports_streaming() const override { return false; }
   size_t get_memory_usage() const override;
   bool is_initialized() const override;
 

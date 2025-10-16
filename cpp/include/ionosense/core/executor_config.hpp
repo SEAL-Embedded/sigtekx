@@ -40,15 +40,16 @@ struct ExecutorConfig : EngineConfig {
   /// Execution strategy to use
   ExecutionMode mode = ExecutionMode::BATCH;
 
-  /// If true, attempt to use CUDA graphs for reduced kernel launch overhead
-  bool prefer_cuda_graphs = false;
-
   /// Maximum number of batches that can be in-flight simultaneously
-  /// (used in streaming mode)
+  /// (used in streaming mode - deferred to v0.10.0+)
   int max_inflight_batches = 2;
 
   /// Device ID to use (defaults to best available)
   int device_id = -1;  // -1 means auto-select
+
+  // NOTE: prefer_cuda_graphs removed in v0.9.3 - deferred to v0.10.0+
+  // CUDA graph optimization will be added when async/streaming features
+  // are fully implemented.
 
   /**
    * @brief Validates the executor configuration.

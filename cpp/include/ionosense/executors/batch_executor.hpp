@@ -53,6 +53,24 @@ class BatchExecutor : public IPipelineExecutor {
       std::vector<std::unique_ptr<IProcessingStage>> stages) override;
   void reset() override;
   void submit(const float* input, float* output, size_t num_samples) override;
+
+  /**
+   * @brief Submits input for processing with callback notification.
+   *
+   * @warning **SYNCHRONOUS IMPLEMENTATION (v0.9.3)**
+   * Despite the "async" name, this method currently BLOCKS until processing
+   * completes, then invokes the callback immediately. True asynchronous
+   * behavior (non-blocking submission with deferred callback) is deferred to
+   * v0.9.4+.
+   *
+   * This design choice avoids complex lifetime management of output buffers
+   * while providing a callback-based API for consistency with the executor
+   * interface.
+   *
+   * @param input Pointer to host input data.
+   * @param num_samples Total number of samples in input.
+   * @param callback Function to invoke with results (called before return).
+   */
   void submit_async(const float* input, size_t num_samples,
                     ResultCallback callback) override;
   void synchronize() override;

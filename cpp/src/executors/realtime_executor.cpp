@@ -4,12 +4,15 @@
  * @date 2025-10-09
  * @author [Kevin Rahsaz]
  *
- * @brief Implementation of RealtimeExecutor.
+ * @brief Stub implementation of RealtimeExecutor (placeholder for v0.10.0+).
  *
- * Note: This is a simplified implementation for v0.9.3 that demonstrates
- * the architecture. It currently delegates to batch processing logic but
- * with streaming-optimized settings. Full ring buffer and overlap handling
- * will be added in future iterations.
+ * @warning **STUB IMPLEMENTATION**
+ * This executor is currently a simple wrapper around BatchExecutor and does
+ * NOT implement true streaming capabilities. It is provided as an
+ * architectural placeholder to demonstrate the executor abstraction pattern.
+ *
+ * Full streaming features (ring buffers, input accumulation, overlap handling,
+ * background processing) will be implemented in v0.9.4+.
  */
 
 #include "ionosense/executors/realtime_executor.hpp"
