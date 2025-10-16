@@ -9,15 +9,15 @@ the engine's capabilities, performance characteristics, and research methodology
 import json
 import sys
 import time
-import numpy as np
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any
+
+import numpy as np
 
 # Add the package to the path
 sys.path.insert(0, str(Path(__file__).parent / "python" / "src"))
 
-from ionosense_hpc.benchmarks.base import BenchmarkResult, save_benchmark_results
 from ionosense_hpc.benchmarks.latency import LatencyBenchmark, LatencyBenchmarkConfig
 from ionosense_hpc.benchmarks.realtime import RealtimeBenchmark, RealtimeBenchmarkConfig
 from ionosense_hpc.benchmarks.throughput import ThroughputBenchmark, ThroughputBenchmarkConfig
@@ -33,14 +33,14 @@ class EnhancedDemoGenerator:
         self.artifacts_root = get_artifacts_root()
         self.demo_data_dir = self.artifacts_root / "demo_data"
         self.demo_data_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Track all measurements for statistical rigor
         self.all_measurements = {}
         self.theoretical_limits = self._calculate_theoretical_limits()
-        
+
         print(f"Enhanced demo data will be saved to: {self.demo_data_dir}")
 
-    def _calculate_theoretical_limits(self) -> Dict[str, float]:
+    def _calculate_theoretical_limits(self) -> dict[str, float]:
         """Calculate theoretical performance limits based on hardware."""
         return {
             "memory_bandwidth_gbs": 936.2,  # RTX 3090 Ti theoretical
@@ -52,7 +52,7 @@ class EnhancedDemoGenerator:
             "memory_size_gb": 24
         }
 
-    def get_scientific_configurations(self) -> List[Tuple]:
+    def get_scientific_configurations(self) -> list[tuple]:
         """Define configurations that reveal different performance characteristics."""
         return [
             # Memory-bound configurations
@@ -65,14 +65,14 @@ class EnhancedDemoGenerator:
             ("extreme", 8192, 64, "Maximum parallelism", "throughput"),
         ]
 
-    def run_comprehensive_analysis(self) -> Dict[str, Any]:
+    def run_comprehensive_analysis(self) -> dict[str, Any]:
         """Run comprehensive performance analysis with statistical rigor."""
         print("\n" + "="*60)
         print("COMPREHENSIVE PERFORMANCE ANALYSIS")
         print("="*60)
-        
+
         configs = self.get_scientific_configurations()
-        
+
         analysis_data = {
             "configurations": [],
             "performance_metrics": [],
@@ -80,11 +80,11 @@ class EnhancedDemoGenerator:
             "efficiency_analysis": [],
             "statistical_analysis": []
         }
-        
+
         for config_name, nfft, batch, description, category in configs:
             print(f"\n[{config_name.upper()}] FFT={nfft}, Batch={batch}")
             print(f"  Category: {category}, Description: {description}")
-            
+
             engine_config = EngineConfig(
                 nfft=nfft,
                 batch=batch,
@@ -99,11 +99,11 @@ class EnhancedDemoGenerator:
                 tags=["demo", "scientific", category],
                 notes=description
             )
-            
+
             # Calculate theoretical metrics
             bytes_per_frame = (nfft * batch * 4 * 2)  # Input + output
             theoretical_min_latency_us = bytes_per_frame / (self.theoretical_limits["memory_bandwidth_gbs"] * 1e3)
-            
+
             config_info = {
                 "name": config_name,
                 "nfft": nfft,
@@ -117,28 +117,28 @@ class EnhancedDemoGenerator:
                 "parallelism_factor": batch * (nfft / 1024)  # Relative parallelism
             }
             analysis_data["configurations"].append(config_info)
-            
+
             # Run multiple iterations for statistical significance
             metrics = self._run_statistical_benchmark(config_name, engine_config)
             analysis_data["performance_metrics"].append(metrics)
-        
+
         # Analyze scaling patterns
         analysis_data["scaling_analysis"] = self._analyze_scaling_patterns(analysis_data["performance_metrics"])
-        
+
         # Calculate efficiency metrics
         analysis_data["efficiency_analysis"] = self._calculate_efficiency_metrics(
             analysis_data["performance_metrics"],
             analysis_data["configurations"]
         )
-        
+
         # Statistical validation
         analysis_data["statistical_analysis"] = self._perform_statistical_tests(
             analysis_data["performance_metrics"]
         )
-        
+
         return analysis_data
 
-    def _run_statistical_benchmark(self, config_name: str, engine_config: EngineConfig) -> Dict:
+    def _run_statistical_benchmark(self, config_name: str, engine_config: EngineConfig) -> dict:
         """Run benchmarks with proper statistical methodology."""
         metrics = {
             "config": config_name,
@@ -146,7 +146,7 @@ class EnhancedDemoGenerator:
             "batch": engine_config.batch,
             "measurements": {}
         }
-        
+
         # Latency measurements with high sample count
         print("  • Latency analysis (1000 samples)...")
         try:
@@ -159,10 +159,10 @@ class EnhancedDemoGenerator:
                 engine_config=engine_config.model_dump(),
                 verbose=False
             )
-            
+
             latency_benchmark = LatencyBenchmark(latency_config)
             latency_result = latency_benchmark.run()
-            
+
             lat_stats = latency_result.statistics.get('latency_us', {})
             if isinstance(lat_stats, dict):
                 metrics["measurements"]["latency"] = {
@@ -178,7 +178,7 @@ class EnhancedDemoGenerator:
                     "cv": round(lat_stats.get('cv', 0), 4),  # Coefficient of variation
                     "samples": lat_stats.get('n', 0)
                 }
-                
+
                 # Calculate jitter metrics
                 if hasattr(latency_result, 'measurements') and isinstance(latency_result.measurements, dict):
                     latencies = latency_result.measurements.get('latency_us', [])
@@ -189,14 +189,14 @@ class EnhancedDemoGenerator:
                             "max_us": round(float(np.max(np.abs(diffs))), 2),
                             "std_us": round(float(np.std(diffs)), 2)
                         }
-                
+
                 print(f"    Mean: {metrics['measurements']['latency']['mean']}µs, "
                       f"P99: {metrics['measurements']['latency']['p99']}µs")
-        
+
         except Exception as e:
             print(f"    Latency test failed: {e}")
             metrics["measurements"]["latency"] = self._generate_synthetic_latency(engine_config)
-        
+
         # Throughput measurements with sustained load
         print("  • Throughput analysis (20s sustained)...")
         try:
@@ -209,10 +209,10 @@ class EnhancedDemoGenerator:
                 engine_config=engine_config.model_dump(),
                 verbose=False
             )
-            
+
             throughput_benchmark = ThroughputBenchmark(throughput_config)
             throughput_result = throughput_benchmark.run()
-            
+
             tp_stats = throughput_result.statistics
             metrics["measurements"]["throughput"] = {
                 "frames_per_second": round(self._get_stat_value(tp_stats, 'frames_per_second'), 1),
@@ -223,14 +223,14 @@ class EnhancedDemoGenerator:
                 "memory_utilization": round(self._get_stat_value(tp_stats, 'memory_utilization_mean'), 1),
                 "power_consumption_w": round(self._get_stat_value(tp_stats, 'power_mean_w', 250), 1)
             }
-            
+
             print(f"    FPS: {metrics['measurements']['throughput']['frames_per_second']}, "
                   f"GPU: {metrics['measurements']['throughput']['gpu_utilization']}%")
-        
+
         except Exception as e:
             print(f"    Throughput test failed: {e}")
             metrics["measurements"]["throughput"] = self._generate_synthetic_throughput(engine_config)
-        
+
         # Real-time compliance testing (for suitable configs)
         if engine_config.nfft <= 2048 and engine_config.batch <= 16:
             print("  • Real-time compliance (10s stream)...")
@@ -244,10 +244,10 @@ class EnhancedDemoGenerator:
                     engine_config=engine_config.model_dump(),
                     verbose=False
                 )
-                
+
                 realtime_benchmark = RealtimeBenchmark(realtime_config)
                 realtime_result = realtime_benchmark.run()
-                
+
                 rt_stats = realtime_result.statistics
                 metrics["measurements"]["realtime"] = {
                     "compliance_rate": round(self._get_stat_value(rt_stats, 'deadline_compliance_rate', 0), 3),
@@ -257,16 +257,16 @@ class EnhancedDemoGenerator:
                     "mean_jitter_ms": round(self._get_stat_value(rt_stats, 'mean_jitter_ms', 0), 3),
                     "max_jitter_ms": round(self._get_stat_value(rt_stats, 'max_jitter_ms', 0), 3)
                 }
-                
+
                 print(f"    Compliance: {metrics['measurements']['realtime']['compliance_rate']*100:.1f}%")
-            
+
             except Exception as e:
                 print(f"    Real-time test failed: {e}")
                 metrics["measurements"]["realtime"] = self._generate_synthetic_realtime(engine_config)
-        
+
         return metrics
 
-    def _get_stat_value(self, stats: Dict, key: str, default: float = 0) -> float:
+    def _get_stat_value(self, stats: dict, key: str, default: float = 0) -> float:
         """Extract statistical value from nested dict structure."""
         val = stats.get(key, default)
         if isinstance(val, dict):
@@ -276,11 +276,11 @@ class EnhancedDemoGenerator:
         except:
             return float(default)
 
-    def _generate_synthetic_latency(self, config: EngineConfig) -> Dict:
+    def _generate_synthetic_latency(self, config: EngineConfig) -> dict:
         """Generate realistic synthetic latency data as fallback."""
         base_latency = 50 + (config.nfft / 256) * 20 + (config.batch - 1) * 5
         std = base_latency * 0.05
-        
+
         return {
             "mean": round(base_latency, 2),
             "median": round(base_latency * 0.98, 2),
@@ -295,11 +295,11 @@ class EnhancedDemoGenerator:
             "samples": 1000
         }
 
-    def _generate_synthetic_throughput(self, config: EngineConfig) -> Dict:
+    def _generate_synthetic_throughput(self, config: EngineConfig) -> dict:
         """Generate realistic synthetic throughput data as fallback."""
         samples_per_frame = config.nfft * config.batch
         base_fps = 50000 / (1 + np.log2(config.nfft) * config.batch * 0.1)
-        
+
         return {
             "frames_per_second": round(base_fps, 1),
             "gb_per_second": round(base_fps * samples_per_frame * 4 / 1e9, 3),
@@ -310,10 +310,10 @@ class EnhancedDemoGenerator:
             "power_consumption_w": round(150 + config.batch * 3 + np.log2(config.nfft) * 5, 1)
         }
 
-    def _generate_synthetic_realtime(self, config: EngineConfig) -> Dict:
+    def _generate_synthetic_realtime(self, config: EngineConfig) -> dict:
         """Generate realistic synthetic real-time data as fallback."""
         base_compliance = 1.0 - (config.nfft / 8192) * 0.3 - (config.batch / 32) * 0.2
-        
+
         return {
             "compliance_rate": round(max(0.5, base_compliance), 3),
             "frames_processed": 1000,
@@ -323,38 +323,38 @@ class EnhancedDemoGenerator:
             "max_jitter_ms": round(config.hop_duration_ms * 0.08, 3)
         }
 
-    def _analyze_scaling_patterns(self, metrics: List[Dict]) -> Dict:
+    def _analyze_scaling_patterns(self, metrics: list[dict]) -> dict:
         """Analyze performance scaling patterns."""
         nfft_values = [m["nfft"] for m in metrics]
         batch_values = [m["batch"] for m in metrics]
-        
+
         latencies = [m["measurements"]["latency"]["mean"] for m in metrics]
         throughputs = [m["measurements"]["throughput"]["frames_per_second"] for m in metrics]
-        
+
         # Compute scaling factors
-        problem_sizes = [n * b for n, b in zip(nfft_values, batch_values)]
-        
+        problem_sizes = [n * b for n, b in zip(nfft_values, batch_values, strict=False)]
+
         # Latency scaling analysis
         lat_correlation = np.corrcoef(problem_sizes, latencies)[0, 1]
         lat_slope, lat_intercept = np.polyfit(np.log(problem_sizes), np.log(latencies), 1)
-        
+
         # Throughput scaling analysis
         tp_correlation = np.corrcoef(problem_sizes, throughputs)[0, 1]
         tp_slope, tp_intercept = np.polyfit(np.log(problem_sizes[:5]), np.log(throughputs[:5]), 1)
-        
+
         # Find optimal configurations
-        latency_per_sample = [l / p for l, p in zip(latencies, problem_sizes)]
+        latency_per_sample = [l / p for l, p in zip(latencies, problem_sizes, strict=False)]
         optimal_latency_idx = np.argmin(latency_per_sample)
-        
-        throughput_per_watt = [t / m["measurements"]["throughput"]["power_consumption_w"] 
-                               for t, m in zip(throughputs, metrics)]
+
+        throughput_per_watt = [t / m["measurements"]["throughput"]["power_consumption_w"]
+                               for t, m in zip(throughputs, metrics, strict=False)]
         optimal_efficiency_idx = np.argmax(throughput_per_watt)
-        
+
         return {
             "latency_scaling": {
                 "correlation": round(lat_correlation, 4),
                 "scaling_exponent": round(lat_slope, 3),
-                "complexity": "O(n^{:.2f})".format(lat_slope),
+                "complexity": f"O(n^{lat_slope:.2f})",
                 "doubling_factor": round(2 ** lat_slope, 2)
             },
             "throughput_scaling": {
@@ -376,24 +376,24 @@ class EnhancedDemoGenerator:
             }
         }
 
-    def _calculate_efficiency_metrics(self, metrics: List[Dict], configs: List[Dict]) -> Dict:
+    def _calculate_efficiency_metrics(self, metrics: list[dict], configs: list[dict]) -> dict:
         """Calculate comprehensive efficiency metrics."""
         efficiency_data = []
-        
-        for metric, config in zip(metrics, configs):
+
+        for metric, config in zip(metrics, configs, strict=False):
             latency = metric["measurements"]["latency"]["mean"]
             throughput = metric["measurements"]["throughput"]
-            
+
             # Calculate various efficiency metrics
             theoretical_min = config["theoretical_min_latency_us"]
             memory_efficiency = (theoretical_min / latency) * 100 if latency > 0 else 0
-            
+
             compute_efficiency = (throughput["gpu_utilization"] / 100) * (
                 throughput["memory_bandwidth_gbs"] / self.theoretical_limits["memory_bandwidth_gbs"]
             ) * 100
-            
+
             power_efficiency = throughput["frames_per_second"] / throughput["power_consumption_w"]
-            
+
             efficiency_data.append({
                 "config": config["name"],
                 "memory_efficiency_pct": round(memory_efficiency, 1),
@@ -406,7 +406,7 @@ class EnhancedDemoGenerator:
                     (throughput["gpu_utilization"] / 100) * (config["batch"] / 64), 3
                 )
             })
-        
+
         return {
             "configurations": efficiency_data,
             "summary": {
@@ -419,21 +419,21 @@ class EnhancedDemoGenerator:
             }
         }
 
-    def _perform_statistical_tests(self, metrics: List[Dict]) -> Dict:
+    def _perform_statistical_tests(self, metrics: list[dict]) -> dict:
         """Perform statistical validation tests."""
         # Extract latency distributions
         latency_cvs = [m["measurements"]["latency"]["cv"] for m in metrics]
-        
+
         # Stability analysis
         stable_configs = [m["config"] for m in metrics if m["measurements"]["latency"]["cv"] < 0.1]
-        
+
         # Outlier detection
         latency_means = [m["measurements"]["latency"]["mean"] for m in metrics]
         expected_latencies = [m["nfft"] * m["batch"] * 0.01 for m in metrics]  # Simple model
-        
-        residuals = [abs(a - e) / e for a, e in zip(latency_means, expected_latencies)]
+
+        residuals = [abs(a - e) / e for a, e in zip(latency_means, expected_latencies, strict=False)]
         outliers = [metrics[i]["config"] for i, r in enumerate(residuals) if r > 0.5]
-        
+
         return {
             "stability_analysis": {
                 "stable_configurations": stable_configs,
@@ -453,12 +453,12 @@ class EnhancedDemoGenerator:
             }
         }
 
-    def generate_comparison_studies(self) -> Dict[str, Any]:
+    def generate_comparison_studies(self) -> dict[str, Any]:
         """Generate detailed head-to-head comparisons."""
         print("\n" + "="*60)
         print("COMPARATIVE ANALYSIS STUDIES")
         print("="*60)
-        
+
         comparisons = {
             "latency_vs_throughput": [
                 ("latency_optimized", 256, 1, "Minimum latency configuration"),
@@ -482,16 +482,16 @@ class EnhancedDemoGenerator:
                 ("performance_mode", 2048, 32, "High-performance configuration")
             ]
         }
-        
+
         comparison_results = {}
-        
+
         for study_name, configs in comparisons.items():
             print(f"\nStudy: {study_name}")
             study_results = []
-            
+
             for config_name, nfft, batch, description in configs:
                 print(f"  Testing {config_name}...")
-                
+
                 engine_config = EngineConfig(
                     nfft=nfft,
                     batch=batch,
@@ -500,9 +500,9 @@ class EnhancedDemoGenerator:
                     warmup_iters=50,
                     enable_profiling=True
                 )
-                
+
                 metrics = self._run_statistical_benchmark(config_name, engine_config)
-                
+
                 study_results.append({
                     "config_name": config_name,
                     "description": description,
@@ -510,56 +510,56 @@ class EnhancedDemoGenerator:
                     "batch": batch,
                     "metrics": metrics["measurements"]
                 })
-            
+
             # Analyze comparison results
             comparison_results[study_name] = {
                 "configurations": study_results,
                 "analysis": self._analyze_comparison(study_results, study_name)
             }
-        
+
         return comparison_results
 
-    def _analyze_comparison(self, results: List[Dict], study_name: str) -> Dict:
+    def _analyze_comparison(self, results: list[dict], study_name: str) -> dict:
         """Analyze comparison study results."""
         if "channel_scaling" in study_name:
             channels = [r["batch"] for r in results]
             latencies = [r["metrics"]["latency"]["mean"] for r in results]
             throughputs = [r["metrics"]["throughput"]["frames_per_second"] for r in results]
-            
+
             # Calculate scaling efficiency
             single_tp = throughputs[0]
-            scaling_efficiency = [(tp / single_tp) / (ch / channels[0]) * 100 
-                                 for tp, ch in zip(throughputs, channels)]
-            
+            scaling_efficiency = [(tp / single_tp) / (ch / channels[0]) * 100
+                                 for tp, ch in zip(throughputs, channels, strict=False)]
+
             return {
                 "scaling_efficiency": [round(e, 1) for e in scaling_efficiency],
                 "optimal_channels": channels[np.argmax(scaling_efficiency)],
                 "latency_penalty": [round(l / latencies[0], 2) for l in latencies],
                 "throughput_gain": [round(t / throughputs[0], 2) for t in throughputs]
             }
-        
+
         elif "fft_size" in study_name:
             sizes = [r["nfft"] for r in results]
             latencies = [r["metrics"]["latency"]["mean"] for r in results]
-            
+
             # Fit complexity model
             log_sizes = np.log2(sizes)
             slope, intercept = np.polyfit(log_sizes, latencies, 1)
-            
+
             return {
                 "complexity_model": f"latency = {intercept:.1f} + {slope:.1f} * log2(nfft)",
                 "doubling_penalty_us": round(slope, 1),
                 "size_impact_factor": [round(l / latencies[0], 2) for l in latencies]
             }
-        
+
         else:
             # Generic analysis
             latencies = [r["metrics"]["latency"]["mean"] for r in results]
             throughputs = [r["metrics"]["throughput"]["frames_per_second"] for r in results]
-            
+
             winner_latency = results[np.argmin(latencies)]["config_name"]
             winner_throughput = results[np.argmax(throughputs)]["config_name"]
-            
+
             return {
                 "winner_latency": winner_latency,
                 "winner_throughput": winner_throughput,
@@ -567,12 +567,12 @@ class EnhancedDemoGenerator:
                 "throughput_range": [round(min(throughputs), 0), round(max(throughputs), 0)]
             }
 
-    def generate_optimized_json_files(self, analysis_data: Dict, comparison_data: Dict) -> None:
+    def generate_optimized_json_files(self, analysis_data: dict, comparison_data: dict) -> None:
         """Generate optimized JSON files for web consumption."""
         print("\n" + "="*60)
         print("GENERATING WEB-OPTIMIZED FILES")
         print("="*60)
-        
+
         # 1. Summary file with key insights
         summary = {
             "generated_at": datetime.now().isoformat(),
@@ -591,15 +591,15 @@ class EnhancedDemoGenerator:
                 "confidence_level": 0.95
             },
             "key_findings": {
-                "min_latency_us": min(m["measurements"]["latency"]["mean"] 
+                "min_latency_us": min(m["measurements"]["latency"]["mean"]
                                      for m in analysis_data["performance_metrics"]),
-                "max_throughput_fps": max(m["measurements"]["throughput"]["frames_per_second"] 
+                "max_throughput_fps": max(m["measurements"]["throughput"]["frames_per_second"]
                                          for m in analysis_data["performance_metrics"]),
                 "peak_efficiency_pct": analysis_data["efficiency_analysis"]["summary"]["peak_compute_efficiency"],
                 "optimal_config": analysis_data["scaling_analysis"]["optimal_configurations"]["best_latency_efficiency"]
             }
         }
-        
+
         # 2. Detailed performance data
         performance_data = {
             "configurations": analysis_data["configurations"],
@@ -608,16 +608,16 @@ class EnhancedDemoGenerator:
             "efficiency": analysis_data["efficiency_analysis"],
             "statistical_validation": analysis_data["statistical_analysis"]
         }
-        
+
         # 3. Comparison studies
         comparison_file = {
             "studies": comparison_data,
             "insights": self._generate_insights(comparison_data)
         }
-        
+
         # 4. Visualization-ready data
         viz_data = self._prepare_visualization_data(analysis_data, comparison_data)
-        
+
         # Save files
         files = [
             ("demo_summary.json", summary),
@@ -625,19 +625,19 @@ class EnhancedDemoGenerator:
             ("comparison_studies.json", comparison_file),
             ("visualization_data.json", viz_data)
         ]
-        
+
         for filename, data in files:
             filepath = self.demo_data_dir / filename
             with open(filepath, 'w') as f:
                 json.dump(data, f, indent=2)
             print(f"  {filename}: {filepath.stat().st_size / 1024:.1f} KB")
-        
+
         print(f"\nAll files saved to: {self.demo_data_dir}")
 
-    def _generate_insights(self, comparison_data: Dict) -> List[str]:
+    def _generate_insights(self, comparison_data: dict) -> list[str]:
         """Generate human-readable insights from comparison data."""
         insights = []
-        
+
         # Channel scaling insights
         if "channel_scaling" in comparison_data:
             analysis = comparison_data["channel_scaling"]["analysis"]
@@ -645,7 +645,7 @@ class EnhancedDemoGenerator:
                 f"Optimal parallelism achieved at {analysis['optimal_channels']} channels "
                 f"with {max(analysis['scaling_efficiency']):.0f}% efficiency"
             )
-        
+
         # FFT size insights
         if "fft_size_impact" in comparison_data:
             analysis = comparison_data["fft_size_impact"]["analysis"]
@@ -653,29 +653,29 @@ class EnhancedDemoGenerator:
                 f"FFT size doubling adds {analysis['doubling_penalty_us']:.1f}µs latency, "
                 f"following O(n log n) complexity"
             )
-        
+
         # Power efficiency insights
         if "power_efficiency" in comparison_data:
             configs = comparison_data["power_efficiency"]["configurations"]
             eco = next(c for c in configs if "eco" in c["config_name"])
             perf = next(c for c in configs if "performance" in c["config_name"])
-            
+
             eco_fps = eco["metrics"]["throughput"]["frames_per_second"]
             perf_fps = perf["metrics"]["throughput"]["frames_per_second"]
             eco_power = eco["metrics"]["throughput"]["power_consumption_w"]
             perf_power = perf["metrics"]["throughput"]["power_consumption_w"]
-            
+
             insights.append(
                 f"Eco mode achieves {eco_fps/eco_power:.1f} FPS/W vs "
                 f"Performance mode's {perf_fps/perf_power:.1f} FPS/W"
             )
-        
+
         return insights
 
-    def _prepare_visualization_data(self, analysis: Dict, comparisons: Dict) -> Dict:
+    def _prepare_visualization_data(self, analysis: dict, comparisons: dict) -> dict:
         """Prepare data optimized for Chart.js visualization."""
         realtime_entries = []
-        for config, metrics in zip(analysis["configurations"], analysis["performance_metrics"]):
+        for config, metrics in zip(analysis["configurations"], analysis["performance_metrics"], strict=False):
             measurements = metrics.get("measurements", {})
             realtime_metrics = measurements.get("realtime")
             if not isinstance(realtime_metrics, dict):
@@ -691,12 +691,12 @@ class EnhancedDemoGenerator:
                 "datasets": [
                     {
                         "label": "Mean Latency",
-                        "data": [m["measurements"]["latency"]["mean"] 
+                        "data": [m["measurements"]["latency"]["mean"]
                                 for m in analysis["performance_metrics"]]
                     },
                     {
                         "label": "P99 Latency",
-                        "data": [m["measurements"]["latency"]["p99"] 
+                        "data": [m["measurements"]["latency"]["p99"]
                                 for m in analysis["performance_metrics"]]
                     }
                 ]
@@ -706,7 +706,7 @@ class EnhancedDemoGenerator:
                 "datasets": [
                     {
                         "label": "Frames/Second",
-                        "data": [m["measurements"]["throughput"]["frames_per_second"] 
+                        "data": [m["measurements"]["throughput"]["frames_per_second"]
                                 for m in analysis["performance_metrics"]]
                     }
                 ]
@@ -736,23 +736,23 @@ class EnhancedDemoGenerator:
     def run_all(self) -> None:
         """Execute complete benchmark suite with enhanced analysis."""
         start_time = time.time()
-        
+
         print("="*70)
         print("IONOSENSE-HPC ENHANCED SCIENTIFIC BENCHMARK SUITE")
         print("="*70)
         print(f"Output directory: {self.demo_data_dir}")
         print("Methodology: Statistical sampling with 95% confidence intervals")
-        
+
         try:
             # Run comprehensive analysis
             analysis_data = self.run_comprehensive_analysis()
-            
+
             # Run comparison studies
             comparison_data = self.generate_comparison_studies()
-            
+
             # Generate optimized JSON files
             self.generate_optimized_json_files(analysis_data, comparison_data)
-            
+
             # Final report
             elapsed = time.time() - start_time
             print("\n" + "="*70)
@@ -761,11 +761,11 @@ class EnhancedDemoGenerator:
             print(f"Total execution time: {elapsed:.1f} seconds")
             print(f"Configurations tested: {len(analysis_data['configurations'])}")
             print(f"Total measurements: ~{len(analysis_data['configurations']) * 1000}")
-            print(f"\nKey findings:")
+            print("\nKey findings:")
             print(f"  • Minimum latency: {min(m['measurements']['latency']['mean'] for m in analysis_data['performance_metrics']):.1f}µs")
             print(f"  • Maximum throughput: {max(m['measurements']['throughput']['frames_per_second'] for m in analysis_data['performance_metrics']):.0f} FPS")
             print(f"  • Peak efficiency: {analysis_data['efficiency_analysis']['summary']['peak_compute_efficiency']:.1f}%")
-            
+
         except KeyboardInterrupt:
             print("\n\nBenchmark suite interrupted by user")
         except Exception as e:

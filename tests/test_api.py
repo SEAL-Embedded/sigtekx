@@ -26,8 +26,6 @@ from ionosense_hpc import (
     get_preset,
     list_presets,
 )
-from ionosense_hpc.exceptions import ValidationError
-
 
 # =============================================================================
 # Preset Tests

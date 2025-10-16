@@ -13,18 +13,16 @@ Input: Individual CSV files in artifacts/data/
 Output: artifacts/data/summary_statistics.csv
 """
 
-import glob
-import pandas as pd
-import numpy as np
-from pathlib import Path
-from typing import Dict, List, Tuple
 import warnings
+from pathlib import Path
+
+import pandas as pd
 
 # Suppress warnings for cleaner output
 warnings.filterwarnings('ignore')
 
 
-def find_experiment_data(data_dir: str = "artifacts/data") -> Dict[str, List[str]]:
+def find_experiment_data(data_dir: str = "artifacts/data") -> dict[str, list[str]]:
     """Find all experiment data files by type."""
     data_path = Path(data_dir)
 
@@ -37,14 +35,14 @@ def find_experiment_data(data_dir: str = "artifacts/data") -> Dict[str, List[str
     # Filter out empty lists and convert to strings
     files = {k: [str(f) for f in v] for k, v in files.items() if v}
 
-    print(f"Found experiment data:")
+    print("Found experiment data:")
     for benchmark_type, file_list in files.items():
         print(f"  {benchmark_type}: {len(file_list)} files")
 
     return files
 
 
-def load_and_combine_data(files: List[str]) -> pd.DataFrame:
+def load_and_combine_data(files: list[str]) -> pd.DataFrame:
     """Load and combine multiple CSV files into a single DataFrame."""
     if not files:
         return pd.DataFrame()
@@ -67,7 +65,7 @@ def load_and_combine_data(files: List[str]) -> pd.DataFrame:
     return combined
 
 
-def analyze_throughput_data(df: pd.DataFrame) -> Dict:
+def analyze_throughput_data(df: pd.DataFrame) -> dict:
     """Analyze throughput benchmark data."""
     if df.empty:
         return {}
@@ -124,7 +122,7 @@ def analyze_throughput_data(df: pd.DataFrame) -> Dict:
     return analysis
 
 
-def analyze_latency_data(df: pd.DataFrame) -> Dict:
+def analyze_latency_data(df: pd.DataFrame) -> dict:
     """Analyze latency benchmark data."""
     if df.empty:
         return {}
@@ -161,7 +159,7 @@ def analyze_latency_data(df: pd.DataFrame) -> Dict:
     return analysis
 
 
-def analyze_accuracy_data(df: pd.DataFrame) -> Dict:
+def analyze_accuracy_data(df: pd.DataFrame) -> dict:
     """Analyze accuracy benchmark data."""
     if df.empty:
         return {}
@@ -189,7 +187,7 @@ def analyze_accuracy_data(df: pd.DataFrame) -> Dict:
     return analysis
 
 
-def create_summary_statistics(all_data: Dict[str, pd.DataFrame]) -> pd.DataFrame:
+def create_summary_statistics(all_data: dict[str, pd.DataFrame]) -> pd.DataFrame:
     """Create a unified summary statistics DataFrame."""
     summary_rows = []
 
@@ -280,7 +278,7 @@ def main():
                 print(f"  Best latency: NFFT={best['nfft']}, Batch={best['batch']}, Latency={best['latency_us']:.1f}us")
 
     # Create unified summary statistics
-    print(f"\nCreating summary statistics...")
+    print("\nCreating summary statistics...")
     summary_df = create_summary_statistics(all_data)
 
     if not summary_df.empty:
@@ -294,7 +292,7 @@ def main():
         print(f"Summary contains {len(summary_df)} measurements across {summary_df['benchmark_type'].nunique()} benchmark types")
 
         # Print quick overview
-        print(f"\nQuick Overview:")
+        print("\nQuick Overview:")
         for benchmark_type in summary_df['benchmark_type'].unique():
             subset = summary_df[summary_df['benchmark_type'] == benchmark_type]
             print(f"  {benchmark_type}: {len(subset)} measurements")
@@ -304,7 +302,7 @@ def main():
     else:
         print("No data available for analysis")
 
-    print(f"\nAnalysis complete!")
+    print("\nAnalysis complete!")
 
 
 if __name__ == "__main__":

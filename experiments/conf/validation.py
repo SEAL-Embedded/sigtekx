@@ -6,9 +6,8 @@ Validates experiment configurations for safety, compatibility, and performance.
 Prevents parameter conflicts and provides helpful error messages.
 """
 
-import warnings
-from typing import Dict, List, Tuple, Any
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -22,10 +21,10 @@ class ConfigValidator:
     """Validates experiment configurations and parameters."""
 
     def __init__(self):
-        self.warnings: List[str] = []
-        self.errors: List[str] = []
+        self.warnings: list[str] = []
+        self.errors: list[str] = []
 
-    def validate_experiment_config(self, config_path: str) -> Tuple[bool, List[str], List[str]]:
+    def validate_experiment_config(self, config_path: str) -> tuple[bool, list[str], list[str]]:
         """
         Validate a complete experiment configuration.
 
@@ -36,7 +35,7 @@ class ConfigValidator:
         self.errors.clear()
 
         try:
-            with open(config_path, 'r') as f:
+            with open(config_path) as f:
                 config = yaml.safe_load(f)
         except Exception as e:
             self.errors.append(f"Cannot load config file: {e}")
@@ -51,7 +50,7 @@ class ConfigValidator:
         return len(self.errors) == 0, self.warnings, self.errors
 
     def validate_engine_params(self, nfft: int, batch: int, overlap: float,
-                             sample_rate_hz: int = 48000) -> Tuple[bool, List[str], List[str]]:
+                             sample_rate_hz: int = 48000) -> tuple[bool, list[str], list[str]]:
         """
         Validate engine parameters for compatibility and performance.
 
@@ -104,7 +103,7 @@ class ConfigValidator:
 
         return len(self.errors) == 0, self.warnings, self.errors
 
-    def _validate_engine_params(self, engine_config: Dict[str, Any]):
+    def _validate_engine_params(self, engine_config: dict[str, Any]):
         """Validate engine parameters from config dict."""
         if not engine_config:
             return
@@ -118,7 +117,7 @@ class ConfigValidator:
         self.warnings.extend(warnings)
         self.errors.extend(errors)
 
-    def _validate_experiment_params(self, experiment_config: Dict[str, Any]):
+    def _validate_experiment_params(self, experiment_config: dict[str, Any]):
         """Validate experiment-specific parameters."""
         if not experiment_config:
             self.errors.append("Missing experiment configuration")
@@ -130,7 +129,7 @@ class ConfigValidator:
         if 'description' not in experiment_config:
             self.warnings.append("Experiment missing description")
 
-    def _validate_hydra_params(self, hydra_config: Dict[str, Any]):
+    def _validate_hydra_params(self, hydra_config: dict[str, Any]):
         """Validate Hydra multirun parameters."""
         if not hydra_config:
             return
@@ -153,7 +152,7 @@ class ConfigValidator:
         elif total_combinations > 500:
             self.errors.append(f"Excessive parameter sweep: {total_combinations} combinations (>500)")
 
-    def _validate_resource_requirements(self, config: Dict[str, Any]):
+    def _validate_resource_requirements(self, config: dict[str, Any]):
         """Validate resource requirements and compatibility."""
         # Check if ionosphere-specific configs have realistic parameters
         experiment = config.get('experiment', {})
