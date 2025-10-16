@@ -288,13 +288,13 @@ if(IONO_WITH_TESTS AND IONO_WITH_CUDA)
 
     FetchContent_MakeAvailable(googletest)
 
-    add_executable(test_engine
-        cpp/tests/test_research_engine.cpp
-        cpp/tests/test_processing_stage.cpp
-        cpp/tests/test_cuda_wrappers.cpp
-        cpp/tests/test_nvtx_profiling.cpp
-        cpp/tests/test_window_functions.cpp
+    # Automatically include all unit test sources so coverage stays in sync
+    file(GLOB TEST_ENGINE_SOURCES CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/cpp/tests/*.cpp"
     )
+    list(SORT TEST_ENGINE_SOURCES)
+
+    add_executable(test_engine ${TEST_ENGINE_SOURCES})
     set_target_properties(test_engine PROPERTIES CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 
     # Add include dirs and set CUDA properties for the test executable - Important!

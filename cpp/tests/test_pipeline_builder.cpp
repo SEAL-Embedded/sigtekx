@@ -12,6 +12,7 @@
 
 #include <gtest/gtest.h>
 
+#include "ionosense/core/cuda_wrappers.hpp"
 #include "ionosense/core/pipeline_builder.hpp"
 #include "ionosense/core/processing_stage.hpp"
 
@@ -291,7 +292,7 @@ TEST_F(PipelineBuilderTest, MixCustomAndHelperStages) {
 //  Edge Case Tests
 // ============================================================================
 
-TEST_F(PipelineBuilderTest, SingleStageP ipeline) {
+TEST_F(PipelineBuilderTest, SingleStagePipeline) {
   PipelineBuilder builder;
   builder.with_config(config_).add_window(StageConfig::WindowType::HANN);
 

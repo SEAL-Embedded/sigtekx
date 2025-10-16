@@ -16,6 +16,7 @@
 #include <cmath>
 #include <vector>
 
+#include "ionosense/core/cuda_wrappers.hpp"
 #include "ionosense/core/pipeline_builder.hpp"
 #include "ionosense/executors/realtime_executor.hpp"
 
