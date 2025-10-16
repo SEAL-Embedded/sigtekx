@@ -188,9 +188,9 @@ print(f"Throughput: {stats.throughput_gbps:.2f} GB/s")
 ## Version Compatibility
 
 - **Python**: 3.11+ (managed via Conda)
-- **NumPy**: 1.24+ (specified in pyproject.toml)
+- **NumPy**: 1.26 (specified in pyproject.toml)
 - **pybind11**: 2.11+ (build dependency)
-- **CUDA**: 12.0+ (runtime requirement)
+- **CUDA**: 13.0+ (runtime requirement)
 
 ## References
 

@@ -23,9 +23,8 @@ Before contributing, ensure you have the development environment set up properly
 #### Required Software
 
 - **Python 3.11+** (via Conda/Miniconda)
-- **CUDA Toolkit 12.0+** 
+- **CUDA Toolkit 13.0+** 
 - **Visual Studio 2022** with C++ build tools (Windows)
-- **CMake 3.25+**
 - **PowerShell 7.0+** (for Windows development)
 - **NVIDIA GPU** with compute capability 6.0+
 

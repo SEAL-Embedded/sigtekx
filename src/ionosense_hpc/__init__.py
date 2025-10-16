@@ -59,6 +59,7 @@ def _bootstrap_windows_dlls():
 
     # Also check for CUDA toolkit in PATH
     cuda_paths = [
+        r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.0\bin',
         r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.0\bin',
         r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.8\bin',
         r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.7\bin',

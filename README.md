@@ -1,7 +1,7 @@
 # Ionosense-HPC
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![CUDA 13.0+](https://img.shields.io/badge/CUDA-12.0+-green.svg)](https://developer.nvidia.com/cuda-toolkit)
+[![CUDA 13.0+](https://img.shields.io/badge/CUDA-13.0+-green.svg)](https://developer.nvidia.com/cuda-toolkit)
 
 High-performance CUDA FFT engine and research-grade benchmarking suite for real-time signal processing and ionospheric physics research.
 
@@ -57,7 +57,7 @@ Ionosense-HPC provides a Python interface to a high-performance CUDA-based signa
 - **Python**: 3.11 or higher
 - **CUDA Toolkit**: 13.0 or higher
 - **Visual Studio 2022**: with C++ build tools
-- **CMake**: 3.25+
+- **CMake**: 3.26+
 - **PowerShell**: 7.0+ (Windows)
 - **Conda/Miniconda**: For environment management
 
@@ -484,7 +484,7 @@ iono doctor
 iono setup                      # Recreate environment
 
 # 2. CUDA not found
-# Install CUDA Toolkit 12.0+ from NVIDIA
+# Install CUDA Toolkit 13.0+ from NVIDIA
 
 # 3. Visual Studio tools not found
 # Install VS 2022 with C++ build tools

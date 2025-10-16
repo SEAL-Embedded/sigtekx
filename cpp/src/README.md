@@ -273,7 +273,7 @@ target_compile_options(ops_fft PRIVATE
 
 ### Compiler Requirements
 
-- **NVCC**: CUDA 12.0+ for C++17 support
+- **NVCC**: CUDA 13.0+ for C++17 support
 - **Host Compiler**: GCC 9+, MSVC 2019+, Clang 10+
 - **Architecture**: SM 7.0+ (Volta, Turing, Ampere, Ada, Hopper)
 
