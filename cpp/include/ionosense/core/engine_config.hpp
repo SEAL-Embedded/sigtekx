@@ -27,6 +27,13 @@ struct EngineConfig {
   float overlap = 0.5f;
   int sample_rate_hz = 48000;
 
+  // Pipeline Parameters (added for unified config)
+  int window_type = 1;      // 0=RECTANGULAR, 1=HANN, 2=BLACKMAN
+  int window_symmetry = 0;  // 0=PERIODIC, 1=SYMMETRIC
+  int window_norm = 0;      // 0=UNITY, 1=SQRT
+  int scale_policy = 1;     // 0=NONE, 1=ONE_OVER_N, 2=ONE_OVER_SQRT_N
+  int output_mode = 0;      // 0=MAGNITUDE, 1=COMPLEX_PASSTHROUGH
+
   // Execution Parameters
   int stream_count = 3;
   int pinned_buffer_count = 2;

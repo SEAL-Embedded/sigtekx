@@ -198,6 +198,11 @@ PYBIND11_MODULE(_engine, m) {
       .def_readwrite("batch", &ionosense::EngineConfig::batch)
       .def_readwrite("overlap", &ionosense::EngineConfig::overlap)
       .def_readwrite("sample_rate_hz", &ionosense::EngineConfig::sample_rate_hz)
+      .def_readwrite("window_type", &ionosense::EngineConfig::window_type)
+      .def_readwrite("window_symmetry", &ionosense::EngineConfig::window_symmetry)
+      .def_readwrite("window_norm", &ionosense::EngineConfig::window_norm)
+      .def_readwrite("scale_policy", &ionosense::EngineConfig::scale_policy)
+      .def_readwrite("output_mode", &ionosense::EngineConfig::output_mode)
       .def_readwrite("stream_count", &ionosense::EngineConfig::stream_count)
       .def_readwrite("pinned_buffer_count",
                      &ionosense::EngineConfig::pinned_buffer_count)

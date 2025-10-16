@@ -70,6 +70,14 @@ class WindowStage::Impl {
                                     config.window_type, sqrt_norm,
                                     config.window_symmetry);
 
+      // Apply window normalization (UNITY or SQRT)
+      // Note: SQRT normalization is already applied during generation
+      // UNITY normalization needs to be applied here
+      if (config.window_norm == StageConfig::WindowNorm::UNITY) {
+        IONO_NVTX_RANGE("Apply UNITY Normalization", profiling::colors::CYAN);
+        window_utils::normalize_window(host_window.data(), config.nfft, config.window_norm);
+      }
+
       // Allocate device memory and upload the window coefficients.
       d_window_.resize(config.nfft);
       {

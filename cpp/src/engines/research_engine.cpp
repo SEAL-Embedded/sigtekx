@@ -40,8 +40,15 @@ class ResearchEngine::Impl {
     stage_config.sample_rate_hz = config.sample_rate_hz;
     stage_config.warmup_iters = config.warmup_iters;
 
+    // Copy pipeline parameters from config
+    stage_config.window_type = static_cast<StageConfig::WindowType>(config.window_type);
+    stage_config.window_symmetry = static_cast<StageConfig::WindowSymmetry>(config.window_symmetry);
+    stage_config.window_norm = static_cast<StageConfig::WindowNorm>(config.window_norm);
+    stage_config.scale_policy = static_cast<StageConfig::ScalePolicy>(config.scale_policy);
+    stage_config.output_mode = static_cast<StageConfig::OutputMode>(config.output_mode);
+
     auto stages = builder.with_config(stage_config)
-                      .add_window(StageConfig::WindowType::HANN)
+                      .add_window(stage_config.window_type)
                       .add_fft()
                       .add_magnitude()
                       .build();

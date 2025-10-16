@@ -321,6 +321,13 @@ class AccuracyBenchmark(BaseBenchmark):
 
         # Apply window (matching engine configuration)
         window = scipy_signal.windows.hann(self.engine_config.nfft, sym=False)
+
+        # Apply UNITY normalization to match GPU implementation
+        # UNITY norm: scale window so sum(window) = N
+        window_sum = np.sum(window)
+        if window_sum > 1e-9:
+            window = window * (self.engine_config.nfft / window_sum)
+
         data_windowed = data * window
 
         # Compute FFT
@@ -398,6 +405,12 @@ class AccuracyBenchmark(BaseBenchmark):
 
         # Apply the same windowing as the GPU pipeline before energy check
         window = scipy_signal.windows.hann(self.engine_config.nfft, sym=False)
+
+        # Apply UNITY normalization to match GPU
+        window_sum = np.sum(window)
+        if window_sum > 1e-9:
+            window = window * (self.engine_config.nfft / window_sum)
+
         windowed_signal = test_signal * window
 
         # Compute time-domain energy
@@ -482,8 +495,14 @@ class AccuracyBenchmark(BaseBenchmark):
         # Process
         output = self.engine.process(test_batch)
 
-        # Expected: DC component should equal sum of window
+        # Expected: DC component should equal sum of window (with UNITY normalization)
         window = scipy_signal.windows.hann(self.engine_config.nfft, sym=False)
+
+        # Apply UNITY normalization
+        window_sum = np.sum(window)
+        if window_sum > 1e-9:
+            window = window * (self.engine_config.nfft / window_sum)
+
         expected_dc = np.sum(window) / self.engine_config.nfft
         actual_dc = output[0, 0]
 

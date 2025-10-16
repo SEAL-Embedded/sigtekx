@@ -274,7 +274,7 @@ class Engine:
             cpp_config = self._cpp_module.EngineConfig()
 
             # Map Python config to C++ config
-            # Only copy fields that exist in C++ EngineConfig
+            # Copy all fields that exist in C++ EngineConfig
             cpp_fields = {
                 'nfft', 'batch', 'overlap', 'sample_rate_hz',
                 'stream_count', 'pinned_buffer_count', 'warmup_iters'
@@ -284,6 +284,32 @@ class Engine:
                 if hasattr(self._config, key):
                     value = getattr(self._config, key)
                     setattr(cpp_config, key, value)
+
+            # Map enum fields (convert Python enum to C++ int)
+            # WindowType: RECTANGULAR=0, HANN=1, BLACKMAN=2
+            if hasattr(self._config, 'window'):
+                window_map = {'rectangular': 0, 'hann': 1, 'blackman': 2}
+                cpp_config.window_type = window_map.get(self._config.window.value, 1)
+
+            # WindowSymmetry: PERIODIC=0, SYMMETRIC=1
+            if hasattr(self._config, 'window_symmetry'):
+                symmetry_map = {'periodic': 0, 'symmetric': 1}
+                cpp_config.window_symmetry = symmetry_map.get(self._config.window_symmetry.value, 0)
+
+            # WindowNorm: UNITY=0, SQRT=1
+            if hasattr(self._config, 'window_norm'):
+                norm_map = {'unity': 0, 'sqrt': 1}
+                cpp_config.window_norm = norm_map.get(self._config.window_norm.value, 0)
+
+            # ScalePolicy: NONE=0, ONE_OVER_N=1, ONE_OVER_SQRT_N=2
+            if hasattr(self._config, 'scale'):
+                scale_map = {'none': 0, 'one_over_n': 1, 'one_over_sqrt_n': 2}
+                cpp_config.scale_policy = scale_map.get(self._config.scale.value, 1)
+
+            # OutputMode: MAGNITUDE=0, COMPLEX_PASSTHROUGH=1
+            if hasattr(self._config, 'output'):
+                output_map = {'magnitude': 0, 'complex': 1, 'complex_passthrough': 1}
+                cpp_config.output_mode = output_map.get(self._config.output.value, 0)
 
             # Initialize C++ engine
             self._cpp_engine.initialize(cpp_config)

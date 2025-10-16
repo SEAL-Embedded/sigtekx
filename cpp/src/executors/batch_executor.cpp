@@ -114,6 +114,13 @@ class BatchExecutor::Impl {
       stage_config.sample_rate_hz = config_.sample_rate_hz;
       stage_config.warmup_iters = config_.warmup_iters;
 
+      // Map pipeline parameters from EngineConfig to StageConfig enums
+      stage_config.window_type = static_cast<StageConfig::WindowType>(config_.window_type);
+      stage_config.window_symmetry = static_cast<StageConfig::WindowSymmetry>(config_.window_symmetry);
+      stage_config.window_norm = static_cast<StageConfig::WindowNorm>(config_.window_norm);
+      stage_config.scale_policy = static_cast<StageConfig::ScalePolicy>(config_.scale_policy);
+      stage_config.output_mode = static_cast<StageConfig::OutputMode>(config_.output_mode);
+
       for (auto& stage : stages_) {
         IONO_NVTX_RANGE("Init Stage", profiling::colors::DARK_GRAY);
         stage->initialize(stage_config, streams_[0].get());
