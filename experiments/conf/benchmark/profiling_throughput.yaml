@@ -11,3 +11,8 @@ measure_pcie_bandwidth: false
 monitor_gpu_utilization: false
 monitor_temperature: false
 monitor_power: false
+
+# GPU clock locking for stable benchmarking (reduces CV by 50-75%)
+lock_gpu_clocks: false  # Set to true to enable clock locking
+gpu_index: 0            # GPU index to lock (use with lock_gpu_clocks)
+use_max_clocks: false   # Use max clocks vs recommended (use with lock_gpu_clocks)

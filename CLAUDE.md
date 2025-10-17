@@ -402,15 +402,29 @@ iprof nsys accuracy -- experiment=profiling +benchmark=accuracy      # 10 iterat
 
 **Purpose**: Reduce benchmark variability (Coefficient of Variation) from 20-40% → 5-15%
 
-### Quick Start
+### C++ Benchmarks (ionoc)
 
 ```powershell
-# Lock GPU clocks for stable benchmarking (requires admin - UAC prompt)
+# Lock GPU clocks for stable C++ benchmarking (requires admin - UAC prompt)
 ionoc bench --preset latency --full --lock-clocks
 ```
 
+### Python Benchmarks (Hydra)
+
+```bash
+# Enable GPU clock locking via Hydra config override
+python benchmarks/run_latency.py +benchmark=latency benchmark.lock_gpu_clocks=true
+
+# Or edit YAML once: experiments/conf/benchmark/latency.yaml
+# lock_gpu_clocks: true
+python benchmarks/run_latency.py +benchmark=latency
+
+# Works with profiling too
+iprof nsys latency  # With lock_gpu_clocks=true in YAML
+```
+
 **What it does:**
-1. Auto-elevates to admin (UAC prompt)
+1. Auto-elevates to admin (UAC prompt on Windows)
 2. Locks GPU graphics/memory clocks to stable values
 3. Runs benchmark
 4. **Automatically** restores original clocks (even on error/Ctrl+C)
@@ -419,7 +433,7 @@ ionoc bench --preset latency --full --lock-clocks
 - Latency: 20% → **5-10%** (50-75% better)
 - Realtime: 40% → **10-15%** (60-75% better)
 
-### Options
+### C++ Options
 
 ```powershell
 # Use recommended clocks (default, conservative)
@@ -433,6 +447,24 @@ ionoc bench --preset latency --full --lock-clocks --gpu-index 1
 
 # Query GPU info (no locking)
 pwsh scripts/gpu-manager.ps1 -Action Query
+```
+
+### Python Options
+
+```bash
+# Use recommended clocks (default)
+python benchmarks/run_latency.py +benchmark=latency \
+  benchmark.lock_gpu_clocks=true
+
+# Use max clocks for peak performance
+python benchmarks/run_latency.py +benchmark=latency \
+  benchmark.lock_gpu_clocks=true \
+  benchmark.use_max_clocks=true
+
+# Multi-GPU: select GPU 1
+python benchmarks/run_latency.py +benchmark=latency \
+  benchmark.lock_gpu_clocks=true \
+  benchmark.gpu_index=1
 ```
 
 **Supported GPUs**: RTX 3090 Ti, RTX 4090, RTX 4080, RTX 4070 Ti, RTX 3080, RTX 3070, A100, V100
@@ -552,4 +584,4 @@ python benchmarks/run_latency.py experiment=ionosphere_multiscale +benchmark=lat
 python benchmarks/run_throughput.py --multirun experiment=ionosphere_resolution
 ```
 
-Last updated: 2025-10-15 (Added GPU clock locking for benchmark stability - reduces CV from 20-40% to 5-15%)
+Last updated: 2025-10-17 (Added Python GPU clock locking support - feature parity with C++)

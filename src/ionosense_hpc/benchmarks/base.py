@@ -180,6 +180,11 @@ class BenchmarkConfig(BaseModel):
     output_format: str = Field(default="json", description="Output format (json, csv, hdf5)")
     verbose: bool = Field(default=True, description="Verbose output")
 
+    # GPU clock locking (reduces benchmark variability by 50-75%)
+    lock_gpu_clocks: bool = Field(default=False, description="Lock GPU clocks for stable benchmarking")
+    gpu_index: int = Field(default=0, ge=0, description="GPU index to lock (use with lock_gpu_clocks)")
+    use_max_clocks: bool = Field(default=False, description="Use max clocks vs recommended (use with lock_gpu_clocks)")
+
 
 class BaseBenchmark(abc.ABC):
     """
@@ -196,6 +201,7 @@ class BaseBenchmark(abc.ABC):
         self.config = config or BenchmarkConfig(name=self.__class__.__name__)
         self.context = BenchmarkContext()
         self.results: list[BenchmarkResult] = []
+        self.gpu_clock_manager = None
         self._setup_reproducibility()
 
     def _setup_reproducibility(self) -> None:
@@ -300,8 +306,37 @@ class BaseBenchmark(abc.ABC):
 
             measurements: list[float | dict[str, Any]] = []
             errors: list[str] = []
+            lock_info: dict[str, Any] | None = None
+
+            # Initialize GPU clock manager if enabled
+            if self.config.lock_gpu_clocks:
+                try:
+                    from ionosense_hpc.utils import GpuClockManager, check_clock_locking_available
+
+                    # Check availability first
+                    available, reason = check_clock_locking_available()
+                    if not available:
+                        logger.warning(f"GPU clock locking not available: {reason}")
+                        logger.warning("Proceeding without clock locking")
+                    else:
+                        self.gpu_clock_manager = GpuClockManager(
+                            gpu_index=self.config.gpu_index,
+                            use_max_clocks=self.config.use_max_clocks
+                        )
+                except Exception as e:
+                    logger.warning(f"Failed to initialize GPU clock manager: {e}")
+                    logger.warning("Proceeding without clock locking")
 
             try:
+                # Lock GPU clocks before setup
+                if self.gpu_clock_manager:
+                    try:
+                        lock_info = self.gpu_clock_manager.lock()
+                    except Exception as e:
+                        logger.warning(f"Failed to lock GPU clocks: {e}")
+                        logger.warning("Proceeding without clock locking")
+                        self.gpu_clock_manager = None
+
                 # Setup phase
                 with setup_range("Benchmark.setup"):
                     logger.info("Setup phase...")
@@ -381,6 +416,14 @@ class BaseBenchmark(abc.ABC):
                     except Exception as e:
                         logger.warning(f"Teardown failed: {e}")
 
+                # Always unlock GPU clocks
+                if self.gpu_clock_manager and self.gpu_clock_manager.locked:
+                    try:
+                        self.gpu_clock_manager.unlock()
+                    except Exception as e:
+                        logger.warning(f"Failed to unlock GPU clocks: {e}")
+                        logger.warning("Manual recovery may be needed (see gpu_clocks.py for commands)")
+
         # Process results
         if not measurements:
             return BenchmarkResult(
@@ -410,13 +453,20 @@ class BaseBenchmark(abc.ABC):
         else:
             statistics = calculate_statistics(measurements_array, self.config)
 
+        # Build metadata
+        metadata: dict[str, Any] = {}
+        if errors:
+            metadata['errors'] = errors
+        if lock_info:
+            metadata['gpu_clock_locking'] = lock_info
+
         result = BenchmarkResult(
             name=self.config.name,
             config=self.config.model_dump(),
             context=self.context,
             measurements=measurements_array,
             statistics=statistics,
-            metadata={'errors': errors} if errors else {},
+            metadata=metadata,
             passed=len(errors) == 0
         )
 

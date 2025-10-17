@@ -2,19 +2,33 @@
 
 **Purpose**: Reduce benchmark variability (Coefficient of Variation) from 20-40% down to 5-15% by locking GPU clocks to stable values.
 
-**Status**: ✅ Implemented and Validated (2025-10-15)
+**Status**: ✅ Implemented and Validated (C++: 2025-10-15, Python: 2025-10-17)
+
+**Platforms**: C++ (`ionoc bench --lock-clocks`) | Python (`benchmark.lock_gpu_clocks=true`)
 
 ---
 
 ## Quick Start
 
+### C++ Benchmarks
+
 ```powershell
-# Lock GPU clocks for stable benchmarking (requires UAC prompt)
+# Lock GPU clocks for stable C++ benchmarking (requires UAC prompt)
 ionoc bench --preset latency --full --ionosphere --lock-clocks
 ```
 
-That's it! The CLI will:
-1. Prompt for admin privileges (UAC)
+### Python Benchmarks
+
+```bash
+# Enable GPU clock locking via Hydra config override
+python benchmarks/run_latency.py +benchmark=latency benchmark.lock_gpu_clocks=true
+
+# Or via iono profile command
+iprof nsys latency  # With lock_gpu_clocks=true in YAML
+```
+
+That's it! The system will:
+1. Request admin privileges (UAC prompt on Windows)
 2. Lock GPU clocks to recommended stable values
 3. Run the benchmark
 4. **Automatically restore original clocks** (even on error/Ctrl+C)
@@ -100,8 +114,9 @@ nvidia-smi -lmc 10251
 
 ## Usage
 
-### Basic Usage
+### C++ Benchmarks (ionoc)
 
+**Basic Usage:**
 ```powershell
 # Use recommended clocks (default)
 ionoc bench --preset latency --full --lock-clocks
@@ -110,14 +125,55 @@ ionoc bench --preset latency --full --lock-clocks
 ionoc bench --preset latency --full --lock-clocks --max-clocks
 ```
 
-### Multi-GPU Systems
-
+**Multi-GPU Systems:**
 ```powershell
 # Lock GPU 0 (default)
 ionoc bench --preset latency --full --lock-clocks
 
 # Lock GPU 1
 ionoc bench --preset latency --full --lock-clocks --gpu-index 1
+```
+
+### Python Benchmarks (Hydra)
+
+**Basic Usage:**
+```bash
+# Use recommended clocks (default) - Hydra CLI override
+python benchmarks/run_latency.py +benchmark=latency \
+  benchmark.lock_gpu_clocks=true
+
+# Use max clocks for peak performance
+python benchmarks/run_latency.py +benchmark=latency \
+  benchmark.lock_gpu_clocks=true \
+  benchmark.use_max_clocks=true
+```
+
+**Multi-GPU Systems:**
+```bash
+# Lock GPU 0 (default)
+python benchmarks/run_latency.py +benchmark=latency \
+  benchmark.lock_gpu_clocks=true
+
+# Lock GPU 1
+python benchmarks/run_latency.py +benchmark=latency \
+  benchmark.lock_gpu_clocks=true \
+  benchmark.gpu_index=1
+```
+
+**Via YAML Config (Persistent):**
+
+Edit `experiments/conf/benchmark/latency.yaml`:
+```yaml
+# GPU clock locking for stable benchmarking (reduces CV by 50-75%)
+lock_gpu_clocks: true   # Change from false to true
+gpu_index: 0            # GPU index to lock
+use_max_clocks: false   # Use max clocks vs recommended
+```
+
+Then run normally:
+```bash
+python benchmarks/run_latency.py +benchmark=latency
+iprof nsys latency
 ```
 
 ### Manual Control (Advanced)
@@ -140,18 +196,23 @@ pwsh scripts/gpu-manager.ps1 -Action Unlock -GpuIndex 0
 
 ## Supported GPUs
 
-The system includes pre-configured clock profiles for:
+The system includes pre-configured clock profiles for **11 GPU models** across **6 architectures**:
 
 | GPU Model | Architecture | Recommended Graphics | Recommended Memory |
 |-----------|--------------|---------------------|-------------------|
-| RTX 3090 Ti | Ampere | 1920 MHz | 10251 MHz |
+| RTX Pro 5000 | Blackwell | 2520 MHz | 1750 MHz |
 | RTX 4090 | Ada Lovelace | 2640 MHz | 10251 MHz |
 | RTX 4080 | Ada Lovelace | 2520 MHz | 11000 MHz |
 | RTX 4070 Ti | Ada Lovelace | 2520 MHz | 10251 MHz |
+| RTX 4000 Mobile | Ada Lovelace | 1590 MHz | 2250 MHz |
+| RTX 3090 Ti | Ampere | 1920 MHz | 10251 MHz |
 | RTX 3080 | Ampere | 1755 MHz | 9501 MHz |
 | RTX 3070 | Ampere | 1725 MHz | 6801 MHz |
 | A100 | Ampere (DC) | 1410 MHz | 1215 MHz |
+| RTX 2080 | Turing | 1710 MHz | 1750 MHz |
 | V100 | Volta (DC) | 1530 MHz | 877 MHz |
+
+**Architectures**: Blackwell (2025), Ada Lovelace (2022-2023), Ampere (2020-2021), Turing (2018), Volta (2017)
 
 **Unknown GPU?** No problem! The system will automatically use your GPU's max clocks from `nvidia-smi`.
 
@@ -192,8 +253,9 @@ nvidia-smi -rmc     # Reset memory clock
 ### Windows Requirements
 
 1. **Administrator Privileges**: Required to change GPU clocks
-   - UAC prompt will appear automatically
-   - Or right-click PowerShell → "Run as Administrator"
+   - **Automatic UAC elevation** - prompt appears automatically when needed
+   - You can run from a **non-admin PowerShell** - elevation handled automatically
+   - Or right-click PowerShell → "Run as Administrator" to avoid UAC prompts
 
 2. **NVIDIA Drivers**: `nvidia-smi` must be in PATH
    - Typically installed at: `C:\Program Files\NVIDIA Corporation\NVSMI\`
@@ -202,6 +264,73 @@ nvidia-smi -rmc     # Reset memory clock
 3. **PowerShell 7+**: Required for script compatibility
    - Check version: `$PSVersionTable.PSVersion`
    - Install: https://github.com/PowerShell/PowerShell/releases
+
+### UAC Elevation Behavior
+
+Both C++ and Python implementations handle UAC elevation **automatically**:
+
+**From Non-Admin PowerShell:**
+```powershell
+# You run this in regular PowerShell (NOT admin)
+ionoc bench --preset latency --full --lock-clocks
+
+# What happens:
+# 1. Script detects you're not admin
+# 2. UAC prompt appears: "Do you want to allow this app to make changes?"
+# 3. You click "Yes"
+# 4. Clocks lock, benchmark runs
+# 5. Output appears in YOUR original PowerShell window
+# 6. Clocks unlock automatically
+```
+
+**From Admin PowerShell:**
+```powershell
+# You opened PowerShell as administrator
+ionoc bench --preset latency --full --lock-clocks
+
+# What happens:
+# 1. Script detects you're already admin
+# 2. NO UAC prompt needed
+# 3. Clocks lock, benchmark runs immediately
+# 4. Clocks unlock automatically
+```
+
+**Key Technical Detail:**
+
+The elevation wrapper (`gpu-manager-elevated.ps1`) uses:
+```powershell
+Start-Process -Verb RunAs -Wait -PassThru -WindowStyle Normal
+```
+
+This pattern ensures:
+- ✅ **UAC elevation** triggered when needed (`-Verb RunAs`)
+- ✅ **Output stays visible** in your original terminal (`-Wait`)
+- ✅ **Exit code propagated** back to caller (`-PassThru`)
+- ✅ **Same experience** whether admin or not
+
+**Python Integration:**
+
+Python benchmarks use the same elevation wrapper:
+```python
+# Python calls: pwsh gpu-manager-elevated.ps1 -Action Lock
+# Wrapper auto-elevates if needed, returns output to Python process
+```
+
+**Why This Matters:**
+
+Without automatic elevation, you'd see errors like:
+```
+❌ Administrator privileges required to lock GPU clocks. Please run as administrator.
+```
+
+With automatic elevation:
+```
+⚠️  GPU clock lock requires administrator privileges
+    UAC prompt will appear - please approve to continue
+[UAC prompt appears]
+🔒 Locking GPU 0 clocks...
+✅ GPU clocks locked successfully
+```
 
 ### Validation
 
@@ -256,11 +385,46 @@ Locked clocks run at **sustained load**, so ensure:
 
 ## Troubleshooting
 
-### UAC Prompt Keeps Appearing
+### UAC Prompt Appears Every Time
 
-**Cause**: PowerShell session isn't elevated
+**Expected behavior**: If you run from a **non-admin PowerShell**, the UAC prompt will appear each time you lock clocks.
 
-**Solution**: Right-click PowerShell → "Run as Administrator" before running `ionoc`
+**Solutions**:
+1. **Accept UAC each time** (recommended for security)
+2. **Run PowerShell as administrator** to avoid prompts:
+   - Right-click PowerShell → "Run as Administrator"
+   - All subsequent commands run elevated (no UAC prompts)
+
+### UAC Prompt Cancelled - What Happens?
+
+If you click "No" or cancel the UAC prompt:
+
+**C++ Benchmarks:**
+```powershell
+ionoc bench --preset latency --full --lock-clocks
+# UAC appears, you click "No"
+# Result: Benchmark aborts with error message
+```
+
+**Python Benchmarks:**
+```bash
+python benchmarks/run_latency.py +benchmark=latency benchmark.lock_gpu_clocks=true
+# UAC appears, you click "No"
+# Result: Warning logged, benchmark continues WITHOUT clock locking
+```
+
+**Solution**: Run benchmark again and approve UAC when prompted
+
+### Output Not Visible After UAC
+
+**Problem**: After approving UAC, you don't see benchmark output
+
+**This should NOT happen** with the current implementation (`gpu-manager-elevated.ps1` uses `-Wait` flag to keep output in original terminal).
+
+**If you still experience this**:
+1. Check you're using the latest `gpu-manager-elevated.ps1` script
+2. Verify PowerShell 7+ is installed (`pwsh --version`)
+3. File an issue with reproduction steps
 
 ### "Failed to lock graphics clock"
 
@@ -322,7 +486,7 @@ pwsh scripts/gpu-manager.ps1 -Action Unlock
 
 ## Best Practices
 
-### For Development
+### For C++ Development
 
 ```powershell
 # Quick dev iteration (no clock locking needed)
@@ -332,21 +496,26 @@ ionoc bench
 ionoc bench --preset latency --full --lock-clocks
 ```
 
-### For Research/Production
+### For Python Research/Production
 
-```powershell
+```bash
 # Always lock clocks for publication-quality benchmarks
-ionoc bench --preset latency --full --ionosphere --lock-clocks
+python benchmarks/run_latency.py +benchmark=latency \
+  benchmark.lock_gpu_clocks=true
 
-# Save baseline with locked clocks
-ionoc bench --preset latency --full --lock-clocks --save-baseline
+# Or edit YAML once for persistent locking
+# (see "Via YAML Config" section above)
 
-# Compare against baseline
-ionoc bench --preset latency --full --lock-clocks
+# Run experiment sweeps with locked clocks
+python benchmarks/run_throughput.py --multirun \
+  experiment=ionosphere_resolution \
+  +benchmark=throughput \
+  benchmark.lock_gpu_clocks=true
 ```
 
-### For Profiling
+### For Profiling (C++ and Python)
 
+**C++ Profiling:**
 ```powershell
 # Lock clocks for stable profiling
 ionoc bench --preset latency --profile --lock-clocks
@@ -355,9 +524,114 @@ ionoc bench --preset latency --profile --lock-clocks
 ionoc profile nsys --stats
 ```
 
+**Python Profiling:**
+```bash
+# Enable in YAML: experiments/conf/benchmark/profiling.yaml
+# lock_gpu_clocks: true
+
+# Then run profiling
+iprof nsys latency
+iprof ncu latency
+```
+
+---
+
+## Python API Reference
+
+For programmatic control in Python code:
+
+### Using the GpuClockManager Class
+
+```python
+from ionosense_hpc.utils import GpuClockManager, check_clock_locking_available
+
+# Check if GPU clock locking is available
+available, reason = check_clock_locking_available()
+if not available:
+    print(f"Clock locking unavailable: {reason}")
+
+# Context manager (recommended - automatic cleanup)
+with GpuClockManager(gpu_index=0, use_max_clocks=False).locked_clocks():
+    # Run your benchmark code here
+    run_my_benchmark()
+# Clocks automatically unlocked here
+
+# Manual control (advanced)
+manager = GpuClockManager(gpu_index=0, use_max_clocks=False)
+try:
+    lock_info = manager.lock()
+    print(f"Locked to: {lock_info}")
+    run_my_benchmark()
+finally:
+    manager.unlock()
+```
+
+### Integration with BaseBenchmark
+
+The `BaseBenchmark` class automatically handles GPU clock locking when configured:
+
+```python
+from ionosense_hpc.benchmarks import LatencyBenchmark, LatencyBenchmarkConfig
+
+# Via config object
+config = LatencyBenchmarkConfig(
+    lock_gpu_clocks=True,
+    gpu_index=0,
+    use_max_clocks=False,
+    iterations=5000
+)
+
+benchmark = LatencyBenchmark(config)
+result = benchmark.run()  # Clocks locked during run, auto-unlocked after
+
+# Lock info saved to result metadata
+if 'gpu_clock_locking' in result.metadata:
+    print(f"Locked clocks: {result.metadata['gpu_clock_locking']}")
+```
+
+### Error Handling
+
+The system gracefully degrades if clock locking is unavailable:
+
+```python
+# If clock locking fails (no admin, not Windows, etc.):
+# - Logs a warning
+# - Continues benchmark WITHOUT clock locking
+# - No exception raised (non-blocking)
+
+# Check availability before running:
+from ionosense_hpc.utils import check_clock_locking_available
+
+available, reason = check_clock_locking_available()
+if available:
+    print("✅ GPU clock locking available")
+else:
+    print(f"⚠️ Clock locking unavailable: {reason}")
+```
+
 ---
 
 ## Technical Details
+
+### Architecture Overview
+
+The GPU clock locking system has three layers:
+
+1. **PowerShell Script** (`scripts/gpu-manager.ps1`)
+   - Low-level nvidia-smi interface
+   - GPU clock database (11 pre-configured profiles)
+   - Validation and safety checks
+
+2. **C++ Integration** (`scripts/cli-cpp.ps1`)
+   - CLI flags: `--lock-clocks`, `--max-clocks`, `--gpu-index`
+   - Automatic UAC elevation
+   - Try/finally cleanup guarantees
+
+3. **Python Integration** (`src/ionosense_hpc/utils/gpu_clocks.py`)
+   - `GpuClockManager` class with context manager protocol
+   - Integrated into `BaseBenchmark` framework
+   - Hydra config override support
+   - Subprocess calls to PowerShell script
 
 ### Clock Locking vs Frequency Scaling
 
@@ -443,7 +717,29 @@ ionoc bench --preset latency --full --ionosphere --lock-clocks
 
 ## Version History
 
-- **1.0.0** (2025-10-15): Initial implementation and validation
+- **1.1.0** (2025-10-17): Python benchmark integration + GPU profile expansion
+  - **Python Integration:**
+    - Added `GpuClockManager` Python class
+    - Integrated into `BaseBenchmark` framework
+    - Hydra config support (CLI overrides + YAML)
+    - Context manager protocol for automatic cleanup
+    - Cross-platform availability checks
+    - Fixed PowerShell switch parameter handling (`-UseRecommended:$true` syntax)
+    - Fixed UTF-8 encoding for emoji output (🔒, ✅, ⚠️)
+  - **UAC Elevation:**
+    - Automatic UAC elevation via `gpu-manager-elevated.ps1` wrapper
+    - Output stays visible in original terminal during elevation
+    - Comprehensive UAC behavior documentation
+  - **GPU Profile Database:**
+    - Added RTX 4000 Ada Mobile (Ada Lovelace mobile workstation)
+    - Added RTX 2080 (Turing gaming desktop)
+    - Added RTX Pro 5000 Blackwell (Blackwell professional workstation)
+    - Total profiles: 8 → 11
+    - Total architectures: 5 → 6 (added Blackwell)
+  - **Configuration:**
+    - Updated all 8 benchmark YAML configs with clock locking fields
+
+- **1.0.0** (2025-10-15): Initial C++ implementation and validation
   - Automatic UAC elevation
   - Multi-GPU support
   - Recommended vs max clock profiles

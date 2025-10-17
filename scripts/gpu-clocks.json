@@ -71,6 +71,33 @@
       "recommended_graphics_clock_mhz": 1530,
       "recommended_memory_clock_mhz": 877,
       "notes": "Data center GPU - stable clocks by default."
+    },
+    "RTX_4000_Ada_Mobile": {
+      "name": "NVIDIA RTX 4000 Ada Generation Laptop GPU",
+      "architecture": "Ada Lovelace",
+      "max_graphics_clock_mhz": 1665,
+      "max_memory_clock_mhz": 2250,
+      "recommended_graphics_clock_mhz": 1590,
+      "recommended_memory_clock_mhz": 2250,
+      "notes": "Mobile workstation GPU - boost varies 60-175W. Conservative graphics clock for thermal stability."
+    },
+    "RTX_2080": {
+      "name": "NVIDIA GeForce RTX 2080",
+      "architecture": "Turing",
+      "max_graphics_clock_mhz": 1800,
+      "max_memory_clock_mhz": 1750,
+      "recommended_graphics_clock_mhz": 1710,
+      "recommended_memory_clock_mhz": 1750,
+      "notes": "Turing architecture. Founders Edition boost is 1800 MHz, reference is 1710 MHz."
+    },
+    "RTX_Pro_5000_Blackwell": {
+      "name": "NVIDIA RTX PRO 5000 Blackwell",
+      "architecture": "Blackwell",
+      "max_graphics_clock_mhz": 2617,
+      "max_memory_clock_mhz": 1750,
+      "recommended_graphics_clock_mhz": 2520,
+      "recommended_memory_clock_mhz": 1750,
+      "notes": "Professional workstation GPU with 48GB GDDR7. Conservative graphics clock for sustained workloads."
     }
   },
   "matching_rules": {
@@ -107,9 +134,25 @@
       {
         "pattern": "V100",
         "profile": "V100"
+      },
+      {
+        "pattern": "RTX 4000.*Ada.*Laptop",
+        "profile": "RTX_4000_Ada_Mobile"
+      },
+      {
+        "pattern": "RTX 4000.*Ada.*Mobile",
+        "profile": "RTX_4000_Ada_Mobile"
+      },
+      {
+        "pattern": "RTX 2080",
+        "profile": "RTX_2080"
+      },
+      {
+        "pattern": "RTX PRO 5000.*Blackwell",
+        "profile": "RTX_Pro_5000_Blackwell"
       }
     ]
   },
-  "version": "1.0.0",
-  "last_updated": "2025-10-15"
+  "version": "1.1.0",
+  "last_updated": "2025-10-17"
 }

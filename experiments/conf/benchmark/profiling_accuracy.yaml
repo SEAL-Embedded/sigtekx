@@ -22,3 +22,8 @@ test_signals:                     # Reduced from 8 signals to 3 essential ones
   - type: noise
     noise_type: white
     amplitude: 0.1
+
+# GPU clock locking for stable benchmarking (reduces CV by 50-75%)
+lock_gpu_clocks: false  # Set to true to enable clock locking
+gpu_index: 0            # GPU index to lock (use with lock_gpu_clocks)
+use_max_clocks: false   # Use max clocks vs recommended (use with lock_gpu_clocks)

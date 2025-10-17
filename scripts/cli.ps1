@@ -665,6 +665,27 @@ GPU PROFILING
                           Targets: latency, throughput, accuracy, realtime, custom
                           Interactive mode if no args provided
 
+GPU CLOCK LOCKING (Python Benchmarks)
+  Enable GPU clock locking for stable Python benchmarks via Hydra config:
+
+  Via CLI override (temporary):
+    python benchmarks/run_latency.py +benchmark=latency benchmark.lock_gpu_clocks=true
+
+  Via YAML config (persistent):
+    Edit experiments/conf/benchmark/latency.yaml:
+      lock_gpu_clocks: true     # Enable clock locking
+      gpu_index: 0              # GPU to lock (default: 0)
+      use_max_clocks: false     # Use recommended clocks (default)
+
+  Works with profiling:
+    iprof nsys latency          # With lock_gpu_clocks=true in YAML
+
+  Requires administrator privileges (UAC prompt will appear automatically)
+  Reduces CV from 20-40% → 5-15% (50-75% better stability)
+  Full docs: docs/performance/gpu-clock-locking.md
+
+  For C++ benchmarks, use: ionoc bench --lock-clocks
+
 PROFILING EXAMPLES:
   .\scripts\cli.ps1 profile nsys latency      # Profile latency benchmark
   .\scripts\cli.ps1 profile ncu throughput   # Profile throughput with NCU

@@ -9,3 +9,8 @@ drop_frame_threshold: 5
 buffer_ahead_frames: 2
 simulate_io_delay: false
 io_delay_ms: 0.1
+
+# GPU clock locking for stable benchmarking (reduces CV by 50-75%)
+lock_gpu_clocks: false  # Set to true to enable clock locking
+gpu_index: 0            # GPU index to lock (use with lock_gpu_clocks)
+use_max_clocks: false   # Use max clocks vs recommended (use with lock_gpu_clocks)
