@@ -46,7 +46,7 @@ engine = Engine(preset='iono')
 engine = Engine(preset='ionox')
 
 # Override specific parameters
-engine = Engine(preset='iono', nfft=8192, mode='realtime')
+engine = Engine(preset='iono', nfft=8192, mode='streaming')
 
 # Context manager for automatic cleanup
 with Engine(preset='iono') as engine:
@@ -109,7 +109,7 @@ Engine(
 * `preset` - Preset name: `'default'`, `'iono'`, or `'ionox'`
 * `config` - Custom `EngineConfig` instance for full control
 * `pipeline` - Custom `Pipeline` from `PipelineBuilder` for advanced use cases
-* `**overrides` - Quick parameter overrides (e.g., `nfft=8192, mode='realtime'`)
+* `**overrides` - Quick parameter overrides (e.g., `nfft=8192, mode='streaming'`)
 
 **Priority:** `pipeline` > `config` > `preset` (with `'default'` as fallback)
 
@@ -225,8 +225,7 @@ except ValidationError as e:
 
 * `mode: ExecutionMode` - Execution strategy (default: `ExecutionMode.BATCH`)
   - `BATCH` - Maximum throughput batch processing
-  - `REALTIME` - Low-latency streaming
-  - `LOW_LATENCY` - Minimize latency variant
+  - `STREAMING` - Low-latency streaming with ring buffer
 * `stream_count: int` - Number of CUDA streams for pipelining (default: 3, range: 1-32)
 * `pinned_buffer_count: int` - Number of pinned memory buffers (default: 2, range: 2-8)
 * `device_id: int` - CUDA device ID (-1 for auto-select, default: -1)
@@ -257,10 +256,10 @@ print(config.memory_estimate_mb)    # Estimated GPU memory usage
 config = EngineConfig.from_preset('iono', nfft=8192, overlap=0.875)
 
 # Apply execution mode override
-config = EngineConfig.from_preset('iono', mode='realtime')
+config = EngineConfig.from_preset('iono', mode='streaming')
 
 # Combine mode override with parameter overrides
-config = EngineConfig.from_preset('iono', mode='realtime', batch=4)
+config = EngineConfig.from_preset('iono', mode='streaming', batch=4)
 ```
 
 #### Serialization
@@ -316,7 +315,7 @@ pipeline = (
         nfft=2048,
         batch=4,
         overlap=0.625,
-        mode='realtime',
+        mode='streaming',
         stream_count=4
     )
     .build()
@@ -428,11 +427,11 @@ engine = Engine(config)
 # NEW (v0.9.3+)
 from ionosense_hpc import Engine
 
-engine = Engine(preset='default', mode='realtime')
+engine = Engine(preset='default', mode='streaming')
 # or
 from ionosense_hpc.config import get_preset
 config = get_preset('default')
-config.mode = 'realtime'
+config.mode = 'streaming'
 engine = Engine(config=config)
 ```
 

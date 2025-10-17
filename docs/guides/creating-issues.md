@@ -515,7 +515,7 @@ void ResearchEngine::Impl::process(...) {
 // New architecture
 class IPipelineExecutor { ... };
 class BatchExecutor : public IPipelineExecutor { ... };
-class RealtimeExecutor : public IPipelineExecutor { ... };
+class StreamingExecutor : public IPipelineExecutor { ... };
 ```
 
 ## Implementation Tasks

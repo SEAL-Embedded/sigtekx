@@ -305,7 +305,7 @@ ionoc bench --preset latency --full
 ionoc bench --preset latency --full --save-baseline
 
 # 2. Modify executor code
-# (swap in new BatchExecutor or RealtimeExecutor)
+# (swap in new BatchExecutor or StreamingExecutor)
 
 # 3. Rebuild and test (automatically compares to baseline)
 iono build

@@ -20,7 +20,7 @@ Transform the ionosense-hpc-lib from a monolithic `ResearchEngine` into a flexib
 ┌────────────▼──────────┐  ┌─────────▼──────────────────┐
 │    Facade Engines     │  │   Direct Toolkit Usage     │
 │  - ResearchEngine     │  │  - Custom pipelines        │
-│  - RealtimeIonoEngine │  │  - Custom executors        │
+│  - AntennaEngine      │  │  - Custom executors        │
 └────────────┬──────────┘  └─────────┬──────────────────┘
              │                        │
 ┌────────────▼────────────────────────▼───────────────────┐
@@ -77,8 +77,7 @@ struct ExecutorConfig : EngineConfig {
     // Executor-specific settings
     enum class ExecutionMode {
         BATCH,           // Process complete batches
-        STREAMING,       // Continuous processing
-        LOW_LATENCY     // Minimize latency over throughput
+        STREAMING        // Continuous processing with ring buffer
     };
     ExecutionMode mode = ExecutionMode::BATCH;
     
@@ -98,8 +97,8 @@ struct ExecutorConfig : EngineConfig {
 - **Key Pattern**: Double/triple buffering with event-based synchronization
 - **Implementation**: Extract current logic from `ResearchEngine::Impl`
 
-#### RealtimeExecutor
-- **Location**: `cpp/src/executors/realtime_executor.cpp`
+#### StreamingExecutor
+- **Location**: `cpp/src/executors/streaming_executor.cpp`
 - **Responsibility**: Low-latency continuous processing
 - **Key Features**:
   - Ring buffer for input accumulation
@@ -164,13 +163,13 @@ public:
 };
 ```
 
-#### RealtimeIonoEngine (New Specialized Engine)
+#### AntennaEngine (New Specialized Engine)
 ```cpp
-class RealtimeIonoEngine {
+class AntennaEngine {
     std::unique_ptr<IPipelineExecutor> executor_;
-    
+
 public:
-    RealtimeIonoEngine(const IonosphereConfig& config) {
+    AntennaEngine(const IonosphereConfig& config) {
         PipelineBuilder builder;
         auto stages = builder
             .with_config(config.stage_config)
@@ -179,8 +178,8 @@ public:
             .add_magnitude()
             .add_stage(std::make_unique<IonoMetricsStage>())
             .build();
-        
-        executor_ = std::make_unique<RealtimeExecutor>();
+
+        executor_ = std::make_unique<StreamingExecutor>();
         ExecutorConfig exec_config(config);
         exec_config.mode = ExecutorConfig::ExecutionMode::STREAMING;
         executor_->initialize(exec_config, std::move(stages));
@@ -219,14 +218,14 @@ public:
 
 ### Specialized Executors
 
-#### RealtimeExecutor Implementation
+#### StreamingExecutor Implementation
 - [ ] Design ring buffer for input accumulation
 - [ ] Implement streaming execution logic
 - [ ] Add callback-based output delivery
 - [ ] Optimize for low latency
 - [ ] Add CUDA graph support (optional)
 
-#### RealtimeIonoEngine
+#### AntennaEngine
 - [ ] Define `IonosphereConfig` structure
 - [ ] Create facade class
 - [ ] Define ionosphere-specific pipeline
@@ -237,16 +236,16 @@ public:
 #### Core Bindings
 - [ ] Bind `IPipelineExecutor` interface
 - [ ] Bind `PipelineBuilder`
-- [ ] Bind `BatchExecutor` and `RealtimeExecutor`
+- [ ] Bind `BatchExecutor` and `StreamingExecutor`
 - [ ] Bind new engine classes
 
 #### Python API Design
 ```python
 # New Python API (v0.9.3)
 from ionosense_hpc import (
-    PipelineBuilder, 
-    BatchExecutor, 
-    RealtimeExecutor,
+    PipelineBuilder,
+    BatchExecutor,
+    StreamingExecutor,
     CustomEngine
 )
 
@@ -260,7 +259,7 @@ pipeline = (builder
     .build())
 
 # Create executor
-executor = RealtimeExecutor(exec_config)
+executor = StreamingExecutor(exec_config)
 
 # Create custom engine
 engine = CustomEngine(pipeline, executor)
@@ -271,7 +270,7 @@ result = engine.process(data)
 
 #### Unit Tests
 - [ ] `BatchExecutor` resource management
-- [ ] `RealtimeExecutor` ring buffer
+- [ ] `StreamingExecutor` ring buffer
 - [ ] `PipelineBuilder` validation
 - [ ] Memory leak detection
 
@@ -298,20 +297,20 @@ cpp/
 │   │   └── executor_config.hpp        [NEW]
 │   ├── executors/
 │   │   ├── batch_executor.hpp         [NEW]
-│   │   └── realtime_executor.hpp      [NEW]
+│   │   └── streaming_executor.hpp     [NEW]
 │   ├── engines/
 │   │   ├── research_engine.hpp        [REWRITTEN]
-│   │   └── realtime_iono_engine.hpp   [NEW]
+│   │   └── antenna_engine.hpp         [NEW]
 │   ├── processing_stage.hpp           [UNCHANGED]
 │   ├── cuda_wrappers.hpp              [UNCHANGED]
 │   └── profiling_macros.hpp           [UNCHANGED]
 ├── src/
 │   ├── executors/
 │   │   ├── batch_executor.cpp         [NEW]
-│   │   └── realtime_executor.cpp      [NEW]
+│   │   └── streaming_executor.cpp     [NEW]
 │   ├── engines/
 │   │   ├── research_engine.cpp        [REWRITTEN]
-│   │   └── realtime_iono_engine.cpp   [NEW]
+│   │   └── antenna_engine.cpp         [NEW]
 │   ├── core/
 │   │   └── pipeline_builder.cpp       [NEW]
 │   ├── processing_stage.cpp           [UNCHANGED]

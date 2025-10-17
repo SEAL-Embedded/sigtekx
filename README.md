@@ -120,7 +120,7 @@ engine_iono = Engine(preset='iono')        # Ionosphere research (4096 FFT, 0.75
 engine_ionox = Engine(preset='ionox')      # Extreme ionosphere (8192 FFT, 0.9 overlap)
 
 # Override preset parameters
-engine = Engine(preset='iono', nfft=8192, mode='realtime')
+engine = Engine(preset='iono', nfft=8192, mode='streaming')
 ```
 
 ### Custom Configuration

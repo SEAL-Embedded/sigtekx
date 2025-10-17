@@ -41,7 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `WindowSymmetry` - PERIODIC (FFT), SYMMETRIC (time-domain)
   - `WindowNorm` - UNITY, SQRT
   - `OutputMode` - MAGNITUDE, COMPLEX
-  - `ExecutionMode` - BATCH, REALTIME, LOW_LATENCY
+  - `ExecutionMode` - BATCH, STREAMING
 - **Computed properties** on `EngineConfig`:
   - `hop_size` - Samples between frame starts
   - `num_output_bins` - Frequency bins in output
@@ -83,7 +83,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - NEW: `Engine(preset=..., config=..., pipeline=..., **overrides)` (keyword args)
 - **Preset initialization** now uses keyword argument:
   - OLD: `Engine(Presets.realtime())`
-  - NEW: `Engine(preset='default', mode='realtime')`
+  - NEW: `Engine(preset='default', mode='streaming')`
 - **Configuration parameter structure**:
   - All parameters now in single unified `EngineConfig`
   - Removed separate `ExecutorConfig` and `StageConfig` classes
@@ -92,11 +92,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Internal Refactoring
 - **Benchmark scripts** updated to use new preset functions:
   - `latency.py`, `throughput.py`, `realtime.py`, `accuracy.py` all migrated
-  - Replaced `Presets.realtime()` with `get_preset('default')`
-  - Added mode overrides where appropriate
+  - Replaced old preset methods with `get_preset('default')`
+  - Added mode overrides where appropriate (e.g., `mode='streaming'`)
 - **Test fixtures** updated in `src/ionosense_hpc/testing/fixtures.py`:
   - `validation_config` fixture uses `get_preset('default', batch=1)`
-  - `realtime_config` fixture uses mode override
+  - Streaming-mode fixtures use `mode='streaming'` override
   - All fixtures compatible with new API
 - **Main exports** updated in `src/ionosense_hpc/__init__.py`:
   - Removed `Presets` class export
@@ -115,13 +115,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Deprecated Components
 - **`Presets` static class** (`src/ionosense_hpc/config/presets.py` old implementation):
-  - Removed `Presets.realtime()` → Use `Engine(preset='default', mode='realtime')`
+  - Removed old preset methods → Use `Engine(preset='default', mode='streaming')` or similar
   - Removed `Presets.throughput()` → Use `Engine(preset='default')` or `Engine(preset='iono')`
   - Removed `Presets.validation()` → Use `Engine(preset='default', batch=1)`
   - Removed `Presets.profiling()` → Use `Engine(preset='default', enable_profiling=True)`
   - Removed `Presets.custom(**kwargs)` → Use `get_preset('default', **kwargs)`
 - **Old preset naming**:
-  - No longer using generic names (realtime, throughput, validation, profiling)
+  - No longer using generic names (validation, profiling, etc.)
   - Replaced with domain-specific names (default, iono, ionox)
 - **Multiple configuration classes**:
   - Consolidated into single `EngineConfig`
@@ -145,16 +145,16 @@ engine = Engine(config)
 from ionosense_hpc import Engine
 
 # Option 1: Direct preset (simplest)
-engine = Engine(preset='default', mode='realtime')
+engine = Engine(preset='default', mode='streaming')
 
 # Option 2: Using get_preset
 from ionosense_hpc.config import get_preset
-config = get_preset('default', mode='realtime')
+config = get_preset('default', mode='streaming')
 engine = Engine(config=config)
 
 # Option 3: Using from_preset factory
 from ionosense_hpc import EngineConfig
-config = EngineConfig.from_preset('default', mode='realtime')
+config = EngineConfig.from_preset('default', mode='streaming')
 engine = Engine(config=config)
 ```
 
@@ -164,7 +164,7 @@ engine = Engine(config=config)
 
 #### Architecture
 - **C++ Backend (arch/cpp-abs branch)**: v0.9.3 cpp-abs
-  - `IPipelineExecutor` interface with `BatchExecutor` and `RealtimeExecutor`
+  - `IPipelineExecutor` interface with `BatchExecutor` and `StreamingExecutor`
   - `IProcessingStage` interface with `WindowStage`, `FFTStage`, `MagnitudeStage`
   - `PipelineBuilder` for composing stages
   - `EngineConfig` and `ExecutorConfig` separation at C++ level

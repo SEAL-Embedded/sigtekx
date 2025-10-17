@@ -17,7 +17,7 @@ Successfully implemented the architecture refactor transforming ionosense-hpc-li
 ┌─────────────────────────────────────────────────────────┐
 │                Application Layer                         │
 │  - ResearchEngine                                     │
-│  - RealtimeIonoEngine                                   │
+│  - AntennaEngine                                        │
 └────────────┬────────────────────────┬───────────────────┘
              │                        │
 ┌────────────▼────────────────────────▼───────────────────┐
@@ -25,7 +25,7 @@ Successfully implemented the architecture refactor transforming ionosense-hpc-li
 │  ┌──────────────────┐      ┌─────────────────┐        │
 │  │ PipelineBuilder  │      │    Executors    │        │
 │  └──────────────────┘      │  - BatchExecutor │        │
-│                             │  - RealtimeExec  │        │
+│                             │  - StreamingExec │        │
 │  ┌──────────────────────────────────────────┐         │
 │  │       Processing Stages (unchanged)      │         │
 │  └──────────────────────────────────────────┘         │
@@ -61,7 +61,7 @@ class IPipelineExecutor {
 **Location**: `cpp/include/ionosense/core/executor_config.hpp`
 
 Extends `EngineConfig` with executor-specific settings:
-- Execution mode (Batch, Streaming, Low-Latency)
+- Execution mode (Batch, Streaming)
 - CUDA graph preferences
 - Maximum inflight batches
 - Device selection
@@ -102,8 +102,8 @@ Extracted from `ResearchEngine::Impl` with same execution logic:
 - ✅ All original functionality preserved
 - ✅ Same resource management patterns
 
-#### 2. RealtimeExecutor
-**Location**: `cpp/src/executors/realtime_executor.cpp`
+#### 2. StreamingExecutor
+**Location**: `cpp/src/executors/streaming_executor.cpp`
 
 Simplified streaming executor (v0.9.3):
 - Currently delegates to BatchExecutor with optimized settings
@@ -142,10 +142,10 @@ class ResearchEngine::Impl {
 - Clear separation of concerns
 - Easy to customize pipeline
 
-#### 2. RealtimeIonoEngine
-**Location**: `cpp/src/engines/realtime_iono_engine.cpp`
+#### 2. AntennaEngine
+**Location**: `cpp/src/engines/antenna_engine.cpp`
 
-Specialized engine for ionosphere analysis:
+Specialized engine for ionosphere antenna analysis:
 - Blackman window for better sidelobe suppression
 - Optimized overlap for time-frequency resolution
 - Pre-configured for HF signal processing
@@ -153,7 +153,7 @@ Specialized engine for ionosphere analysis:
 **Factory methods**:
 ```cpp
 auto config = IonosphereConfig::create_realtime(2048, 48000);
-RealtimeIonoEngine engine(config);
+AntennaEngine engine(config);
 ```
 
 ## File Structure
@@ -169,19 +169,19 @@ cpp/
 │   │   └── pipeline_builder.hpp        [NEW]
 │   ├── executors/
 │   │   ├── batch_executor.hpp          [NEW]
-│   │   └── realtime_executor.hpp       [NEW]
+│   │   └── streaming_executor.hpp      [NEW]
 │   └── engines/
-│       ├── research_engine.hpp      [NEW]
-│       └── realtime_iono_engine.hpp    [NEW]
+│       ├── research_engine.hpp         [NEW]
+│       └── antenna_engine.hpp          [NEW]
 ├── src/
 │   ├── core/
 │   │   └── pipeline_builder.cpp        [NEW]
 │   ├── executors/
 │   │   ├── batch_executor.cpp          [NEW]
-│   │   └── realtime_executor.cpp       [NEW]
+│   │   └── streaming_executor.cpp      [NEW]
 │   └── engines/
-│       ├── research_engine.cpp      [NEW]
-│       └── realtime_iono_engine.cpp    [NEW]
+│       ├── research_engine.cpp         [NEW]
+│       └── antenna_engine.cpp          [NEW]
 └── examples/
     └── architecture_demo.cpp            [NEW]
 ```
@@ -207,9 +207,9 @@ add_library(ion_engine OBJECT
     # New architecture (v0.9.3)
     cpp/src/core/pipeline_builder.cpp
     cpp/src/executors/batch_executor.cpp
-    cpp/src/executors/realtime_executor.cpp
+    cpp/src/executors/streaming_executor.cpp
     cpp/src/engines/research_engine.cpp
-    cpp/src/engines/realtime_iono_engine.cpp
+    cpp/src/engines/antenna_engine.cpp
 )
 ```
 
@@ -249,12 +249,12 @@ std::vector<float> output(config.num_output_bins() * config.batch);
 engine.process(input.data(), output.data(), input.size());
 ```
 
-### Example 2: RealtimeIonoEngine
+### Example 2: AntennaEngine
 ```cpp
-#include "ionosense/engines/realtime_iono_engine.hpp"
+#include "ionosense/engines/antenna_engine.hpp"
 
 auto config = IonosphereConfig::create_realtime(2048, 48000);
-RealtimeIonoEngine engine(config);
+AntennaEngine engine(config);
 engine.process(hf_signal, spectrum, num_samples);
 ```
 
@@ -327,7 +327,7 @@ executor.initialize(exec_config, std::move(stages));
 
 ### For New Features
 1. **Use new architecture**: Build with `PipelineBuilder` + executors
-2. **Create specialized engines**: Follow `RealtimeIonoEngine` pattern
+2. **Create specialized engines**: Follow `AntennaEngine` pattern
 3. **Extend with custom stages**: Implement `IProcessingStage` interface
 
 ## Success Metrics
@@ -337,7 +337,7 @@ executor.initialize(exec_config, std::move(stages));
 - ✅ Memory usage unchanged
 - ✅ Clean separation of concerns achieved
 - ✅ Multiple executor types demonstrated
-- ✅ Specialized engine created (RealtimeIonoEngine)
+- ✅ Specialized engine created (AntennaEngine)
 
 ## Conclusion
 
