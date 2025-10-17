@@ -1,13 +1,13 @@
 /**
- * @file realtime_executor.hpp
+ * @file streaming_executor.hpp
  * @version 0.9.3
- * @date 2025-10-09
+ * @date 2025-10-16
  * @author [Kevin Rahsaz]
  *
- * @brief Realtime streaming executor with low-latency processing.
+ * @brief Streaming executor with low-latency continuous processing.
  *
- * Implements continuous streaming processing with callback-based output
- * delivery and minimal blocking operations.
+ * Implements continuous streaming processing with ring buffer management,
+ * callback-based output delivery, and minimal blocking operations.
  */
 
 #pragma once
@@ -20,8 +20,8 @@
 namespace ionosense {
 
 /**
- * @class RealtimeExecutor
- * @brief Placeholder executor for low-latency continuous streaming.
+ * @class StreamingExecutor
+ * @brief Executor for low-latency continuous streaming processing.
  *
  * @warning **STUB IMPLEMENTATION (v0.9.3)**
  * This executor is currently a thin wrapper around BatchExecutor and does NOT
@@ -39,21 +39,22 @@ namespace ionosense {
  * - Frame-by-frame processing as data arrives
  * - Overlap handling for continuous streams
  * - Callback invocation upon frame completion
+ * - CUDA stream pipelining for overlapped compute/transfer
  * - Optional CUDA graph optimization for minimal overhead
  *
  * For now, use BatchExecutor directly for batch processing, or wait for
- * v0.9.4 for true realtime streaming support.
+ * v0.9.4 for true streaming support.
  */
-class RealtimeExecutor : public IPipelineExecutor {
+class StreamingExecutor : public IPipelineExecutor {
  public:
-  RealtimeExecutor();
-  ~RealtimeExecutor() override;
+  StreamingExecutor();
+  ~StreamingExecutor() override;
 
   // Disable copy, enable move
-  RealtimeExecutor(const RealtimeExecutor&) = delete;
-  RealtimeExecutor& operator=(const RealtimeExecutor&) = delete;
-  RealtimeExecutor(RealtimeExecutor&&) noexcept;
-  RealtimeExecutor& operator=(RealtimeExecutor&&) noexcept;
+  StreamingExecutor(const StreamingExecutor&) = delete;
+  StreamingExecutor& operator=(const StreamingExecutor&) = delete;
+  StreamingExecutor(StreamingExecutor&&) noexcept;
+  StreamingExecutor& operator=(StreamingExecutor&&) noexcept;
 
   // IPipelineExecutor interface
   void initialize(

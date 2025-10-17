@@ -55,9 +55,8 @@ class OutputMode(str, Enum):
 
 class ExecutionMode(str, Enum):
     """Execution strategy for the engine."""
-    BATCH = 'batch'              # Maximum throughput batch processing
-    REALTIME = 'realtime'        # Low-latency streaming (future)
-    LOW_LATENCY = 'low_latency'  # Minimize latency variant
+    BATCH = 'batch'         # Maximum throughput batch processing
+    STREAMING = 'streaming'  # Low-latency streaming with ring buffer
 
 
 # ============================================================================
@@ -305,10 +304,10 @@ class EngineConfig(BaseModel):
 
         Examples:
             >>> config = EngineConfig.from_preset('iono')
-            >>> config = EngineConfig.from_preset('iono', mode='realtime')
+            >>> config = EngineConfig.from_preset('iono', mode='streaming')
             >>> config = EngineConfig.from_preset('iono', nfft=8192, overlap=0.875)
         """
-        from .presets import get_preset
+        from .config_presets import get_preset
         config = get_preset(name)
 
         # Apply mode override
@@ -350,11 +349,11 @@ def _apply_mode_overrides(config: EngineConfig, mode: ExecutionMode) -> EngineCo
     """
     overrides = {}
 
-    if mode == ExecutionMode.REALTIME or mode == ExecutionMode.LOW_LATENCY:
-        # Realtime: Minimize latency, reduce batch size
-        overrides['stream_count'] = 3
-        overrides['pinned_buffer_count'] = 2
-        overrides['batch'] = max(2, config.batch // 4)  # Reduce batch for lower latency
+    if mode == ExecutionMode.STREAMING:
+        # Streaming: Minimize latency, reduce batch size, more streams
+        overrides['stream_count'] = 6
+        overrides['pinned_buffer_count'] = 4
+        overrides['batch'] = max(2, config.batch // 2)  # Reduce batch for lower latency
     elif mode == ExecutionMode.BATCH:
         # Batch: Maximize throughput, use more buffers
         overrides['stream_count'] = 4

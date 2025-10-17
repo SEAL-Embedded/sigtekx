@@ -122,7 +122,7 @@ PYBIND11_MODULE(_engine, m) {
         Architecture (v0.9.3 - cpp-abs):
         - PipelineBuilder: Construct processing pipelines from stages
         - BatchExecutor: High-throughput batch processing
-        - RealtimeExecutor: Placeholder for streaming (v0.9.4+)
+        - StreamingExecutor: Placeholder for streaming (v0.9.4+)
 
         Key classes:
         - ResearchEngine: Main user-facing engine (wrapper over executors)
@@ -186,10 +186,7 @@ PYBIND11_MODULE(_engine, m) {
       .value("BATCH", ionosense::ExecutorConfig::ExecutionMode::BATCH,
              "Process complete batches with maximum throughput")
       .value("STREAMING", ionosense::ExecutorConfig::ExecutionMode::STREAMING,
-             "Continuous processing with input accumulation (v0.9.4+)")
-      .value("LOW_LATENCY",
-             ionosense::ExecutorConfig::ExecutionMode::LOW_LATENCY,
-             "Minimize latency at cost of throughput")
+             "Continuous processing with low-latency via ring buffer (v0.9.4+)")
       .export_values();
 
   // --- Bind Configuration Structs ---
@@ -221,7 +218,7 @@ PYBIND11_MODULE(_engine, m) {
       "Configuration for pipeline executors (extends EngineConfig)")
       .def(py::init<>())
       .def_readwrite("mode", &ionosense::ExecutorConfig::mode,
-                     "Execution strategy (BATCH/STREAMING/LOW_LATENCY)")
+                     "Execution strategy (BATCH/STREAMING)")
       .def_readwrite("max_inflight_batches",
                      &ionosense::ExecutorConfig::max_inflight_batches,
                      "Maximum concurrent batches (streaming mode, v0.9.4+)")
@@ -235,9 +232,6 @@ PYBIND11_MODULE(_engine, m) {
             break;
           case ionosense::ExecutorConfig::ExecutionMode::STREAMING:
             mode_str = "STREAMING";
-            break;
-          case ionosense::ExecutorConfig::ExecutionMode::LOW_LATENCY:
-            mode_str = "LOW_LATENCY";
             break;
         }
         return "<ExecutorConfig mode=" + mode_str +

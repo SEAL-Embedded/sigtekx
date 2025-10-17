@@ -1,12 +1,12 @@
 /**
- * @file test_realtime_executor.cpp
+ * @file test_streaming_executor.cpp
  * @version 0.9.3
- * @date 2025-10-15
+ * @date 2025-10-16
  * @author [Kevin Rahsaz]
  *
- * @brief Unit tests for the RealtimeExecutor class (stub implementation).
+ * @brief Unit tests for the StreamingExecutor class (stub implementation).
  *
- * Note: RealtimeExecutor is currently a stub that delegates to BatchExecutor.
+ * Note: StreamingExecutor is currently a stub that delegates to BatchExecutor.
  * These tests validate that the stub behaves correctly and clearly documents
  * current limitations until full streaming support is added in v0.9.4+.
  */
@@ -18,7 +18,7 @@
 
 #include "ionosense/core/cuda_wrappers.hpp"
 #include "ionosense/core/pipeline_builder.hpp"
-#include "ionosense/executors/realtime_executor.hpp"
+#include "ionosense/executors/streaming_executor.hpp"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -27,10 +27,10 @@
 using namespace ionosense;
 
 /**
- * @class RealtimeExecutorTest
- * @brief Test fixture for RealtimeExecutor tests.
+ * @class StreamingExecutorTest
+ * @brief Test fixture for StreamingExecutor tests.
  */
-class RealtimeExecutorTest : public ::testing::Test {
+class StreamingExecutorTest : public ::testing::Test {
  protected:
   void SetUp() override {
     // Check for CUDA device availability
@@ -67,12 +67,12 @@ class RealtimeExecutorTest : public ::testing::Test {
 //  Construction and Initialization Tests
 // ============================================================================
 
-TEST_F(RealtimeExecutorTest, Construction) {
-  EXPECT_NO_THROW(RealtimeExecutor executor);
+TEST_F(StreamingExecutorTest, Construction) {
+  EXPECT_NO_THROW(StreamingExecutor executor);
 }
 
-TEST_F(RealtimeExecutorTest, InitializationWithStreamingMode) {
-  RealtimeExecutor executor;
+TEST_F(StreamingExecutorTest, InitializationWithStreamingMode) {
+  StreamingExecutor executor;
   EXPECT_FALSE(executor.is_initialized());
 
   PipelineBuilder builder;
@@ -86,26 +86,9 @@ TEST_F(RealtimeExecutorTest, InitializationWithStreamingMode) {
   EXPECT_TRUE(executor.is_initialized());
 }
 
-TEST_F(RealtimeExecutorTest, InitializationWithLowLatencyMode) {
-  RealtimeExecutor executor;
-
-  ExecutorConfig low_latency_config = config_;
-  low_latency_config.mode = ExecutorConfig::ExecutionMode::LOW_LATENCY;
-
-  PipelineBuilder builder;
-  auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
-                    .add_fft()
-                    .build();
-
-  EXPECT_NO_THROW(executor.initialize(low_latency_config, std::move(stages)));
-  EXPECT_TRUE(executor.is_initialized());
-}
-
-TEST_F(RealtimeExecutorTest, InitializationWithBatchModeExpectedException) {
-  // Note: This test documents expected behavior but implementation may vary
-  // Currently RealtimeExecutor might accept BATCH mode and delegate to
-  // BatchExecutor We test current behavior here.
-  RealtimeExecutor executor;
+TEST_F(StreamingExecutorTest, InitializationWithBatchModeExpectedException) {
+  // Note: StreamingExecutor requires STREAMING execution mode
+  StreamingExecutor executor;
 
   ExecutorConfig batch_config = config_;
   batch_config.mode = ExecutorConfig::ExecutionMode::BATCH;
@@ -115,13 +98,13 @@ TEST_F(RealtimeExecutorTest, InitializationWithBatchModeExpectedException) {
                     .add_fft()
                     .build();
 
-  // Current implementation requires STREAMING or LOW_LATENCY
+  // Current implementation requires STREAMING mode
   EXPECT_THROW(executor.initialize(batch_config, std::move(stages)),
                std::runtime_error);
 }
 
-TEST_F(RealtimeExecutorTest, Reset) {
-  RealtimeExecutor executor;
+TEST_F(StreamingExecutorTest, Reset) {
+  StreamingExecutor executor;
 
   PipelineBuilder builder;
   auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
@@ -138,8 +121,8 @@ TEST_F(RealtimeExecutorTest, Reset) {
 //  Processing Tests (Delegated to BatchExecutor)
 // ============================================================================
 
-TEST_F(RealtimeExecutorTest, BasicProcessing) {
-  RealtimeExecutor executor;
+TEST_F(StreamingExecutorTest, BasicProcessing) {
+  StreamingExecutor executor;
 
   PipelineBuilder builder;
   auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
@@ -167,8 +150,8 @@ TEST_F(RealtimeExecutorTest, BasicProcessing) {
   EXPECT_TRUE(has_nonzero);
 }
 
-TEST_F(RealtimeExecutorTest, SubmitAsync) {
-  RealtimeExecutor executor;
+TEST_F(StreamingExecutorTest, SubmitAsync) {
+  StreamingExecutor executor;
 
   PipelineBuilder builder;
   auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
@@ -193,8 +176,8 @@ TEST_F(RealtimeExecutorTest, SubmitAsync) {
   EXPECT_TRUE(callback_called);
 }
 
-TEST_F(RealtimeExecutorTest, StatsReporting) {
-  RealtimeExecutor executor;
+TEST_F(StreamingExecutorTest, StatsReporting) {
+  StreamingExecutor executor;
 
   PipelineBuilder builder;
   auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
@@ -218,14 +201,14 @@ TEST_F(RealtimeExecutorTest, StatsReporting) {
 //  Capability Tests (Stub Behavior)
 // ============================================================================
 
-TEST_F(RealtimeExecutorTest, SupportsStreamingReturnsFalse) {
-  // v0.9.3: RealtimeExecutor is a stub and does NOT support true streaming
-  RealtimeExecutor executor;
+TEST_F(StreamingExecutorTest, SupportsStreamingReturnsFalse) {
+  // v0.9.3: StreamingExecutor is a stub and does NOT support true streaming
+  StreamingExecutor executor;
   EXPECT_FALSE(executor.supports_streaming());
 }
 
-TEST_F(RealtimeExecutorTest, MemoryUsage) {
-  RealtimeExecutor executor;
+TEST_F(StreamingExecutorTest, MemoryUsage) {
+  StreamingExecutor executor;
 
   PipelineBuilder builder;
   auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
@@ -246,8 +229,8 @@ TEST_F(RealtimeExecutorTest, MemoryUsage) {
 //  Move Semantics Tests
 // ============================================================================
 
-TEST_F(RealtimeExecutorTest, MoveConstruction) {
-  RealtimeExecutor executor1;
+TEST_F(StreamingExecutorTest, MoveConstruction) {
+  StreamingExecutor executor1;
 
   PipelineBuilder builder;
   auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
@@ -255,12 +238,12 @@ TEST_F(RealtimeExecutorTest, MoveConstruction) {
                     .build();
   executor1.initialize(config_, std::move(stages));
 
-  RealtimeExecutor executor2(std::move(executor1));
+  StreamingExecutor executor2(std::move(executor1));
   EXPECT_TRUE(executor2.is_initialized());
 }
 
-TEST_F(RealtimeExecutorTest, MoveAssignment) {
-  RealtimeExecutor executor1;
+TEST_F(StreamingExecutorTest, MoveAssignment) {
+  StreamingExecutor executor1;
 
   PipelineBuilder builder;
   auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
@@ -268,7 +251,7 @@ TEST_F(RealtimeExecutorTest, MoveAssignment) {
                     .build();
   executor1.initialize(config_, std::move(stages));
 
-  RealtimeExecutor executor2;
+  StreamingExecutor executor2;
   executor2 = std::move(executor1);
   EXPECT_TRUE(executor2.is_initialized());
 }
@@ -279,7 +262,7 @@ TEST_F(RealtimeExecutorTest, MoveAssignment) {
 
 /**
  * @test DocumentedLimitations
- * @brief This test documents the current limitations of RealtimeExecutor.
+ * @brief This test documents the current limitations of StreamingExecutor.
  *
  * The following features are NOT implemented in v0.9.3:
  * - Ring buffer for input accumulation
@@ -290,9 +273,9 @@ TEST_F(RealtimeExecutorTest, MoveAssignment) {
  *
  * All of these will be added in v0.9.4+.
  */
-TEST_F(RealtimeExecutorTest, DocumentedLimitations) {
+TEST_F(StreamingExecutorTest, DocumentedLimitations) {
   // This test exists to document limitations for reviewers and future devs
-  SUCCEED() << "RealtimeExecutor v0.9.3 is a STUB implementation.\n"
+  SUCCEED() << "StreamingExecutor v0.9.3 is a STUB implementation.\n"
             << "It delegates to BatchExecutor and does NOT support:\n"
             << "  - True streaming (supports_streaming() == false)\n"
             << "  - Ring buffers\n"

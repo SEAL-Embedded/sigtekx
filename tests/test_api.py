@@ -54,22 +54,38 @@ class TestPresets:
         assert config.mode == ExecutionMode.BATCH
 
     def test_get_preset_iono(self):
-        """Test getting iono preset."""
+        """Test getting iono preset (defaults to batch)."""
         config = get_preset('iono')
-        assert config.nfft == 4096
-        assert config.batch == 8
+        assert config.nfft == 8192  # Batch: higher resolution
+        assert config.batch == 16
         assert config.overlap == 0.75
         assert config.window == WindowType.BLACKMAN
         assert config.mode == ExecutionMode.BATCH
 
+    def test_get_preset_iono_streaming(self):
+        """Test getting iono preset with streaming executor."""
+        config = get_preset('iono', executor='streaming')
+        assert config.nfft == 4096  # Streaming: lower latency
+        assert config.batch == 8
+        assert config.overlap == 0.75
+        assert config.mode == ExecutionMode.STREAMING
+
     def test_get_preset_ionox(self):
-        """Test getting ionox preset."""
+        """Test getting ionox preset (defaults to batch)."""
         config = get_preset('ionox')
-        assert config.nfft == 8192
-        assert config.batch == 16
-        assert config.overlap == 0.9
+        assert config.nfft == 32768  # Batch: maximum resolution
+        assert config.batch == 32
+        assert config.overlap == 0.9375
         assert config.window == WindowType.BLACKMAN
         assert config.mode == ExecutionMode.BATCH
+
+    def test_get_preset_ionox_streaming(self):
+        """Test getting ionox preset with streaming executor."""
+        config = get_preset('ionox', executor='streaming')
+        assert config.nfft == 8192  # Streaming: balanced
+        assert config.batch == 16
+        assert config.overlap == 0.9
+        assert config.mode == ExecutionMode.STREAMING
 
     def test_get_preset_unknown(self):
         """Test error on unknown preset."""
@@ -77,11 +93,14 @@ class TestPresets:
             get_preset('nonexistent')
 
     def test_describe_preset(self):
-        """Test preset description."""
+        """Test preset description (shows both variants)."""
         desc = describe_preset('iono')
         assert 'Ionosphere' in desc
-        assert '4096' in desc
-        assert 'BLACKMAN' in desc
+        assert 'batch' in desc
+        assert 'streaming' in desc
+        # Contains NFFFTs for both variants
+        assert '8192' in desc  # batch
+        assert '4096' in desc  # streaming
 
     def test_compare_presets(self):
         """Test preset comparison table."""
@@ -135,35 +154,36 @@ class TestEngineConfig:
             window_symmetry=WindowSymmetry.SYMMETRIC,
             window_norm=WindowNorm.SQRT,
             scale=ScalePolicy.ONE_OVER_SQRT_N,
-            mode=ExecutionMode.REALTIME
+            mode=ExecutionMode.STREAMING
         )
 
         assert config.nfft == 4096
         assert config.batch == 8
         assert config.window == WindowType.BLACKMAN
         assert config.window_symmetry == WindowSymmetry.SYMMETRIC
-        assert config.mode == ExecutionMode.REALTIME
+        assert config.mode == ExecutionMode.STREAMING
 
     def test_from_preset_method(self):
         """Test EngineConfig.from_preset() class method."""
         config = EngineConfig.from_preset('iono')
-        assert config.nfft == 4096
-        assert config.batch == 8
+        assert config.nfft == 8192  # Batch variant (default)
+        assert config.batch == 16
 
     def test_from_preset_with_overrides(self):
         """Test preset with parameter overrides."""
-        config = EngineConfig.from_preset('iono', nfft=8192, overlap=0.875)
-        assert config.nfft == 8192  # Overridden
+        config = EngineConfig.from_preset('iono', nfft=16384, overlap=0.875)
+        assert config.nfft == 16384  # Overridden
         assert config.overlap == 0.875  # Overridden
-        assert config.batch == 8  # From preset
+        assert config.batch == 16  # From preset (batch variant)
 
     def test_from_preset_with_mode_override(self):
         """Test preset with mode override."""
-        config = EngineConfig.from_preset('iono', mode=ExecutionMode.REALTIME)
-        assert config.mode == ExecutionMode.REALTIME
-        # Mode override should adjust stream/buffer counts
-        assert config.stream_count == 3
-        assert config.pinned_buffer_count == 2
+        config = EngineConfig.from_preset('iono', mode=ExecutionMode.STREAMING)
+        assert config.mode == ExecutionMode.STREAMING
+        # Mode override should adjust stream/buffer counts for STREAMING
+        assert config.stream_count == 6  # STREAMING mode override
+        assert config.pinned_buffer_count == 4  # STREAMING mode override
+        assert config.batch == 8  # Reduced from 16 (batch//2) for lower latency
 
     def test_computed_properties(self):
         """Test computed properties."""
@@ -195,14 +215,14 @@ class TestEngineConfig:
             window_symmetry='symmetric',  # type: ignore[arg-type]
             window_norm='sqrt',  # type: ignore[arg-type]
             scale='1/sqrt(N)',  # type: ignore[arg-type]
-            mode='realtime'  # type: ignore[arg-type]
+            mode='streaming'  # type: ignore[arg-type]
         )
 
         assert config.window == WindowType.BLACKMAN
         assert config.window_symmetry == WindowSymmetry.SYMMETRIC
         assert config.window_norm == WindowNorm.SQRT
         assert config.scale == ScalePolicy.ONE_OVER_SQRT_N
-        assert config.mode == ExecutionMode.REALTIME
+        assert config.mode == ExecutionMode.STREAMING
 
     def test_config_repr(self):
         """Test configuration string representation."""
@@ -405,14 +425,14 @@ class TestEngineInitialization:
 
     def test_init_with_preset_and_mode_override(self):
         """Test preset with mode override."""
-        engine = Engine(preset='default', mode=ExecutionMode.REALTIME)
-        assert engine.config.mode == ExecutionMode.REALTIME
+        engine = Engine(preset='default', mode=ExecutionMode.STREAMING)
+        assert engine.config.mode == ExecutionMode.STREAMING
         engine.close()
 
     def test_init_with_mode_string(self):
         """Test mode override with string."""
-        engine = Engine(preset='default', mode='realtime')
-        assert engine.config.mode == ExecutionMode.REALTIME
+        engine = Engine(preset='default', mode='streaming')
+        assert engine.config.mode == ExecutionMode.STREAMING
         engine.close()
 
     def test_init_default_when_none(self):
@@ -486,8 +506,7 @@ class TestEnums:
     def test_execution_mode_enum(self):
         """Test ExecutionMode enum."""
         assert ExecutionMode.BATCH.value == 'batch'
-        assert ExecutionMode.REALTIME.value == 'realtime'
-        assert ExecutionMode.LOW_LATENCY.value == 'low_latency'
+        assert ExecutionMode.STREAMING.value == 'streaming'
 
 
 # =============================================================================
@@ -559,13 +578,13 @@ class TestEndToEndIntegration:
             preset='iono',
             nfft=8192,  # Increase resolution
             overlap=0.875,  # More temporal resolution
-            mode='realtime'  # Switch to realtime mode
+            mode='streaming'  # Switch to realtime mode
         )
 
         # Verify overrides
         assert engine.config.nfft == 8192
         assert engine.config.overlap == 0.875
-        assert engine.config.mode == ExecutionMode.REALTIME
+        assert engine.config.mode == ExecutionMode.STREAMING
 
         # Verify preset values maintained
         assert engine.config.window == WindowType.BLACKMAN
@@ -577,13 +596,13 @@ class TestEndToEndIntegration:
         # Create config from preset with modifications
         config = EngineConfig.from_preset(
             'ionox',
-            mode=ExecutionMode.REALTIME,
+            mode=ExecutionMode.STREAMING,
             nfft=16384
         )
 
         # Verify
         assert config.nfft == 16384
-        assert config.mode == ExecutionMode.REALTIME
+        assert config.mode == ExecutionMode.STREAMING
         assert config.window == WindowType.BLACKMAN  # From ionox preset
 
         # Use config
@@ -611,7 +630,7 @@ class TestBackwardCompatibility:
         config_dict = config.model_dump()
 
         assert isinstance(config_dict, dict)
-        assert config_dict['nfft'] == 4096
+        assert config_dict['nfft'] == 8192  # Batch variant (default)
 
     def test_config_modification(self):
         """Test config can be modified after creation."""

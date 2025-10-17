@@ -76,13 +76,13 @@ class Engine:
     2. Config-based (flexible): Engine(config=custom_config)
     3. Pipeline-based (advanced): Engine(pipeline=custom_pipeline)
 
-    The engine automatically selects the appropriate executor (Batch or Realtime)
+    The engine automatically selects the appropriate executor (Batch or Streaming)
     based on the execution mode.
 
     Examples:
         # Preset-based (90% of use cases)
         >>> engine = Engine(preset='iono')
-        >>> engine = Engine(preset='iono', mode='realtime')
+        >>> engine = Engine(preset='iono', mode='streaming')
 
         # Config-based (custom requirements)
         >>> config = EngineConfig(nfft=4096, batch=8, overlap=0.75)
@@ -128,7 +128,7 @@ class Engine:
             config: Custom EngineConfig object
             pipeline: Pre-built Pipeline from PipelineBuilder
             builder: Builder function for custom pipeline (advanced)
-            mode: Execution mode override ('batch', 'realtime', 'low_latency')
+            mode: Execution mode override ('batch', 'streaming')
             **overrides: Quick parameter overrides (nfft, batch, overlap, etc.)
 
         Raises:
@@ -140,7 +140,7 @@ class Engine:
         Examples:
             >>> engine = Engine()  # Uses 'default' preset
             >>> engine = Engine(preset='iono')
-            >>> engine = Engine(preset='iono', mode='realtime')
+            >>> engine = Engine(preset='iono', mode='streaming')
             >>> engine = Engine(config=my_config)
             >>> engine = Engine(pipeline=my_pipeline)
             >>> engine = Engine(preset='iono', nfft=8192, overlap=0.9)

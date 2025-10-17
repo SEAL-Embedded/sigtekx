@@ -73,7 +73,7 @@ class LatencyBenchmark(BaseBenchmark):
                 engine_config = EngineConfig(**self.config.engine_config)
             else:
                 engine_config = get_preset('default')
-                engine_config.mode = ExecutionMode.REALTIME
+                engine_config.mode = ExecutionMode.STREAMING
 
             # Initialize engine
             with nvtx_range("InitializeEngine", color=ProfileColor.DARK_GRAY):

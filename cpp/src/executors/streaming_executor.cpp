@@ -1,10 +1,10 @@
 /**
- * @file realtime_executor.cpp
+ * @file streaming_executor.cpp
  * @version 0.9.3
- * @date 2025-10-09
+ * @date 2025-10-16
  * @author [Kevin Rahsaz]
  *
- * @brief Stub implementation of RealtimeExecutor (placeholder for v0.9.4+).
+ * @brief Stub implementation of StreamingExecutor (placeholder for v0.9.4+).
  *
  * @warning **STUB IMPLEMENTATION**
  * This executor is currently a simple wrapper around BatchExecutor and does
@@ -12,10 +12,10 @@
  * architectural placeholder to demonstrate the executor abstraction pattern.
  *
  * Full streaming features (ring buffers, input accumulation, overlap handling,
- * background processing) will be implemented in v0.9.4+.
+ * CUDA stream pipelining, background processing) will be implemented in v0.9.4+.
  */
 
-#include "ionosense/executors/realtime_executor.hpp"
+#include "ionosense/executors/streaming_executor.hpp"
 
 #include <stdexcept>
 
@@ -24,10 +24,10 @@
 namespace ionosense {
 
 // ============================================================================
-//  RealtimeExecutor::Impl (Private Implementation)
+//  StreamingExecutor::Impl (Private Implementation)
 // ============================================================================
 
-class RealtimeExecutor::Impl {
+class StreamingExecutor::Impl {
  public:
   Impl() {
     // Note: Device initialization (cudaDeviceReset, cudaSetDeviceFlags) is
@@ -41,21 +41,20 @@ class RealtimeExecutor::Impl {
   void initialize(const ExecutorConfig& config,
                   std::vector<std::unique_ptr<IProcessingStage>> stages) {
     // Validate streaming mode requirements
-    if (config.mode != ExecutorConfig::ExecutionMode::STREAMING &&
-        config.mode != ExecutorConfig::ExecutionMode::LOW_LATENCY) {
+    if (config.mode != ExecutorConfig::ExecutionMode::STREAMING) {
       throw std::runtime_error(
-          "RealtimeExecutor requires STREAMING or LOW_LATENCY execution mode");
+          "StreamingExecutor requires STREAMING execution mode");
     }
 
     // For now, delegate to BatchExecutor with optimized settings
     // Future: Implement dedicated ring buffer and overlap management
-    ExecutorConfig realtime_config = config;
-    realtime_config.stream_count =
+    ExecutorConfig streaming_config = config;
+    streaming_config.stream_count =
         std::max(config.stream_count, 2);  // Ensure at least 2 streams
-    realtime_config.pinned_buffer_count =
+    streaming_config.pinned_buffer_count =
         config.max_inflight_batches;  // Use inflight count for buffers
 
-    batch_executor_->initialize(realtime_config, std::move(stages));
+    batch_executor_->initialize(streaming_config, std::move(stages));
   }
 
   void reset() { batch_executor_->reset(); }
@@ -84,44 +83,44 @@ class RealtimeExecutor::Impl {
 };
 
 // ============================================================================
-//  RealtimeExecutor Public Interface
+//  StreamingExecutor Public Interface
 // ============================================================================
 
-RealtimeExecutor::RealtimeExecutor() : pImpl(std::make_unique<Impl>()) {}
-RealtimeExecutor::~RealtimeExecutor() = default;
-RealtimeExecutor::RealtimeExecutor(RealtimeExecutor&&) noexcept = default;
-RealtimeExecutor& RealtimeExecutor::operator=(RealtimeExecutor&&) noexcept =
+StreamingExecutor::StreamingExecutor() : pImpl(std::make_unique<Impl>()) {}
+StreamingExecutor::~StreamingExecutor() = default;
+StreamingExecutor::StreamingExecutor(StreamingExecutor&&) noexcept = default;
+StreamingExecutor& StreamingExecutor::operator=(StreamingExecutor&&) noexcept =
     default;
 
-void RealtimeExecutor::initialize(
+void StreamingExecutor::initialize(
     const ExecutorConfig& config,
     std::vector<std::unique_ptr<IProcessingStage>> stages) {
   pImpl->initialize(config, std::move(stages));
 }
 
-void RealtimeExecutor::reset() { pImpl->reset(); }
+void StreamingExecutor::reset() { pImpl->reset(); }
 
-void RealtimeExecutor::submit(const float* input, float* output,
-                              size_t num_samples) {
+void StreamingExecutor::submit(const float* input, float* output,
+                               size_t num_samples) {
   pImpl->submit(input, output, num_samples);
 }
 
-void RealtimeExecutor::submit_async(const float* input, size_t num_samples,
-                                    ResultCallback callback) {
+void StreamingExecutor::submit_async(const float* input, size_t num_samples,
+                                     ResultCallback callback) {
   pImpl->submit_async(input, num_samples, callback);
 }
 
-void RealtimeExecutor::synchronize() { pImpl->synchronize(); }
+void StreamingExecutor::synchronize() { pImpl->synchronize(); }
 
-ProcessingStats RealtimeExecutor::get_stats() const {
+ProcessingStats StreamingExecutor::get_stats() const {
   return pImpl->get_stats();
 }
 
-size_t RealtimeExecutor::get_memory_usage() const {
+size_t StreamingExecutor::get_memory_usage() const {
   return pImpl->get_memory_usage();
 }
 
-bool RealtimeExecutor::is_initialized() const {
+bool StreamingExecutor::is_initialized() const {
   return pImpl->is_initialized();
 }
 

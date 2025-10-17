@@ -1,26 +1,26 @@
 /**
- * @file realtime_iono_engine.cpp
+ * @file antenna_engine.cpp
  * @version 0.9.3
- * @date 2025-10-09
+ * @date 2025-10-16
  * @author [Kevin Rahsaz]
  *
- * @brief Implementation of RealtimeIonoEngine.
+ * @brief Implementation of AntennaEngine.
  */
 
-#include "ionosense/engines/realtime_iono_engine.hpp"
+#include "ionosense/engines/antenna_engine.hpp"
 
 #include <stdexcept>
 
 #include "ionosense/core/pipeline_builder.hpp"
-#include "ionosense/executors/realtime_executor.hpp"
+#include "ionosense/executors/streaming_executor.hpp"
 
 namespace ionosense {
 
 // ============================================================================
-//  RealtimeIonoEngine::Impl
+//  AntennaEngine::Impl
 // ============================================================================
 
-class RealtimeIonoEngine::Impl {
+class AntennaEngine::Impl {
  public:
   explicit Impl(const IonosphereConfig& config) {
     // Build ionosphere-specific pipeline
@@ -43,8 +43,8 @@ class RealtimeIonoEngine::Impl {
     // TODO: Add ionosphere-specific metrics stage here in future
     // .add_stage(std::make_unique<IonoMetricsStage>())
 
-    // Initialize executor with realtime/streaming config
-    executor_ = std::make_unique<RealtimeExecutor>();
+    // Initialize executor with streaming config
+    executor_ = std::make_unique<StreamingExecutor>();
     executor_->initialize(config, std::move(stages));
   }
 
@@ -91,36 +91,35 @@ class RealtimeIonoEngine::Impl {
 };
 
 // ============================================================================
-//  RealtimeIonoEngine Public Interface
+//  AntennaEngine Public Interface
 // ============================================================================
 
-RealtimeIonoEngine::RealtimeIonoEngine(const IonosphereConfig& config)
+AntennaEngine::AntennaEngine(const IonosphereConfig& config)
     : pImpl(std::make_unique<Impl>(config)) {}
 
-RealtimeIonoEngine::~RealtimeIonoEngine() = default;
-RealtimeIonoEngine::RealtimeIonoEngine(RealtimeIonoEngine&&) noexcept = default;
-RealtimeIonoEngine& RealtimeIonoEngine::operator=(
-    RealtimeIonoEngine&&) noexcept = default;
+AntennaEngine::~AntennaEngine() = default;
+AntennaEngine::AntennaEngine(AntennaEngine&&) noexcept = default;
+AntennaEngine& AntennaEngine::operator=(AntennaEngine&&) noexcept = default;
 
-void RealtimeIonoEngine::process(const float* input, float* output,
-                                 size_t num_samples) {
+void AntennaEngine::process(const float* input, float* output,
+                            size_t num_samples) {
   pImpl->process(input, output, num_samples);
 }
 
-void RealtimeIonoEngine::process_async(const float* input, size_t num_samples,
-                                       ResultCallback callback) {
+void AntennaEngine::process_async(const float* input, size_t num_samples,
+                                  ResultCallback callback) {
   pImpl->process_async(input, num_samples, callback);
 }
 
-void RealtimeIonoEngine::synchronize() { pImpl->synchronize(); }
+void AntennaEngine::synchronize() { pImpl->synchronize(); }
 
-void RealtimeIonoEngine::reset() { pImpl->reset(); }
+void AntennaEngine::reset() { pImpl->reset(); }
 
-ProcessingStats RealtimeIonoEngine::get_stats() const {
+ProcessingStats AntennaEngine::get_stats() const {
   return pImpl->get_stats();
 }
 
-bool RealtimeIonoEngine::is_initialized() const {
+bool AntennaEngine::is_initialized() const {
   return pImpl->is_initialized();
 }
 

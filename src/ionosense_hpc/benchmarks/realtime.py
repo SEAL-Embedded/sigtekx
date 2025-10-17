@@ -71,7 +71,7 @@ class RealtimeBenchmark(BaseBenchmark):
                 self.engine_config = EngineConfig(**self.config.engine_config)
             else:
                 self.engine_config = get_preset('default')
-                self.engine_config.mode = ExecutionMode.REALTIME
+                self.engine_config.mode = ExecutionMode.STREAMING
 
             # Calculate frame deadline
             if self.config.frame_deadline_ms is None:
@@ -368,7 +368,7 @@ if __name__ == '__main__':
     # Load engine preset
     if args.preset == 'realtime':
         preset_config = get_preset('default')
-        preset_config.mode = ExecutionMode.REALTIME
+        preset_config.mode = ExecutionMode.STREAMING
         config.engine_config = preset_config.model_dump()
     else:
         config.engine_config = get_preset(args.preset).model_dump()

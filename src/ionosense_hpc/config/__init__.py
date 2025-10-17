@@ -7,7 +7,13 @@ This module exports the unified configuration API:
 - Validation: Input/config validation utilities
 """
 
-from .presets import compare_presets, describe_preset, get_preset, list_presets
+from .config_presets import (
+    compare_presets,
+    describe_preset,
+    get_preset,
+    list_executors,
+    list_presets,
+)
 from .schemas import (
     EngineConfig,
     ExecutionMode,
@@ -39,6 +45,7 @@ __all__ = [
     # Preset functions
     'get_preset',
     'list_presets',
+    'list_executors',
     'describe_preset',
     'compare_presets',
 

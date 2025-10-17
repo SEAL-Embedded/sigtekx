@@ -1,12 +1,13 @@
 /**
- * @file realtime_iono_engine.hpp
+ * @file antenna_engine.hpp
  * @version 0.9.3
- * @date 2025-10-09
+ * @date 2025-10-16
  * @author [Kevin Rahsaz]
  *
- * @brief Specialized engine for realtime ionosphere signal processing.
+ * @brief Specialized engine for ionosphere antenna system signal processing.
  *
- * This facade combines RealtimeExecutor with an ionosphere-optimized
+ * This facade provides a production-ready engine for the lab's ionosphere
+ * antenna system, combining StreamingExecutor with an ionosphere-optimized
  * pipeline for continuous HF signal analysis.
  */
 
@@ -33,14 +34,14 @@ struct IonosphereConfig : ExecutorConfig {
   bool enable_multipath_mitigation = false;
 
   /**
-   * @brief Creates a configuration optimized for realtime ionosphere
+   * @brief Creates a configuration optimized for streaming ionosphere
    * processing.
    * @param nfft FFT size (typically 2048-8192 for ionosphere work).
    * @param sample_rate Sample rate in Hz (e.g., 48000 for HF).
    * @return IonosphereConfig with optimal settings.
    */
-  static IonosphereConfig create_realtime(int nfft = 2048,
-                                          int sample_rate = 48000) {
+  static IonosphereConfig create_streaming(int nfft = 2048,
+                                           int sample_rate = 48000) {
     IonosphereConfig config;
     config.nfft = nfft;
     config.batch = 8;
@@ -48,7 +49,7 @@ struct IonosphereConfig : ExecutorConfig {
     config.sample_rate_hz = sample_rate;
     config.stream_count = 3;
     config.pinned_buffer_count = 2;
-    config.mode = ExecutionMode::LOW_LATENCY;
+    config.mode = ExecutionMode::STREAMING;
     config.max_inflight_batches = 2;
     return config;
   }
@@ -74,10 +75,10 @@ struct IonosphereConfig : ExecutorConfig {
 };
 
 /**
- * @class RealtimeIonoEngine
- * @brief Specialized engine for realtime ionosphere signal processing.
+ * @class AntennaEngine
+ * @brief Production engine for ionosphere antenna system signal processing.
  *
- * This engine is pre-configured for ionosphere analysis:
+ * This engine is pre-configured for ionosphere antenna system analysis:
  * - Blackman window for better sidelobe suppression
  * - Optimized overlap for time-frequency resolution
  * - Streaming execution with low latency
@@ -85,29 +86,29 @@ struct IonosphereConfig : ExecutorConfig {
  *
  * Example usage:
  * @code
- *   auto config = IonosphereConfig::create_realtime(2048, 48000);
- *   RealtimeIonoEngine engine(config);
+ *   auto config = IonosphereConfig::create_streaming(2048, 48000);
+ *   AntennaEngine engine(config);
  *   engine.process(hf_signal_data, output, num_samples);
  * @endcode
  */
-class RealtimeIonoEngine {
+class AntennaEngine {
  public:
   /**
    * @brief Constructs the engine with ionosphere-specific configuration.
    * @param config Ionosphere processing configuration.
    */
-  explicit RealtimeIonoEngine(const IonosphereConfig& config);
+  explicit AntennaEngine(const IonosphereConfig& config);
 
   /**
    * @brief Destructor.
    */
-  ~RealtimeIonoEngine();
+  ~AntennaEngine();
 
   // Disable copy, enable move
-  RealtimeIonoEngine(const RealtimeIonoEngine&) = delete;
-  RealtimeIonoEngine& operator=(const RealtimeIonoEngine&) = delete;
-  RealtimeIonoEngine(RealtimeIonoEngine&&) noexcept;
-  RealtimeIonoEngine& operator=(RealtimeIonoEngine&&) noexcept;
+  AntennaEngine(const AntennaEngine&) = delete;
+  AntennaEngine& operator=(const AntennaEngine&) = delete;
+  AntennaEngine(AntennaEngine&&) noexcept;
+  AntennaEngine& operator=(AntennaEngine&&) noexcept;
 
   /**
    * @brief Processes ionosphere signal data.

@@ -21,8 +21,7 @@ namespace ionosense {
  * @brief Configuration for pipeline executor behavior and resource management.
  *
  * Extends EngineConfig with executor-specific settings that control how the
- * pipeline is executed (batch vs streaming vs low-latency) and which
- * optimizations to apply.
+ * pipeline is executed (batch vs streaming) and which optimizations to apply.
  */
 struct ExecutorConfig : EngineConfig {
   /**
@@ -30,9 +29,8 @@ struct ExecutorConfig : EngineConfig {
    * @brief Defines the execution strategy for the pipeline.
    */
   enum class ExecutionMode {
-    BATCH,       ///< Process complete batches with maximum throughput
-    STREAMING,   ///< Continuous processing with input accumulation
-    LOW_LATENCY  ///< Minimize latency at the cost of some throughput
+    BATCH,      ///< Process complete batches with maximum throughput
+    STREAMING   ///< Continuous processing with low-latency via ring buffer
   };
 
   // --- Executor-Specific Settings ---
