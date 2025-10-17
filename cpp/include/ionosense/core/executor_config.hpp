@@ -29,8 +29,8 @@ struct ExecutorConfig : EngineConfig {
    * @brief Defines the execution strategy for the pipeline.
    */
   enum class ExecutionMode {
-    BATCH,      ///< Process complete batches with maximum throughput
-    STREAMING   ///< Continuous processing with low-latency via ring buffer
+    BATCH,     ///< Process complete batches with maximum throughput
+    STREAMING  ///< Continuous processing with low-latency via ring buffer
   };
 
   // --- Executor-Specific Settings ---

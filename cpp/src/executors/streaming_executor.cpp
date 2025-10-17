@@ -12,7 +12,8 @@
  * architectural placeholder to demonstrate the executor abstraction pattern.
  *
  * Full streaming features (ring buffers, input accumulation, overlap handling,
- * CUDA stream pipelining, background processing) will be implemented in v0.9.4+.
+ * CUDA stream pipelining, background processing) will be implemented in
+ * v0.9.4+.
  */
 
 #include "ionosense/executors/streaming_executor.hpp"

@@ -16,7 +16,10 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
+
+if TYPE_CHECKING:
+    from ionosense_hpc.utils.gpu_clocks import GpuClockManager
 
 import numpy as np
 import yaml  # type: ignore[import-untyped]
@@ -201,7 +204,7 @@ class BaseBenchmark(abc.ABC):
         self.config = config or BenchmarkConfig(name=self.__class__.__name__)
         self.context = BenchmarkContext()
         self.results: list[BenchmarkResult] = []
-        self.gpu_clock_manager = None
+        self.gpu_clock_manager: GpuClockManager | None = None
         self._setup_reproducibility()
 
     def _setup_reproducibility(self) -> None:

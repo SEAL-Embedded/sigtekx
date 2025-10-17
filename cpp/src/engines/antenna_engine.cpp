@@ -115,12 +115,8 @@ void AntennaEngine::synchronize() { pImpl->synchronize(); }
 
 void AntennaEngine::reset() { pImpl->reset(); }
 
-ProcessingStats AntennaEngine::get_stats() const {
-  return pImpl->get_stats();
-}
+ProcessingStats AntennaEngine::get_stats() const { return pImpl->get_stats(); }
 
-bool AntennaEngine::is_initialized() const {
-  return pImpl->is_initialized();
-}
+bool AntennaEngine::is_initialized() const { return pImpl->is_initialized(); }
 
 }  // namespace ionosense

@@ -167,7 +167,8 @@ class GpuClockManager:
             output = result.stdout.strip()
             if output and output.startswith('{'):
                 try:
-                    return json.loads(output)
+                    parsed: dict[str, Any] = json.loads(output)
+                    return parsed
                 except json.JSONDecodeError:
                     pass
 
