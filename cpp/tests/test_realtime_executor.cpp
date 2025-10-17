@@ -8,7 +8,7 @@
  *
  * Note: RealtimeExecutor is currently a stub that delegates to BatchExecutor.
  * These tests validate that the stub behaves correctly and clearly documents
- * current limitations until full streaming support is added in v0.10.0+.
+ * current limitations until full streaming support is added in v0.9.4+.
  */
 
 #include <gtest/gtest.h>
@@ -288,7 +288,7 @@ TEST_F(RealtimeExecutorTest, MoveAssignment) {
  * - Overlap handling for continuous streams
  * - Background processing with callbacks
  *
- * All of these will be added in v0.10.0+.
+ * All of these will be added in v0.9.4+.
  */
 TEST_F(RealtimeExecutorTest, DocumentedLimitations) {
   // This test exists to document limitations for reviewers and future devs
@@ -298,5 +298,5 @@ TEST_F(RealtimeExecutorTest, DocumentedLimitations) {
             << "  - Ring buffers\n"
             << "  - Input accumulation\n"
             << "  - Background processing\n"
-            << "\nFull implementation planned for v0.10.0+";
+            << "\nFull implementation planned for v0.9.4+";
 }

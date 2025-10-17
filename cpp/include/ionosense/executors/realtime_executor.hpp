@@ -26,7 +26,7 @@ namespace ionosense {
  * @warning **STUB IMPLEMENTATION (v0.9.3)**
  * This executor is currently a thin wrapper around BatchExecutor and does NOT
  * implement true streaming capabilities. It is provided as an architectural
- * placeholder for v0.10.0+ where full streaming features will be added.
+ * placeholder for v0.9.4+ where full streaming features will be added.
  *
  * **Current behavior:**
  * - Delegates all operations to BatchExecutor
@@ -42,7 +42,7 @@ namespace ionosense {
  * - Optional CUDA graph optimization for minimal overhead
  *
  * For now, use BatchExecutor directly for batch processing, or wait for
- * v0.10.0 for true realtime streaming support.
+ * v0.9.4 for true realtime streaming support.
  */
 class RealtimeExecutor : public IPipelineExecutor {
  public:

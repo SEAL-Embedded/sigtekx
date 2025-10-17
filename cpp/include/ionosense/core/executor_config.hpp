@@ -41,13 +41,13 @@ struct ExecutorConfig : EngineConfig {
   ExecutionMode mode = ExecutionMode::BATCH;
 
   /// Maximum number of batches that can be in-flight simultaneously
-  /// (used in streaming mode - deferred to v0.10.0+)
+  /// (used in streaming mode - deferred to v0.9.4+)
   int max_inflight_batches = 2;
 
   /// Device ID to use (defaults to best available)
   int device_id = -1;  // -1 means auto-select
 
-  // NOTE: prefer_cuda_graphs removed in v0.9.3 - deferred to v0.10.0+
+  // NOTE: prefer_cuda_graphs removed in v0.9.3 - deferred to v0.9.4+
   // CUDA graph optimization will be added when async/streaming features
   // are fully implemented.
 

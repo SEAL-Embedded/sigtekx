@@ -4,7 +4,7 @@
  * @date 2025-10-09
  * @author [Kevin Rahsaz]
  *
- * @brief Stub implementation of RealtimeExecutor (placeholder for v0.10.0+).
+ * @brief Stub implementation of RealtimeExecutor (placeholder for v0.9.4+).
  *
  * @warning **STUB IMPLEMENTATION**
  * This executor is currently a simple wrapper around BatchExecutor and does
