@@ -5,25 +5,28 @@ Policy:
 - Default derived artifacts under <repo>/artifacts so routine cleans preserve results.
 - Allow overrides via env vars for research workflows and CI.
 """
-
 from __future__ import annotations
 
 import os
 from datetime import datetime
 from pathlib import Path
+import pytest
 
 
 def _repo_root() -> Path:
-    """Best-effort project root (directory containing pyproject.toml)."""
-    cur = Path(__file__).resolve()
-    for parent in [cur] + list(cur.parents):
-        if (parent.parent / "pyproject.toml").exists():
-            return parent.parent
+
+    """Find project root by searching for pyproject.toml"""
+
+    path = Path(__file__).resolve()
+
+    for parent in [path] + list(path.parents):
         if (parent / "pyproject.toml").exists():
             return parent
-    # Fallback: two levels up from utils/
-    return Path(__file__).resolve().parents[3]
 
+    raise FileNotFoundError(
+        f"Project root not found: no project.toml in {path} or any parent directory. "
+        f"Set IONO_OUTPUT_ROOT environment  variable to override"
+    )
 
 def _sanitize_component(name: str) -> str:
     """Return a filesystem safe name limited to simple characters."""
