@@ -83,8 +83,8 @@ _PRESET_VARIANTS = {
     'iono': {
         'batch': EngineConfig(
             # Signal parameters - Ionosphere batch throughput
-            nfft=8192,  # Higher resolution for batch throughput
-            batch=16,   # Larger batch for efficiency
+            nfft=16384,  # Higher resolution for batch throughput
+            batch=32,    # Large batch for maximum efficiency
             overlap=0.75,
             sample_rate_hz=48000,
 
@@ -106,7 +106,7 @@ _PRESET_VARIANTS = {
         'streaming': EngineConfig(
             # Signal parameters - Ionosphere streaming latency
             nfft=4096,  # Lower NFFT for reduced latency
-            batch=8,    # Smaller batch for faster processing
+            batch=2,    # Minimal batch for lowest latency
             overlap=0.75,
             sample_rate_hz=48000,
 
@@ -153,7 +153,7 @@ _PRESET_VARIANTS = {
         'streaming': EngineConfig(
             # Signal parameters - Extreme ionosphere latency
             nfft=8192,  # Balanced for quality and latency
-            batch=16,   # Moderate batch size
+            batch=2,    # Minimal batch for lowest latency
             overlap=0.9,
             sample_rate_hz=48000,
 

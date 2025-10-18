@@ -19,7 +19,7 @@
 #include "ionosense/core/cuda_wrappers.hpp"
 #include "ionosense/core/processing_stage.hpp"  // for ProcessingStats definition
 #include "ionosense/core/profiling_macros.hpp"
-#include "ionosense/engines/research_engine.hpp"
+#include "ionosense/executors/batch_executor.hpp"
 
 using namespace ionosense;
 
@@ -32,7 +32,7 @@ static std::vector<float> generate_test_signal(int nfft, int batch) {
   return signal;
 }
 
-static void run_warmup(ResearchEngine& engine, int warmup_iters, int nfft,
+static void run_warmup(BatchExecutor& executor, int warmup_iters, int nfft,
                        int batch) {
   IONO_NVTX_RANGE("Warmup Phase", profiling::colors::LIGHT_GRAY);
   std::vector<float> warmup_input(static_cast<size_t>(nfft) * batch, 0.0f);
@@ -40,12 +40,12 @@ static void run_warmup(ResearchEngine& engine, int warmup_iters, int nfft,
   for (int i = 0; i < warmup_iters; ++i) {
     const std::string name = "Warmup " + std::to_string(i);
     IONO_NVTX_RANGE(name.c_str(), profiling::colors::LIGHT_GRAY);
-    engine.process(warmup_input.data(), warmup_output.data(),
-                   warmup_input.size());
+    executor.submit(warmup_input.data(), warmup_output.data(),
+                    warmup_input.size());
   }
   {
     IONO_NVTX_RANGE("Warmup Sync", profiling::colors::YELLOW);
-    engine.synchronize();
+    executor.synchronize();
   }
 }
 
@@ -60,9 +60,9 @@ TEST(NvtxProfilingTest, BenchmarkPhasesRun) {
   const int iterations = 20;
   const int warmup_iters = 5;
 
-  ResearchEngine engine;
+  BatchExecutor executor;
 
-  EngineConfig cfg;
+  ExecutorConfig cfg;
   cfg.nfft = nfft;
   cfg.batch = batch;
   cfg.overlap = 0.5f;
@@ -70,24 +70,18 @@ TEST(NvtxProfilingTest, BenchmarkPhasesRun) {
   cfg.stream_count = 3;
   cfg.pinned_buffer_count = 2;
   cfg.warmup_iters = 0;  // manual warmup below
-  cfg.enable_profiling = true;
+  cfg.mode = ExecutorConfig::ExecutionMode::BATCH;
+  cfg.device_id = -1;  // auto-select
 
   {
-    IONO_NVTX_RANGE("Engine Initialization", profiling::colors::DARK_GRAY);
-    EXPECT_NO_THROW(engine.initialize(cfg));
-    EXPECT_TRUE(engine.is_initialized());
-  }
-
-  // Runtime info (sanity)
-  {
-    IONO_NVTX_RANGE("Query Runtime Info", profiling::colors::CYAN);
-    auto info = engine.get_runtime_info();
-    EXPECT_FALSE(info.device_name.empty());
-    EXPECT_GT(info.cuda_runtime_version, 0);
+    IONO_NVTX_RANGE("Executor Initialization", profiling::colors::DARK_GRAY);
+    auto stages = StageFactory::create_default_pipeline();
+    EXPECT_NO_THROW(executor.initialize(cfg, std::move(stages)));
+    EXPECT_TRUE(executor.is_initialized());
   }
 
   // Warmup
-  run_warmup(engine, warmup_iters, nfft, batch);
+  run_warmup(executor, warmup_iters, nfft, batch);
 
   // Benchmark
   std::vector<float> input = generate_test_signal(nfft, batch);
@@ -102,7 +96,7 @@ TEST(NvtxProfilingTest, BenchmarkPhasesRun) {
       IONO_NVTX_RANGE(iter_name.c_str(), profiling::colors::NVIDIA_BLUE);
       auto t0 = std::chrono::high_resolution_clock::now();
       EXPECT_NO_THROW(
-          engine.process(input.data(), output.data(), input.size()));
+          executor.submit(input.data(), output.data(), input.size()));
       auto t1 = std::chrono::high_resolution_clock::now();
       latencies.push_back(
           std::chrono::duration<float, std::micro>(t1 - t0).count());
@@ -112,20 +106,20 @@ TEST(NvtxProfilingTest, BenchmarkPhasesRun) {
   // Sync and analyze
   {
     IONO_NVTX_RANGE("Results Analysis", profiling::colors::CYAN);
-    engine.synchronize();
+    executor.synchronize();
     ASSERT_EQ(latencies.size(), static_cast<size_t>(iterations));
     const float mean =
         std::accumulate(latencies.begin(), latencies.end(), 0.0f) /
         static_cast<float>(latencies.size());
     EXPECT_GT(mean, 0.0f);
-    const auto stats = engine.get_stats();
+    const auto stats = executor.get_stats();
     EXPECT_GT(stats.frames_processed, 0u);
   }
 
   // Cleanup
   {
     IONO_NVTX_RANGE("Cleanup Phase", profiling::colors::RED);
-    engine.reset();
-    EXPECT_FALSE(engine.is_initialized());
+    executor.reset();
+    EXPECT_FALSE(executor.is_initialized());
   }
 }

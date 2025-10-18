@@ -131,6 +131,17 @@ struct ProcessingStats {
 };
 
 /**
+ * @struct RuntimeInfo
+ * @brief Runtime device and platform information.
+ */
+struct RuntimeInfo {
+  std::string device_name;         ///< CUDA device name
+  std::string cuda_version;        ///< CUDA runtime version string
+  int cuda_runtime_version = 0;    ///< CUDA runtime version (integer)
+  int cuda_driver_version = 0;     ///< CUDA driver version (integer)
+};
+
+/**
  * @class IProcessingStage
  * @brief Abstract base class for a stage in the processing pipeline (Strategy
  * Pattern).

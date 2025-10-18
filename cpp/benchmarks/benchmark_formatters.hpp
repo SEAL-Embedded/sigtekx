@@ -15,7 +15,7 @@
 #include "benchmark_config.hpp"
 #include "benchmark_persistence.hpp"
 #include "benchmark_results.hpp"
-#include "ionosense/engines/research_engine.hpp"
+#include "ionosense/executors/batch_executor.hpp"
 
 namespace ionosense {
 namespace benchmark {

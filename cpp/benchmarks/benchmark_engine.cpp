@@ -42,14 +42,42 @@
 #include "reference_compute.hpp"
 #include "signal_generator.hpp"
 
-// Engine and core functionality
+// Executor and core functionality
 #include "ionosense/core/cuda_wrappers.hpp"
 #include "ionosense/core/processing_stage.hpp"
 #include "ionosense/core/profiling_macros.hpp"
-#include "ionosense/engines/research_engine.hpp"
+#include "ionosense/executors/batch_executor.hpp"
+#include "ionosense/executors/streaming_executor.hpp"
 
 using namespace ionosense;
 using namespace ionosense::benchmark;
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+static RuntimeInfo get_cuda_runtime_info() {
+  RuntimeInfo info;
+
+  cudaDeviceProp prop;
+  cudaGetDeviceProperties(&prop, 0);
+  info.device_name = prop.name;
+
+  int runtime_version = 0;
+  cudaRuntimeGetVersion(&runtime_version);
+  info.cuda_runtime_version = runtime_version;
+
+  int driver_version = 0;
+  cudaDriverGetVersion(&driver_version);
+  info.cuda_driver_version = driver_version;
+
+  char version_str[64];
+  snprintf(version_str, sizeof(version_str), "%d.%d",
+           runtime_version / 1000, (runtime_version % 100) / 10);
+  info.cuda_version = version_str;
+
+  return info;
+}
 
 // ============================================================================
 // Main
@@ -83,31 +111,33 @@ int main(int argc, char* argv[]) {
                 << " | Overlap: " << config.overlap << "\n\n";
     }
 
-    // Initialize engine
-    ResearchEngine engine;
-    EngineConfig engine_config;
-    engine_config.nfft = config.nfft;
-    engine_config.batch = config.batch;
-    engine_config.overlap = config.overlap;
-    engine_config.sample_rate_hz = config.sample_rate_hz;
-    engine_config.stream_count = config.stream_count;
-    engine_config.pinned_buffer_count = config.pinned_buffer_count;
-    engine_config.warmup_iters = 0;  // Manual warmup
-    engine_config.enable_profiling = true;
+    // Initialize executor (BatchExecutor for now)
+    BatchExecutor executor;
+    ExecutorConfig executor_config;
+    executor_config.nfft = config.nfft;
+    executor_config.batch = config.batch;
+    executor_config.overlap = config.overlap;
+    executor_config.sample_rate_hz = config.sample_rate_hz;
+    executor_config.stream_count = config.stream_count;
+    executor_config.pinned_buffer_count = config.pinned_buffer_count;
+    executor_config.warmup_iters = 0;  // Manual warmup
+    executor_config.mode = ExecutorConfig::ExecutionMode::BATCH;
+    executor_config.device_id = -1;  // Auto-select
 
     {
-      IONO_NVTX_RANGE("Engine Initialization", profiling::colors::DARK_GRAY);
-      engine.initialize(engine_config);
+      IONO_NVTX_RANGE("Executor Initialization", profiling::colors::DARK_GRAY);
+      auto stages = StageFactory::create_default_pipeline();
+      executor.initialize(executor_config, std::move(stages));
     }
 
-    RuntimeInfo runtime_info = engine.get_runtime_info();
+    RuntimeInfo runtime_info = get_cuda_runtime_info();
 
     // Warmup
     if (!config.quiet && config.warmup_iterations > 0) {
       std::cout << "Warmup (" << config.warmup_iterations << " iterations)...\n";
     }
     if (config.warmup_iterations > 0) {
-      run_warmup(engine, config);
+      run_warmup(executor, config);
     }
 
     // Run benchmark based on preset
@@ -118,7 +148,7 @@ int main(int argc, char* argv[]) {
     switch (config.preset) {
       case BenchmarkPreset::LATENCY:
       case BenchmarkPreset::DEV: {
-        auto results = run_latency_benchmark(engine, config);
+        auto results = run_latency_benchmark(executor, config);
         print_latency_results(config, results, runtime_info);
 
         // Save baseline if requested
@@ -132,7 +162,7 @@ int main(int argc, char* argv[]) {
       }
 
       case BenchmarkPreset::THROUGHPUT: {
-        auto results = run_throughput_benchmark(engine, config);
+        auto results = run_throughput_benchmark(executor, config);
         print_throughput_results(config, results, runtime_info);
 
         // Save baseline if requested
@@ -146,7 +176,7 @@ int main(int argc, char* argv[]) {
       }
 
       case BenchmarkPreset::REALTIME: {
-        auto results = run_realtime_benchmark(engine, config);
+        auto results = run_realtime_benchmark(executor, config);
         print_realtime_results(config, results, runtime_info);
 
         // Save baseline if requested
@@ -160,7 +190,7 @@ int main(int argc, char* argv[]) {
       }
 
       case BenchmarkPreset::ACCURACY: {
-        auto results = run_accuracy_benchmark(engine, config);
+        auto results = run_accuracy_benchmark(executor, config);
         print_accuracy_results(config, results, runtime_info);
 
         // Save baseline if requested
@@ -177,7 +207,7 @@ int main(int argc, char* argv[]) {
     // Cleanup
     {
       IONO_NVTX_RANGE("Cleanup", profiling::colors::RED);
-      engine.reset();
+      executor.reset();
     }
 
     return 0;

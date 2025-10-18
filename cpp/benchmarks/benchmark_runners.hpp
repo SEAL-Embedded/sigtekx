@@ -20,7 +20,7 @@
 #include "reference_compute.hpp"
 #include "signal_generator.hpp"
 #include "ionosense/core/profiling_macros.hpp"
-#include "ionosense/engines/research_engine.hpp"
+#include "ionosense/executors/batch_executor.hpp"
 
 namespace ionosense {
 namespace benchmark {
@@ -32,10 +32,10 @@ namespace benchmark {
 /**
  * @brief Run warmup iterations to stabilize GPU state.
  *
- * @param engine ResearchEngine instance
+ * @param executor BatchExecutor instance
  * @param config Benchmark configuration
  */
-inline void run_warmup(ResearchEngine& engine, const BenchmarkConfig& config) {
+inline void run_warmup(BatchExecutor& executor, const BenchmarkConfig& config) {
   IONO_NVTX_RANGE("Warmup Phase", profiling::colors::LIGHT_GRAY);
 
   std::vector<float> warmup_input(static_cast<size_t>(config.nfft) *
@@ -46,13 +46,13 @@ inline void run_warmup(ResearchEngine& engine, const BenchmarkConfig& config) {
   for (int i = 0; i < config.warmup_iterations; ++i) {
     const std::string name = "Warmup " + std::to_string(i);
     IONO_NVTX_RANGE(name.c_str(), profiling::colors::LIGHT_GRAY);
-    engine.process(warmup_input.data(), warmup_output.data(),
-                   warmup_input.size());
+    executor.submit(warmup_input.data(), warmup_output.data(),
+                    warmup_input.size());
   }
 
   {
     IONO_NVTX_RANGE("Warmup Sync", profiling::colors::YELLOW);
-    engine.synchronize();
+    executor.synchronize();
   }
 }
 
@@ -66,11 +66,11 @@ inline void run_warmup(ResearchEngine& engine, const BenchmarkConfig& config) {
  * Measures per-iteration latency statistics including mean, percentiles,
  * and standard deviation.
  *
- * @param engine ResearchEngine instance
+ * @param executor BatchExecutor instance
  * @param config Benchmark configuration
  * @return LatencyResults with all computed statistics
  */
-inline LatencyResults run_latency_benchmark(ResearchEngine& engine,
+inline LatencyResults run_latency_benchmark(BatchExecutor& executor,
                                              const BenchmarkConfig& config) {
   IONO_NVTX_RANGE("Latency Benchmark", profiling::colors::NVIDIA_BLUE);
 
@@ -99,7 +99,7 @@ inline LatencyResults run_latency_benchmark(ResearchEngine& engine,
     // Use CUDA events to measure GPU execution time directly
     // This eliminates CPU-side timing overhead and OS scheduler noise
     cudaEventRecord(start_event);
-    engine.process(input.data(), output.data(), input_size);
+    executor.submit(input.data(), output.data(), input_size);
     cudaEventRecord(stop_event);
     cudaEventSynchronize(stop_event);  // Wait for GPU work to complete
 
@@ -190,7 +190,7 @@ inline LatencyResults run_latency_benchmark(ResearchEngine& engine,
   }
 
   // Get throughput from engine stats
-  auto stats = engine.get_stats();
+  auto stats = executor.get_stats();
   results.throughput_gbps = stats.throughput_gbps;
   results.frames_processed = stats.frames_processed;
 
@@ -211,7 +211,7 @@ inline LatencyResults run_latency_benchmark(ResearchEngine& engine,
  * @param config Benchmark configuration
  * @return ThroughputResults with all computed metrics
  */
-inline ThroughputResults run_throughput_benchmark(ResearchEngine& engine,
+inline ThroughputResults run_throughput_benchmark(BatchExecutor& executor,
                                                    const BenchmarkConfig& config) {
   IONO_NVTX_RANGE("Throughput Benchmark", profiling::colors::GREEN);
 
@@ -234,11 +234,11 @@ inline ThroughputResults run_throughput_benchmark(ResearchEngine& engine,
     const std::string iter_name = "Frame " + std::to_string(frame_count + 1);
     IONO_NVTX_RANGE(iter_name.c_str(), profiling::colors::GREEN);
 
-    engine.process(input.data(), output.data(), input_size);
+    executor.submit(input.data(), output.data(), input_size);
     frame_count++;
   }
 
-  engine.synchronize();
+  executor.synchronize();
   auto actual_end = std::chrono::high_resolution_clock::now();
 
   float actual_duration =
@@ -272,7 +272,7 @@ inline ThroughputResults run_throughput_benchmark(ResearchEngine& engine,
  * @param config Benchmark configuration
  * @return RealtimeResults with all computed metrics
  */
-inline RealtimeResults run_realtime_benchmark(ResearchEngine& engine,
+inline RealtimeResults run_realtime_benchmark(BatchExecutor& executor,
                                                const BenchmarkConfig& config) {
   IONO_NVTX_RANGE("Realtime Benchmark", profiling::colors::ORANGE);
 
@@ -310,8 +310,8 @@ inline RealtimeResults run_realtime_benchmark(ResearchEngine& engine,
     // For high-frequency measurements (>5000 FPS), CPU timing provides better
     // stability than CUDA events due to lower per-frame overhead
     auto frame_start = std::chrono::high_resolution_clock::now();
-    engine.process(input.data(), output.data(), input_size);
-    engine.synchronize();
+    executor.submit(input.data(), output.data(), input_size);
+    executor.synchronize();
     auto frame_end = std::chrono::high_resolution_clock::now();
 
     float frame_latency_ms =
@@ -391,7 +391,7 @@ inline RealtimeResults run_realtime_benchmark(ResearchEngine& engine,
  * @param config Benchmark configuration
  * @return AccuracyResults with pass/fail based on numerical agreement
  */
-inline AccuracyResults run_accuracy_benchmark(ResearchEngine& engine,
+inline AccuracyResults run_accuracy_benchmark(BatchExecutor& executor,
                                                const BenchmarkConfig& config) {
   IONO_NVTX_RANGE("Accuracy Benchmark", profiling::colors::PURPLE);
 
@@ -411,8 +411,8 @@ inline AccuracyResults run_accuracy_benchmark(ResearchEngine& engine,
     std::vector<float> output(output_size);
 
     // Run engine processing
-    engine.process(input.data(), output.data(), input_size);
-    engine.synchronize();
+    executor.submit(input.data(), output.data(), input_size);
+    executor.synchronize();
 
     // Compute reference that EXACTLY matches pipeline
     std::vector<float> reference = compute_pipeline_reference(

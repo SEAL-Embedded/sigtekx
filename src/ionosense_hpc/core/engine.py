@@ -256,7 +256,7 @@ class Engine:
         )
 
     def _initialize(self) -> None:
-        """Initialize GPU resources and C++ engine."""
+        """Initialize GPU resources and C++ executor."""
         if self._initialized:
             return
 
@@ -267,17 +267,23 @@ class Engine:
             )
 
         try:
-            # Create C++ engine (always use ResearchEngine for now)
-            self._cpp_engine = self._cpp_module.ResearchEngine()
+            # Create appropriate executor based on execution mode
+            if self._config.mode == ExecutionMode.BATCH:
+                self._cpp_engine = self._cpp_module.BatchExecutor()
+            elif self._config.mode == ExecutionMode.STREAMING:
+                self._cpp_engine = self._cpp_module.StreamingExecutor()
+            else:
+                raise ValueError(f"Unknown execution mode: {self._config.mode}")
 
-            # Convert Python config to C++ EngineConfig
-            cpp_config = self._cpp_module.EngineConfig()
+            # Convert Python config to C++ ExecutorConfig
+            cpp_config = self._cpp_module.ExecutorConfig()
 
             # Map Python config to C++ config
-            # Copy all fields that exist in C++ EngineConfig
+            # Copy all fields that exist in C++ ExecutorConfig (extends EngineConfig)
             cpp_fields = {
                 'nfft', 'batch', 'overlap', 'sample_rate_hz',
-                'stream_count', 'pinned_buffer_count', 'warmup_iters'
+                'stream_count', 'pinned_buffer_count', 'warmup_iters',
+                'device_id'
             }
 
             for key in cpp_fields:
@@ -311,7 +317,12 @@ class Engine:
                 output_map = {'magnitude': 0, 'complex': 1, 'complex_passthrough': 1}
                 cpp_config.output_mode = output_map.get(self._config.output.value, 0)
 
-            # Initialize C++ engine
+            # ExecutionMode: BATCH=0, STREAMING=1
+            if hasattr(self._config, 'mode'):
+                mode_map = {'batch': 0, 'streaming': 1}
+                cpp_config.mode = mode_map.get(self._config.mode.value, 0)
+
+            # Initialize C++ executor
             self._cpp_engine.initialize(cpp_config)
             self._initialized = True
 

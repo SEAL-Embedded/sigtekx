@@ -1,15 +1,15 @@
 /**
  * @file bindings.cpp
- * @version 0.1.0
- * @date 2025-09-01
+ * @version 0.9.3
+ * @date 2025-10-17
  * @author [Kevin Rahsaz]
  *
- * @brief pybind11 wrappers to expose the C++ ResearchEngine to Python.
+ * @brief pybind11 wrappers to expose C++ executors to Python.
  *
- * This file creates the Python module `_engine` and provides bindings for the
- * core C++ classes and functions. It includes a Python-friendly wrapper class,
- * `PyResearchEngine`, to handle conversions between NumPy arrays and C++
- * pointers, enabling efficient, zero-copy data exchange where possible.
+ * This file creates the Python module `_engine` and provides bindings for
+ * the pipeline executor architecture. It includes Python-friendly wrapper
+ * classes to handle conversions between NumPy arrays and C++ pointers,
+ * enabling efficient, zero-copy data exchange where possible.
  */
 
 #include <pybind11/numpy.h>
@@ -18,40 +18,48 @@
 
 #include <sstream>
 
+#include "ionosense/core/executor_config.hpp"
+#include "ionosense/core/pipeline_executor.hpp"
 #include "ionosense/core/processing_stage.hpp"
-#include "ionosense/engines/research_engine.hpp"
+#include "ionosense/executors/batch_executor.hpp"
+#include "ionosense/executors/streaming_executor.hpp"
 
 namespace py = pybind11;
 namespace ionosense {
 
 /**
- * @class PyResearchEngine
- * @brief A Python-facing wrapper for the C++ ResearchEngine.
+ * @class PyExecutor
+ * @brief A Python-facing wrapper template for C++ executors.
  *
- * This class adapts the C++ engine's pointer-based API to a more Pythonic,
+ * This class adapts the C++ executor's pointer-based API to a more Pythonic,
  * NumPy-based interface. It manages input/output buffers and validates array
  * shapes and sizes to provide a safe and convenient API for Python users.
  */
-class PyResearchEngine {
+template <typename ExecutorType>
+class PyExecutor {
  public:
   /**
-   * @brief Constructs the Python wrapper and the underlying C++ engine.
+   * @brief Constructs the Python wrapper and the underlying C++ executor.
    */
-  PyResearchEngine() : engine_(std::make_unique<ResearchEngine>()) {}
+  PyExecutor() : executor_(std::make_unique<ExecutorType>()) {}
 
   /**
-   * @brief Initializes the engine and pre-allocates Python-side buffers.
-   * @param config The engine configuration.
+   * @brief Initializes the executor and pre-allocates Python-side buffers.
+   * @param config The executor configuration.
    */
-  void initialize(const EngineConfig& config) {
-    engine_->initialize(config);
+  void initialize(const ExecutorConfig& config) {
+    // Create default pipeline stages
+    auto stages = StageFactory::create_default_pipeline();
+
+    // Initialize executor with config and stages
+    executor_->initialize(config, std::move(stages));
     config_ = config;
     output_buffer_.resize(config.num_output_bins() * config.batch);
   }
 
   /**
    * @brief Processes a NumPy array.
-   * @param input A 1D or 2D NumPy array of floats.
+   * @param input A 1D NumPy array of floats.
    * @return A 2D NumPy array containing the magnitude spectra.
    * @throws std::runtime_error if input dimensions or size are incorrect.
    */
@@ -69,7 +77,7 @@ class PyResearchEngine {
       throw std::runtime_error(oss.str());
     }
 
-    engine_->process(input.data(), output_buffer_.data(), expected_size);
+    executor_->submit(input.data(), output_buffer_.data(), expected_size);
 
     // Return a copy of the output buffer, reshaped for Python.
     return py::array(py::buffer_info(
@@ -80,29 +88,30 @@ class PyResearchEngine {
         {sizeof(float) * config_.num_output_bins(), sizeof(float)}));
   }
 
-  /** @brief Resets the engine to an uninitialized state. */
-  void reset() { engine_->reset(); }
+  /** @brief Resets the executor to an uninitialized state. */
+  void reset() { executor_->reset(); }
 
-  /** @brief Synchronizes all CUDA streams in the engine. */
-  void synchronize() { engine_->synchronize(); }
+  /** @brief Synchronizes all CUDA streams. */
+  void synchronize() { executor_->synchronize(); }
 
   /** @brief Gets the latest processing statistics. */
-  ProcessingStats get_stats() const { return engine_->get_stats(); }
+  ProcessingStats get_stats() const { return executor_->get_stats(); }
 
-  /** @brief Gets runtime information about the CUDA environment. */
-  RuntimeInfo get_runtime_info() const { return engine_->get_runtime_info(); }
+  /** @brief Checks if the executor has been initialized. */
+  bool is_initialized() const { return executor_->is_initialized(); }
 
-  /** @brief Checks if the engine has been initialized. */
-  bool is_initialized() const { return engine_->is_initialized(); }
-
-  /** @brief Gets the current engine configuration. */
-  EngineConfig get_config() const { return config_; }
+  /** @brief Gets the current executor configuration. */
+  ExecutorConfig get_config() const { return config_; }
 
  private:
-  std::unique_ptr<ResearchEngine> engine_;
-  EngineConfig config_;
+  std::unique_ptr<ExecutorType> executor_;
+  ExecutorConfig config_;
   std::vector<float> output_buffer_;
 };
+
+// Type aliases for Python bindings
+using PyBatchExecutor = PyExecutor<BatchExecutor>;
+using PyStreamingExecutor = PyExecutor<StreamingExecutor>;
 
 }  // namespace ionosense
 
@@ -119,24 +128,27 @@ PYBIND11_MODULE(_engine, m) {
         This module provides high-performance CUDA-accelerated signal processing
         with a composable pipeline/executor architecture.
 
-        Architecture (v0.9.3 - cpp-abs):
-        - PipelineBuilder: Construct processing pipelines from stages
+        Architecture (v0.9.3 - executor-direct):
         - BatchExecutor: High-throughput batch processing
-        - StreamingExecutor: Placeholder for streaming (v0.9.4+)
+        - StreamingExecutor: Low-latency streaming (stub in v0.9.3)
+        - ExecutorConfig: Unified configuration with execution mode
+        - StageFactory: Pipeline stage construction
 
         Key classes:
-        - ResearchEngine: Main user-facing engine (wrapper over executors)
-        - ExecutorConfig: Configuration for pipeline executors
-        - EngineConfig: Base configuration for signal processing
+        - BatchExecutor: Direct batch executor (no facade)
+        - StreamingExecutor: Direct streaming executor (no facade)
+        - ExecutorConfig: Configuration with mode-aware presets
+        - StageConfig: Per-stage configuration
 
         Example:
             >>> import _engine
-            >>> config = _engine.EngineConfig()
+            >>> config = _engine.ExecutorConfig()
             >>> config.nfft = 1024
             >>> config.batch = 4
-            >>> engine = _engine.ResearchEngine()
-            >>> engine.initialize(config)
-            >>> output = engine.process(input_data)
+            >>> config.mode = _engine.ExecutionMode.BATCH
+            >>> executor = _engine.BatchExecutor()
+            >>> executor.initialize(config)
+            >>> output = executor.process(input_data)
     )pbdoc";
 
   // --- Bind Enums for StageConfig ---
@@ -256,26 +268,42 @@ PYBIND11_MODULE(_engine, m) {
       .def_readonly("frames_processed",
                     &ionosense::ProcessingStats::frames_processed);
 
-  py::class_<ionosense::RuntimeInfo>(m, "RuntimeInfo")
-      .def_readonly("device_name", &ionosense::RuntimeInfo::device_name)
-      .def_readonly("cuda_version", &ionosense::RuntimeInfo::cuda_version);
-
-  // --- Bind the Main Engine Wrapper Class ---
-  py::class_<ionosense::PyResearchEngine>(m, "ResearchEngine")
+  // --- Bind Executor Classes ---
+  py::class_<ionosense::PyBatchExecutor>(
+      m, "BatchExecutor",
+      "High-throughput batch executor for processing complete batches")
       .def(py::init<>())
-      .def("initialize", &ionosense::PyResearchEngine::initialize,
-           py::arg("config"), "Initializes the engine.")
-      .def("process", &ionosense::PyResearchEngine::process, py::arg("input"),
-           "Processes a batch of data.")
-      .def("reset", &ionosense::PyResearchEngine::reset, "Resets the engine.")
-      .def("synchronize", &ionosense::PyResearchEngine::synchronize,
+      .def("initialize", &ionosense::PyBatchExecutor::initialize,
+           py::arg("config"), "Initializes the executor with configuration.")
+      .def("process", &ionosense::PyBatchExecutor::process, py::arg("input"),
+           "Processes a batch of input data.")
+      .def("reset", &ionosense::PyBatchExecutor::reset,
+           "Resets the executor to uninitialized state.")
+      .def("synchronize", &ionosense::PyBatchExecutor::synchronize,
            "Synchronizes all CUDA streams.")
-      .def("get_stats", &ionosense::PyResearchEngine::get_stats,
-           "Gets performance statistics.")
-      .def("get_runtime_info", &ionosense::PyResearchEngine::get_runtime_info,
-           "Gets CUDA runtime info.")
+      .def("get_stats", &ionosense::PyBatchExecutor::get_stats,
+           "Gets performance statistics from last operation.")
       .def_property_readonly("is_initialized",
-                             &ionosense::PyResearchEngine::is_initialized);
+                             &ionosense::PyBatchExecutor::is_initialized,
+                             "Check if executor is initialized.");
+
+  py::class_<ionosense::PyStreamingExecutor>(
+      m, "StreamingExecutor",
+      "Low-latency streaming executor (stub in v0.9.3)")
+      .def(py::init<>())
+      .def("initialize", &ionosense::PyStreamingExecutor::initialize,
+           py::arg("config"), "Initializes the executor with configuration.")
+      .def("process", &ionosense::PyStreamingExecutor::process,
+           py::arg("input"), "Processes a batch of input data.")
+      .def("reset", &ionosense::PyStreamingExecutor::reset,
+           "Resets the executor to uninitialized state.")
+      .def("synchronize", &ionosense::PyStreamingExecutor::synchronize,
+           "Synchronizes all CUDA streams.")
+      .def("get_stats", &ionosense::PyStreamingExecutor::get_stats,
+           "Gets performance statistics from last operation.")
+      .def_property_readonly("is_initialized",
+                             &ionosense::PyStreamingExecutor::is_initialized,
+                             "Check if executor is initialized.");
 
   // --- Bind Utility Functions ---
   m.def("get_available_devices",

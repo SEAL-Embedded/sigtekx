@@ -162,10 +162,6 @@ add_library(ion_engine OBJECT
     # Executors
     cpp/src/executors/batch_executor.cpp
     cpp/src/executors/streaming_executor.cpp
-
-    # Engines
-    cpp/src/engines/research_engine.cpp
-    cpp/src/engines/antenna_engine.cpp
 )
 target_include_directories(ion_engine PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/cpp/include
