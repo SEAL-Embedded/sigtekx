@@ -20,6 +20,7 @@ Comprehensive documentation for the ionosense-hpc CUDA-accelerated FFT processin
 - [Architecture Overview](architecture/overview.md) - System design and components
 - [Project Structure](architecture/project-structure.md) - Codebase organization
 - [Python Package Structure](architecture/python-package-structure.md) - Python package reading order
+- **[Thread Safety](architecture/thread-safety.md)** - Multi-threading guide and thread safety guarantees
 - [Architecture Diagrams](architecture/diagrams/) - Visual system documentation
 
 ### Performance & Optimization
@@ -30,6 +31,7 @@ Comprehensive documentation for the ionosense-hpc CUDA-accelerated FFT processin
 ### Technical Notes
 - [IEEE754 Compliance](technical-notes/ieee754-compliance.md) - Floating-point accuracy validation
 - [Buffer Synchronization Fix](technical-notes/buffer-synchronization-fix.md) - Multi-buffer pipeline synchronization
+- [Thread Safety Audit v0.9.3](technical-notes/thread-safety-audit-v0.9.3.md) - Comprehensive thread safety analysis
 
 ---
 
@@ -43,7 +45,8 @@ Comprehensive documentation for the ionosense-hpc CUDA-accelerated FFT processin
 ### For Contributors
 1. [Development Guide](guides/development.md)
 2. [Architecture Overview](architecture/overview.md)
-3. [Contributing Guidelines](guides/contributing.md)
+3. [Thread Safety](architecture/thread-safety.md)
+4. [Contributing Guidelines](guides/contributing.md)
 
 ### For Performance Optimization
 1. **[Stability Improvements](performance/stability-improvements.md)** - Start here!
@@ -92,6 +95,7 @@ System design, structure, and visual documentation.
 - High-level architecture
 - Component interactions
 - Codebase organization
+- **Thread safety and multi-threading**
 - Visual diagrams
 
 **Files**: `architecture/`
@@ -122,6 +126,7 @@ Detailed technical documentation on specific features and fixes.
 **Key Topics**:
 - IEEE754 compliance validation
 - Buffer synchronization patterns
+- **Thread safety audit and analysis**
 - Architecture decisions
 - Implementation details
 
@@ -188,6 +193,7 @@ See [Stability Improvements](performance/stability-improvements.md) for full sto
 - **API Usage** → `guides/api-reference.md`
 - **Benchmarking** → `guides/benchmarking.md` or `performance/`
 - **Performance** → `performance/stability-improvements.md` (start here!)
+- **Thread Safety** → `architecture/thread-safety.md`
 - **Architecture** → `architecture/overview.md`
 - **Contributing** → `guides/contributing.md`
 
@@ -207,9 +213,11 @@ See [Stability Improvements](performance/stability-improvements.md) for full sto
 
 ## 📝 Documentation Maintenance
 
-**Last Updated**: 2025-10-15
+**Last Updated**: 2025-10-17
 
 **Recent Changes**:
+- ✅ Added comprehensive thread safety documentation (v0.9.3)
+- ✅ Added thread safety audit report with Google terminology
 - ✅ Reorganized into category-based structure
 - ✅ Added stability-improvements.md executive summary
 - ✅ Updated gpu-clock-locking.md with validated results (CV=18.72%)
