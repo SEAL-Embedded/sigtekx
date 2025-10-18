@@ -1,8 +1,8 @@
 # Ionosense HPC - Architecture Documentation
 
-**Version:** 0.9.2  
-**Status:** Research Ready  
-**Last Updated:** September 2025
+**Version:** 0.9.3
+**Status:** Research Ready
+**Last Updated:** October 2025
 
 ---
 
@@ -78,14 +78,14 @@ The platform serves three primary research applications:
 The system is organized into distinct architectural layers:
 
 #### **Python Bindings Layer**
-- `PyResearchEngine`: Python wrapper providing NumPy integration
 - `pybind11 Module`: Zero-copy interface between Python and C++
+- Direct executor bindings: `BatchExecutor`, `StreamingExecutor`
 
-#### **C++ Public API**
-- `ResearchEngine`: Main engine facade (Pimpl pattern)
-- `Engine Factory`: Factory for creating configured engines
-- `Configuration`: Type-safe configuration management
-- `Statistics`: Performance metrics collection
+#### **C++ Executor API (v0.9.3)**
+- `BatchExecutor`: High-throughput batch processing executor
+- `StreamingExecutor`: Low-latency streaming executor
+- `ExecutorConfig`: Unified configuration management
+- `ProcessingStats`: Performance metrics collection
 
 #### **Processing Pipeline**
 - `Window Stage`: Windowing functions (Hann, Hamming, etc.)

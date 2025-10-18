@@ -33,10 +33,10 @@ Ionosense-HPC provides a Python interface to a high-performance CUDA-based signa
 │  ├── Benchmark Framework (Latency/Throughput/Accuracy)  │
 │  └── Utilities (Signals, Device, Profiling)             │
 │  ↓                                                       │
-│  C++ Backend (ResearchEngine via pybind11)              │
-│  ├── Async Processing Pipeline (3 CUDA streams)         │
-│  ├── RAII Resource Management                           │
-│  └── Optimized CUDA Kernels                             │
+│  C++ Backend (BatchExecutor/StreamingExecutor pybind11) │
+│  ├── Direct Executor Interface (no facade layer)        │
+│  ├── Async Processing Pipeline (multi-stream)           │
+│  └── Optimized CUDA Kernels (STFT pipeline)             │
 │  ↓                                                       │
 │  GPU (CUDA FFT + Custom Kernels)                        │
 │  ↓                                                       │

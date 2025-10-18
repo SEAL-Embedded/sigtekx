@@ -39,10 +39,10 @@ from ionosense_hpc import Engine
 # Use default configuration (1024 FFT, 0.5 overlap)
 engine = Engine(preset='default')
 
-# Use ionosphere configuration (4096 FFT, 0.75 overlap, Blackman window)
+# Use ionosphere configuration (16384 FFT batch / 4096 streaming, 0.75 overlap, Blackman window)
 engine = Engine(preset='iono')
 
-# Use extreme ionosphere configuration (8192 FFT, 0.9 overlap)
+# Use extreme ionosphere configuration (32768 FFT batch / 8192 streaming, 0.9375 overlap)
 engine = Engine(preset='ionox')
 
 # Override specific parameters
@@ -115,24 +115,39 @@ Engine(
 
 #### Available Presets
 
+Presets adapt their parameters based on execution mode for optimal performance:
+
+**Batch Mode (default)** - Optimized for high throughput:
+
 | Preset | NFFT | Batch | Overlap | Window | Description |
 |--------|------|-------|---------|--------|-------------|
 | `default` | 1024 | 2 | 0.5 | Hann | General-purpose signal processing |
-| `iono` | 4096 | 8 | 0.75 | Blackman | Ionosphere scintillation research |
-| `ionox` | 8192 | 16 | 0.9 | Blackman | Extreme ionosphere (ULF/VLF, missile detection) |
+| `iono` | 16384 | 32 | 0.75 | Blackman | Ionosphere scintillation research (high resolution) |
+| `ionox` | 32768 | 32 | 0.9375 | Blackman | Extreme ionosphere (ULF/VLF, missile detection) |
+
+**Streaming Mode** - Optimized for low latency:
+
+| Preset | NFFT | Batch | Overlap | Window | Description |
+|--------|------|-------|---------|--------|-------------|
+| `default` | 1024 | 2 | 0.5 | Hann | General-purpose signal processing |
+| `iono` | 4096 | 2 | 0.75 | Blackman | Ionosphere scintillation research (low latency) |
+| `ionox` | 8192 | 2 | 0.9 | Blackman | Extreme ionosphere (balanced quality/latency) |
 
 Use preset functions for more control:
 
 ```python
 from ionosense_hpc.config import get_preset, list_presets, describe_preset, compare_presets
 
-# Get preset configuration
-config = get_preset('iono')
+# Get preset configuration (defaults to batch executor variant)
+config = get_preset('iono')  # 16384 NFFT, 32 batch (high throughput)
+
+# Get streaming variant for low latency
+config = get_preset('iono', executor='streaming')  # 4096 NFFT, 2 batch (low latency)
 
 # List all available presets
 presets = list_presets()  # Returns ['default', 'iono', 'ionox']
 
-# Get detailed preset information
+# Get detailed preset information (shows both variants)
 info = describe_preset('iono')
 
 # Compare multiple presets
@@ -252,14 +267,17 @@ print(config.memory_estimate_mb)    # Estimated GPU memory usage
 #### Factory Method
 
 ```python
-# Create from preset with overrides
-config = EngineConfig.from_preset('iono', nfft=8192, overlap=0.875)
+# Create from preset with overrides (gets batch variant by default)
+config = EngineConfig.from_preset('iono', nfft=32768, overlap=0.875)
 
-# Apply execution mode override
-config = EngineConfig.from_preset('iono', mode='streaming')
+# Apply execution mode override (automatically selects streaming variant)
+config = EngineConfig.from_preset('iono', mode='streaming')  # 4096 NFFT, 2 batch
 
 # Combine mode override with parameter overrides
 config = EngineConfig.from_preset('iono', mode='streaming', batch=4)
+
+# Note: Mode parameter selects preset variant (batch vs streaming),
+# then applies mode-specific optimizations
 ```
 
 #### Serialization

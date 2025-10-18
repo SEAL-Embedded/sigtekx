@@ -35,23 +35,39 @@ ionosense-hpc-lib/
 |-- pyproject.toml          # Python packaging, lint, and test configuration
 ```
 
-### C++ Library (cpp/)
+### C++ Library (cpp/) - v0.9.3 Architecture
 ```
 cpp/
+|-- benchmarks/             # C++ standalone benchmarks
+|   |-- core/              # Config, results, persistence
+|   |-- formatters/        # Output formatters
+|   |-- runners/           # Benchmark runners (latency, throughput, etc.)
+|   |-- utils/             # Signal generator, reference compute
+|   `-- main.cpp           # Entry point
 |-- bindings/
-|   |-- bindings.cpp        # pybind11 module entrypoint
-|   `-- README.md           # Binding layer documentation
+|   `-- bindings.cpp        # pybind11 BatchExecutor/StreamingExecutor bindings
 |-- include/ionosense/
-|   |-- cuda_wrappers.hpp   # RAII wrappers for CUDA/cuFFT handles
-|   |-- processing_stage.hpp# Abstract interfaces for processing stages
-|   |-- research_engine.hpp # Public API surface for ResearchEngine
-|   `-- README.md           # Header level design notes
-|-- src/
-|   |-- ops_fft.cu          # CUDA kernels for FFT and spectral ops
-|   |-- processing_stage.cpp# Stage implementations
-|   |-- research_engine.cpp # Core engine logic
-|   `-- README.md           # Implementation details and module map
-|`-- tests/                 # C++ tests executed via CTest presets
+|   |-- core/              # Core abstractions
+|   |   |-- executor_config.hpp
+|   |   |-- pipeline_executor.hpp
+|   |   |-- pipeline_builder.hpp
+|   |   `-- processing_stage.hpp
+|   |-- executors/         # Executor implementations
+|   |   |-- batch_executor.hpp
+|   |   `-- streaming_executor.hpp
+|   |-- kernels/           # CUDA kernel headers
+|   `-- profiling/         # NVTX profiling utilities
+|       `-- nvtx.hpp
+|-- src/                   # Implementation files
+|   |-- core/              # Pipeline, stages, utils
+|   |-- executors/         # Batch & streaming executors
+|   |-- kernels/           # STFT pipeline kernels (windowing, FFT wrapper, magnitude)
+|   `-- profiling/         # NVTX profiling
+|`-- tests/                # C++ tests (organized by component)
+    |-- core/              # Pipeline and stage tests
+    |-- executors/         # Executor tests
+    |-- integration/       # Integration tests
+    `-- profiling/         # Profiling tests
 ```
 
 ### Python Package (src/ionosense_hpc)
