@@ -4,7 +4,7 @@
  * NVTX implementation - keeps all CUDA/NVTX headers isolated to .cu
  */
 
-#include "ionosense/core/profiling_macros.hpp"
+#include "ionosense/profiling/nvtx.hpp"
 
 #ifdef IONOSENSE_ENABLE_PROFILING
 #define NVTX3_CPP_REQUIRE_EXPLICIT_VERSION

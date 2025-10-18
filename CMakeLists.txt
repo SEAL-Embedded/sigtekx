@@ -150,9 +150,11 @@ FetchContent_Declare(
 # ============================================================================
 if(IONO_WITH_CUDA)
 add_library(ion_engine OBJECT
-    # CUDA kernels
-    cpp/src/ops_fft.cu
-    cpp/src/profiling_nvtx.cu
+    # CUDA kernels (STFT pipeline operations)
+    cpp/src/kernels/fft_wrapper.cu
+
+    # Profiling
+    cpp/src/profiling/nvtx.cu
 
     # Core infrastructure
     cpp/src/core/processing_stage.cpp
@@ -284,9 +286,9 @@ if(IONO_WITH_TESTS AND IONO_WITH_CUDA)
 
     FetchContent_MakeAvailable(googletest)
 
-    # Automatically include all unit test sources so coverage stays in sync
-    file(GLOB TEST_ENGINE_SOURCES CONFIGURE_DEPENDS
-        "${CMAKE_CURRENT_SOURCE_DIR}/cpp/tests/*.cpp"
+    # Automatically include all unit test sources (organized in subdirectories)
+    file(GLOB_RECURSE TEST_ENGINE_SOURCES CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/cpp/tests/**/*.cpp"
     )
     list(SORT TEST_ENGINE_SOURCES)
 
@@ -314,7 +316,7 @@ if(IONO_WITH_TESTS AND IONO_WITH_CUDA)
     # This executable is for C++ kernel development and iteration BEFORE Python
     # integration. For production profiling, use `iprof` with Python benchmarks.
     add_executable(benchmark_engine
-        cpp/benchmarks/benchmark_engine.cpp
+        cpp/benchmarks/main.cpp
     )
     set_target_properties(benchmark_engine PROPERTIES CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 

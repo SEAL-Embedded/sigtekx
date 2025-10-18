@@ -22,8 +22,8 @@
 #include <vector>
 
 #include "ionosense/core/cuda_wrappers.hpp"
-#include "ionosense/core/profiling_macros.hpp"
 #include "ionosense/core/window_functions.hpp"
+#include "ionosense/profiling/nvtx.hpp"
 
 // --- External Kernel Launch Function Declarations (from ops_fft.cu) ---
 namespace ionosense {

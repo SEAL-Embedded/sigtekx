@@ -288,8 +288,7 @@ PYBIND11_MODULE(_engine, m) {
                              "Check if executor is initialized.");
 
   py::class_<ionosense::PyStreamingExecutor>(
-      m, "StreamingExecutor",
-      "Low-latency streaming executor (stub in v0.9.3)")
+      m, "StreamingExecutor", "Low-latency streaming executor (stub in v0.9.3)")
       .def(py::init<>())
       .def("initialize", &ionosense::PyStreamingExecutor::initialize,
            py::arg("config"), "Initializes the executor with configuration.")

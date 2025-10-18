@@ -13,8 +13,8 @@
 #include <sstream>
 #include <string>
 
-#include "benchmark_config.hpp"
-#include "benchmark_results.hpp"
+#include "../benchmarks/core/config.hpp"
+#include "../benchmarks/core/results.hpp"
 
 namespace ionosense {
 namespace benchmark {

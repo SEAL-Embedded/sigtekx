@@ -33,19 +33,19 @@
 #include <cuda_runtime.h>
 
 // Benchmark infrastructure
-#include "benchmark_config.hpp"
-#include "benchmark_formatters.hpp"
-#include "benchmark_persistence.hpp"
-#include "benchmark_results.hpp"
-#include "benchmark_runners.hpp"
-#include "cli_parser.hpp"
-#include "reference_compute.hpp"
-#include "signal_generator.hpp"
+#include "../benchmarks/core/config.hpp"
+#include "../benchmarks/formatters/formatters.hpp"
+#include "../benchmarks/core/persistence.hpp"
+#include "../benchmarks/core/results.hpp"
+#include "../benchmarks/runners/all_runners.hpp"
+#include "../benchmarks/core/cli_parser.hpp"
+#include "../benchmarks/utils/reference_compute.hpp"
+#include "../benchmarks/utils/signal_generator.hpp"
 
 // Executor and core functionality
 #include "ionosense/core/cuda_wrappers.hpp"
 #include "ionosense/core/processing_stage.hpp"
-#include "ionosense/core/profiling_macros.hpp"
+#include "ionosense/profiling/nvtx.hpp"
 #include "ionosense/executors/batch_executor.hpp"
 #include "ionosense/executors/streaming_executor.hpp"
 

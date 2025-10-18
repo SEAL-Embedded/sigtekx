@@ -12,9 +12,9 @@
 #include <iostream>
 #include <string>
 
-#include "benchmark_config.hpp"
-#include "benchmark_persistence.hpp"
-#include "benchmark_results.hpp"
+#include "../benchmarks/core/config.hpp"
+#include "../benchmarks/core/persistence.hpp"
+#include "../benchmarks/core/results.hpp"
 #include "ionosense/executors/batch_executor.hpp"
 
 namespace ionosense {

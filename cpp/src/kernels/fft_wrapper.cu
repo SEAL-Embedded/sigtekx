@@ -26,7 +26,7 @@
 #include <algorithm>
 #include <cmath>
 
-#include "ionosense/core/profiling_macros.hpp"
+#include "ionosense/profiling/nvtx.hpp"
 namespace ionosense {
 namespace kernels {
 

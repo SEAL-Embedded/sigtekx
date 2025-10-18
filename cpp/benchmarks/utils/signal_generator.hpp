@@ -12,7 +12,7 @@
 #include <random>
 #include <vector>
 
-#include "ionosense/core/profiling_macros.hpp"
+#include "ionosense/profiling/nvtx.hpp"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846

@@ -21,7 +21,7 @@
 #include <cuda_runtime.h>
 #include <cufft.h>
 
-#include "ionosense/core/profiling_macros.hpp"
+#include "ionosense/profiling/nvtx.hpp"
 #include "ionosense/core/window_functions.hpp"
 
 namespace ionosense {

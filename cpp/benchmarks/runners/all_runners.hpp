@@ -15,11 +15,11 @@
 #include <string>
 #include <vector>
 
-#include "benchmark_config.hpp"
-#include "benchmark_results.hpp"
-#include "reference_compute.hpp"
-#include "signal_generator.hpp"
-#include "ionosense/core/profiling_macros.hpp"
+#include "../benchmarks/core/config.hpp"
+#include "../benchmarks/core/results.hpp"
+#include "../benchmarks/utils/reference_compute.hpp"
+#include "../benchmarks/utils/signal_generator.hpp"
+#include "ionosense/profiling/nvtx.hpp"
 #include "ionosense/executors/batch_executor.hpp"
 
 namespace ionosense {

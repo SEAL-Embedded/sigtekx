@@ -135,10 +135,10 @@ struct ProcessingStats {
  * @brief Runtime device and platform information.
  */
 struct RuntimeInfo {
-  std::string device_name;         ///< CUDA device name
-  std::string cuda_version;        ///< CUDA runtime version string
-  int cuda_runtime_version = 0;    ///< CUDA runtime version (integer)
-  int cuda_driver_version = 0;     ///< CUDA driver version (integer)
+  std::string device_name;       ///< CUDA device name
+  std::string cuda_version;      ///< CUDA runtime version string
+  int cuda_runtime_version = 0;  ///< CUDA runtime version (integer)
+  int cuda_driver_version = 0;   ///< CUDA driver version (integer)
 };
 
 /**

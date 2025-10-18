@@ -11,7 +11,7 @@
 #include <iostream>
 #include <string>
 
-#include "benchmark_config.hpp"
+#include "../benchmarks/core/config.hpp"
 
 namespace ionosense {
 namespace benchmark {

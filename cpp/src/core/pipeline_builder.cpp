@@ -12,7 +12,7 @@
 #include <algorithm>
 #include <stdexcept>
 
-#include "ionosense/core/profiling_macros.hpp"
+#include "ionosense/profiling/nvtx.hpp"
 
 namespace ionosense {
 

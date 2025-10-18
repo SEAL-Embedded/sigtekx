@@ -15,7 +15,7 @@
 
 #include "ionosense/core/cuda_wrappers.hpp"
 #include "ionosense/core/engine_config.hpp"
-#include "ionosense/core/profiling_macros.hpp"
+#include "ionosense/profiling/nvtx.hpp"
 
 namespace ionosense {
 namespace engine_utils {

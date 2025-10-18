@@ -18,8 +18,8 @@
 
 #include "ionosense/core/cuda_wrappers.hpp"
 #include "ionosense/core/processing_stage.hpp"  // for ProcessingStats definition
-#include "ionosense/core/profiling_macros.hpp"
 #include "ionosense/executors/batch_executor.hpp"
+#include "ionosense/profiling/nvtx.hpp"
 
 using namespace ionosense;
 

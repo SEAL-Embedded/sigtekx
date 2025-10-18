@@ -17,7 +17,7 @@
 #include <stdexcept>
 
 #include "ionosense/core/cuda_wrappers.hpp"
-#include "ionosense/core/profiling_macros.hpp"
+#include "ionosense/profiling/nvtx.hpp"
 
 namespace ionosense {
 
