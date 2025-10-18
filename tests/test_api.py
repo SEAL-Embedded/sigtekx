@@ -56,8 +56,8 @@ class TestPresets:
     def test_get_preset_iono(self):
         """Test getting iono preset (defaults to batch)."""
         config = get_preset('iono')
-        assert config.nfft == 8192  # Batch: higher resolution
-        assert config.batch == 16
+        assert config.nfft == 16384  # Batch: higher resolution
+        assert config.batch == 32
         assert config.overlap == 0.75
         assert config.window == WindowType.BLACKMAN
         assert config.mode == ExecutionMode.BATCH
@@ -66,7 +66,7 @@ class TestPresets:
         """Test getting iono preset with streaming executor."""
         config = get_preset('iono', executor='streaming')
         assert config.nfft == 4096  # Streaming: lower latency
-        assert config.batch == 8
+        assert config.batch == 2
         assert config.overlap == 0.75
         assert config.mode == ExecutionMode.STREAMING
 
@@ -83,7 +83,7 @@ class TestPresets:
         """Test getting ionox preset with streaming executor."""
         config = get_preset('ionox', executor='streaming')
         assert config.nfft == 8192  # Streaming: balanced
-        assert config.batch == 16
+        assert config.batch == 2
         assert config.overlap == 0.9
         assert config.mode == ExecutionMode.STREAMING
 
@@ -99,7 +99,7 @@ class TestPresets:
         assert 'batch' in desc
         assert 'streaming' in desc
         # Contains NFFFTs for both variants
-        assert '8192' in desc  # batch
+        assert '16384' in desc  # batch
         assert '4096' in desc  # streaming
 
     def test_compare_presets(self):
@@ -166,15 +166,15 @@ class TestEngineConfig:
     def test_from_preset_method(self):
         """Test EngineConfig.from_preset() class method."""
         config = EngineConfig.from_preset('iono')
-        assert config.nfft == 8192  # Batch variant (default)
-        assert config.batch == 16
+        assert config.nfft == 16384  # Batch variant (default)
+        assert config.batch == 32
 
     def test_from_preset_with_overrides(self):
         """Test preset with parameter overrides."""
-        config = EngineConfig.from_preset('iono', nfft=16384, overlap=0.875)
-        assert config.nfft == 16384  # Overridden
+        config = EngineConfig.from_preset('iono', nfft=32768, overlap=0.875)
+        assert config.nfft == 32768  # Overridden
         assert config.overlap == 0.875  # Overridden
-        assert config.batch == 16  # From preset (batch variant)
+        assert config.batch == 32  # From preset (batch variant)
 
     def test_from_preset_with_mode_override(self):
         """Test preset with mode override."""
@@ -183,7 +183,7 @@ class TestEngineConfig:
         # Mode override should adjust stream/buffer counts for STREAMING
         assert config.stream_count == 6  # STREAMING mode override
         assert config.pinned_buffer_count == 4  # STREAMING mode override
-        assert config.batch == 8  # Reduced from 16 (batch//2) for lower latency
+        assert config.batch == 2  # Minimal batch for lower latency
 
     def test_computed_properties(self):
         """Test computed properties."""
@@ -630,7 +630,7 @@ class TestBackwardCompatibility:
         config_dict = config.model_dump()
 
         assert isinstance(config_dict, dict)
-        assert config_dict['nfft'] == 8192  # Batch variant (default)
+        assert config_dict['nfft'] == 16384  # Batch variant (default)
 
     def test_config_modification(self):
         """Test config can be modified after creation."""

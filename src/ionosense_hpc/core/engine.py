@@ -25,6 +25,11 @@ from numpy.typing import ArrayLike, NDArray
 from ionosense_hpc.config import (
     EngineConfig,
     ExecutionMode,
+    OutputMode,
+    ScalePolicy,
+    WindowNorm,
+    WindowSymmetry,
+    WindowType,
     validate_batch_size,
     validate_config_device_compatibility,
     validate_input_array,
@@ -291,36 +296,56 @@ class Engine:
                     value = getattr(self._config, key)
                     setattr(cpp_config, key, value)
 
-            # Map enum fields (convert Python enum to C++ int)
-            # WindowType: RECTANGULAR=0, HANN=1, BLACKMAN=2
+            # Map enum fields (convert Python enum to C++ enum objects)
+            # WindowType: RECTANGULAR, HANN, BLACKMAN
             if hasattr(self._config, 'window'):
-                window_map = {'rectangular': 0, 'hann': 1, 'blackman': 2}
-                cpp_config.window_type = window_map.get(self._config.window.value, 1)
+                window_map = {
+                    WindowType.RECTANGULAR: self._cpp_module.WindowType.RECTANGULAR,
+                    WindowType.HANN: self._cpp_module.WindowType.HANN,
+                    WindowType.BLACKMAN: self._cpp_module.WindowType.BLACKMAN,
+                }
+                cpp_config.window_type = window_map.get(self._config.window, self._cpp_module.WindowType.HANN)
 
-            # WindowSymmetry: PERIODIC=0, SYMMETRIC=1
+            # WindowSymmetry: PERIODIC, SYMMETRIC
             if hasattr(self._config, 'window_symmetry'):
-                symmetry_map = {'periodic': 0, 'symmetric': 1}
-                cpp_config.window_symmetry = symmetry_map.get(self._config.window_symmetry.value, 0)
+                symmetry_map = {
+                    WindowSymmetry.PERIODIC: self._cpp_module.WindowSymmetry.PERIODIC,
+                    WindowSymmetry.SYMMETRIC: self._cpp_module.WindowSymmetry.SYMMETRIC,
+                }
+                cpp_config.window_symmetry = symmetry_map.get(self._config.window_symmetry, self._cpp_module.WindowSymmetry.PERIODIC)
 
-            # WindowNorm: UNITY=0, SQRT=1
+            # WindowNorm: UNITY, SQRT
             if hasattr(self._config, 'window_norm'):
-                norm_map = {'unity': 0, 'sqrt': 1}
-                cpp_config.window_norm = norm_map.get(self._config.window_norm.value, 0)
+                norm_map = {
+                    WindowNorm.UNITY: self._cpp_module.WindowNorm.UNITY,
+                    WindowNorm.SQRT: self._cpp_module.WindowNorm.SQRT,
+                }
+                cpp_config.window_norm = norm_map.get(self._config.window_norm, self._cpp_module.WindowNorm.UNITY)
 
-            # ScalePolicy: NONE=0, ONE_OVER_N=1, ONE_OVER_SQRT_N=2
+            # ScalePolicy: NONE, ONE_OVER_N, ONE_OVER_SQRT_N
             if hasattr(self._config, 'scale'):
-                scale_map = {'none': 0, 'one_over_n': 1, 'one_over_sqrt_n': 2}
-                cpp_config.scale_policy = scale_map.get(self._config.scale.value, 1)
+                scale_map = {
+                    ScalePolicy.NONE: self._cpp_module.ScalePolicy.NONE,
+                    ScalePolicy.ONE_OVER_N: self._cpp_module.ScalePolicy.ONE_OVER_N,
+                    ScalePolicy.ONE_OVER_SQRT_N: self._cpp_module.ScalePolicy.ONE_OVER_SQRT_N,
+                }
+                cpp_config.scale_policy = scale_map.get(self._config.scale, self._cpp_module.ScalePolicy.ONE_OVER_N)
 
-            # OutputMode: MAGNITUDE=0, COMPLEX_PASSTHROUGH=1
+            # OutputMode: MAGNITUDE, COMPLEX (Python) -> COMPLEX_PASSTHROUGH (C++)
             if hasattr(self._config, 'output'):
-                output_map = {'magnitude': 0, 'complex': 1, 'complex_passthrough': 1}
-                cpp_config.output_mode = output_map.get(self._config.output.value, 0)
+                output_map = {
+                    OutputMode.MAGNITUDE: self._cpp_module.OutputMode.MAGNITUDE,
+                    OutputMode.COMPLEX: self._cpp_module.OutputMode.COMPLEX_PASSTHROUGH,
+                }
+                cpp_config.output_mode = output_map.get(self._config.output, self._cpp_module.OutputMode.MAGNITUDE)
 
-            # ExecutionMode: BATCH=0, STREAMING=1
+            # ExecutionMode: BATCH, STREAMING
             if hasattr(self._config, 'mode'):
-                mode_map = {'batch': 0, 'streaming': 1}
-                cpp_config.mode = mode_map.get(self._config.mode.value, 0)
+                mode_map = {
+                    ExecutionMode.BATCH: self._cpp_module.ExecutionMode.BATCH,
+                    ExecutionMode.STREAMING: self._cpp_module.ExecutionMode.STREAMING,
+                }
+                cpp_config.mode = mode_map.get(self._config.mode, self._cpp_module.ExecutionMode.BATCH)
 
             # Initialize C++ executor
             self._cpp_engine.initialize(cpp_config)
@@ -545,13 +570,23 @@ class Engine:
                 "device_memory_free_mb": 0,
             }
 
-        info = self._cpp_engine.get_runtime_info()
-        return {
-            "device_name": str(info.device_name),
-            "cuda_version": str(info.cuda_version),
-            "device_memory_mb": int(getattr(info, "device_memory_total_mb", 0)),
-            "device_memory_free_mb": int(getattr(info, "device_memory_free_mb", 0)),
-        }
+        # Use device utilities to get runtime info
+        try:
+            from ionosense_hpc.utils.device import device_info as get_device_info
+            info = get_device_info()
+            return {
+                "device_name": str(info.get("name", "Unknown")),
+                "cuda_version": str(info.get("cuda_version", "Unknown")),
+                "device_memory_mb": int(info.get("memory_total_mb", 0)),
+                "device_memory_free_mb": int(info.get("memory_free_mb", 0)),
+            }
+        except Exception:
+            return {
+                "device_name": "Unknown",
+                "cuda_version": "Unknown",
+                "device_memory_mb": 0,
+                "device_memory_free_mb": 0,
+            }
 
     # -------------------------------------------------------------------------
     # Context Manager Protocol

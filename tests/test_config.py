@@ -85,8 +85,8 @@ class TestPresets:
     def test_iono_preset_batch(self):
         """Test ionosphere preset configuration (batch - throughput)."""
         config = get_preset('iono', executor='batch')
-        assert config.nfft == 8192  # Higher resolution for batch
-        assert config.batch == 16   # Larger batch
+        assert config.nfft == 16384  # Higher resolution for batch
+        assert config.batch == 32    # Larger batch
         assert config.overlap == 0.75
         assert config.pinned_buffer_count == 4
 
@@ -94,7 +94,7 @@ class TestPresets:
         """Test ionosphere preset configuration (streaming - latency)."""
         config = get_preset('iono', executor='streaming')
         assert config.nfft == 4096  # Lower resolution for latency
-        assert config.batch == 8    # Smaller batch
+        assert config.batch == 2    # Smaller batch
         assert config.overlap == 0.75
         assert config.stream_count == 6  # More streams for pipelining
 
@@ -110,7 +110,7 @@ class TestPresets:
         """Test extreme ionosphere preset configuration (streaming)."""
         config = get_preset('ionox', executor='streaming')
         assert config.nfft == 8192   # Balanced for quality and latency
-        assert config.batch == 16
+        assert config.batch == 2
         assert config.overlap == 0.9
         assert config.warmup_iters == 10
 

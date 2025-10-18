@@ -308,12 +308,19 @@ class EngineConfig(BaseModel):
             >>> config = EngineConfig.from_preset('iono', nfft=8192, overlap=0.875)
         """
         from .config_presets import get_preset
-        config = get_preset(name)
 
-        # Apply mode override
+        # Determine executor variant based on mode
+        executor = 'batch'  # default
         if mode is not None:
             if isinstance(mode, str):
                 mode = ExecutionMode(mode)
+            # Map ExecutionMode to executor string for get_preset
+            executor = 'streaming' if mode == ExecutionMode.STREAMING else 'batch'
+
+        config = get_preset(name, executor=executor)
+
+        # Apply mode override (to ensure mode field is set correctly)
+        if mode is not None:
             config = _apply_mode_overrides(config, mode)
 
         # Apply additional overrides
