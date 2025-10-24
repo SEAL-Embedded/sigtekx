@@ -5,6 +5,7 @@ nfft: 4096                    # Good frequency resolution while maintaining effi
 batch: 64                     # Large batch size for continuous data processing
 overlap: 0.875                # Very high overlap for smooth temporal continuity
 sample_rate_hz: 48000         # Standard ionosphere monitoring rate
+mode: streaming               # Streaming executor for continuous antenna monitoring
 stream_count: 6               # Higher stream count for sustained throughput
 pinned_buffer_count: 8        # More buffers for continuous operation
 warmup_iters: 10              # Moderate warmup for production efficiency

@@ -95,10 +95,14 @@ class StreamingExecutor::Impl {
     const size_t complex_buffer_size = output_buffer_size;
 
     // Allocate ring buffer for input accumulation
-    // Size: enough for batch frames + safety margin
-    const size_t ring_capacity = static_cast<size_t>(config_.nfft) +
-                                 (config_.batch - 1) * hop_size_ +
-                                 config_.nfft;  // Extra for safety
+    // Size: enough for batch frames + extra capacity for benchmark workloads
+    // Benchmarks may push nfft*batch samples at once, so we need capacity for:
+    // - Current buffered samples (up to nfft + (batch-1)*hop_size)
+    // - Incoming chunk (up to nfft*batch for benchmarks)
+    const size_t min_capacity = static_cast<size_t>(config_.nfft) +
+                                (config_.batch - 1) * hop_size_;
+    const size_t benchmark_chunk_size = static_cast<size_t>(config_.nfft) * config_.batch;
+    const size_t ring_capacity = min_capacity + benchmark_chunk_size;
     {
       const std::string ring_msg = profiling::format_memory_range(
           "Allocate Ring Buffer", ring_capacity * sizeof(float));

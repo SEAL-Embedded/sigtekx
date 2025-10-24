@@ -5,6 +5,7 @@ nfft: 4096                    # Balanced resolution for real-time constraints
 batch: 2                      # Small batch for low latency
 overlap: 0.625                # Good temporal resolution without excessive computation
 sample_rate_hz: 48000         # Standard ionosphere monitoring rate
+mode: streaming               # Streaming executor for real-time antenna data
 stream_count: 3               # Moderate streams for real-time processing
 pinned_buffer_count: 3        # Minimal buffers for low memory footprint
 warmup_iters: 5               # Fast warmup for quick startup

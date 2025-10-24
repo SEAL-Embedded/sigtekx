@@ -3,6 +3,7 @@ nfft: 2048
 batch: 8
 overlap: 0.5
 sample_rate_hz: 48000
+mode: streaming
 stream_count: 3
 pinned_buffer_count: 3
 warmup_iters: 5

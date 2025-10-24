@@ -81,8 +81,14 @@ def run_latency_benchmark(cfg: DictConfig) -> float:
 
         # Convert measurements to DataFrame
         if hasattr(result, 'measurements') and result.measurements is not None:
+            # Measurements can be either a dict of arrays or a single array
+            if isinstance(result.measurements, dict):
+                latency_data = result.measurements.get('latency_us', [])
+            else:
+                latency_data = result.measurements
+
             df = pd.DataFrame({
-                'latency_us': result.measurements.get('latency_us', []),
+                'latency_us': latency_data,
                 'engine_nfft': engine_config.nfft,
                 'engine_batch': engine_config.batch,
             })

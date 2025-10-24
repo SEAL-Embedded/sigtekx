@@ -5,6 +5,7 @@ nfft: 8192                    # High frequency resolution for detailed spectral 
 batch: 16                     # Moderate batch size for memory efficiency
 overlap: 0.75                 # High overlap for temporal resolution
 sample_rate_hz: 48000         # Standard ionosphere monitoring rate
+mode: streaming               # Streaming executor for continuous antenna data
 stream_count: 4               # Multiple streams for parallel processing
 pinned_buffer_count: 4        # Sufficient buffers for high-resolution processing
 warmup_iters: 20              # More warmup for stable high-res measurements
