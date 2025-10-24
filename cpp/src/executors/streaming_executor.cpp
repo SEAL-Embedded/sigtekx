@@ -94,20 +94,24 @@ class StreamingExecutor::Impl {
         static_cast<size_t>(config_.num_output_bins()) * config_.channels;
     const size_t complex_buffer_size = output_buffer_size;
 
-    // Allocate ring buffer for input accumulation
-    // Size: enough for batch frames + extra capacity for benchmark workloads
-    // Benchmarks may push nfft*batch samples at once, so we need capacity for:
-    // - Current buffered samples (up to nfft + (batch-1)*hop_size)
-    // - Incoming chunk (up to nfft*batch for benchmarks)
-    const size_t min_capacity = static_cast<size_t>(config_.nfft) +
-                                (config_.channels - 1) * hop_size_;
-    const size_t benchmark_chunk_size = static_cast<size_t>(config_.nfft) * config_.channels;
-    const size_t ring_capacity = min_capacity + benchmark_chunk_size;
+    // Allocate per-channel ring buffers for true multi-channel streaming
+    // Each channel maintains its own independent sample stream with overlap
+    // Size per channel: enough for one frame (nfft) + extra capacity for benchmarks
+    // Benchmarks may push nfft samples per channel at once
+    const size_t min_capacity_per_channel = static_cast<size_t>(config_.nfft);
+    const size_t benchmark_chunk_per_channel = static_cast<size_t>(config_.nfft);
+    const size_t ring_capacity_per_channel = min_capacity_per_channel + benchmark_chunk_per_channel;
     {
       const std::string ring_msg = profiling::format_memory_range(
-          "Allocate Ring Buffer", ring_capacity * sizeof(float));
+          "Allocate Per-Channel Ring Buffers",
+          ring_capacity_per_channel * config_.channels * sizeof(float));
       IONO_NVTX_RANGE(ring_msg.c_str(), profiling::colors::CYAN);
-      input_ring_buffer_ = std::make_unique<RingBuffer<float>>(ring_capacity);
+
+      // Create one ring buffer per channel
+      input_ring_buffers_.resize(config_.channels);
+      for (int ch = 0; ch < config_.channels; ++ch) {
+        input_ring_buffers_[ch] = std::make_unique<RingBuffer<float>>(ring_capacity_per_channel);
+      }
     }
 
     // Allocate pinned staging buffer for batch extraction
@@ -220,7 +224,14 @@ class StreamingExecutor::Impl {
       d_intermediate_buffers_.clear();
       d_output_buffers_.clear();
       h_batch_staging_.resize(0);
-      input_ring_buffer_.reset();
+
+      // Reset all per-channel ring buffers
+      for (auto& ring_buffer : input_ring_buffers_) {
+        if (ring_buffer) {
+          ring_buffer.reset();
+        }
+      }
+      input_ring_buffers_.clear();
     }
 
     frame_counter_ = 0;
@@ -234,21 +245,48 @@ class StreamingExecutor::Impl {
       throw std::runtime_error("Executor not initialized");
     }
 
-    const auto start_time = std::chrono::high_resolution_clock::now();
-
-    // Push new samples to ring buffer
-    {
-      IONO_NVTX_RANGE("Push to Ring Buffer", profiling::colors::CYAN);
-      input_ring_buffer_->push(input, num_samples);
+    // Validate input size: must be multiple of channels for channel-major layout
+    // Expected layout: [ch0_sample0, ch0_sample1, ..., ch0_sampleN,
+    //                   ch1_sample0, ch1_sample1, ..., ch1_sampleN, ...]
+    if (num_samples % config_.channels != 0) {
+      throw std::runtime_error(
+          "Input size must be a multiple of channels. Expected channel-major layout: "
+          "[ch0[0..N], ch1[0..N], ...]. Got num_samples=" + std::to_string(num_samples) +
+          ", channels=" + std::to_string(config_.channels));
     }
 
-    // Calculate samples needed for one batch
-    const size_t samples_per_batch =
-        static_cast<size_t>(config_.nfft) + (config_.channels - 1) * hop_size_;
+    const auto start_time = std::chrono::high_resolution_clock::now();
+    const size_t samples_per_channel = num_samples / config_.channels;
 
-    // Process all available batches
+    // Push samples to per-channel ring buffers (channel-major layout)
+    {
+      IONO_NVTX_RANGE("Push to Per-Channel Ring Buffers", profiling::colors::CYAN);
+      for (int ch = 0; ch < config_.channels; ++ch) {
+        const float* channel_input = input + ch * samples_per_channel;
+        input_ring_buffers_[ch]->push(channel_input, samples_per_channel);
+      }
+    }
+
+    // Samples needed per channel for one frame (no longer batch-dependent)
+    const size_t samples_needed_per_channel = static_cast<size_t>(config_.nfft);
+
+    // Process all available frames (synchronized across channels)
+    // All channels must have enough samples to extract a frame
     size_t batches_processed = 0;
-    while (input_ring_buffer_->available() >= samples_per_batch) {
+    while (input_ring_buffers_[0]->available() >= samples_needed_per_channel) {
+      // Verify all channels have sufficient samples
+      bool all_channels_ready = true;
+      for (int ch = 0; ch < config_.channels; ++ch) {
+        if (input_ring_buffers_[ch]->available() < samples_needed_per_channel) {
+          all_channels_ready = false;
+          break;
+        }
+      }
+
+      if (!all_channels_ready) {
+        break;
+      }
+
       process_one_batch(output + batches_processed * config_.num_output_bins() *
                                      config_.channels);
       batches_processed++;
@@ -263,7 +301,7 @@ class StreamingExecutor::Impl {
           duration.count() / static_cast<float>(batches_processed);
       stats_.frames_processed += batches_processed;
       stats_.throughput_gbps = calculate_throughput(
-          samples_per_batch * batches_processed, duration.count());
+          num_samples * batches_processed, duration.count());
     }
   }
 
@@ -274,15 +312,38 @@ class StreamingExecutor::Impl {
       throw std::runtime_error("Executor not initialized");
     }
 
-    // Push samples to ring buffer
-    input_ring_buffer_->push(input, num_samples);
+    // Validate input size
+    if (num_samples % config_.channels != 0) {
+      throw std::runtime_error(
+          "Input size must be a multiple of channels for channel-major layout");
+    }
 
-    // Calculate samples needed for one batch
-    const size_t samples_per_batch =
-        static_cast<size_t>(config_.nfft) + (config_.channels - 1) * hop_size_;
+    const size_t samples_per_channel = num_samples / config_.channels;
+
+    // Push samples to per-channel ring buffers
+    for (int ch = 0; ch < config_.channels; ++ch) {
+      const float* channel_input = input + ch * samples_per_channel;
+      input_ring_buffers_[ch]->push(channel_input, samples_per_channel);
+    }
+
+    // Samples needed per channel
+    const size_t samples_needed_per_channel = static_cast<size_t>(config_.nfft);
 
     // Process all available batches
-    while (input_ring_buffer_->available() >= samples_per_batch) {
+    while (input_ring_buffers_[0]->available() >= samples_needed_per_channel) {
+      // Verify all channels ready
+      bool all_channels_ready = true;
+      for (int ch = 0; ch < config_.channels; ++ch) {
+        if (input_ring_buffers_[ch]->available() < samples_needed_per_channel) {
+          all_channels_ready = false;
+          break;
+        }
+      }
+
+      if (!all_channels_ready) {
+        break;
+      }
+
       // Allocate output buffer for this batch
       std::vector<float> output(config_.num_output_bins() * config_.channels);
       process_one_batch(output.data());
@@ -311,8 +372,10 @@ class StreamingExecutor::Impl {
 
     size_t total = 0;
 
-    // Ring buffer
-    total += input_ring_buffer_->capacity() * sizeof(float);
+    // Per-channel ring buffers
+    for (const auto& ring_buffer : input_ring_buffers_) {
+      total += ring_buffer->capacity() * sizeof(float);
+    }
 
     // Staging buffer
     total += h_batch_staging_.bytes();
@@ -340,40 +403,59 @@ class StreamingExecutor::Impl {
 
  private:
   void run_warmup() {
-    const size_t warmup_samples =
-        static_cast<size_t>(config_.nfft) + (config_.channels - 1) * hop_size_;
-    std::vector<float> dummy_input(warmup_samples, 0.0f);
+    // Prepare warmup data: nfft samples per channel
+    const size_t samples_per_channel = static_cast<size_t>(config_.nfft);
+    const size_t total_warmup_samples = samples_per_channel * config_.channels;
+    std::vector<float> dummy_input(total_warmup_samples, 0.0f);
     std::vector<float> dummy_output(
         static_cast<size_t>(config_.num_output_bins()) * config_.channels);
 
     stats_.is_warmup = true;
     for (int i = 0; i < config_.warmup_iters; ++i) {
-      // Clear ring buffer before each warmup iteration
-      input_ring_buffer_->reset();
-      input_ring_buffer_->push(dummy_input.data(), warmup_samples);
+      // Clear all per-channel ring buffers before each warmup iteration
+      for (auto& ring_buffer : input_ring_buffers_) {
+        ring_buffer->reset();
+      }
+
+      // Push to per-channel buffers (channel-major layout)
+      for (int ch = 0; ch < config_.channels; ++ch) {
+        const float* channel_input = dummy_input.data() + ch * samples_per_channel;
+        input_ring_buffers_[ch]->push(channel_input, samples_per_channel);
+      }
+
       process_one_batch(dummy_output.data());
     }
     stats_.is_warmup = false;
 
-    // Clear ring buffer after warmup
-    input_ring_buffer_->reset();
+    // Clear all ring buffers after warmup
+    for (auto& ring_buffer : input_ring_buffers_) {
+      ring_buffer->reset();
+    }
   }
 
   void process_one_batch(float* output) {
     IONO_NVTX_RANGE("Process One Batch", profiling::colors::PURPLE);
 
-    // Extract batch from ring buffer to staging buffer
+    // Extract one frame per channel independently to staging buffer
+    // Output layout: channel-major [ch0[0..nfft-1], ch1[0..nfft-1], ...]
     {
-      IONO_NVTX_RANGE("Extract Batch from Ring", profiling::colors::GREEN);
-      input_ring_buffer_->extract_batch(h_batch_staging_.get(), config_.nfft,
-                                        config_.channels, hop_size_);
+      IONO_NVTX_RANGE("Extract Per-Channel Frames", profiling::colors::GREEN);
+      for (int ch = 0; ch < config_.channels; ++ch) {
+        float* channel_staging = h_batch_staging_.get() + ch * config_.nfft;
+
+        // Extract nfft samples from this channel's ring buffer
+        // Simple non-overlapping extraction (ring buffer handles the read position)
+        input_ring_buffers_[ch]->extract_frame(channel_staging, config_.nfft);
+      }
     }
 
-    // Advance ring buffer read pointer by hop_size * batch
-    // This implements the sliding window for STFT overlap
+    // Advance each channel's ring buffer read pointer by hop_size
+    // This implements the sliding window for STFT overlap independently per channel
     {
-      const size_t advance_samples = hop_size_ * config_.channels;
-      input_ring_buffer_->advance(advance_samples);
+      IONO_NVTX_RANGE("Advance Per-Channel Ring Buffers", profiling::colors::GREEN);
+      for (int ch = 0; ch < config_.channels; ++ch) {
+        input_ring_buffers_[ch]->advance(hop_size_);
+      }
     }
 
     // Round-robin buffer selection
@@ -511,8 +593,9 @@ class StreamingExecutor::Impl {
   cudaDeviceProp device_props_{};
   size_t hop_size_ = 0;
 
-  // Ring buffer for continuous input accumulation
-  std::unique_ptr<RingBuffer<float>> input_ring_buffer_;
+  // Per-channel ring buffers for true multi-channel streaming (v0.9.4+)
+  // Each channel maintains independent sample stream with overlap
+  std::vector<std::unique_ptr<RingBuffer<float>>> input_ring_buffers_;
 
   // Pinned staging buffer for batch extraction
   PinnedHostBuffer<float> h_batch_staging_;

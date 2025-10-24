@@ -29,12 +29,18 @@ namespace ionosense {
  * minimal latency.
  *
  * **Key Features (v0.9.4):**
- * - Ring buffer for continuous input accumulation
- * - Overlap-aware batch extraction for STFT processing
+ * - **Per-channel ring buffers** for true multi-channel streaming
+ * - **Independent channel processing** with per-channel overlap
+ * - **Channel-major input layout**: [ch0[0..N], ch1[0..N], ...]
  * - Frame-by-frame processing as samples arrive
  * - CUDA stream pipelining (H2D → Compute → D2H)
  * - Round-robin device buffers for in-flight batches
  * - Minimal blocking with event-based synchronization
+ *
+ * **Multi-Channel Architecture:**
+ * Each channel maintains its own independent ring buffer and sample stream.
+ * Overlap is managed per-channel, enabling true dual-antenna support where
+ * each antenna produces an independent signal stream.
  *
  * **Usage Pattern:**
  * ```cpp
@@ -42,14 +48,19 @@ namespace ionosense {
  * ExecutorConfig config;
  * config.mode = ExecutorConfig::ExecutionMode::STREAMING;
  * config.nfft = 1024;
- * config.batch = 2;
+ * config.channels = 2;  // Dual-antenna system
  * config.overlap = 0.5;  // 50% overlap (hop_size = 512)
  * executor.initialize(config, stages);
  *
- * // Feed samples incrementally (e.g., 256 samples at a time)
- * executor.submit(samples, output, 256);  // Processes when enough samples
- * available
+ * // Feed samples incrementally in channel-major layout
+ * // Input: [ch0_samples[0..255], ch1_samples[0..255]]
+ * executor.submit(samples, output, 512);  // 256 samples per channel
  * ```
+ *
+ * **Input Layout Requirement:**
+ * Input must be in channel-major layout: all samples for channel 0, then all
+ * samples for channel 1, etc. The total num_samples must be a multiple of
+ * the number of channels.
  *
  * **Future Enhancements (v0.9.5+):**
  * - True async with background thread (submit_async() currently synchronous)
