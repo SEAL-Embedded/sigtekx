@@ -1,13 +1,14 @@
 /**
  * @file streaming_executor.hpp
- * @version 0.9.3
- * @date 2025-10-16
+ * @version 0.9.4
+ * @date 2025-10-18
  * @author [Kevin Rahsaz]
  *
  * @brief Streaming executor with low-latency continuous processing.
  *
  * Implements continuous streaming processing with ring buffer management,
- * callback-based output delivery, and minimal blocking operations.
+ * overlap-aware frame extraction, and CUDA stream pipelining for minimal
+ * latency.
  */
 
 #pragma once
@@ -23,27 +24,36 @@ namespace ionosense {
  * @class StreamingExecutor
  * @brief Executor for low-latency continuous streaming processing.
  *
- * @warning **STUB IMPLEMENTATION (v0.9.3)**
- * This executor is currently a thin wrapper around BatchExecutor and does NOT
- * implement true streaming capabilities. It is provided as an architectural
- * placeholder for v0.9.4+ where full streaming features will be added.
+ * Implements true streaming with ring buffer for input accumulation and
+ * overlap-aware frame extraction. Optimized for continuous processing with
+ * minimal latency.
  *
- * **Current behavior:**
- * - Delegates all operations to BatchExecutor
- * - Does NOT accumulate input in ring buffers
- * - Does NOT process frames as they arrive
- * - Does NOT support true streaming (supports_streaming() returns false)
+ * **Key Features (v0.9.4):**
+ * - Ring buffer for continuous input accumulation
+ * - Overlap-aware batch extraction for STFT processing
+ * - Frame-by-frame processing as samples arrive
+ * - CUDA stream pipelining (H2D → Compute → D2H)
+ * - Round-robin device buffers for in-flight batches
+ * - Minimal blocking with event-based synchronization
  *
- * **Planned features for v0.9.4+:**
- * - Ring buffer for input accumulation
- * - Frame-by-frame processing as data arrives
- * - Overlap handling for continuous streams
- * - Callback invocation upon frame completion
- * - CUDA stream pipelining for overlapped compute/transfer
- * - Optional CUDA graph optimization for minimal overhead
+ * **Usage Pattern:**
+ * ```cpp
+ * StreamingExecutor executor;
+ * ExecutorConfig config;
+ * config.mode = ExecutorConfig::ExecutionMode::STREAMING;
+ * config.nfft = 1024;
+ * config.batch = 2;
+ * config.overlap = 0.5;  // 50% overlap (hop_size = 512)
+ * executor.initialize(config, stages);
  *
- * For now, use BatchExecutor directly for batch processing, or wait for
- * v0.9.4 for true streaming support.
+ * // Feed samples incrementally (e.g., 256 samples at a time)
+ * executor.submit(samples, output, 256);  // Processes when enough samples
+ * available
+ * ```
+ *
+ * **Future Enhancements (v0.9.5+):**
+ * - True async with background thread (submit_async() currently synchronous)
+ * - Optional CUDA graph optimization for zero-overhead kernel launches
  */
 class StreamingExecutor : public IPipelineExecutor {
  public:
@@ -68,10 +78,10 @@ class StreamingExecutor : public IPipelineExecutor {
   ProcessingStats get_stats() const override;
 
   /**
-   * @brief Reports streaming capability (currently false).
-   * @return false - streaming not implemented in v0.9.3 stub.
+   * @brief Reports streaming capability.
+   * @return true - streaming fully implemented with ring buffer (v0.9.4+).
    */
-  bool supports_streaming() const override { return false; }
+  bool supports_streaming() const override { return true; }
   size_t get_memory_usage() const override;
   bool is_initialized() const override;
 

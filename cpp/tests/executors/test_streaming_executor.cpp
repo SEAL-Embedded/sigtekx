@@ -201,10 +201,10 @@ TEST_F(StreamingExecutorTest, StatsReporting) {
 //  Capability Tests (Stub Behavior)
 // ============================================================================
 
-TEST_F(StreamingExecutorTest, SupportsStreamingReturnsFalse) {
-  // v0.9.3: StreamingExecutor is a stub and does NOT support true streaming
+TEST_F(StreamingExecutorTest, SupportsStreamingReturnsTrue) {
+  // v0.9.4: StreamingExecutor now supports true streaming with ring buffer
   StreamingExecutor executor;
-  EXPECT_FALSE(executor.supports_streaming());
+  EXPECT_TRUE(executor.supports_streaming());
 }
 
 TEST_F(StreamingExecutorTest, MemoryUsage) {
@@ -261,25 +261,30 @@ TEST_F(StreamingExecutorTest, MoveAssignment) {
 // ============================================================================
 
 /**
- * @test DocumentedLimitations
- * @brief This test documents the current limitations of StreamingExecutor.
+ * @test DocumentedCapabilitiesAndLimitations
+ * @brief This test documents current capabilities and remaining limitations.
  *
- * The following features are NOT implemented in v0.9.3:
- * - Ring buffer for input accumulation
- * - Frame-by-frame processing as data arrives
- * - True asynchronous, non-blocking behavior
- * - Overlap handling for continuous streams
- * - Background processing with callbacks
+ * **Implemented in v0.9.4:**
+ * - Ring buffer for input accumulation ✓
+ * - Frame-by-frame processing as data arrives ✓
+ * - Overlap handling for continuous streams ✓
+ * - CUDA stream pipelining ✓
+ * - True streaming (supports_streaming() == true) ✓
  *
- * All of these will be added in v0.9.4+.
+ * **Not yet implemented (v0.9.5+):**
+ * - True asynchronous, non-blocking submit_async()
+ * - Background thread for callback invocation
+ * - CUDA graph optimization
  */
-TEST_F(StreamingExecutorTest, DocumentedLimitations) {
-  // This test exists to document limitations for reviewers and future devs
-  SUCCEED() << "StreamingExecutor v0.9.3 is a STUB implementation.\n"
-            << "It delegates to BatchExecutor and does NOT support:\n"
-            << "  - True streaming (supports_streaming() == false)\n"
-            << "  - Ring buffers\n"
-            << "  - Input accumulation\n"
-            << "  - Background processing\n"
-            << "\nFull implementation planned for v0.9.4+";
+TEST_F(StreamingExecutorTest, DocumentedCapabilitiesAndLimitations) {
+  // This test exists to document capabilities for reviewers and future devs
+  SUCCEED() << "StreamingExecutor v0.9.4 IMPLEMENTED features:\n"
+            << "  ✓ Ring buffer for continuous input accumulation\n"
+            << "  ✓ Overlap-aware batch extraction (STFT)\n"
+            << "  ✓ Frame-by-frame processing\n"
+            << "  ✓ CUDA stream pipelining (H2D → Compute → D2H)\n"
+            << "  ✓ True streaming (supports_streaming() == true)\n"
+            << "\nRemaining for v0.9.5+:\n"
+            << "  - True async submit_async() with background thread\n"
+            << "  - CUDA graph optimization";
 }
