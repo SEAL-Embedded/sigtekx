@@ -96,7 +96,7 @@ class AccuracyBenchmark(BaseBenchmark):
             else:
                 # Use default preset with minimal batch for validation
                 self.engine_config = get_preset('default')
-                self.engine_config.batch = 1
+                self.engine_config.channels = 1
 
             # Accuracy validation is single-frame; force zero overlap for determinism.
             if self.engine_config.overlap != 0.0:
@@ -242,7 +242,7 @@ class AccuracyBenchmark(BaseBenchmark):
         """Generate test signal based on specification."""
         assert self.engine_config is not None
         nfft = self.engine_config.nfft
-        batch = self.engine_config.batch
+        batch = self.engine_config.channels
         sample_rate = self.engine_config.sample_rate_hz
         n_samples = nfft
 
@@ -313,7 +313,7 @@ class AccuracyBenchmark(BaseBenchmark):
     def _compute_reference_fft(self, data: np.ndarray) -> np.ndarray:
         """Compute reference FFT using scipy."""
         assert self.engine_config is not None
-        data = data.reshape(self.engine_config.batch, self.engine_config.nfft)
+        data = data.reshape(self.engine_config.channels, self.engine_config.nfft)
 
         # Use double precision for reference if configured
         if self.config.use_double_precision_reference:
@@ -417,7 +417,7 @@ class AccuracyBenchmark(BaseBenchmark):
         time_energy = np.sum(windowed_signal**2)
 
         # Process and get frequency domain
-        test_batch = np.tile(test_signal, self.engine_config.batch)
+        test_batch = np.tile(test_signal, self.engine_config.channels)
         freq_output = self.engine.process(test_batch)
 
         # Compute frequency-domain energy (accounting for one-sided spectrum)
@@ -463,15 +463,15 @@ class AccuracyBenchmark(BaseBenchmark):
         )
 
         # Process individually
-        batch1 = np.tile(signal1, self.engine_config.batch)
-        batch2 = np.tile(signal2, self.engine_config.batch)
+        batch1 = np.tile(signal1, self.engine_config.channels)
+        batch2 = np.tile(signal2, self.engine_config.channels)
 
         output1 = self.engine.process(batch1)
         output2 = self.engine.process(batch2)
 
         # Process sum
         sum_signal = signal1 + signal2
-        sum_batch = np.tile(sum_signal, self.engine_config.batch)
+        sum_batch = np.tile(sum_signal, self.engine_config.channels)
         sum_output = self.engine.process(sum_batch)
 
         # Check linearity
@@ -490,7 +490,7 @@ class AccuracyBenchmark(BaseBenchmark):
         assert self.engine is not None
         # Test with DC signal (all ones)
         test_signal = np.ones(self.engine_config.nfft, dtype=np.float32)
-        test_batch = np.tile(test_signal, self.engine_config.batch)
+        test_batch = np.tile(test_signal, self.engine_config.channels)
 
         # Process
         output = self.engine.process(test_batch)

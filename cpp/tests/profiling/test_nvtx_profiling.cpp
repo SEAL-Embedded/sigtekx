@@ -64,7 +64,7 @@ TEST(NvtxProfilingTest, BenchmarkPhasesRun) {
 
   ExecutorConfig cfg;
   cfg.nfft = nfft;
-  cfg.batch = batch;
+  cfg.channels = batch;
   cfg.overlap = 0.5f;
   cfg.sample_rate_hz = 48000;
   cfg.stream_count = 3;

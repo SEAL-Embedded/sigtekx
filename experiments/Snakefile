@@ -37,7 +37,7 @@ rule run_throughput_sweep:
         python benchmarks/run_throughput.py --multirun \
             experiment=baseline \
             +benchmark=throughput \
-            "engine.batch=1,2,4,8,16,32,64"
+            "engine.channels=1,2,4,8,16,32,64"
         """
 
 # Run accuracy benchmark sweep
@@ -118,7 +118,7 @@ print('All artifacts cleaned')
 rule test:
     shell:
         """
-        python benchmarks/run_latency.py engine.nfft=512 engine.batch=1 +benchmark=latency benchmark.iterations=10
+        python benchmarks/run_latency.py engine.nfft=512 engine.channels=1 +benchmark=latency benchmark.iterations=10
         python experiments/scripts/analyze.py
         python experiments/scripts/generate_figures.py
         """

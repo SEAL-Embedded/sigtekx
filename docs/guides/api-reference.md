@@ -61,14 +61,14 @@ from ionosense_hpc import Engine, EngineConfig
 # Create custom configuration
 config = EngineConfig(
     nfft=4096,
-    batch=8,
+    channels=8,
     overlap=0.75,
     window='blackman',
     window_symmetry='periodic',
     window_norm='unity',
     scale='1/N',
     output='magnitude',
-    mode='batch'
+    mode='channels'
 )
 engine = Engine(config=config)
 
@@ -88,7 +88,7 @@ pipeline = (
     .add_window('blackman', symmetry='periodic', norm='unity')
     .add_fft(scale='1/N')
     .add_magnitude()
-    .configure(nfft=4096, batch=8, overlap=0.75)
+    .configure(nfft=4096, channels=8, overlap=0.75)
     .build()
 )
 engine = Engine(pipeline=pipeline)
@@ -186,7 +186,7 @@ import numpy as np
 from ionosense_hpc import Engine
 
 with Engine(preset='iono') as engine:
-    signal = np.random.randn(engine.config.nfft * engine.config.batch).astype(np.float32)
+    signal = np.random.randn(engine.config.nfft * engine.config.channels).astype(np.float32)
     spectrum = engine.process(signal)
 
     print(f"Input shape: {signal.shape}")
@@ -274,7 +274,7 @@ config = EngineConfig.from_preset('iono', nfft=32768, overlap=0.875)
 config = EngineConfig.from_preset('iono', mode='streaming')  # 4096 NFFT, 2 batch
 
 # Combine mode override with parameter overrides
-config = EngineConfig.from_preset('iono', mode='streaming', batch=4)
+config = EngineConfig.from_preset('iono', mode='streaming', channels=4)
 
 # Note: Mode parameter selects preset variant (batch vs streaming),
 # then applies mode-specific optimizations
@@ -308,7 +308,7 @@ pipeline = (
     .add_window('blackman', symmetry='periodic', norm='unity')
     .add_fft(scale='1/N')
     .add_magnitude()
-    .configure(nfft=4096, batch=8, overlap=0.75)
+    .configure(nfft=4096, channels=8, overlap=0.75)
     .build()
 )
 ```
@@ -331,7 +331,7 @@ pipeline = (
     .add_fft(scale='1/sqrt(N)')
     .configure(
         nfft=2048,
-        batch=4,
+        channels=4,
         overlap=0.625,
         mode='streaming',
         stream_count=4
@@ -370,7 +370,7 @@ config = EngineConfig(
     window_norm='unity',
     scale='1/N',
     output='magnitude',
-    mode='batch'
+    mode='channels'
 )
 ```
 

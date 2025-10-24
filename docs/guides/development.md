@@ -437,12 +437,12 @@ class TestEngine:
     def test_basic_processing(self):
         """Test basic signal processing."""
         config = Presets.validation()
-        test_data = np.random.randn(config.nfft * config.batch).astype(np.float32)
+        test_data = np.random.randn(config.nfft * config.channels).astype(np.float32)
 
         with Engine(config) as engine:
             output = engine.process(test_data)
 
-            assert output.shape == (config.batch, config.num_output_bins)
+            assert output.shape == (config.channels, config.num_output_bins)
             assert not np.any(np.isnan(output))
 ```
 

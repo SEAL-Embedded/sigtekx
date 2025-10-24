@@ -276,7 +276,7 @@ Primary user-facing API:
 from ionosense_hpc import Engine, EngineConfig
 
 # Create engine
-config = EngineConfig(nfft=2048, batch=4, overlap=0.75)
+config = EngineConfig(nfft=2048, channels=4, overlap=0.75)
 engine = Engine(config)
 
 # Process data
@@ -306,7 +306,7 @@ config = Presets.realtime()  # <100μs latency
 # Custom configuration
 config = EngineConfig(
     nfft=4096,
-    batch=8,
+    channels=8,
     overlap=0.5,
     sample_rate_hz=96000
 )
@@ -489,7 +489,7 @@ Pinned host buffers use double buffering:
 def estimate_memory_mb(config: EngineConfig) -> float:
     """Estimate GPU memory usage."""
     nfft = config.nfft
-    batch = config.batch
+    batch = config.channels
     num_bins = nfft // 2 + 1
     
     # Input buffers (double buffered)
@@ -510,7 +510,7 @@ def estimate_memory_mb(config: EngineConfig) -> float:
     return input_mb + intermediate_mb + output_mb + window_mb + work_mb
 ```
 
-Typical memory usage (nfft=1024, batch=2): **~10 MB**
+Typical memory usage (nfft=1024, channels=2): **~10 MB**
 
 ---
 
@@ -561,7 +561,7 @@ cufftExecR2C(plan, d_input, d_intermediate);
 **Performance Characteristics:**
 - Complexity: O(n log n)
 - Throughput: ~1000 FFTs/ms (nfft=1024)
-- Dominant stage for small batch sizes
+- Dominant stage for small channel counts
 
 #### **Stage 4: Magnitude Computation**
 ```cuda
@@ -678,7 +678,7 @@ Multirun mode for parameter sweeps:
 # Sweep over NFFT values
 python benchmarks/run_latency.py --multirun \
     engine.nfft=256,512,1024,2048,4096 \
-    engine.batch=1,2,4,8
+    engine.channels=1,2,4,8
 ```
 
 Hydra automatically:
@@ -818,7 +818,7 @@ with mlflow.start_run():
     # Log parameters
     mlflow.log_params({
         "nfft": config.nfft,
-        "batch": config.batch,
+        "channels": config.channels,
         "overlap": config.overlap
     })
     
@@ -1010,7 +1010,7 @@ public:
 
 ### 9.1 Measured Performance
 
-Based on validation benchmarks (RTX 4070, nfft=1024, batch=2):
+Based on validation benchmarks (RTX 4070, nfft=1024, channels=2):
 
 | Metric | Value | Comparison |
 |--------|-------|------------|
@@ -1044,7 +1044,7 @@ Batch   Latency (μs)   Throughput (FPS)
 16      478.9          ~2,100
 ```
 
-**Observation:** Near-linear scaling up to batch=8, then efficiency decreases due to memory bandwidth saturation.
+**Observation:** Near-linear scaling up to channels=8, then efficiency decreases due to memory bandwidth saturation.
 
 ### 9.3 Bottleneck Analysis
 
@@ -1056,7 +1056,7 @@ For typical configurations (nfft=1024-2048):
 4. **Synchronization**: <5% of total time
 
 **Optimization Strategies:**
-- Increase batch size to amortize transfer overhead
+- Increase channel count to amortize transfer overhead
 - Use CUDA streams to overlap compute and transfer
 - Consider CUDA Graphs for very low latency (future work)
 

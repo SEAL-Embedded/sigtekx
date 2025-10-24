@@ -2,7 +2,7 @@
 # Optimized for low-latency ionosphere analysis and live monitoring
 name: ionosphere_realtime
 nfft: 4096                    # Balanced resolution for real-time constraints
-batch: 2                      # Small batch for low latency
+channels: 2                   # Dual-channel antenna system
 overlap: 0.625                # Good temporal resolution without excessive computation
 sample_rate_hz: 48000         # Standard ionosphere monitoring rate
 mode: streaming               # Streaming executor for real-time antenna data

@@ -39,9 +39,9 @@ inline void run_warmup(BatchExecutor& executor, const BenchmarkConfig& config) {
   IONO_NVTX_RANGE("Warmup Phase", profiling::colors::LIGHT_GRAY);
 
   std::vector<float> warmup_input(static_cast<size_t>(config.nfft) *
-                                   config.batch);
+                                   config.channels);
   std::vector<float> warmup_output(
-      static_cast<size_t>(config.nfft / 2 + 1) * config.batch);
+      static_cast<size_t>(config.nfft / 2 + 1) * config.channels);
 
   for (int i = 0; i < config.warmup_iterations; ++i) {
     const std::string name = "Warmup " + std::to_string(i);

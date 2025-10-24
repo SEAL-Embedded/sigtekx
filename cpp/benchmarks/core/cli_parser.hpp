@@ -46,7 +46,7 @@ inline BenchmarkConfig parse_args(int argc, char* argv[]) {
   // Also collect parameter overrides
   struct Override {
     bool has_nfft = false;
-    bool has_batch = false;
+    bool has_channels = false;
     bool has_overlap = false;
     bool has_sample_rate = false;
     bool has_streams = false;
@@ -55,7 +55,7 @@ inline BenchmarkConfig parse_args(int argc, char* argv[]) {
     bool has_warmup = false;
     bool has_seed = false;
     int nfft = 0;
-    int batch = 0;
+    int channels = 0;
     float overlap = 0.0f;
     int sample_rate_hz = 0;
     int stream_count = 0;
@@ -91,7 +91,7 @@ IONOSPHERE VARIANTS (mutually exclusive):
 
 ENGINE PARAMETERS:
   --nfft <value>        FFT size (default: preset-dependent)
-  --batch <value>       Batch size (default: preset-dependent)
+  --channels <value>       Batch size (default: preset-dependent)
   --overlap <value>     Overlap ratio 0-1 (default: preset-dependent)
   --sample-rate <hz>    Sample rate in Hz (default: 48000)
   --streams <n>         CUDA streams (default: 3)
@@ -125,10 +125,10 @@ EXAMPLES:
   benchmark_engine --preset throughput --ionox --full
 
   # Custom experimentation
-  benchmark_engine --preset throughput --nfft 4096 --batch 16 --quick
+  benchmark_engine --preset throughput --nfft 4096 --channels 16 --quick
 
   # Blank canvas (override everything)
-  benchmark_engine --nfft 8192 --batch 32 --overlap 0.875 --iterations 100
+  benchmark_engine --nfft 8192 --channels 32 --overlap 0.875 --iterations 100
 
 IONOSPHERE PARAMETER REFERENCE:
   Preset      | --iono (standard)        | --ionox (extreme)
@@ -171,9 +171,9 @@ IONOSPHERE PARAMETER REFERENCE:
     else if (arg == "--nfft" && i + 1 < argc) {
       overrides.nfft = std::stoi(argv[++i]);
       overrides.has_nfft = true;
-    } else if (arg == "--batch" && i + 1 < argc) {
-      overrides.batch = std::stoi(argv[++i]);
-      overrides.has_batch = true;
+    } else if (arg == "--channels" && i + 1 < argc) {
+      overrides.channels = std::stoi(argv[++i]);
+      overrides.has_channels = true;
     } else if (arg == "--overlap" && i + 1 < argc) {
       overrides.overlap = std::stof(argv[++i]);
       overrides.has_overlap = true;
@@ -263,7 +263,7 @@ IONOSPHERE PARAMETER REFERENCE:
 
   // Apply parameter overrides
   if (overrides.has_nfft) config.nfft = overrides.nfft;
-  if (overrides.has_batch) config.batch = overrides.batch;
+  if (overrides.has_channels) config.channels = overrides.channels;
   if (overrides.has_overlap) config.overlap = overrides.overlap;
   if (overrides.has_sample_rate) config.sample_rate_hz = overrides.sample_rate_hz;
   if (overrides.has_streams) config.stream_count = overrides.stream_count;

@@ -1,6 +1,6 @@
 name: throughput
 nfft: 4096
-batch: 32
+channels: 32
 overlap: 0.5
 sample_rate_hz: 48000
 mode: batch

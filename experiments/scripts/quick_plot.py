@@ -107,7 +107,7 @@ def plot_throughput_quick(df: pd.DataFrame, save: bool = False, show: bool = Tru
 
     # FPS vs NFFT
     axes[0].scatter(throughput_data['engine_nfft'], throughput_data['frames_per_second'],
-                   c=throughput_data['engine_batch'], cmap='viridis', s=100, alpha=0.7)
+                   c=throughput_data['engine_channels'], cmap='viridis', s=100, alpha=0.7)
     axes[0].set_xlabel('NFFT Size')
     axes[0].set_ylabel('Frames Per Second')
     axes[0].set_title('Throughput: FPS vs NFFT')
@@ -121,7 +121,7 @@ def plot_throughput_quick(df: pd.DataFrame, save: bool = False, show: bool = Tru
 
     # FPS vs Batch Size
     if 'gb_per_second' in throughput_data.columns:
-        axes[1].scatter(throughput_data['engine_batch'], throughput_data['gb_per_second'],
+        axes[1].scatter(throughput_data['engine_channels'], throughput_data['gb_per_second'],
                        c=throughput_data['engine_nfft'], cmap='plasma', s=100, alpha=0.7)
         axes[1].set_xlabel('Batch Size')
         axes[1].set_ylabel('GB/Second')
@@ -131,7 +131,7 @@ def plot_throughput_quick(df: pd.DataFrame, save: bool = False, show: bool = Tru
         cbar2 = plt.colorbar(scatter2, ax=axes[1])
         cbar2.set_label('NFFT Size')
     else:
-        axes[1].scatter(throughput_data['engine_batch'], throughput_data['frames_per_second'],
+        axes[1].scatter(throughput_data['engine_channels'], throughput_data['frames_per_second'],
                        c=throughput_data['engine_nfft'], cmap='plasma', s=100, alpha=0.7)
         axes[1].set_xlabel('Batch Size')
         axes[1].set_ylabel('Frames Per Second')
@@ -161,7 +161,7 @@ def plot_latency_quick(df: pd.DataFrame, save: bool = False, show: bool = True, 
 
     # Mean latency vs NFFT
     axes[0].scatter(latency_data['engine_nfft'], latency_data['mean_latency_us'],
-                   c=latency_data['engine_batch'], cmap='viridis', s=100, alpha=0.7)
+                   c=latency_data['engine_channels'], cmap='viridis', s=100, alpha=0.7)
     axes[0].set_xlabel('NFFT Size')
     axes[0].set_ylabel('Mean Latency (us)')
     axes[0].set_title('Latency: Mean vs NFFT')
@@ -186,7 +186,7 @@ def plot_latency_quick(df: pd.DataFrame, save: bool = False, show: bool = True, 
         axes[1].legend()
     else:
         # Latency vs batch size
-        axes[1].scatter(latency_data['engine_batch'], latency_data['mean_latency_us'],
+        axes[1].scatter(latency_data['engine_channels'], latency_data['mean_latency_us'],
                        c=latency_data['engine_nfft'], cmap='plasma', s=100, alpha=0.7)
         axes[1].set_xlabel('Batch Size')
         axes[1].set_ylabel('Mean Latency (us)')
@@ -216,7 +216,7 @@ def plot_accuracy_quick(df: pd.DataFrame, save: bool = False, show: bool = True,
 
     # Pass rate vs NFFT
     axes[0].scatter(accuracy_data['engine_nfft'], accuracy_data['pass_rate'],
-                   c=accuracy_data['engine_batch'], cmap='viridis', s=100, alpha=0.7)
+                   c=accuracy_data['engine_channels'], cmap='viridis', s=100, alpha=0.7)
     axes[0].set_xlabel('NFFT Size')
     axes[0].set_ylabel('Pass Rate')
     axes[0].set_title('Accuracy: Pass Rate vs NFFT')
@@ -236,7 +236,7 @@ def plot_accuracy_quick(df: pd.DataFrame, save: bool = False, show: bool = True,
         axes[1].set_title('Accuracy: Pass Rate vs SNR')
     else:
         # Pass rate vs batch size
-        axes[1].scatter(accuracy_data['engine_batch'], accuracy_data['pass_rate'],
+        axes[1].scatter(accuracy_data['engine_channels'], accuracy_data['pass_rate'],
                        c=accuracy_data['engine_nfft'], cmap='plasma', s=100, alpha=0.7)
         axes[1].set_xlabel('Batch Size')
         axes[1].set_ylabel('Pass Rate')
@@ -277,18 +277,18 @@ def plot_overview_quick(df: pd.DataFrame, save: bool = False, show: bool = True,
 
         if benchmark_type == 'throughput' and 'frames_per_second' in subset.columns:
             axes[i].scatter(subset['engine_nfft'], subset['frames_per_second'],
-                           c=subset['engine_batch'], cmap='viridis', s=80, alpha=0.7)
+                           c=subset['engine_channels'], cmap='viridis', s=80, alpha=0.7)
             axes[i].set_ylabel('Frames Per Second')
             axes[i].set_title(f'Throughput Overview\n({len(subset)} measurements)')
         elif benchmark_type == 'latency' and 'mean_latency_us' in subset.columns:
             axes[i].scatter(subset['engine_nfft'], subset['mean_latency_us'],
-                           c=subset['engine_batch'], cmap='plasma', s=80, alpha=0.7)
+                           c=subset['engine_channels'], cmap='plasma', s=80, alpha=0.7)
             axes[i].set_ylabel('Mean Latency (us)')
             axes[i].set_yscale('log')
             axes[i].set_title(f'Latency Overview\n({len(subset)} measurements)')
         elif benchmark_type == 'accuracy' and 'pass_rate' in subset.columns:
             axes[i].scatter(subset['engine_nfft'], subset['pass_rate'],
-                           c=subset['engine_batch'], cmap='coolwarm', s=80, alpha=0.7)
+                           c=subset['engine_channels'], cmap='coolwarm', s=80, alpha=0.7)
             axes[i].set_ylabel('Pass Rate')
             axes[i].set_title(f'Accuracy Overview\n({len(subset)} measurements)')
 
@@ -322,10 +322,10 @@ def print_data_summary(df: pd.DataFrame):
             print(f"  {benchmark_type}: {len(subset)} measurements")
 
             if len(subset) > 0:
-                configs = subset[['engine_nfft', 'engine_batch']].drop_duplicates()
+                configs = subset[['engine_nfft', 'engine_channels']].drop_duplicates()
                 print(f"    Configurations: {len(configs)} unique NFFT/batch combinations")
                 print(f"    NFFT range: {subset['engine_nfft'].min()}-{subset['engine_nfft'].max()}")
-                print(f"    Batch range: {subset['engine_batch'].min()}-{subset['engine_batch'].max()}")
+                print(f"    Batch range: {subset['engine_channels'].min()}-{subset['engine_channels'].max()}")
 
     print()
 
@@ -371,7 +371,7 @@ def main():
     # Filter by specific configuration if requested
     if args.config:
         nfft, batch = args.config
-        df = df[(df['engine_nfft'] == nfft) & (df['engine_batch'] == batch)]
+        df = df[(df['engine_nfft'] == nfft) & (df['engine_channels'] == batch)]
         print(f"Filtered to NFFT={nfft}, Batch={batch}: {len(df)} measurements")
         if df.empty:
             print("No data matches the specified configuration")

@@ -2,7 +2,7 @@
 # Optimized for continuous monitoring and trend analysis over extended periods
 name: ionosphere_longterm
 nfft: 4096                    # Good frequency resolution while maintaining efficiency
-batch: 64                     # Large batch size for continuous data processing
+channels: 64                  # High channel count for throughput optimization
 overlap: 0.875                # Very high overlap for smooth temporal continuity
 sample_rate_hz: 48000         # Standard ionosphere monitoring rate
 mode: streaming               # Streaming executor for continuous antenna monitoring

@@ -48,7 +48,7 @@ class TestPresets:
         config = get_preset('default')
         assert isinstance(config, EngineConfig)
         assert config.nfft == 1024
-        assert config.batch == 2
+        assert config.channels == 2
         assert config.overlap == 0.5
         assert config.window == WindowType.HANN
         assert config.mode == ExecutionMode.BATCH
@@ -57,7 +57,7 @@ class TestPresets:
         """Test getting iono preset (defaults to batch)."""
         config = get_preset('iono')
         assert config.nfft == 16384  # Batch: higher resolution
-        assert config.batch == 32
+        assert config.channels == 32
         assert config.overlap == 0.75
         assert config.window == WindowType.BLACKMAN
         assert config.mode == ExecutionMode.BATCH
@@ -66,7 +66,7 @@ class TestPresets:
         """Test getting iono preset with streaming executor."""
         config = get_preset('iono', executor='streaming')
         assert config.nfft == 4096  # Streaming: lower latency
-        assert config.batch == 2
+        assert config.channels == 2
         assert config.overlap == 0.75
         assert config.mode == ExecutionMode.STREAMING
 
@@ -74,7 +74,7 @@ class TestPresets:
         """Test getting ionox preset (defaults to batch)."""
         config = get_preset('ionox')
         assert config.nfft == 32768  # Batch: maximum resolution
-        assert config.batch == 32
+        assert config.channels == 32
         assert config.overlap == 0.9375
         assert config.window == WindowType.BLACKMAN
         assert config.mode == ExecutionMode.BATCH
@@ -83,7 +83,7 @@ class TestPresets:
         """Test getting ionox preset with streaming executor."""
         config = get_preset('ionox', executor='streaming')
         assert config.nfft == 8192  # Streaming: balanced
-        assert config.batch == 2
+        assert config.channels == 2
         assert config.overlap == 0.9
         assert config.mode == ExecutionMode.STREAMING
 
@@ -133,7 +133,7 @@ class TestEngineConfig:
         """Test default configuration values."""
         config = EngineConfig()
         assert config.nfft == 1024
-        assert config.batch == 2
+        assert config.channels == 2
         assert config.overlap == 0.5
         assert config.sample_rate_hz == 48000
         assert config.window == WindowType.HANN
@@ -147,7 +147,7 @@ class TestEngineConfig:
         """Test creating custom configuration."""
         config = EngineConfig(
             nfft=4096,
-            batch=8,
+            channels=8,
             overlap=0.75,
             sample_rate_hz=96000,
             window=WindowType.BLACKMAN,
@@ -158,7 +158,7 @@ class TestEngineConfig:
         )
 
         assert config.nfft == 4096
-        assert config.batch == 8
+        assert config.channels == 8
         assert config.window == WindowType.BLACKMAN
         assert config.window_symmetry == WindowSymmetry.SYMMETRIC
         assert config.mode == ExecutionMode.STREAMING
@@ -167,14 +167,14 @@ class TestEngineConfig:
         """Test EngineConfig.from_preset() class method."""
         config = EngineConfig.from_preset('iono')
         assert config.nfft == 16384  # Batch variant (default)
-        assert config.batch == 32
+        assert config.channels == 32
 
     def test_from_preset_with_overrides(self):
         """Test preset with parameter overrides."""
         config = EngineConfig.from_preset('iono', nfft=32768, overlap=0.875)
         assert config.nfft == 32768  # Overridden
         assert config.overlap == 0.875  # Overridden
-        assert config.batch == 32  # From preset (batch variant)
+        assert config.channels == 32  # From preset (batch variant)
 
     def test_from_preset_with_mode_override(self):
         """Test preset with mode override."""
@@ -183,7 +183,7 @@ class TestEngineConfig:
         # Mode override should adjust stream/buffer counts for STREAMING
         assert config.stream_count == 6  # STREAMING mode override
         assert config.pinned_buffer_count == 4  # STREAMING mode override
-        assert config.batch == 2  # Minimal batch for lower latency
+        assert config.channels == 2  # Minimal batch for lower latency
 
     def test_computed_properties(self):
         """Test computed properties."""
@@ -226,7 +226,7 @@ class TestEngineConfig:
 
     def test_config_repr(self):
         """Test configuration string representation."""
-        config = EngineConfig(nfft=2048, batch=4, overlap=0.75)
+        config = EngineConfig(nfft=2048, channels=4, overlap=0.75)
         repr_str = repr(config)
 
         assert '2048' in repr_str
@@ -235,7 +235,7 @@ class TestEngineConfig:
 
     def test_config_to_dict(self):
         """Test configuration export to dictionary."""
-        config = EngineConfig(nfft=2048, batch=4)
+        config = EngineConfig(nfft=2048, channels=4)
         config_dict = config.to_dict()
 
         assert isinstance(config_dict, dict)
@@ -257,13 +257,13 @@ class TestPipelineBuilder:
             .add_window('hann')
             .add_fft()
             .add_magnitude()
-            .configure(nfft=1024, batch=2)
+            .configure(nfft=1024, channels=2)
             .build()
         )
 
         assert pipeline.num_stages == 3
         assert pipeline.config.nfft == 1024
-        assert pipeline.config.batch == 2
+        assert pipeline.config.channels == 2
 
     def test_custom_window_params(self):
         """Test pipeline with custom window parameters."""
@@ -276,7 +276,7 @@ class TestPipelineBuilder:
             )
             .add_fft(scale='1/N')
             .add_magnitude()
-            .configure(nfft=4096, batch=8)
+            .configure(nfft=4096, channels=8)
             .build()
         )
 
@@ -286,7 +286,7 @@ class TestPipelineBuilder:
 
     def test_pipeline_with_config_object(self):
         """Test pipeline with EngineConfig object."""
-        config = EngineConfig(nfft=2048, batch=4, overlap=0.75)
+        config = EngineConfig(nfft=2048, channels=4, overlap=0.75)
 
         pipeline = (
             PipelineBuilder()
@@ -298,7 +298,7 @@ class TestPipelineBuilder:
         )
 
         assert pipeline.config.nfft == 2048
-        assert pipeline.config.batch == 4
+        assert pipeline.config.channels == 4
 
     def test_pipeline_describe(self):
         """Test pipeline description."""
@@ -307,7 +307,7 @@ class TestPipelineBuilder:
             .add_window('blackman')
             .add_fft('1/sqrt(N)')
             .add_magnitude()
-            .configure(nfft=4096, batch=8, overlap=0.75)
+            .configure(nfft=4096, channels=8, overlap=0.75)
             .build()
         )
 
@@ -324,7 +324,7 @@ class TestPipelineBuilder:
             .add_window()
             .add_fft()
             .add_magnitude()
-            .configure(nfft=1024, batch=2)
+            .configure(nfft=1024, channels=2)
             .build()
         )
 
@@ -360,7 +360,7 @@ class TestPipelineBuilder:
             PipelineBuilder()
             .add_window()
             .add_fft()
-            .configure(nfft=1024, batch=2)
+            .configure(nfft=1024, channels=2)
         )
 
         builder.clear()
@@ -393,7 +393,7 @@ class TestEngineInitialization:
 
     def test_init_with_config_object(self):
         """Test initializing with EngineConfig object."""
-        config = EngineConfig(nfft=2048, batch=4)
+        config = EngineConfig(nfft=2048, channels=4)
         engine = Engine(config=config)
         assert engine.config.nfft == 2048
         assert engine.is_initialized
@@ -406,7 +406,7 @@ class TestEngineInitialization:
             .add_window('hann')
             .add_fft()
             .add_magnitude()
-            .configure(nfft=4096, batch=8)
+            .configure(nfft=4096, channels=8)
             .build()
         )
 
@@ -417,9 +417,9 @@ class TestEngineInitialization:
 
     def test_init_with_preset_and_overrides(self):
         """Test preset with quick parameter overrides."""
-        engine = Engine(preset='iono', nfft=8192, batch=16)
+        engine = Engine(preset='iono', nfft=8192, channels=16)
         assert engine.config.nfft == 8192  # Overridden
-        assert engine.config.batch == 16  # Overridden
+        assert engine.config.channels == 16  # Overridden
         assert engine.config.window == WindowType.BLACKMAN  # From preset
         engine.close()
 
@@ -456,7 +456,7 @@ class TestEngineInitialization:
             .add_window()
             .add_fft()
             .add_magnitude()
-            .configure(nfft=1024, batch=2)
+            .configure(nfft=1024, channels=2)
             .build()
         )
 
@@ -526,14 +526,14 @@ class TestEndToEndIntegration:
         engine = Engine(preset='iono')
 
         # Generate test data
-        n_samples = engine.config.nfft * engine.config.batch
+        n_samples = engine.config.nfft * engine.config.channels
         test_data = np.random.randn(n_samples).astype(np.float32)
 
         # Process
         output = engine.process(test_data)
 
         # Verify output shape
-        expected_shape = (engine.config.batch, engine.config.num_output_bins)
+        expected_shape = (engine.config.channels, engine.config.num_output_bins)
         assert output.shape == expected_shape
         assert output.dtype == np.float32
 
@@ -551,7 +551,7 @@ class TestEndToEndIntegration:
             .add_window('blackman', symmetry='periodic', norm='unity')
             .add_fft(scale='1/N')
             .add_magnitude()
-            .configure(nfft=4096, batch=8, overlap=0.75)
+            .configure(nfft=4096, channels=8, overlap=0.75)
             .build()
         )
 
@@ -636,7 +636,7 @@ class TestBackwardCompatibility:
         """Test config can be modified after creation."""
         config = get_preset('default')
         config.nfft = 2048
-        config.batch = 4
+        config.channels = 4
 
         assert config.nfft == 2048
-        assert config.batch == 4
+        assert config.channels == 4

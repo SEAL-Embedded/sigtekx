@@ -1,6 +1,6 @@
 name: realtime
 nfft: 1024
-batch: 2
+channels: 2
 overlap: 0.5
 sample_rate_hz: 48000
 mode: streaming

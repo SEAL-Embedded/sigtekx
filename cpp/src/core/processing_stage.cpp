@@ -30,11 +30,11 @@ namespace ionosense {
 namespace kernels {
 // Declares functions defined in another translation unit (.cu file).
 extern void launch_apply_window(const float* input, float* output,
-                                const float* window, int nfft, int batch,
+                                const float* window, int nfft, int channels,
                                 int stride, cudaStream_t stream);
 
 extern void launch_magnitude(const float2* input, float* output, int num_bins,
-                             int batch, int input_stride, float scale,
+                             int channels, int input_stride, float scale,
                              cudaStream_t stream);
 
 }  // namespace kernels
@@ -104,13 +104,13 @@ class WindowStage::Impl {
   void process(void* input, void* output, size_t num_samples,
                cudaStream_t stream) {
     const std::string range_name =
-        profiling::format_stage_range("Window", config_.batch, config_.nfft);
+        profiling::format_stage_range("Window", config_.channels, config_.nfft);
     IONO_NVTX_RANGE(range_name.c_str(), profiling::colors::PURPLE);
     if (!initialized_) {
       throw std::runtime_error("WindowStage not initialized");
     }
 
-    if (num_samples != static_cast<size_t>(config_.nfft * config_.batch)) {
+    if (num_samples != static_cast<size_t>(config_.nfft * config_.channels)) {
       throw std::runtime_error("Invalid number of samples for window stage");
     }
 
@@ -120,7 +120,7 @@ class WindowStage::Impl {
     {
       IONO_NVTX_RANGE("Window Kernel Launch", profiling::colors::PURPLE);
       kernels::launch_apply_window(input_ptr, output_ptr, d_window_.get(),
-                                   config_.nfft, config_.batch, config_.nfft,
+                                   config_.nfft, config_.channels, config_.nfft,
                                    stream);
     }
   }
@@ -179,7 +179,7 @@ class FFTStage::Impl {
           1,                    // ostride
           config.nfft / 2 + 1,  // odist (distance for R2C output)
           CUFFT_R2C,            // Transform type
-          config.batch,         // Number of transforms in the batch
+          config.channels,      // Number of transforms in the batch
           stream);
     }
     initialized_ = true;
@@ -189,13 +189,13 @@ class FFTStage::Impl {
   void process(void* input, void* output, size_t num_samples,
                cudaStream_t /*stream*/) {
     const std::string range_name =
-        profiling::format_stage_range("FFT", config_.batch, config_.nfft);
+        profiling::format_stage_range("FFT", config_.channels, config_.nfft);
     IONO_NVTX_RANGE(range_name.c_str(), profiling::colors::PURPLE);
     if (!initialized_) {
       throw std::runtime_error("FFTStage not initialized");
     }
 
-    if (num_samples != static_cast<size_t>(config_.nfft * config_.batch)) {
+    if (num_samples != static_cast<size_t>(config_.nfft * config_.channels)) {
       throw std::runtime_error("Invalid number of samples for FFT stage");
     }
 
@@ -269,7 +269,7 @@ class MagnitudeStage::Impl {
   void process(void* input, void* output, size_t num_elements,
                cudaStream_t stream) {
     const std::string range_name =
-        profiling::format_stage_range("Magnitude", config_.batch, config_.nfft);
+        profiling::format_stage_range("Magnitude", config_.channels, config_.nfft);
     IONO_NVTX_RANGE(range_name.c_str(), profiling::colors::PURPLE);
     if (!initialized_) {
       throw std::runtime_error("MagnitudeStage not initialized");
@@ -279,14 +279,14 @@ class MagnitudeStage::Impl {
     float* mag_output = static_cast<float*>(output);
 
     const int bins_per_frame = num_output_bins_;
-    const int frames = static_cast<int>(config_.batch);
+    const int frames = static_cast<int>(config_.channels);
 
     if (frames <= 0) {
-      throw std::runtime_error("MagnitudeStage: invalid batch size");
+      throw std::runtime_error("MagnitudeStage: invalid channel count");
     }
     if (num_elements % static_cast<size_t>(frames) != 0) {
       throw std::runtime_error(
-          "MagnitudeStage: num_elements not divisible by batch size");
+          "MagnitudeStage: num_elements not divisible by channel count");
     }
 
     const int inferred_stride =

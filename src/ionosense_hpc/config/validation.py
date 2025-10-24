@@ -59,8 +59,8 @@ def estimate_memory_usage_mb(config: EngineConfig) -> int:
         Estimated memory usage in megabytes
     """
     # Calculate buffer sizes
-    input_size = config.nfft * config.batch * 4  # float32
-    output_size = config.num_output_bins * config.batch * 4
+    input_size = config.nfft * config.channels * 4  # float32
+    output_size = config.num_output_bins * config.channels * 4
     complex_size = output_size * 2  # complex float
 
     # Account for all buffers
@@ -68,7 +68,7 @@ def estimate_memory_usage_mb(config: EngineConfig) -> int:
     total_bytes = per_buffer * config.pinned_buffer_count
 
     # Add workspace estimates
-    cufft_workspace = config.nfft * config.batch * 8  # Rough estimate
+    cufft_workspace = config.nfft * config.channels * 8  # Rough estimate
     total_bytes += cufft_workspace
 
     # Window coefficients
@@ -146,10 +146,10 @@ def validate_batch_size(data: np.ndarray, config: EngineConfig) -> None:
     Raises:
         ValidationError: If batch size doesn't match
     """
-    expected_samples = config.nfft * config.batch
+    expected_samples = config.nfft * config.channels
     if data.size != expected_samples:
         raise ValidationError(
             "Data size mismatch for batch processing",
-            expected=f"{expected_samples} samples ({config.batch} x {config.nfft})",
+            expected=f"{expected_samples} samples ({config.channels} x {config.nfft})",
             got=f"{data.size} samples"
         )

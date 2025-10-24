@@ -113,8 +113,8 @@ def plot_throughput_scaling(df: pd.DataFrame, output_dir: Path) -> None:
 
     # 2. Throughput vs Batch Size
     ax2 = axes[0, 1]
-    if len(throughput_data['engine_batch'].unique()) > 1:
-        batch_groups = throughput_data.groupby('engine_batch')['frames_per_second'].agg(['mean', 'std', 'count'])
+    if len(throughput_data['engine_channels'].unique()) > 1:
+        batch_groups = throughput_data.groupby('engine_channels')['frames_per_second'].agg(['mean', 'std', 'count'])
         batch_values = batch_groups.index
         fps_means = batch_groups['mean']
         fps_stds = batch_groups['std'].fillna(0)
@@ -135,7 +135,7 @@ def plot_throughput_scaling(df: pd.DataFrame, output_dir: Path) -> None:
     if len(throughput_data) > 2:
         pivot_data = throughput_data.pivot_table(
             index='engine_nfft',
-            columns='engine_batch',
+            columns='engine_channels',
             values='frames_per_second',
             aggfunc='mean'
         )
@@ -226,8 +226,8 @@ def plot_latency_analysis(df: pd.DataFrame, output_dir: Path) -> None:
 
     # 2. Latency vs Batch Size
     ax2 = axes[0, 1]
-    if len(latency_data['engine_batch'].unique()) > 1:
-        batch_groups = latency_data.groupby('engine_batch')['mean_latency_us'].agg(['mean', 'std', 'count'])
+    if len(latency_data['engine_channels'].unique()) > 1:
+        batch_groups = latency_data.groupby('engine_channels')['mean_latency_us'].agg(['mean', 'std', 'count'])
         batch_values = batch_groups.index
         latency_means = batch_groups['mean']
         latency_stds = batch_groups['std'].fillna(0)
@@ -263,7 +263,7 @@ def plot_latency_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     if len(latency_data) > 2:
         pivot_data = latency_data.pivot_table(
             index='engine_nfft',
-            columns='engine_batch',
+            columns='engine_channels',
             values='mean_latency_us',
             aggfunc='mean'
         )
@@ -329,7 +329,7 @@ def plot_combined_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         subset = df[df['benchmark_type'] == benchmark_type]
         if not subset.empty:
             colors = ['blue', 'red', 'green', 'orange', 'purple']
-            ax2.scatter(subset['engine_nfft'], subset['engine_batch'],
+            ax2.scatter(subset['engine_nfft'], subset['engine_channels'],
                        s=60, alpha=0.7, label=benchmark_type, color=colors[i % len(colors)])
 
     ax2.set_xlabel('NFFT Size')
@@ -388,7 +388,7 @@ def plot_combined_analysis(df: pd.DataFrame, output_dir: Path) -> None:
                 best_row = valid_throughput.loc[best_idx]
                 best_configs_text += "Best Throughput:\n"
                 best_configs_text += f"  NFFT: {int(best_row['engine_nfft'])}\n"
-                best_configs_text += f"  Batch: {int(best_row['engine_batch'])}\n"
+                best_configs_text += f"  Batch: {int(best_row['engine_channels'])}\n"
                 best_configs_text += f"  FPS: {best_row['frames_per_second']:.1f}\n\n"
 
     # Find best latency configuration
@@ -401,7 +401,7 @@ def plot_combined_analysis(df: pd.DataFrame, output_dir: Path) -> None:
                 best_row = valid_latency.loc[best_idx]
                 best_configs_text += "Best Latency:\n"
                 best_configs_text += f"  NFFT: {int(best_row['engine_nfft'])}\n"
-                best_configs_text += f"  Batch: {int(best_row['engine_batch'])}\n"
+                best_configs_text += f"  Batch: {int(best_row['engine_channels'])}\n"
                 best_configs_text += f"  Latency: {best_row['mean_latency_us']:.1f}μs\n\n"
 
     ax4.text(0.05, 0.95, best_configs_text, transform=ax4.transAxes,
@@ -447,7 +447,7 @@ def plot_accuracy_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         valid_data = accuracy_data.dropna(subset=['pass_rate'])
         if not valid_data.empty:
             ax.scatter(valid_data['engine_nfft'], valid_data['pass_rate'],
-                      s=100, alpha=0.7, c=valid_data['engine_batch'], cmap='viridis')
+                      s=100, alpha=0.7, c=valid_data['engine_channels'], cmap='viridis')
             ax.set_xlabel('NFFT Size')
             ax.set_ylabel('Pass Rate')
             ax.set_title('Accuracy vs NFFT Size')

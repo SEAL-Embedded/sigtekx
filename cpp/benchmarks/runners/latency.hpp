@@ -35,12 +35,12 @@ inline LatencyResults run_latency_benchmark(BatchExecutor& executor,
 
   LatencyResults results;
 
-  const size_t input_size = static_cast<size_t>(config.nfft) * config.batch;
+  const size_t input_size = static_cast<size_t>(config.nfft) * config.channels;
   const size_t output_size =
-      static_cast<size_t>(config.nfft / 2 + 1) * config.batch;
+      static_cast<size_t>(config.nfft / 2 + 1) * config.channels;
 
   std::vector<float> input =
-      generate_test_signal(config.nfft, config.batch, config.random_seed);
+      generate_test_signal(config.nfft, config.channels, config.random_seed);
   std::vector<float> output(output_size);
 
   results.latencies_us.reserve(config.iterations);

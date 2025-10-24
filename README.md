@@ -97,7 +97,7 @@ import numpy as np
 # Create engine with default preset (1024 FFT, sub-200μs latency)
 with Engine(preset='default') as engine:
     # Generate or load signal data
-    signal = np.random.randn(engine.config.nfft * engine.config.batch).astype(np.float32)
+    signal = np.random.randn(engine.config.nfft * engine.config.channels).astype(np.float32)
 
     # Process signal (GPU-accelerated FFT)
     spectrum = engine.process(signal)
@@ -131,7 +131,7 @@ from ionosense_hpc import Engine, EngineConfig
 # Full custom configuration
 config = EngineConfig(
     nfft=4096,                 # FFT size
-    batch=8,                   # Parallel processing
+    channels=8,                # Number of signal channels
     overlap=0.75,              # Window overlap
     sample_rate_hz=48000,      # Sampling rate
     window='blackman',         # Window function
@@ -237,7 +237,7 @@ experiment:
 
 engine:
   nfft: 4096
-  batch: 16
+  channels: 16
   overlap: 0.5
   sample_rate_hz: 48000
 ```
@@ -258,8 +258,8 @@ python benchmarks/run_latency.py experiment=baseline engine.nfft=2048
 # Sweep over NFFT sizes
 python benchmarks/run_latency.py --multirun experiment=nfft_scaling +benchmark=latency
 
-# Sweep over batch sizes
-python benchmarks/run_throughput.py --multirun experiment=batch_scaling +benchmark=throughput
+# Sweep over channel counts
+python benchmarks/run_throughput.py --multirun experiment=channels_scaling +benchmark=throughput
 
 # Custom parameter sweep
 python benchmarks/run_latency.py --multirun engine.nfft=1024,2048,4096,8192 +benchmark=latency

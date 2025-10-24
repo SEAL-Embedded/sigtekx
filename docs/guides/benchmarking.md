@@ -238,7 +238,7 @@ from ionosense_hpc.benchmarks import ScalingBenchmark
 benchmark = ScalingBenchmark()
 results = benchmark.run_scaling_analysis()
 
-print(f"Optimal batch size: {results['batch_scaling']['optimal_batch']}")
+print(f"Optimal channel count: {results['channels_scaling']['optimal_batch']}")
 print(f"Optimal FFT size: {results['nfft_scaling']['optimal_nfft']}")
 ```
 
@@ -283,7 +283,7 @@ sweep_type: grid
 parameters:
   - name: "engine_config.nfft"
     values: [256, 512, 1024, 2048, 4096]
-  - name: "engine_config.batch"
+  - name: "engine_config.channels"
     range:
       start: 1
       stop: 32
@@ -329,7 +329,7 @@ n_samples: 50
 parameters:
   - name: "engine_config.nfft"
     range: [256, 4096]
-  - name: "engine_config.batch"
+  - name: "engine_config.channels"
     range: [1, 16]
 ```
 
@@ -346,14 +346,14 @@ parameters:
 
 # Windows (dev shell)
 ibench bench latency
-ibench sweep nfft_batch_sweep -Benchmark latency -Multirun
+ibench sweep nfft_channels_sweep -Benchmark latency -Multirun
 ibench report
 ```
 
 **Programmatic Workflow:**
 ```powershell
 python benchmarks/run_latency.py experiment=baseline
-python benchmarks/run_latency.py --multirun experiment=nfft_batch_sweep
+python benchmarks/run_latency.py --multirun experiment=nfft_channels_sweep
 snakemake --cores 4 --snakefile experiments/Snakefile
 ```
 
@@ -559,7 +559,7 @@ outlier_threshold: 3.0
 
 engine_config:
   nfft: 1024
-  batch: 2
+  channels: 2
   overlap: 0.5
   sample_rate_hz: 48000
 
@@ -644,7 +644,7 @@ iono info devices                # Check GPU status
 
 3. **Low GPU Utilization**
    - **Diagnosis**: `./scripts/cli.sh profile nsys benchmark --full`
-   - **Solutions**: Increase batch size, optimize kernel launch
+   - **Solutions**: Increase channel count, optimize kernel launch
 
 ### Performance Optimization Workflow
 

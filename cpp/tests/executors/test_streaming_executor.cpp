@@ -42,7 +42,7 @@ class StreamingExecutorTest : public ::testing::Test {
 
     // Standard executor configuration for streaming/low-latency mode
     config_.nfft = 512;
-    config_.batch = 2;
+    config_.channels = 2;
     config_.overlap = 0.5f;
     config_.sample_rate_hz = 48000;
     config_.stream_count = 3;
@@ -76,7 +76,7 @@ TEST_F(StreamingExecutorTest, InitializationWithStreamingMode) {
   EXPECT_FALSE(executor.is_initialized());
 
   PipelineBuilder builder;
-  auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
+  auto stages = builder.with_config(StageConfig{config_.nfft, config_.channels})
                     .add_window(StageConfig::WindowType::HANN)
                     .add_fft()
                     .add_magnitude()
@@ -94,7 +94,7 @@ TEST_F(StreamingExecutorTest, InitializationWithBatchModeExpectedException) {
   batch_config.mode = ExecutorConfig::ExecutionMode::BATCH;
 
   PipelineBuilder builder;
-  auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
+  auto stages = builder.with_config(StageConfig{config_.nfft, config_.channels})
                     .add_fft()
                     .build();
 
@@ -107,7 +107,7 @@ TEST_F(StreamingExecutorTest, Reset) {
   StreamingExecutor executor;
 
   PipelineBuilder builder;
-  auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
+  auto stages = builder.with_config(StageConfig{config_.nfft, config_.channels})
                     .add_fft()
                     .build();
   executor.initialize(config_, std::move(stages));
@@ -125,15 +125,15 @@ TEST_F(StreamingExecutorTest, BasicProcessing) {
   StreamingExecutor executor;
 
   PipelineBuilder builder;
-  auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
+  auto stages = builder.with_config(StageConfig{config_.nfft, config_.channels})
                     .add_window(StageConfig::WindowType::HANN)
                     .add_fft()
                     .add_magnitude()
                     .build();
   executor.initialize(config_, std::move(stages));
 
-  const size_t input_size = config_.nfft * config_.batch;
-  const size_t output_size = config_.num_output_bins() * config_.batch;
+  const size_t input_size = config_.nfft * config_.channels;
+  const size_t output_size = config_.num_output_bins() * config_.channels;
   auto input = generate_sinusoid(input_size, 10.0f);
   std::vector<float> output(output_size);
 
@@ -154,14 +154,14 @@ TEST_F(StreamingExecutorTest, SubmitAsync) {
   StreamingExecutor executor;
 
   PipelineBuilder builder;
-  auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
+  auto stages = builder.with_config(StageConfig{config_.nfft, config_.channels})
                     .add_window(StageConfig::WindowType::HANN)
                     .add_fft()
                     .add_magnitude()
                     .build();
   executor.initialize(config_, std::move(stages));
 
-  const size_t input_size = config_.nfft * config_.batch;
+  const size_t input_size = config_.nfft * config_.channels;
   auto input = generate_sinusoid(input_size, 15.0f);
 
   bool callback_called = false;
@@ -180,13 +180,13 @@ TEST_F(StreamingExecutorTest, StatsReporting) {
   StreamingExecutor executor;
 
   PipelineBuilder builder;
-  auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
+  auto stages = builder.with_config(StageConfig{config_.nfft, config_.channels})
                     .add_fft()
                     .build();
   executor.initialize(config_, std::move(stages));
 
-  const size_t input_size = config_.nfft * config_.batch;
-  const size_t output_size = config_.num_output_bins() * config_.batch * 2;
+  const size_t input_size = config_.nfft * config_.channels;
+  const size_t output_size = config_.num_output_bins() * config_.channels * 2;
   auto input = generate_sinusoid(input_size, 10.0f);
   std::vector<float> output(output_size);
 
@@ -211,7 +211,7 @@ TEST_F(StreamingExecutorTest, MemoryUsage) {
   StreamingExecutor executor;
 
   PipelineBuilder builder;
-  auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
+  auto stages = builder.with_config(StageConfig{config_.nfft, config_.channels})
                     .add_fft()
                     .build();
 
@@ -233,7 +233,7 @@ TEST_F(StreamingExecutorTest, MoveConstruction) {
   StreamingExecutor executor1;
 
   PipelineBuilder builder;
-  auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
+  auto stages = builder.with_config(StageConfig{config_.nfft, config_.channels})
                     .add_fft()
                     .build();
   executor1.initialize(config_, std::move(stages));
@@ -246,7 +246,7 @@ TEST_F(StreamingExecutorTest, MoveAssignment) {
   StreamingExecutor executor1;
 
   PipelineBuilder builder;
-  auto stages = builder.with_config(StageConfig{config_.nfft, config_.batch})
+  auto stages = builder.with_config(StageConfig{config_.nfft, config_.channels})
                     .add_fft()
                     .build();
   executor1.initialize(config_, std::move(stages));

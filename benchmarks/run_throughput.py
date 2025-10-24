@@ -71,11 +71,11 @@ def run_throughput_benchmark(cfg: DictConfig) -> float:
     mlflow.set_tracking_uri(cfg.mlflow.tracking_uri)
     mlflow.set_experiment(cfg.mlflow.experiment_name)
 
-    with mlflow.start_run(run_name=f"throughput_{engine_config.nfft}x{engine_config.batch}"):
+    with mlflow.start_run(run_name=f"throughput_{engine_config.nfft}x{engine_config.channels}"):
         # Log configuration
         mlflow.log_params({
             "engine.nfft": engine_config.nfft,
-            "engine.batch": engine_config.batch,
+            "engine.channels": engine_config.channels,
             "engine.overlap": engine_config.overlap,
             "benchmark.test_duration_s": benchmark_config.test_duration_s,
         })
@@ -102,14 +102,14 @@ def run_throughput_benchmark(cfg: DictConfig) -> float:
         # Save summary
         summary = {
             'engine_nfft': engine_config.nfft,
-            'engine_batch': engine_config.batch,
+            'engine_channels': engine_config.channels,
             'frames_per_second': fps,
             'gb_per_second': result.statistics.get('gb_per_second', {}).get('mean', 0),
             'gpu_utilization': result.statistics.get('gpu_utilization_mean', 0),
         }
 
         summary_df = pd.DataFrame([summary])
-        summary_path = output_dir / f"throughput_summary_{engine_config.nfft}_{engine_config.batch}.csv"
+        summary_path = output_dir / f"throughput_summary_{engine_config.nfft}_{engine_config.channels}.csv"
         summary_df.to_csv(summary_path, index=False)
         mlflow.log_artifact(str(summary_path))
 

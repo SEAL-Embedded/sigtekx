@@ -347,10 +347,10 @@ class StreamingLatencyBenchmark(LatencyBenchmark):
         cfg2 = self.engine.config
         assert cfg2 is not None
         engine_config: EngineConfig = cfg2
-        chunk_size = engine_config.nfft * engine_config.batch
+        chunk_size = engine_config.nfft * engine_config.channels
 
         # Get next chunk with overlap
-        hop_size = engine_config.hop_size * engine_config.batch
+        hop_size = engine_config.hop_size * engine_config.channels
         start_idx = self.stream_position * hop_size
         end_idx = start_idx + chunk_size
 

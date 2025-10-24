@@ -82,16 +82,16 @@ class EngineConfig(BaseModel):
         >>> config = EngineConfig()
 
         # Quick parameter overrides
-        >>> config = EngineConfig(nfft=4096, batch=8, overlap=0.75)
+        >>> config = EngineConfig(nfft=4096, channels=8, overlap=0.75)
 
         # Full custom configuration
         >>> config = EngineConfig(
         ...     nfft=8192,
-        ...     batch=16,
+        ...     channels=16,
         ...     overlap=0.9,
         ...     window=WindowType.BLACKMAN,
         ...     window_symmetry=WindowSymmetry.PERIODIC,
-        ...     mode=ExecutionMode.BATCH
+        ...     mode=ExecutionMode.channels
         ... )
 
         # From preset (using class method)
@@ -108,10 +108,8 @@ class EngineConfig(BaseModel):
         description="FFT size (must be a power of 2)"
     )
 
-    batch: int = Field(
-        default=2,
-        gt=0,
-        description="Number of parallel signals to process"
+    channels: int = Field(
+        default=2, gt=0, description="Number of independent signal channels to process"
     )
 
     overlap: float = Field(
@@ -237,8 +235,8 @@ class EngineConfig(BaseModel):
         """Warns if configuration may exceed typical memory constraints."""
         import warnings
 
-        bytes_per_input_buffer = self.nfft * self.batch * 4  # float32
-        bytes_per_output_buffer = self.num_output_bins * self.batch * 4
+        bytes_per_input_buffer = self.nfft * self.channels * 4  # float32
+        bytes_per_output_buffer = self.num_output_bins * self.channels * 4
         total_bytes = (bytes_per_input_buffer + bytes_per_output_buffer) * self.pinned_buffer_count * 3
 
         if total_bytes > 256 * 1024**2:  # 256MB warning threshold
@@ -281,8 +279,8 @@ class EngineConfig(BaseModel):
     @property
     def memory_estimate_mb(self) -> float:
         """Estimated GPU memory usage in MB (rough estimate)."""
-        bytes_per_input = self.nfft * self.batch * 4
-        bytes_per_output = self.num_output_bins * self.batch * 4
+        bytes_per_input = self.nfft * self.channels * 4
+        bytes_per_output = self.num_output_bins * self.channels * 4
         total_bytes = (bytes_per_input + bytes_per_output) * self.pinned_buffer_count * 4
         return total_bytes / (1024 * 1024)
 
@@ -340,7 +338,7 @@ class EngineConfig(BaseModel):
     def __repr__(self) -> str:
         """Concise string representation."""
         return (
-            f"<EngineConfig nfft={self.nfft} batch={self.batch} "
+            f"<EngineConfig nfft={self.nfft} channels={self.channels} "
             f"overlap={self.overlap:.1%} mode={self.mode.value}>"
         )
 
@@ -360,11 +358,12 @@ def _apply_mode_overrides(config: EngineConfig, mode: ExecutionMode) -> EngineCo
         # Streaming: Minimize latency, reduce batch size, more streams
         overrides['stream_count'] = 6
         overrides['pinned_buffer_count'] = 4
-        overrides['batch'] = max(2, config.batch // 2)  # Reduce batch for lower latency
-    elif mode == ExecutionMode.BATCH:
+        overrides['batch'] = max(2, config.channels // 2)  # Reduce batch for lower latency
+    elif mode == ExecutionMode.channels:
         # Batch: Maximize throughput, use more buffers
         overrides['stream_count'] = 4
         overrides['pinned_buffer_count'] = 4
 
     overrides['mode'] = mode  # type: ignore[assignment]
     return config.model_copy(update=overrides)
+

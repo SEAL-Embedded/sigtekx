@@ -2,7 +2,7 @@
 # Optimized for fine frequency resolution and ionospheric scintillation analysis
 name: ionosphere_hires
 nfft: 8192                    # High frequency resolution for detailed spectral analysis
-batch: 16                     # Moderate batch size for memory efficiency
+channels: 16                  # Multi-channel parallel processing
 overlap: 0.75                 # High overlap for temporal resolution
 sample_rate_hz: 48000         # Standard ionosphere monitoring rate
 mode: streaming               # Streaming executor for continuous antenna data

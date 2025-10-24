@@ -48,11 +48,11 @@ def run_latency_benchmark(cfg: DictConfig) -> float:
     mlflow.set_tracking_uri(cfg.mlflow.tracking_uri)
     mlflow.set_experiment(cfg.mlflow.experiment_name)
 
-    with mlflow.start_run(run_name=f"latency_{engine_config.nfft}x{engine_config.batch}"):
+    with mlflow.start_run(run_name=f"latency_{engine_config.nfft}x{engine_config.channels}"):
         # Log configuration
         mlflow.log_params({
             "engine.nfft": engine_config.nfft,
-            "engine.batch": engine_config.batch,
+            "engine.channels": engine_config.channels,
             "engine.overlap": engine_config.overlap,
             "benchmark.iterations": benchmark_config.iterations,
             "benchmark.deadline_us": benchmark_config.deadline_us,
@@ -90,10 +90,10 @@ def run_latency_benchmark(cfg: DictConfig) -> float:
             df = pd.DataFrame({
                 'latency_us': latency_data,
                 'engine_nfft': engine_config.nfft,
-                'engine_batch': engine_config.batch,
+                'engine_channels': engine_config.channels,
             })
 
-            output_path = output_dir / f"latency_{engine_config.nfft}_{engine_config.batch}.parquet"
+            output_path = output_dir / f"latency_{engine_config.nfft}_{engine_config.channels}.parquet"
             df.to_parquet(output_path, index=False)
 
             # Log artifact to MLflow
@@ -102,14 +102,14 @@ def run_latency_benchmark(cfg: DictConfig) -> float:
         # Also save summary
         summary = {
             'engine_nfft': engine_config.nfft,
-            'engine_batch': engine_config.batch,
+            'engine_channels': engine_config.channels,
             'mean_latency_us': mean_latency,
             'p95_latency_us': result.statistics.get('latency_us', {}).get('p95', 0),
             'p99_latency_us': result.statistics.get('latency_us', {}).get('p99', 0),
         }
 
         summary_df = pd.DataFrame([summary])
-        summary_path = output_dir / f"latency_summary_{engine_config.nfft}_{engine_config.batch}.csv"
+        summary_path = output_dir / f"latency_summary_{engine_config.nfft}_{engine_config.channels}.csv"
         summary_df.to_csv(summary_path, index=False)
         mlflow.log_artifact(str(summary_path))
 

@@ -109,7 +109,7 @@ class ThroughputBenchmark(BaseBenchmark):
 
             # Determine test parameters
             bytes_per_sample = 4  # float32
-            samples_per_batch = self.engine_config.nfft * self.engine_config.batch
+            samples_per_batch = self.engine_config.nfft * self.engine_config.channels
             bytes_per_batch = samples_per_batch * bytes_per_sample
 
             if self.config.data_size_gb is not None:
@@ -316,7 +316,7 @@ class ScalingBenchmark(ThroughputBenchmark):
             # Create config for this batch size
             test_config = EngineConfig(
                 nfft=base_nfft,
-                batch=batch_size,
+                channels=batch_size,
                 warmup_iters=5
             )
 
@@ -364,7 +364,7 @@ class ScalingBenchmark(ThroughputBenchmark):
             # Create config for this FFT size
             test_config = EngineConfig(
                 nfft=nfft_size,
-                batch=base_batch,
+                channels=base_batch,
                 warmup_iters=5
             )
 
@@ -417,7 +417,7 @@ class ScalingBenchmark(ThroughputBenchmark):
         for nfft, batch in test_combinations:
             test_config = EngineConfig(
                 nfft=nfft,
-                batch=batch,
+                channels=batch,
                 warmup_iters=5
             )
 
@@ -440,7 +440,7 @@ class ScalingBenchmark(ThroughputBenchmark):
 
             combined_results.append({
                 'nfft': nfft,
-                'batch': batch,
+                'channels': batch,
                 'throughput_msps': throughput
             })
 

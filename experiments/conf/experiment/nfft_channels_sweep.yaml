@@ -3,9 +3,9 @@ defaults:
   - override /engine: realtime
 
 experiment:
-  name: nfft_batch_sweep
-  description: Systematic sweep of NFFT and batch size parameters for performance characterization
-  tags: [sweep, performance, nfft, batch]
+  name: nfft_channels_sweep
+  description: Systematic sweep of NFFT and channel count parameters for performance characterization
+  tags: [sweep, performance, nfft, channels]
 
 # Multirun configuration for comprehensive parameter sweep
 hydra:
@@ -13,7 +13,7 @@ hydra:
   sweeper:
     params:
       engine.nfft: 512,1024,2048,4096,8192
-      engine.batch: 1,2,4,8,16,32
+      engine.channels: 1,2,4,8,16,32
 
 # Analysis configuration
 analysis:

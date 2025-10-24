@@ -49,11 +49,11 @@ def run_accuracy_benchmark(cfg: DictConfig) -> float:
     mlflow.set_tracking_uri(cfg.mlflow.tracking_uri)
     mlflow.set_experiment(cfg.mlflow.experiment_name)
 
-    with mlflow.start_run(run_name=f"accuracy_{engine_config.nfft}x{engine_config.batch}"):
+    with mlflow.start_run(run_name=f"accuracy_{engine_config.nfft}x{engine_config.channels}"):
         # Log configuration
         mlflow.log_params({
             "engine.nfft": engine_config.nfft,
-            "engine.batch": engine_config.batch,
+            "engine.channels": engine_config.channels,
             "benchmark.absolute_tolerance": benchmark_config.absolute_tolerance,
             "benchmark.relative_tolerance": benchmark_config.relative_tolerance,
             "benchmark.snr_threshold_db": benchmark_config.snr_threshold_db,
@@ -93,7 +93,7 @@ def run_accuracy_benchmark(cfg: DictConfig) -> float:
                     'max_rel_error': test_result['comparison'].get('max_rel_error', 0),
                     'snr_db': test_result['comparison'].get('snr_db', 0),
                     'engine_nfft': engine_config.nfft,
-                    'engine_batch': engine_config.batch,
+                    'engine_channels': engine_config.channels,
                 }
                 # Add GPU vs Reference stats if available
                 if 'gpu_stats' in test_result:
@@ -104,21 +104,21 @@ def run_accuracy_benchmark(cfg: DictConfig) -> float:
                 results_data.append(row)
 
             df = pd.DataFrame(results_data)
-            output_path = output_dir / f"accuracy_details_{engine_config.nfft}_{engine_config.batch}.csv"
+            output_path = output_dir / f"accuracy_details_{engine_config.nfft}_{engine_config.channels}.csv"
             df.to_csv(output_path, index=False)
             mlflow.log_artifact(str(output_path))
 
         # Save summary
         summary = {
             'engine_nfft': engine_config.nfft,
-            'engine_batch': engine_config.batch,
+            'engine_channels': engine_config.channels,
             'pass_rate': extract_float(result.statistics.get('pass_rate', 0)),
             'mean_snr_db': extract_float(result.statistics.get('mean_snr_db', 0)),
             'mean_error': extract_float(result.statistics.get('mean_error', 0)),
         }
 
         summary_df = pd.DataFrame([summary])
-        summary_path = output_dir / f"accuracy_summary_{engine_config.nfft}_{engine_config.batch}.csv"
+        summary_path = output_dir / f"accuracy_summary_{engine_config.nfft}_{engine_config.channels}.csv"
         summary_df.to_csv(summary_path, index=False)
         mlflow.log_artifact(str(summary_path))
 

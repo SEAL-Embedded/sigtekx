@@ -87,7 +87,7 @@ class EnhancedDemoGenerator:
 
             engine_config = EngineConfig(
                 nfft=nfft,
-                batch=batch,
+                channels=batch,
                 overlap=0.5,
                 sample_rate_hz=48000,
                 stream_count=3,
@@ -107,7 +107,7 @@ class EnhancedDemoGenerator:
             config_info = {
                 "name": config_name,
                 "nfft": nfft,
-                "batch": batch,
+                "channels": batch,
                 "category": category,
                 "description": description,
                 "total_samples": nfft * batch,
@@ -143,7 +143,7 @@ class EnhancedDemoGenerator:
         metrics = {
             "config": config_name,
             "nfft": engine_config.nfft,
-            "batch": engine_config.batch,
+            "channels": engine_config.channels,
             "measurements": {}
         }
 
@@ -232,7 +232,7 @@ class EnhancedDemoGenerator:
             metrics["measurements"]["throughput"] = self._generate_synthetic_throughput(engine_config)
 
         # Real-time compliance testing (for suitable configs)
-        if engine_config.nfft <= 2048 and engine_config.batch <= 16:
+        if engine_config.nfft <= 2048 and engine_config.channels <= 16:
             print("  • Real-time compliance (10s stream)...")
             try:
                 realtime_config = RealtimeBenchmarkConfig(
@@ -278,7 +278,7 @@ class EnhancedDemoGenerator:
 
     def _generate_synthetic_latency(self, config: EngineConfig) -> dict:
         """Generate realistic synthetic latency data as fallback."""
-        base_latency = 50 + (config.nfft / 256) * 20 + (config.batch - 1) * 5
+        base_latency = 50 + (config.nfft / 256) * 20 + (config.channels - 1) * 5
         std = base_latency * 0.05
 
         return {
@@ -297,22 +297,22 @@ class EnhancedDemoGenerator:
 
     def _generate_synthetic_throughput(self, config: EngineConfig) -> dict:
         """Generate realistic synthetic throughput data as fallback."""
-        samples_per_frame = config.nfft * config.batch
-        base_fps = 50000 / (1 + np.log2(config.nfft) * config.batch * 0.1)
+        samples_per_frame = config.nfft * config.channels
+        base_fps = 50000 / (1 + np.log2(config.nfft) * config.channels * 0.1)
 
         return {
             "frames_per_second": round(base_fps, 1),
             "gb_per_second": round(base_fps * samples_per_frame * 4 / 1e9, 3),
             "samples_per_second": round(base_fps * samples_per_frame, 0),
             "memory_bandwidth_gbs": round(base_fps * samples_per_frame * 8 / 1e9, 2),
-            "gpu_utilization": round(min(95, 10 + np.log2(config.nfft) * config.batch * 2), 1),
-            "memory_utilization": round(min(90, 5 + config.batch * 2.5), 1),
-            "power_consumption_w": round(150 + config.batch * 3 + np.log2(config.nfft) * 5, 1)
+            "gpu_utilization": round(min(95, 10 + np.log2(config.nfft) * config.channels * 2), 1),
+            "memory_utilization": round(min(90, 5 + config.channels * 2.5), 1),
+            "power_consumption_w": round(150 + config.channels * 3 + np.log2(config.nfft) * 5, 1)
         }
 
     def _generate_synthetic_realtime(self, config: EngineConfig) -> dict:
         """Generate realistic synthetic real-time data as fallback."""
-        base_compliance = 1.0 - (config.nfft / 8192) * 0.3 - (config.batch / 32) * 0.2
+        base_compliance = 1.0 - (config.nfft / 8192) * 0.3 - (config.channels / 32) * 0.2
 
         return {
             "compliance_rate": round(max(0.5, base_compliance), 3),
@@ -494,7 +494,7 @@ class EnhancedDemoGenerator:
 
                 engine_config = EngineConfig(
                     nfft=nfft,
-                    batch=batch,
+                    channels=batch,
                     overlap=0.5,
                     sample_rate_hz=48000,
                     warmup_iters=50,
@@ -507,7 +507,7 @@ class EnhancedDemoGenerator:
                     "config_name": config_name,
                     "description": description,
                     "nfft": nfft,
-                    "batch": batch,
+                    "channels": batch,
                     "metrics": metrics["measurements"]
                 })
 

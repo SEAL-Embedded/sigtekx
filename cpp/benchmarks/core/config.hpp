@@ -61,7 +61,7 @@ struct BenchmarkConfig {
 
   // Engine parameters
   int nfft = 2048;
-  int batch = 4;
+  int channels = 4;
   float overlap = 0.625f;
   int sample_rate_hz = 48000;
   int stream_count = 3;
@@ -108,7 +108,7 @@ inline BenchmarkConfig get_dev_config() {
   BenchmarkConfig config;
   config.preset = BenchmarkPreset::DEV;
   config.nfft = 2048;
-  config.batch = 2;
+  config.channels = 2;
   config.overlap = 0.5f;
   config.sample_rate_hz = 100000;  // 100kHz for regular benchmarks
   config.iterations = 20;
@@ -121,7 +121,7 @@ inline BenchmarkConfig get_latency_config(RunMode mode = RunMode::FULL) {
   config.preset = BenchmarkPreset::LATENCY;
   config.run_mode = mode;
   config.nfft = 2048;
-  config.batch = 2;  // Low batch for minimal latency
+  config.channels = 2;  // Low channel count for minimal latency
   config.overlap = 0.5f;  // 50% overlap for regular benchmarks
   config.sample_rate_hz = 100000;  // 100kHz
   config.deadline_us = 200.0f;
@@ -151,7 +151,7 @@ inline BenchmarkConfig get_throughput_config(RunMode mode = RunMode::FULL) {
   config.preset = BenchmarkPreset::THROUGHPUT;
   config.run_mode = mode;
   config.nfft = 4096;
-  config.batch = 32;  // Large batch for throughput
+  config.channels = 32;  // Large channel count for throughput
   config.overlap = 0.5f;  // 50% overlap
   config.sample_rate_hz = 100000;  // 100kHz
   config.measure_bandwidth = false;
@@ -180,7 +180,7 @@ inline BenchmarkConfig get_realtime_config(RunMode mode = RunMode::FULL) {
   config.preset = BenchmarkPreset::REALTIME;
   config.run_mode = mode;
   config.nfft = 2048;
-  config.batch = 2;  // Low batch for streaming latency
+  config.channels = 2;  // Low channel count for streaming latency
   config.overlap = 0.5f;  // 50% overlap
   config.sample_rate_hz = 100000;  // 100kHz
   config.strict_timing = true;
@@ -211,7 +211,7 @@ inline BenchmarkConfig get_accuracy_config(RunMode mode = RunMode::FULL) {
   config.preset = BenchmarkPreset::ACCURACY;
   config.run_mode = mode;
   config.nfft = 2048;
-  config.batch = 1;  // Single batch for reference test
+  config.channels = 1;  // Single channel for reference test
   config.overlap = 0.0f;  // 0% overlap
   config.sample_rate_hz = 100000;  // 100kHz
 
@@ -249,28 +249,28 @@ inline void apply_iono_variant(BenchmarkConfig& config) {
 
   switch (config.preset) {
     case BenchmarkPreset::LATENCY:
-      // Iono latency: 4096 NFFT, low batch for minimal latency
+      // Iono latency: 4096 NFFT, low channel count for minimal latency
       config.nfft = 4096;
-      config.batch = 2;
+      config.channels = 2;
       break;
 
     case BenchmarkPreset::THROUGHPUT:
       // Iono throughput: 16384 NFFT, large batch for ULF/VLF detection
       config.nfft = 16384;
-      config.batch = 32;
+      config.channels = 32;
       break;
 
     case BenchmarkPreset::REALTIME:
-      // Iono realtime: 4096 NFFT, low batch for streaming latency
+      // Iono realtime: 4096 NFFT, low channel count for streaming latency
       config.nfft = 4096;
-      config.batch = 2;
+      config.channels = 2;
       config.strict_timing = true;
       break;
 
     case BenchmarkPreset::ACCURACY:
       // Iono accuracy: 4096 NFFT, single batch
       config.nfft = 4096;
-      config.batch = 1;
+      config.channels = 1;
       break;
 
     case BenchmarkPreset::DEV:
@@ -285,23 +285,23 @@ inline void apply_ionox_variant(BenchmarkConfig& config) {
 
   switch (config.preset) {
     case BenchmarkPreset::LATENCY:
-      // Ionox latency: 8192 NFFT, 90% overlap, low batch
+      // Ionox latency: 8192 NFFT, 90% overlap, low channel count
       config.nfft = 8192;
-      config.batch = 2;
+      config.channels = 2;
       config.overlap = 0.9f;
       break;
 
     case BenchmarkPreset::THROUGHPUT:
       // Ionox throughput: 32768 NFFT, 93.75% overlap for extreme missile detection
       config.nfft = 32768;
-      config.batch = 32;
+      config.channels = 32;
       config.overlap = 0.9375f;
       break;
 
     case BenchmarkPreset::REALTIME:
-      // Ionox realtime: 8192 NFFT, 90% overlap, low batch
+      // Ionox realtime: 8192 NFFT, 90% overlap, low channel count
       config.nfft = 8192;
-      config.batch = 2;
+      config.channels = 2;
       config.overlap = 0.9f;
       config.strict_timing = true;
       break;
@@ -309,7 +309,7 @@ inline void apply_ionox_variant(BenchmarkConfig& config) {
     case BenchmarkPreset::ACCURACY:
       // Ionox accuracy: 8192 NFFT, 90% overlap, single batch
       config.nfft = 8192;
-      config.batch = 1;
+      config.channels = 1;
       config.overlap = 0.9f;
       break;
 

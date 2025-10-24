@@ -1,6 +1,6 @@
 name: profiling
 nfft: 2048
-batch: 8
+channels: 8
 overlap: 0.5
 sample_rate_hz: 48000
 mode: streaming

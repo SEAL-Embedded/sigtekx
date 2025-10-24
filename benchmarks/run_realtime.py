@@ -48,12 +48,12 @@ def run_realtime_benchmark(cfg: DictConfig) -> float:
     mlflow.set_tracking_uri(cfg.mlflow.tracking_uri)
     mlflow.set_experiment(cfg.mlflow.experiment_name)
 
-    run_name = f"realtime_{engine_config.nfft}x{engine_config.batch}"
+    run_name = f"realtime_{engine_config.nfft}x{engine_config.channels}"
     with mlflow.start_run(run_name=run_name):
         # Log configuration parameters
         mlflow.log_params({
             "engine.nfft": engine_config.nfft,
-            "engine.batch": engine_config.batch,
+            "engine.channels": engine_config.channels,
             "engine.overlap": engine_config.overlap,
             "benchmark.stream_duration_s": benchmark_config.stream_duration_s,
             "benchmark.frame_deadline_ms": benchmark_config.frame_deadline_ms,
@@ -107,7 +107,7 @@ def run_realtime_benchmark(cfg: DictConfig) -> float:
 
         summary = {
             "engine_nfft": engine_config.nfft,
-            "engine_batch": engine_config.batch,
+            "engine_channels": engine_config.channels,
             "stream_duration_s": benchmark_config.stream_duration_s,
             "deadline_compliance_rate": compliance,
             "mean_latency_ms": extract_float(stats.get("mean_latency_ms"), 0.0),
@@ -119,7 +119,7 @@ def run_realtime_benchmark(cfg: DictConfig) -> float:
         }
 
         summary_df = pd.DataFrame([summary])
-        summary_path = output_dir / f"realtime_summary_{engine_config.nfft}_{engine_config.batch}.csv"
+        summary_path = output_dir / f"realtime_summary_{engine_config.nfft}_{engine_config.channels}.csv"
         summary_df.to_csv(summary_path, index=False)
         mlflow.log_artifact(str(summary_path))
 

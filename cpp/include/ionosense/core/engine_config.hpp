@@ -1,12 +1,16 @@
 /**
  * @file engine_config.hpp
- * @version 0.9.3
- * @date 2025-10-09
+ * @version 0.9.4
+ * @date 2025-10-23
  * @author [Kevin Rahsaz]
  *
- * @brief Core configuration structures for the processing engine.
+ * @brief Core configuration structures for signal processing.
  *
  * Defines EngineConfig and utility functions used across the library.
+ *
+ * ⚠️  BREAKING CHANGE (v0.9.4): 'batch' renamed to 'channels' for clarity.
+ * - 'channels' = number of independent signal channels (e.g., dual antenna = 2)
+ * - Industry-standard terminology alignment
  */
 
 #pragma once
@@ -18,12 +22,15 @@ namespace ionosense {
 
 /**
  * @struct EngineConfig
- * @brief Configuration structure for the processing engine.
+ * @brief Core configuration for signal processing parameters.
+ *
+ * Contains fundamental signal processing parameters used by all executors.
+ * For executor-specific settings (e.g., execution mode), see ExecutorConfig.
  */
 struct EngineConfig {
   // Signal Parameters
   int nfft = 1024;
-  int batch = 2;
+  int channels = 2;  // Renamed from 'batch' in v0.9.4 for clarity
   float overlap = 0.5f;
   int sample_rate_hz = 48000;
 

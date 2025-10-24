@@ -39,9 +39,9 @@ inline void run_warmup(BatchExecutor& executor, const BenchmarkConfig& config) {
   IONO_NVTX_RANGE("Warmup Phase", profiling::colors::LIGHT_GRAY);
 
   std::vector<float> warmup_input(static_cast<size_t>(config.nfft) *
-                                   config.batch);
+                                   config.channels);
   std::vector<float> warmup_output(
-      static_cast<size_t>(config.nfft / 2 + 1) * config.batch);
+      static_cast<size_t>(config.nfft / 2 + 1) * config.channels);
 
   for (int i = 0; i < config.warmup_iterations; ++i) {
     const std::string name = "Warmup " + std::to_string(i);
@@ -76,12 +76,12 @@ inline LatencyResults run_latency_benchmark(BatchExecutor& executor,
 
   LatencyResults results;
 
-  const size_t input_size = static_cast<size_t>(config.nfft) * config.batch;
+  const size_t input_size = static_cast<size_t>(config.nfft) * config.channels;
   const size_t output_size =
-      static_cast<size_t>(config.nfft / 2 + 1) * config.batch;
+      static_cast<size_t>(config.nfft / 2 + 1) * config.channels;
 
   std::vector<float> input =
-      generate_test_signal(config.nfft, config.batch, config.random_seed);
+      generate_test_signal(config.nfft, config.channels, config.random_seed);
   std::vector<float> output(output_size);
 
   results.latencies_us.reserve(config.iterations);
@@ -217,12 +217,12 @@ inline ThroughputResults run_throughput_benchmark(BatchExecutor& executor,
 
   ThroughputResults results;
 
-  const size_t input_size = static_cast<size_t>(config.nfft) * config.batch;
+  const size_t input_size = static_cast<size_t>(config.nfft) * config.channels;
   const size_t output_size =
-      static_cast<size_t>(config.nfft / 2 + 1) * config.batch;
+      static_cast<size_t>(config.nfft / 2 + 1) * config.channels;
 
   std::vector<float> input =
-      generate_test_signal(config.nfft, config.batch, config.random_seed);
+      generate_test_signal(config.nfft, config.channels, config.random_seed);
   std::vector<float> output(output_size);
 
   size_t frame_count = 0;
@@ -287,12 +287,12 @@ inline RealtimeResults run_realtime_benchmark(BatchExecutor& executor,
         (static_cast<float>(hop_size) / static_cast<float>(config.sample_rate_hz)) * 1000.0f;
   }
 
-  const size_t input_size = static_cast<size_t>(config.nfft) * config.batch;
+  const size_t input_size = static_cast<size_t>(config.nfft) * config.channels;
   const size_t output_size =
-      static_cast<size_t>(config.nfft / 2 + 1) * config.batch;
+      static_cast<size_t>(config.nfft / 2 + 1) * config.channels;
 
   std::vector<float> input =
-      generate_test_signal(config.nfft, config.batch, config.random_seed);
+      generate_test_signal(config.nfft, config.channels, config.random_seed);
   std::vector<float> output(output_size);
 
   std::vector<float> frame_latencies_ms;
@@ -397,9 +397,9 @@ inline AccuracyResults run_accuracy_benchmark(BatchExecutor& executor,
 
   AccuracyResults results;
 
-  const size_t input_size = static_cast<size_t>(config.nfft) * config.batch;
+  const size_t input_size = static_cast<size_t>(config.nfft) * config.channels;
   const size_t output_size =
-      static_cast<size_t>(config.nfft / 2 + 1) * config.batch;
+      static_cast<size_t>(config.nfft / 2 + 1) * config.channels;
 
   // Single test: Pure sine wave with full pipeline validation
   {
@@ -407,7 +407,7 @@ inline AccuracyResults run_accuracy_benchmark(BatchExecutor& executor,
 
     // Generate pure sine at frequency bin 10
     std::vector<float> input = generate_test_signal(
-        config.nfft, config.batch, config.random_seed, SignalType::PURE_SINE);
+        config.nfft, config.channels, config.random_seed, SignalType::PURE_SINE);
     std::vector<float> output(output_size);
 
     // Run engine processing
@@ -416,7 +416,7 @@ inline AccuracyResults run_accuracy_benchmark(BatchExecutor& executor,
 
     // Compute reference that EXACTLY matches pipeline
     std::vector<float> reference = compute_pipeline_reference(
-        input, config.nfft, config.batch);
+        input, config.nfft, config.channels);
 
     // Compare numerically
     float max_error = compute_max_error(output, reference);

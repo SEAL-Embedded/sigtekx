@@ -5,6 +5,42 @@ All notable changes to the Ionosense-HPC project will be documented in this file
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.4] - 2025-10-23
+
+### Changed
+
+#### BREAKING: Terminology Refactor - `batch` → `channels`
+
+**Motivation**: Aligned terminology with industry standards and eliminated confusion between:
+- **Number of signal channels** (dual antenna = 2 channels)
+- **Execution mode** (batch vs streaming)
+- **Temporal batching** (frames processed together)
+
+**What Changed**:
+- `EngineConfig.batch` → `EngineConfig.channels`
+- `engine.batch` → `engine.channels` (in all YAML configs)
+- `experiment=batch_scaling` → `experiment=channels_scaling`
+- `nfft_batch_sweep.yaml` → `nfft_channels_sweep.yaml`
+
+**Migration**:
+```python
+# OLD (v0.9.3 and earlier)
+config = EngineConfig(nfft=4096, batch=8, overlap=0.5)
+engine = Engine(config=config)
+
+# NEW (v0.9.4+)
+config = EngineConfig(nfft=4096, channels=8, overlap=0.5)
+engine = Engine(config=config)
+```
+
+**Impact**:
+- ⚠️ **Zero backwards compatibility** - all old code using `batch` will fail with clear AttributeError
+- All C++ core, Python bindings, benchmarks, tests, and configs updated
+- Documentation updated to reflect industry-standard terminology
+- YAML experiment configs and Snakemake workflows updated
+
+**Note**: The `mode='batch'` parameter (execution mode) is unchanged - it still refers to batch vs streaming execution strategy.
+
 ## [0.9.3] - 2025-10-15
 
 ### Added

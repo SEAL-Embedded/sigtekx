@@ -144,7 +144,7 @@ def setup_logging(
 def log_config(config: 'EngineConfig', level: int = logging.INFO) -> None:
     """Logs key engine configuration parameters."""
     logger.log(level, "Engine Configuration:")
-    logger.log(level, f"  FFT Size: {config.nfft}, Batch Size: {config.batch}")
+    logger.log(level, f"  FFT Size: {config.nfft}, Batch Size: {config.channels}")
     logger.log(level, f"  Sample Rate: {config.sample_rate_hz} Hz, Overlap: {config.overlap:.1%}")
     logger.log(level, f"  Frame/Hop Duration: {config.frame_duration_ms:.2f}ms / {config.hop_duration_ms:.2f}ms")
 

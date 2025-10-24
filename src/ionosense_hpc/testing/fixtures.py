@@ -72,7 +72,7 @@ def validation_config() -> EngineConfig:
     """Provides a small, controlled configuration for validation and debugging (matches old 'validation' preset)."""
     return EngineConfig(
         nfft=256,
-        batch=1,
+        channels=1,
         overlap=0.0,
         sample_rate_hz=1000,
         warmup_iters=0
@@ -148,7 +148,7 @@ def yaml_benchmark_config(temp_data_dir: Path) -> Path:
         "warmup_iterations": 50,
         "engine_config": {
             "nfft": 1024,
-            "batch": 2,
+            "channels": 2,
             "overlap": 0.5
         },
         "test_signals": [
@@ -186,7 +186,7 @@ def mock_engine(monkeypatch) -> Engine:
         def __init__(self, config=None, **_):
             if config is None:
                 default_config = get_preset('default')
-                default_config.batch = 1
+                default_config.channels = 1
                 self.config = default_config
             else:
                 self.config = config
@@ -194,9 +194,9 @@ def mock_engine(monkeypatch) -> Engine:
 
         def process(self, data):
             _ = data  # ensure interface compatibility while keeping mock lightweight
-            batch = self.config.batch
+            batch = self.config.channels
             bins = self.config.num_output_bins
-            return np.random.randn(batch, bins).astype(np.float32)
+            return np.random.randn(channels, bins).astype(np.float32)
 
         def close(self):
             self.is_initialized = False
@@ -237,7 +237,7 @@ def test_sine_data() -> np.ndarray:
 @pytest.fixture
 def test_batch_data(seeded_rng: np.random.Generator) -> np.ndarray:
     """Generates standard dual-channel batch data for testing."""
-    config = EngineConfig(nfft=1024, batch=2, sample_rate_hz=48000)
+    config = EngineConfig(nfft=1024, channels=2, sample_rate_hz=48000)
     return cast(
         np.ndarray,
         make_test_batch(

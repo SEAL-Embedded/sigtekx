@@ -107,7 +107,7 @@ int main(int argc, char* argv[]) {
         std::cout << " (ionox)";
       }
       std::cout << " | Mode: " << mode_to_string(config.run_mode) << "\n";
-      std::cout << "NFFT: " << config.nfft << " | Batch: " << config.batch
+      std::cout << "NFFT: " << config.nfft << " | Batch: " << config.channels
                 << " | Overlap: " << config.overlap << "\n\n";
     }
 
@@ -115,7 +115,7 @@ int main(int argc, char* argv[]) {
     BatchExecutor executor;
     ExecutorConfig executor_config;
     executor_config.nfft = config.nfft;
-    executor_config.batch = config.batch;
+    executor_config.channels = config.channels;
     executor_config.overlap = config.overlap;
     executor_config.sample_rate_hz = config.sample_rate_hz;
     executor_config.stream_count = config.stream_count;

@@ -34,7 +34,7 @@ class PipelineBuilderTest : public ::testing::Test {
 
     // Standard configuration for tests
     config_.nfft = 512;
-    config_.batch = 2;
+    config_.channels = 2;
     config_.overlap = 0.5f;
     config_.sample_rate_hz = 48000;
   }
@@ -134,7 +134,7 @@ TEST_F(PipelineBuilderTest, ValidateInvalidNFFT) {
 
 TEST_F(PipelineBuilderTest, ValidateInvalidBatch) {
   StageConfig bad_config = config_;
-  bad_config.batch = 0;  // Not positive
+  bad_config.channels = 0;  // Not positive
 
   PipelineBuilder builder;
   builder.with_config(bad_config).add_fft();
@@ -190,7 +190,7 @@ TEST_F(PipelineBuilderTest, EstimateMemoryScalesWithConfig) {
 
   StageConfig large_config = config_;
   large_config.nfft = 4096;
-  large_config.batch = 8;
+  large_config.channels = 8;
 
   PipelineBuilder large_builder;
   large_builder.with_config(large_config).add_fft();

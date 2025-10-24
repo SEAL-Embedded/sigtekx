@@ -75,7 +75,7 @@ def analyze_throughput_data(df: pd.DataFrame) -> dict:
         'total_runs': len(df),
         'parameter_ranges': {
             'nfft': {'min': df['engine_nfft'].min(), 'max': df['engine_nfft'].max()},
-            'batch': {'min': df['engine_batch'].min(), 'max': df['engine_batch'].max()}
+            'channels': {'min': df['engine_channels'].min(), 'max': df['engine_channels'].max()}
         }
     }
 
@@ -107,14 +107,14 @@ def analyze_throughput_data(df: pd.DataFrame) -> dict:
         analysis['nfft_scaling'] = nfft_scaling.to_dict('index')
 
         # Group by batch size to see scaling
-        batch_scaling = df.groupby('engine_batch')['frames_per_second'].agg(['mean', 'std', 'count'])
+        batch_scaling = df.groupby('engine_channels')['frames_per_second'].agg(['mean', 'std', 'count'])
         analysis['batch_scaling'] = batch_scaling.to_dict('index')
 
         # Find optimal configuration
         best_fps_idx = df['frames_per_second'].idxmax()
         analysis['best_performance'] = {
             'nfft': int(df.loc[best_fps_idx, 'engine_nfft']),
-            'batch': int(df.loc[best_fps_idx, 'engine_batch']),
+            'channels': int(df.loc[best_fps_idx, 'engine_channels']),
             'fps': float(df.loc[best_fps_idx, 'frames_per_second']),
             'efficiency': float(df.loc[best_fps_idx, 'gb_per_second']) if 'gb_per_second' in df.columns else None
         }
@@ -132,7 +132,7 @@ def analyze_latency_data(df: pd.DataFrame) -> dict:
         'total_runs': len(df),
         'parameter_ranges': {
             'nfft': {'min': df['engine_nfft'].min(), 'max': df['engine_nfft'].max()},
-            'batch': {'min': df['engine_batch'].min(), 'max': df['engine_batch'].max()}
+            'channels': {'min': df['engine_channels'].min(), 'max': df['engine_channels'].max()}
         }
     }
 
@@ -152,7 +152,7 @@ def analyze_latency_data(df: pd.DataFrame) -> dict:
         best_latency_idx = df['mean_latency_us'].idxmin()
         analysis['best_latency'] = {
             'nfft': int(df.loc[best_latency_idx, 'engine_nfft']),
-            'batch': int(df.loc[best_latency_idx, 'engine_batch']),
+            'channels': int(df.loc[best_latency_idx, 'engine_channels']),
             'latency_us': float(df.loc[best_latency_idx, 'mean_latency_us'])
         }
 
@@ -169,7 +169,7 @@ def analyze_accuracy_data(df: pd.DataFrame) -> dict:
         'total_runs': len(df),
         'parameter_ranges': {
             'nfft': {'min': df['engine_nfft'].min(), 'max': df['engine_nfft'].max()},
-            'batch': {'min': df['engine_batch'].min(), 'max': df['engine_batch'].max()}
+            'channels': {'min': df['engine_channels'].min(), 'max': df['engine_channels'].max()}
         }
     }
 
@@ -199,7 +199,7 @@ def create_summary_statistics(all_data: dict[str, pd.DataFrame]) -> pd.DataFrame
             summary_row = {
                 'benchmark_type': benchmark_type,
                 'engine_nfft': row['engine_nfft'],
-                'engine_batch': row['engine_batch'],
+                'engine_channels': row['engine_channels'],
                 'source_file': row.get('source_file', 'unknown')
             }
 

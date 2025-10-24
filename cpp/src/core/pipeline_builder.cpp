@@ -64,7 +64,7 @@ class PipelineBuilder::Impl {
       return false;
     }
 
-    if (config_.batch <= 0) {
+    if (config_.channels <= 0) {
       error_msg = "batch must be positive.";
       return false;
     }
@@ -101,9 +101,9 @@ class PipelineBuilder::Impl {
 
     // Add buffer allocations based on configuration
     const size_t input_buffer_size =
-        static_cast<size_t>(config_.nfft) * config_.batch * sizeof(float);
+        static_cast<size_t>(config_.nfft) * config_.channels * sizeof(float);
     const size_t output_buffer_size =
-        static_cast<size_t>(config_.nfft / 2 + 1) * config_.batch *
+        static_cast<size_t>(config_.nfft / 2 + 1) * config_.channels *
         sizeof(float);
     const size_t complex_buffer_size = output_buffer_size * 2;
 

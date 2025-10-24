@@ -294,14 +294,14 @@ def make_test_batch(
     *,
     rng: np.random.Generator,
     n_samples: int | None = None,
-    batch: int | None = None,
+    channels: int | None = None,
     dtype: DTypeLike = np.float32,
     channel_variation: float = 0.01,
     **kwargs,
 ) -> np.ndarray:
     """Create a batched signal array tailored to the engine configuration."""
     n_samples = int(n_samples or config.nfft)
-    batch = int(batch or config.batch)
+    batch = int(batch or config.channels)
     sample_rate = int(kwargs.pop("sample_rate", config.sample_rate_hz))
 
     if n_samples <= 0:
@@ -377,7 +377,7 @@ def make_test_batch(
     batch_data: np.ndarray
     if base_signal is not None:
         base_signal = np.asarray(base_signal, dtype=np.float64)
-        batch_data = np.empty((batch, n_samples), dtype=np.float64)
+        batch_data = np.empty((channels, n_samples), dtype=np.float64)
         variation_scale = float(max(channel_variation, 0.0))
         for idx in range(batch):
             channel = base_signal.copy()
@@ -399,7 +399,7 @@ def make_test_batch(
         else:
             noise_kind = cast(NoiseKind, signal_key.replace("_noise", ""))
         amplitude = float(kwargs.pop("amplitude", 1.0))
-        batch_data = np.empty((batch, n_samples), dtype=np.float64)
+        batch_data = np.empty((channels, n_samples), dtype=np.float64)
         for idx in range(batch):
             batch_data[idx] = make_noise(
                 n_samples,

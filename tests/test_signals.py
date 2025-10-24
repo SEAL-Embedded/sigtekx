@@ -130,7 +130,7 @@ class TestBatchGenerator:
     def test_batch_creation(self, batch_size: int, signal_type: str) -> None:
         """Test that batches are created with the correct shape and properties."""
         nfft = 1024
-        config = EngineConfig(nfft=nfft, batch=batch_size, sample_rate_hz=self.SAMPLE_RATE)
+        config = EngineConfig(nfft=nfft, channels=batch_size, sample_rate_hz=self.SAMPLE_RATE)
         rng = np.random.default_rng(123)
         batch_data = make_test_batch(signal_type, config, rng=rng)
 
@@ -141,7 +141,7 @@ class TestBatchGenerator:
         """Channels in a batch should differ when expected."""
         nfft = 1024
         batch_size = 4
-        config = EngineConfig(nfft=nfft, batch=batch_size, sample_rate_hz=self.SAMPLE_RATE)
+        config = EngineConfig(nfft=nfft, channels=batch_size, sample_rate_hz=self.SAMPLE_RATE)
 
         sine_batch = make_test_batch(
             "sine",
@@ -166,7 +166,7 @@ class TestBatchGenerator:
         """Channels in a 'zeros' batch should be identical."""
         nfft = 1024
         batch_size = 4
-        config = EngineConfig(nfft=nfft, batch=batch_size, sample_rate_hz=self.SAMPLE_RATE)
+        config = EngineConfig(nfft=nfft, channels=batch_size, sample_rate_hz=self.SAMPLE_RATE)
         zeros_batch = make_test_batch(
             "zeros",
             config,

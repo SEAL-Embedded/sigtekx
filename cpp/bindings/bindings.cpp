@@ -1,7 +1,7 @@
 /**
  * @file bindings.cpp
- * @version 0.9.3
- * @date 2025-10-17
+ * @version 0.9.4
+ * @date 2025-10-23
  * @author [Kevin Rahsaz]
  *
  * @brief pybind11 wrappers to expose C++ executors to Python.
@@ -54,7 +54,7 @@ class PyExecutor {
     // Initialize executor with config and stages
     executor_->initialize(config, std::move(stages));
     config_ = config;
-    output_buffer_.resize(config.num_output_bins() * config.batch);
+    output_buffer_.resize(config.num_output_bins() * config.channels);
   }
 
   /**
@@ -69,7 +69,7 @@ class PyExecutor {
       throw std::runtime_error("Input must be a 1D NumPy array.");
     }
 
-    size_t expected_size = static_cast<size_t>(config_.nfft) * config_.batch;
+    size_t expected_size = static_cast<size_t>(config_.nfft) * config_.channels;
     if (static_cast<size_t>(input.size()) != expected_size) {
       std::ostringstream oss;
       oss << "Input size mismatch. Expected " << expected_size
@@ -83,7 +83,7 @@ class PyExecutor {
     return py::array(py::buffer_info(
         output_buffer_.data(), sizeof(float),
         py::format_descriptor<float>::format(), 2,
-        {static_cast<py::ssize_t>(config_.batch),
+        {static_cast<py::ssize_t>(config_.channels),
          static_cast<py::ssize_t>(config_.num_output_bins())},
         {sizeof(float) * config_.num_output_bins(), sizeof(float)}));
   }
@@ -144,8 +144,8 @@ PYBIND11_MODULE(_engine, m) {
             >>> import _engine
             >>> config = _engine.ExecutorConfig()
             >>> config.nfft = 1024
-            >>> config.batch = 4
-            >>> config.mode = _engine.ExecutionMode.BATCH
+            >>> config.channels = 4
+            >>> config.mode = _engine.ExecutionMode.channels
             >>> executor = _engine.BatchExecutor()
             >>> executor.initialize(config)
             >>> output = executor.process(input_data)
@@ -195,7 +195,7 @@ PYBIND11_MODULE(_engine, m) {
   py::enum_<ionosense::ExecutorConfig::ExecutionMode>(m, "ExecutionMode",
                                                       "Execution strategy for "
                                                       "pipeline executors")
-      .value("BATCH", ionosense::ExecutorConfig::ExecutionMode::BATCH,
+      .value("channels", ionosense::ExecutorConfig::ExecutionMode::BATCH,
              "Process complete batches with maximum throughput")
       .value("STREAMING", ionosense::ExecutorConfig::ExecutionMode::STREAMING,
              "Continuous processing with low-latency via ring buffer (v0.9.4+)")
@@ -205,7 +205,7 @@ PYBIND11_MODULE(_engine, m) {
   py::class_<ionosense::EngineConfig>(m, "EngineConfig")
       .def(py::init<>())
       .def_readwrite("nfft", &ionosense::EngineConfig::nfft)
-      .def_readwrite("batch", &ionosense::EngineConfig::batch)
+      .def_readwrite("channels", &ionosense::EngineConfig::channels)
       .def_readwrite("overlap", &ionosense::EngineConfig::overlap)
       .def_readwrite("sample_rate_hz", &ionosense::EngineConfig::sample_rate_hz)
       .def_readwrite("window_type", &ionosense::EngineConfig::window_type)
@@ -221,7 +221,7 @@ PYBIND11_MODULE(_engine, m) {
       .def("num_output_bins", &ionosense::EngineConfig::num_output_bins)
       .def("__repr__", [](const ionosense::EngineConfig& c) {
         return "<EngineConfig nfft=" + std::to_string(c.nfft) +
-               ", batch=" + std::to_string(c.batch) + ">";
+               ", channels=" + std::to_string(c.channels) + ">";
       });
 
   // --- Bind ExecutorConfig (v0.9.3 architecture) ---
@@ -240,7 +240,7 @@ PYBIND11_MODULE(_engine, m) {
         std::string mode_str;
         switch (c.mode) {
           case ionosense::ExecutorConfig::ExecutionMode::BATCH:
-            mode_str = "BATCH";
+            mode_str = "channels";
             break;
           case ionosense::ExecutorConfig::ExecutionMode::STREAMING:
             mode_str = "STREAMING";
@@ -248,7 +248,7 @@ PYBIND11_MODULE(_engine, m) {
         }
         return "<ExecutorConfig mode=" + mode_str +
                ", nfft=" + std::to_string(c.nfft) +
-               ", batch=" + std::to_string(c.batch) + ">";
+               ", channels=" + std::to_string(c.channels) + ">";
       });
 
   py::class_<ionosense::StageConfig>(m, "StageConfig")
@@ -311,6 +311,6 @@ PYBIND11_MODULE(_engine, m) {
   m.def("select_best_device", &ionosense::engine_utils::select_best_device,
         "Selects the best available CUDA device.");
 
-  m.attr("__version__") = "0.9.3";
+  m.attr("__version__") = "0.9.4";
   m.attr("__architecture_version__") = "cpp-abs (pipeline/executor split)";
 }

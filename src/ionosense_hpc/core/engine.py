@@ -90,7 +90,7 @@ class Engine:
         >>> engine = Engine(preset='iono', mode='streaming')
 
         # Config-based (custom requirements)
-        >>> config = EngineConfig(nfft=4096, batch=8, overlap=0.75)
+        >>> config = EngineConfig(nfft=4096, channels=8, overlap=0.75)
         >>> engine = Engine(config=config)
 
         # Pipeline-based (full control)
@@ -99,7 +99,7 @@ class Engine:
         ...     .add_window('blackman')
         ...     .add_fft('1/N')
         ...     .add_magnitude()
-        ...     .configure(nfft=4096, batch=8)
+        ...     .configure(nfft=4096, channels=8)
         ...     .build())
         >>> engine = Engine(pipeline=pipeline)
 
@@ -173,7 +173,7 @@ class Engine:
 
         # Store pipeline if provided
         self._pipeline = pipeline
-        self._expected_samples = self._config.nfft * self._config.batch
+        self._expected_samples = self._config.nfft * self._config.channels
 
         # Initialize state
         self._cpp_engine: Any = None
@@ -711,7 +711,7 @@ def benchmark_latency(
     engine = Engine(preset=preset, **kwargs)
 
     # Prepare test data
-    data_size = engine.config.nfft * engine.config.batch
+    data_size = engine.config.nfft * engine.config.channels
     test_data = np.random.randn(data_size).astype(np.float32)
 
     # Warmup

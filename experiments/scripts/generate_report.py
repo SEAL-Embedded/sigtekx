@@ -114,7 +114,7 @@ def generate_executive_summary(df: pd.DataFrame) -> str:
     # Basic statistics
     total_measurements = len(df)
     benchmark_types = df['benchmark_type'].nunique() if 'benchmark_type' in df.columns else 0
-    unique_configs = df[['engine_nfft', 'engine_batch']].drop_duplicates().shape[0] if all(col in df.columns for col in ['engine_nfft', 'engine_batch']) else 0
+    unique_configs = df[['engine_nfft', 'engine_channels']].drop_duplicates().shape[0] if all(col in df.columns for col in ['engine_nfft', 'engine_channels']) else 0
 
     summary_parts.append(f"""
     <div class="summary-stats">
@@ -140,7 +140,7 @@ def generate_executive_summary(df: pd.DataFrame) -> str:
                 <div class="performance-highlight">
                     <h4>Throughput Performance</h4>
                     <p><strong>Peak Performance:</strong> {max_fps:.1f} FPS</p>
-                    <p><strong>Best Configuration:</strong> NFFT={int(best_config['engine_nfft'])}, Batch={int(best_config['engine_batch'])}</p>
+                    <p><strong>Best Configuration:</strong> NFFT={int(best_config['engine_nfft'])}, Batch={int(best_config['engine_channels'])}</p>
                 </div>
                 """)
 
@@ -151,7 +151,7 @@ def generate_executive_summary(df: pd.DataFrame) -> str:
                 <div class="performance-highlight">
                     <h4>Latency Performance</h4>
                     <p><strong>Lowest Latency:</strong> {min_latency:.1f} μs</p>
-                    <p><strong>Best Configuration:</strong> NFFT={int(best_config['engine_nfft'])}, Batch={int(best_config['engine_batch'])}</p>
+                    <p><strong>Best Configuration:</strong> NFFT={int(best_config['engine_nfft'])}, Batch={int(best_config['engine_channels'])}</p>
                 </div>
                 """)
 
@@ -162,7 +162,7 @@ def generate_executive_summary(df: pd.DataFrame) -> str:
                 <div class="performance-highlight">
                     <h4>Accuracy Performance</h4>
                     <p><strong>Best Pass Rate:</strong> {max_accuracy:.1%}</p>
-                    <p><strong>Best Configuration:</strong> NFFT={int(best_config['engine_nfft'])}, Batch={int(best_config['engine_batch'])}</p>
+                    <p><strong>Best Configuration:</strong> NFFT={int(best_config['engine_nfft'])}, Batch={int(best_config['engine_channels'])}</p>
                 </div>
                 """)
 
@@ -182,13 +182,13 @@ def generate_detailed_tables(df: pd.DataFrame) -> str:
 
             # Format the data for display
             if benchmark_type == 'throughput':
-                display_cols = ['engine_nfft', 'engine_batch', 'frames_per_second', 'gb_per_second']
+                display_cols = ['engine_nfft', 'engine_channels', 'frames_per_second', 'gb_per_second']
                 col_names = ['NFFT', 'Batch Size', 'FPS', 'GB/s']
             elif benchmark_type == 'latency':
-                display_cols = ['engine_nfft', 'engine_batch', 'mean_latency_us', 'p95_latency_us']
+                display_cols = ['engine_nfft', 'engine_channels', 'mean_latency_us', 'p95_latency_us']
                 col_names = ['NFFT', 'Batch Size', 'Mean Latency (μs)', 'P95 Latency (μs)']
             elif benchmark_type == 'accuracy':
-                display_cols = ['engine_nfft', 'engine_batch', 'pass_rate', 'mean_snr_db']
+                display_cols = ['engine_nfft', 'engine_channels', 'pass_rate', 'mean_snr_db']
                 col_names = ['NFFT', 'Batch Size', 'Pass Rate', 'Mean SNR (dB)']
             else:
                 continue

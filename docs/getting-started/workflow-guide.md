@@ -39,7 +39,7 @@ Each benchmark script is a Hydra application that accepts configuration override
 python benchmarks/run_throughput.py --multirun \
     experiment=baseline \
     +benchmark=throughput \
-    "engine.batch=1,2,4,8,16,32,64"
+    "engine.channels=1,2,4,8,16,32,64"
 
 # Latency sweep
 python benchmarks/run_latency.py --multirun \
@@ -99,7 +99,7 @@ Combine presets with additional Hydra overrides (e.g., `engine.nfft=2048,4096` o
         params:
           engine.nfft: 2048,4096,8192
           engine.overlap: 0.5,0.75
-          engine.batch: 8,16,32
+          engine.channels: 8,16,32
     ```
 
 2. Run the desired benchmark directly with Hydra overrides:

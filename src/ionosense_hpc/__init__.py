@@ -238,7 +238,7 @@ def show_versions(verbose: bool = True) -> dict:
     if _ENGINE_AVAILABLE:
         try:
             config = get_preset('default')
-            config.batch = 1  # Minimal config for version check
+            config.channels = 1  # Minimal config for version check
             engine = Engine(config=config)
             try:
                 info = engine.device_info
@@ -318,7 +318,7 @@ def self_test(verbose: bool = True) -> bool:
     engine = None
     try:
         config = get_preset('default')
-        config.batch = 1  # Minimal config for testing
+        config.channels = 1  # Minimal config for testing
         engine = Engine(config=config)
         if verbose:
             print("   OK: Engine initialized")
@@ -333,10 +333,10 @@ def self_test(verbose: bool = True) -> bool:
         print("4. Testing signal processing...")
     try:
         import numpy as np
-        test_data = np.zeros(engine.config.nfft * engine.config.batch, dtype=np.float32)
+        test_data = np.zeros(engine.config.nfft * engine.config.channels, dtype=np.float32)
         output = engine.process(test_data)
 
-        expected_shape = (engine.config.batch, engine.config.num_output_bins)
+        expected_shape = (engine.config.channels, engine.config.num_output_bins)
         if output.shape != expected_shape:
             if verbose:
                 print(f"   FAIL: Unexpected output shape {output.shape}")

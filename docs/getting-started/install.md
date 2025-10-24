@@ -467,7 +467,7 @@ python -c "import ionosense_hpc; print('✓ Import successful')"
 >>> from ionosense_hpc import Engine, Presets, generate_test_signal
 >>> engine = Engine(Presets.throughput())
 >>> signals = generate_test_signal(sample_rate=100_000, duration=0.1)
->>> frame = signals['ch1'][: engine.config.nfft * engine.config.batch]
+>>> frame = signals['ch1'][: engine.config.nfft * engine.config.channels]
 >>> output = engine.process(frame)
 >>> print(f"Output shape: {output.shape}")
 >>> engine.close()

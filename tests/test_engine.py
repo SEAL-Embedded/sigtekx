@@ -31,7 +31,7 @@ def test_config() -> EngineConfig:
     """Small configuration for fast testing."""
     return EngineConfig(
         nfft=256,
-        batch=1,
+        channels=1,
         overlap=0.0,
         sample_rate_hz=1000,
         warmup_iters=0,
@@ -63,7 +63,7 @@ class TestEngineBasics:
         """Test engine creation with string preset."""
         engine = Engine(preset='default')
         assert engine.config.nfft == 1024
-        assert engine.config.batch == 2
+        assert engine.config.channels == 2
         assert engine.is_initialized
         engine.close()
 
@@ -91,7 +91,7 @@ class TestEngineBasics:
         engine = Engine(config=test_config)
         output = engine.process(test_data)
 
-        assert output.shape == (1, 129)  # (batch, nfft//2 + 1)
+        assert output.shape == (1, 129)  # (channels, nfft//2 + 1)
         assert output.dtype == np.float32
         assert np.all(output >= 0)  # Magnitude is non-negative
 
@@ -374,7 +374,7 @@ class TestConvenienceFunctions:
     def test_process_signal(self, test_data: np.ndarray):
         """Test one-shot processing function."""
         # With preset and overrides
-        output = process_signal(test_data, preset='default', nfft=256, batch=1, overlap=0.0)
+        output = process_signal(test_data, preset='default', nfft=256, channels=1, overlap=0.0)
         assert output.shape == (1, 129)
 
         # With default preset (requires larger data)
@@ -388,7 +388,7 @@ class TestConvenienceFunctions:
             preset='default',
             iterations=10,
             nfft=256,
-            batch=1,
+            channels=1,
             overlap=0.0,
             warmup_iters=0
         )
@@ -467,7 +467,7 @@ class TestEngineIntegration:
         # Custom config for research
         config = EngineConfig(
             nfft=2048,
-            batch=4,
+            channels=4,
             overlap=0.5,
             sample_rate_hz=48000,
             enable_profiling=True
@@ -477,7 +477,7 @@ class TestEngineIntegration:
         engine = Engine(config=config)
 
         # Generate test signals
-        test_size = config.nfft * config.batch
+        test_size = config.nfft * config.channels
         signals = [
             np.random.randn(test_size).astype(np.float32)
             for _ in range(10)

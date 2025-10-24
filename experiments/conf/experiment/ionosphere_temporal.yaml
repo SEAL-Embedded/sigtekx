@@ -13,7 +13,7 @@ hydra:
   sweeper:
     params:
       engine.overlap: 0.25,0.5,0.625,0.75,0.875,0.9375
-      engine.batch: 16,32,64,128
+      engine.channels: 16,32,64,128
 
 # Analysis configuration
 analysis:

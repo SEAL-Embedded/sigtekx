@@ -109,7 +109,7 @@ class BatchExecutor::Impl {
       IONO_NVTX_RANGE("Initialize Pipeline Stages", profiling::colors::MAGENTA);
       StageConfig stage_config{};
       stage_config.nfft = config_.nfft;
-      stage_config.batch = config_.batch;
+      stage_config.channels = config_.channels;
       stage_config.overlap = config_.overlap;
       stage_config.sample_rate_hz = config_.sample_rate_hz;
       stage_config.warmup_iters = config_.warmup_iters;
@@ -134,9 +134,9 @@ class BatchExecutor::Impl {
 
     // Allocate device buffers
     const size_t buffer_size =
-        static_cast<size_t>(config_.nfft) * config_.batch;
+        static_cast<size_t>(config_.nfft) * config_.channels;
     const size_t output_buffer_size =
-        static_cast<size_t>(config_.num_output_bins()) * config_.batch;
+        static_cast<size_t>(config_.num_output_bins()) * config_.channels;
     const size_t complex_buffer_size = output_buffer_size;
 
     {
@@ -305,11 +305,11 @@ class BatchExecutor::Impl {
           // MagnitudeStage expects element count (complex pairs), not float
           // count
           current_size =
-              static_cast<size_t>(config_.num_output_bins()) * config_.batch;
+              static_cast<size_t>(config_.num_output_bins()) * config_.channels;
         } else if (stage_name == "MagnitudeStage") {
           // Magnitude: complex → real, halves size
           current_size =
-              static_cast<size_t>(config_.num_output_bins()) * config_.batch;
+              static_cast<size_t>(config_.num_output_bins()) * config_.channels;
         }
         // For other stages (Window, etc.), size stays the same
 
@@ -323,7 +323,7 @@ class BatchExecutor::Impl {
     // D2H Transfer
     {
       const size_t complex_elements =
-          static_cast<size_t>(config_.num_output_bins()) * config_.batch;
+          static_cast<size_t>(config_.num_output_bins()) * config_.channels;
       const size_t bytes = complex_elements * sizeof(float);
       const std::string d2h_msg =
           profiling::format_memory_range("D2H Transfer", bytes);
@@ -365,12 +365,12 @@ class BatchExecutor::Impl {
     //
     // This approach avoids complex lifetime management of output buffers
     // while maintaining API consistency with the executor interface.
-    std::vector<float> output(config_.num_output_bins() * config_.batch);
+    std::vector<float> output(config_.num_output_bins() * config_.channels);
     submit(input, output.data(), num_samples);
 
     if (callback) {
       IONO_NVTX_RANGE("Result Callback", profiling::colors::CYAN);
-      callback(output.data(), config_.num_output_bins(), config_.batch, stats_);
+      callback(output.data(), config_.num_output_bins(), config_.channels, stats_);
     }
   }
 
@@ -410,9 +410,9 @@ class BatchExecutor::Impl {
  private:
   void run_warmup() {
     std::vector<float> dummy_input(
-        static_cast<size_t>(config_.nfft) * config_.batch, 0.0f);
+        static_cast<size_t>(config_.nfft) * config_.channels, 0.0f);
     std::vector<float> dummy_output(
-        static_cast<size_t>(config_.num_output_bins()) * config_.batch);
+        static_cast<size_t>(config_.num_output_bins()) * config_.channels);
 
     stats_.is_warmup = true;
     for (int i = 0; i < config_.warmup_iters; ++i) {

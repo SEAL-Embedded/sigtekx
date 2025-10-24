@@ -17,7 +17,7 @@ Example:
     ...     .add_window('blackman', symmetry='periodic')
     ...     .add_fft(scale='1/N')
     ...     .add_magnitude()
-    ...     .configure(nfft=4096, batch=8, overlap=0.75)
+    ...     .configure(nfft=4096, channels=8, overlap=0.75)
     ...     .build()
     ... )
 """
@@ -48,7 +48,7 @@ class PipelineBuilder:
         >>> builder.add_window('hann')
         >>> builder.add_fft()
         >>> builder.add_magnitude()
-        >>> builder.configure(nfft=2048, batch=4)
+        >>> builder.configure(nfft=2048, channels=4)
         >>> pipeline = builder.build()
 
         # Fluent interface (recommended)
@@ -56,7 +56,7 @@ class PipelineBuilder:
         ...     .add_window('hann')
         ...     .add_fft('1/N')
         ...     .add_magnitude()
-        ...     .configure(nfft=2048, batch=4)
+        ...     .configure(nfft=2048, channels=4)
         ...     .build())
 
         # Custom window configuration
@@ -68,7 +68,7 @@ class PipelineBuilder:
         ...     )
         ...     .add_fft(scale='1/sqrt(N)')
         ...     .add_magnitude()
-        ...     .configure(nfft=4096, batch=8, overlap=0.75)
+        ...     .configure(nfft=4096, channels=8, overlap=0.75)
         ...     .build())
     """
 
@@ -174,10 +174,10 @@ class PipelineBuilder:
 
         Examples:
             # Using kwargs
-            >>> builder.configure(nfft=4096, batch=8, overlap=0.75)
+            >>> builder.configure(nfft=4096, channels=8, overlap=0.75)
 
             # Using config object
-            >>> config = EngineConfig(nfft=4096, batch=8, overlap=0.75)
+            >>> config = EngineConfig(nfft=4096, channels=8, overlap=0.75)
             >>> builder.configure(config=config)
 
             # Mix preset with overrides
@@ -309,7 +309,7 @@ class Pipeline:
               1. Window: HANN (PERIODIC, UNITY norm)
               2. FFT: scale=1/N
               3. Magnitude
-            Config: nfft=4096 batch=8 overlap=75.0%
+            Config: nfft=4096 channels=8 overlap=75.0%
         """
         lines = [f"Pipeline ({self.num_stages} stages):"]
 
@@ -330,7 +330,7 @@ class Pipeline:
 
         lines.append(
             f"Config: nfft={self._config.nfft} "
-            f"batch={self._config.batch} "
+            f"channels={self._config.channels} "
             f"overlap={self._config.overlap:.1%}"
         )
 

@@ -15,7 +15,7 @@ class TestEngineConfig:
         """Test default configuration values."""
         config = EngineConfig()
         assert config.nfft == 1024
-        assert config.batch == 2
+        assert config.channels == 2
         assert config.overlap == 0.5
         assert config.sample_rate_hz == 48000
 
@@ -60,7 +60,7 @@ class TestEngineConfig:
         """Test memory usage warning for large configs."""
         with pytest.warns(ResourceWarning):
             # This should trigger a warning for >4GB
-            EngineConfig(nfft=65536, batch=256)
+            EngineConfig(nfft=65536, channels=256)
 
 
 class TestPresets:
@@ -70,7 +70,7 @@ class TestPresets:
         """Test default preset configuration (batch)."""
         config = get_preset('default')
         assert config.nfft == 1024
-        assert config.batch == 2
+        assert config.channels == 2
         assert config.overlap == 0.5
         assert config.warmup_iters == 1
 
@@ -78,7 +78,7 @@ class TestPresets:
         """Test default preset configuration (streaming)."""
         config = get_preset('default', executor='streaming')
         assert config.nfft == 1024
-        assert config.batch == 2
+        assert config.channels == 2
         assert config.overlap == 0.5
         assert config.stream_count == 4  # More streams for streaming
 
@@ -86,7 +86,7 @@ class TestPresets:
         """Test ionosphere preset configuration (batch - throughput)."""
         config = get_preset('iono', executor='batch')
         assert config.nfft == 16384  # Higher resolution for batch
-        assert config.batch == 32    # Larger batch
+        assert config.channels == 32    # Larger batch
         assert config.overlap == 0.75
         assert config.pinned_buffer_count == 4
 
@@ -94,7 +94,7 @@ class TestPresets:
         """Test ionosphere preset configuration (streaming - latency)."""
         config = get_preset('iono', executor='streaming')
         assert config.nfft == 4096  # Lower resolution for latency
-        assert config.batch == 2    # Smaller batch
+        assert config.channels == 2    # Smaller batch
         assert config.overlap == 0.75
         assert config.stream_count == 6  # More streams for pipelining
 
@@ -102,7 +102,7 @@ class TestPresets:
         """Test extreme ionosphere preset configuration (batch)."""
         config = get_preset('ionox', executor='batch')
         assert config.nfft == 32768  # Maximum resolution
-        assert config.batch == 32    # Very large batch
+        assert config.channels == 32    # Very large batch
         assert config.overlap == 0.9375
         assert config.warmup_iters == 10
 
@@ -110,15 +110,15 @@ class TestPresets:
         """Test extreme ionosphere preset configuration (streaming)."""
         config = get_preset('ionox', executor='streaming')
         assert config.nfft == 8192   # Balanced for quality and latency
-        assert config.batch == 2
+        assert config.channels == 2
         assert config.overlap == 0.9
         assert config.warmup_iters == 10
 
     def test_custom_preset(self):
         """Test custom preset creation with overrides."""
-        config = EngineConfig.from_preset('default', nfft=2048, batch=4)
+        config = EngineConfig.from_preset('default', nfft=2048, channels=4)
         assert config.nfft == 2048
-        assert config.batch == 4
+        assert config.channels == 4
 
         # Should preserve other defaults
         assert config.overlap == 0.5
@@ -179,7 +179,7 @@ def test_memory_estimation(nfft, batch, expected_mb):
     """Test memory usage estimation."""
     from ionosense_hpc.config import estimate_memory_usage_mb
 
-    config = EngineConfig(nfft=nfft, batch=batch)
+    config = EngineConfig(nfft=nfft, channels=batch)
     estimated = estimate_memory_usage_mb(config)
 
     # Should be within a reasonable range or both be small.

@@ -37,7 +37,7 @@ _PRESET_VARIANTS = {
         'batch': EngineConfig(
             # Signal parameters - General-purpose batch
             nfft=1024,
-            batch=2,
+            channels=2,
             overlap=0.5,
             sample_rate_hz=48000,
 
@@ -59,7 +59,7 @@ _PRESET_VARIANTS = {
         'streaming': EngineConfig(
             # Signal parameters - Low-latency streaming
             nfft=1024,
-            batch=2,
+            channels=2,
             overlap=0.5,
             sample_rate_hz=48000,
 
@@ -84,7 +84,7 @@ _PRESET_VARIANTS = {
         'batch': EngineConfig(
             # Signal parameters - Ionosphere batch throughput
             nfft=16384,  # Higher resolution for batch throughput
-            batch=32,    # Large batch for maximum efficiency
+            channels=32,    # Large batch for maximum efficiency
             overlap=0.75,
             sample_rate_hz=48000,
 
@@ -106,7 +106,7 @@ _PRESET_VARIANTS = {
         'streaming': EngineConfig(
             # Signal parameters - Ionosphere streaming latency
             nfft=4096,  # Lower NFFT for reduced latency
-            batch=2,    # Minimal batch for lowest latency
+            channels=2,    # Minimal batch for lowest latency
             overlap=0.75,
             sample_rate_hz=48000,
 
@@ -131,7 +131,7 @@ _PRESET_VARIANTS = {
         'batch': EngineConfig(
             # Signal parameters - Extreme ionosphere throughput
             nfft=32768,  # Maximum frequency resolution
-            batch=32,    # Very large batch for maximum throughput
+            channels=32,    # Very large batch for maximum throughput
             overlap=0.9375,  # Very high overlap
             sample_rate_hz=48000,
 
@@ -153,7 +153,7 @@ _PRESET_VARIANTS = {
         'streaming': EngineConfig(
             # Signal parameters - Extreme ionosphere latency
             nfft=8192,  # Balanced for quality and latency
-            batch=2,    # Minimal batch for lowest latency
+            channels=2,    # Minimal batch for lowest latency
             overlap=0.9,
             sample_rate_hz=48000,
 
@@ -295,7 +295,7 @@ def describe_preset(name: str, executor: str | None = None) -> str:
 
         config = _PRESET_VARIANTS[name][executor]
         return f"""{title} ({executor}):
-  FFT: {config.nfft}, Batch: {config.batch}, Overlap: {config.overlap:.1%}
+  FFT: {config.nfft}, Batch: {config.channels}, Overlap: {config.overlap:.1%}
   Window: {config.window.value.upper()} ({config.window_symmetry.value.upper()})
   Mode: {config.mode.value.upper()}
   Sample Rate: {config.sample_rate_hz} Hz"""
@@ -306,7 +306,7 @@ def describe_preset(name: str, executor: str | None = None) -> str:
             lines.append(
                 f"  {exec_type:10s}: "
                 f"FFT: {config.nfft}, "
-                f"Batch: {config.batch}, "
+                f"Batch: {config.channels}, "
                 f"Overlap: {config.overlap:.1%}"
             )
         return "\n".join(lines)
@@ -335,7 +335,7 @@ def compare_presets() -> str:
         line = (
             f"{name:<10} | "
             f"{cfg.nfft:<6} | "
-            f"{cfg.batch:<6} | "
+            f"{cfg.channels:<6} | "
             f"{cfg.overlap:<8.1%} | "
             f"{cfg.window.value:<10}"
         )

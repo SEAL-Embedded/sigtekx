@@ -108,7 +108,7 @@ class ProcessingStageTest : public ::testing::Test {
     stream_ = std::make_unique<CudaStream>();
 
     config_.nfft = 256;
-    config_.batch = 2;
+    config_.channels = 2;
     config_.overlap = 0.5f;
     config_.sample_rate_hz = 48000;
   }
@@ -165,7 +165,7 @@ TEST_F(ProcessingStageTest, WindowStageProcess) {
   WindowStage stage;
   stage.initialize(config_, stream_->get());
 
-  const size_t total_samples = config_.nfft * config_.batch;
+  const size_t total_samples = config_.nfft * config_.channels;
   auto host_input = generate_test_signal(total_samples);
 
   DeviceBuffer<float> d_input(total_samples);
@@ -197,7 +197,7 @@ TEST_F(ProcessingStageTest, WindowStageInPlace) {
   WindowStage stage;
   stage.initialize(config_, stream_->get());
 
-  const size_t total_samples = config_.nfft * config_.batch;
+  const size_t total_samples = config_.nfft * config_.channels;
   auto host_data = generate_test_signal(total_samples);
 
   DeviceBuffer<float> d_data(total_samples);
@@ -237,7 +237,7 @@ TEST_F(ProcessingStageTest, FFTStageProcess) {
   FFTStage stage;
   stage.initialize(config_, stream_->get());
 
-  const size_t total_samples = config_.nfft * config_.batch;
+  const size_t total_samples = config_.nfft * config_.channels;
   std::vector<float> host_input(total_samples, 1.0f);
 
   DeviceBuffer<float> d_input(total_samples);
@@ -265,10 +265,10 @@ TEST_F(ProcessingStageTest, FFTStageSinusoid) {
   stage.initialize(config_, stream_->get());
 
   const int freq_bin = 10;
-  const size_t total_samples = config_.nfft * config_.batch;
+  const size_t total_samples = config_.nfft * config_.channels;
   std::vector<float> host_input(total_samples);
 
-  for (size_t ch = 0; ch < static_cast<size_t>(config_.batch); ++ch) {
+  for (size_t ch = 0; ch < static_cast<size_t>(config_.channels); ++ch) {
     for (size_t i = 0; i < static_cast<size_t>(config_.nfft); ++i) {
       host_input[ch * config_.nfft + i] =
           std::cos(2.0f * M_PI * freq_bin * i / config_.nfft);
@@ -276,7 +276,7 @@ TEST_F(ProcessingStageTest, FFTStageSinusoid) {
   }
 
   DeviceBuffer<float> d_input(total_samples);
-  const size_t complex_size = (config_.nfft / 2 + 1) * config_.batch;
+  const size_t complex_size = (config_.nfft / 2 + 1) * config_.channels;
   DeviceBuffer<float2> d_output(total_samples);
 
   d_input.copy_from_host(host_input.data(), total_samples, stream_->get());
@@ -286,7 +286,7 @@ TEST_F(ProcessingStageTest, FFTStageSinusoid) {
   d_output.copy_to_host(host_output.data(), host_output.size(), stream_->get());
   stream_->synchronize();
 
-  for (size_t ch = 0; ch < static_cast<size_t>(config_.batch); ++ch) {
+  for (size_t ch = 0; ch < static_cast<size_t>(config_.channels); ++ch) {
     float max_magnitude = 0.0f;
     int max_bin = -1;
 
@@ -329,7 +329,7 @@ TEST_F(ProcessingStageTest, MagnitudeStageProcess) {
   stage.initialize(config_, stream_->get());
 
   const size_t num_bins = config_.nfft / 2 + 1;
-  const size_t total_complex = num_bins * config_.batch;
+  const size_t total_complex = num_bins * config_.channels;
   std::vector<float2> host_input(total_complex,
                                  {3.0f, 4.0f});  // magnitude should be 5
 
@@ -358,7 +358,7 @@ TEST_F(ProcessingStageTest, MagnitudeStageScaling) {
   stage.initialize(config_, stream_->get());
 
   const size_t num_bins = config_.nfft / 2 + 1;
-  const size_t total_complex = num_bins * config_.batch;
+  const size_t total_complex = num_bins * config_.channels;
   std::vector<float2> host_input(total_complex,
                                  {static_cast<float>(config_.nfft), 0.0f});
 
@@ -478,7 +478,7 @@ TEST_F(ProcessingStageTest, WindowStageRespectsSymmetryConfig) {
 
   // Test SYMMETRIC mode configuration
   config_.nfft = size;
-  config_.batch = 1;
+  config_.channels = 1;
   config_.window_type = StageConfig::WindowType::HANN;
   config_.window_symmetry = StageConfig::WindowSymmetry::SYMMETRIC;
 
@@ -536,7 +536,7 @@ TEST_F(ProcessingStageTest, FullPipelineIntegration) {
   fft_stage.initialize(config_, stream_->get());
   mag_stage.initialize(config_, stream_->get());
 
-  const size_t total_samples = config_.nfft * config_.batch;
+  const size_t total_samples = config_.nfft * config_.channels;
   const int test_freq_bin = 8;
 
   // This test was failing due to how the test signal was generated.
@@ -546,7 +546,7 @@ TEST_F(ProcessingStageTest, FullPipelineIntegration) {
   // This corrected implementation generates a proper signal for each batch
   // item, ensuring the frequency content is correct for the FFT length.
   std::vector<float> host_input(total_samples);
-  for (size_t ch = 0; ch < static_cast<size_t>(config_.batch); ++ch) {
+  for (size_t ch = 0; ch < static_cast<size_t>(config_.channels); ++ch) {
     for (size_t i = 0; i < static_cast<size_t>(config_.nfft); ++i) {
       host_input[ch * config_.nfft + i] =
           std::cos(2.0f * M_PI * test_freq_bin * i / config_.nfft);
@@ -556,7 +556,7 @@ TEST_F(ProcessingStageTest, FullPipelineIntegration) {
   DeviceBuffer<float> d_input(total_samples);
   DeviceBuffer<float> d_windowed(total_samples);
   DeviceBuffer<float2> d_fft(total_samples);
-  DeviceBuffer<float> d_magnitude((config_.nfft / 2 + 1) * config_.batch);
+  DeviceBuffer<float> d_magnitude((config_.nfft / 2 + 1) * config_.channels);
 
   d_input.copy_from_host(host_input.data(), total_samples, stream_->get());
 
@@ -565,13 +565,13 @@ TEST_F(ProcessingStageTest, FullPipelineIntegration) {
   fft_stage.process(d_windowed.get(), d_fft.get(), total_samples,
                     stream_->get());
   mag_stage.process(d_fft.get(), d_magnitude.get(),
-                    (config_.nfft / 2 + 1) * config_.batch, stream_->get());
+                    (config_.nfft / 2 + 1) * config_.channels, stream_->get());
 
-  std::vector<float> magnitude((config_.nfft / 2 + 1) * config_.batch);
+  std::vector<float> magnitude((config_.nfft / 2 + 1) * config_.channels);
   d_magnitude.copy_to_host(magnitude.data(), magnitude.size(), stream_->get());
   stream_->synchronize();
 
-  for (size_t ch = 0; ch < static_cast<size_t>(config_.batch); ++ch) {
+  for (size_t ch = 0; ch < static_cast<size_t>(config_.channels); ++ch) {
     float max_mag = 0.0f;
     int peak_bin = -1;
 

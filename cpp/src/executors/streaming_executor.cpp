@@ -89,9 +89,9 @@ class StreamingExecutor::Impl {
     // Calculate buffer sizes
     hop_size_ = config_.hop_size();
     const size_t buffer_size =
-        static_cast<size_t>(config_.nfft) * config_.batch;
+        static_cast<size_t>(config_.nfft) * config_.channels;
     const size_t output_buffer_size =
-        static_cast<size_t>(config_.num_output_bins()) * config_.batch;
+        static_cast<size_t>(config_.num_output_bins()) * config_.channels;
     const size_t complex_buffer_size = output_buffer_size;
 
     // Allocate ring buffer for input accumulation
@@ -100,8 +100,8 @@ class StreamingExecutor::Impl {
     // - Current buffered samples (up to nfft + (batch-1)*hop_size)
     // - Incoming chunk (up to nfft*batch for benchmarks)
     const size_t min_capacity = static_cast<size_t>(config_.nfft) +
-                                (config_.batch - 1) * hop_size_;
-    const size_t benchmark_chunk_size = static_cast<size_t>(config_.nfft) * config_.batch;
+                                (config_.channels - 1) * hop_size_;
+    const size_t benchmark_chunk_size = static_cast<size_t>(config_.nfft) * config_.channels;
     const size_t ring_capacity = min_capacity + benchmark_chunk_size;
     {
       const std::string ring_msg = profiling::format_memory_range(
@@ -142,7 +142,7 @@ class StreamingExecutor::Impl {
       IONO_NVTX_RANGE("Initialize Pipeline Stages", profiling::colors::MAGENTA);
       StageConfig stage_config{};
       stage_config.nfft = config_.nfft;
-      stage_config.batch = config_.batch;
+      stage_config.channels = config_.channels;
       stage_config.overlap = config_.overlap;
       stage_config.sample_rate_hz = config_.sample_rate_hz;
       stage_config.warmup_iters = config_.warmup_iters;
@@ -244,13 +244,13 @@ class StreamingExecutor::Impl {
 
     // Calculate samples needed for one batch
     const size_t samples_per_batch =
-        static_cast<size_t>(config_.nfft) + (config_.batch - 1) * hop_size_;
+        static_cast<size_t>(config_.nfft) + (config_.channels - 1) * hop_size_;
 
     // Process all available batches
     size_t batches_processed = 0;
     while (input_ring_buffer_->available() >= samples_per_batch) {
       process_one_batch(output + batches_processed * config_.num_output_bins() *
-                                     config_.batch);
+                                     config_.channels);
       batches_processed++;
     }
 
@@ -279,19 +279,19 @@ class StreamingExecutor::Impl {
 
     // Calculate samples needed for one batch
     const size_t samples_per_batch =
-        static_cast<size_t>(config_.nfft) + (config_.batch - 1) * hop_size_;
+        static_cast<size_t>(config_.nfft) + (config_.channels - 1) * hop_size_;
 
     // Process all available batches
     while (input_ring_buffer_->available() >= samples_per_batch) {
       // Allocate output buffer for this batch
-      std::vector<float> output(config_.num_output_bins() * config_.batch);
+      std::vector<float> output(config_.num_output_bins() * config_.channels);
       process_one_batch(output.data());
 
       // Invoke callback immediately (true async with background thread is
       // v0.9.5+)
       if (callback) {
         IONO_NVTX_RANGE("Result Callback", profiling::colors::CYAN);
-        callback(output.data(), config_.num_output_bins(), config_.batch,
+        callback(output.data(), config_.num_output_bins(), config_.channels,
                  stats_);
       }
     }
@@ -341,10 +341,10 @@ class StreamingExecutor::Impl {
  private:
   void run_warmup() {
     const size_t warmup_samples =
-        static_cast<size_t>(config_.nfft) + (config_.batch - 1) * hop_size_;
+        static_cast<size_t>(config_.nfft) + (config_.channels - 1) * hop_size_;
     std::vector<float> dummy_input(warmup_samples, 0.0f);
     std::vector<float> dummy_output(
-        static_cast<size_t>(config_.num_output_bins()) * config_.batch);
+        static_cast<size_t>(config_.num_output_bins()) * config_.channels);
 
     stats_.is_warmup = true;
     for (int i = 0; i < config_.warmup_iters; ++i) {
@@ -366,13 +366,13 @@ class StreamingExecutor::Impl {
     {
       IONO_NVTX_RANGE("Extract Batch from Ring", profiling::colors::GREEN);
       input_ring_buffer_->extract_batch(h_batch_staging_.get(), config_.nfft,
-                                        config_.batch, hop_size_);
+                                        config_.channels, hop_size_);
     }
 
     // Advance ring buffer read pointer by hop_size * batch
     // This implements the sliding window for STFT overlap
     {
-      const size_t advance_samples = hop_size_ * config_.batch;
+      const size_t advance_samples = hop_size_ * config_.channels;
       input_ring_buffer_->advance(advance_samples);
     }
 
@@ -403,7 +403,7 @@ class StreamingExecutor::Impl {
     // H2D Transfer
     {
       const size_t num_samples =
-          static_cast<size_t>(config_.nfft) * config_.batch;
+          static_cast<size_t>(config_.nfft) * config_.channels;
       const size_t bytes = num_samples * sizeof(float);
       const std::string h2d_msg =
           profiling::format_memory_range("H2D Transfer", bytes);
@@ -426,7 +426,7 @@ class StreamingExecutor::Impl {
 
       void* current_input = d_input.get();
       void* current_output = nullptr;
-      size_t current_size = static_cast<size_t>(config_.nfft) * config_.batch;
+      size_t current_size = static_cast<size_t>(config_.nfft) * config_.channels;
 
       for (size_t stage_idx = 0; stage_idx < stages_.size(); ++stage_idx) {
         const auto& stage = stages_[stage_idx];
@@ -462,10 +462,10 @@ class StreamingExecutor::Impl {
         // Update size for next stage
         if (stage_name == "FFTStage") {
           current_size =
-              static_cast<size_t>(config_.num_output_bins()) * config_.batch;
+              static_cast<size_t>(config_.num_output_bins()) * config_.channels;
         } else if (stage_name == "MagnitudeStage") {
           current_size =
-              static_cast<size_t>(config_.num_output_bins()) * config_.batch;
+              static_cast<size_t>(config_.num_output_bins()) * config_.channels;
         }
 
         // Next stage's input is this stage's output
@@ -478,7 +478,7 @@ class StreamingExecutor::Impl {
     // D2H Transfer
     {
       const size_t complex_elements =
-          static_cast<size_t>(config_.num_output_bins()) * config_.batch;
+          static_cast<size_t>(config_.num_output_bins()) * config_.channels;
       const size_t bytes = complex_elements * sizeof(float);
       const std::string d2h_msg =
           profiling::format_memory_range("D2H Transfer", bytes);
