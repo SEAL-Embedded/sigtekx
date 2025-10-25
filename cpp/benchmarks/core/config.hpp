@@ -12,6 +12,8 @@
 #include <string>
 #include <vector>
 
+#include "ionosense/core/executor_config.hpp"
+
 namespace ionosense {
 namespace benchmark {
 
@@ -58,6 +60,7 @@ struct BenchmarkConfig {
   BenchmarkPreset preset = BenchmarkPreset::DEV;
   RunMode run_mode = RunMode::FULL;
   IonoVariant iono_variant = IonoVariant::NONE;
+  ExecutorConfig::ExecutionMode exec_mode = ExecutorConfig::ExecutionMode::STREAMING;
 
   // Engine parameters
   int nfft = 2048;
@@ -107,6 +110,7 @@ struct BenchmarkConfig {
 inline BenchmarkConfig get_dev_config() {
   BenchmarkConfig config;
   config.preset = BenchmarkPreset::DEV;
+  config.exec_mode = ExecutorConfig::ExecutionMode::STREAMING;
   config.nfft = 2048;
   config.channels = 2;
   config.overlap = 0.5f;
@@ -120,6 +124,7 @@ inline BenchmarkConfig get_latency_config(RunMode mode = RunMode::FULL) {
   BenchmarkConfig config;
   config.preset = BenchmarkPreset::LATENCY;
   config.run_mode = mode;
+  config.exec_mode = ExecutorConfig::ExecutionMode::STREAMING;
   config.nfft = 2048;
   config.channels = 2;  // Low channel count for minimal latency
   config.overlap = 0.5f;  // 50% overlap for regular benchmarks
@@ -150,6 +155,7 @@ inline BenchmarkConfig get_throughput_config(RunMode mode = RunMode::FULL) {
   BenchmarkConfig config;
   config.preset = BenchmarkPreset::THROUGHPUT;
   config.run_mode = mode;
+  config.exec_mode = ExecutorConfig::ExecutionMode::BATCH;
   config.nfft = 4096;
   config.channels = 32;  // Large channel count for throughput
   config.overlap = 0.5f;  // 50% overlap
@@ -179,6 +185,7 @@ inline BenchmarkConfig get_realtime_config(RunMode mode = RunMode::FULL) {
   BenchmarkConfig config;
   config.preset = BenchmarkPreset::REALTIME;
   config.run_mode = mode;
+  config.exec_mode = ExecutorConfig::ExecutionMode::STREAMING;
   config.nfft = 2048;
   config.channels = 2;  // Low channel count for streaming latency
   config.overlap = 0.5f;  // 50% overlap
@@ -210,6 +217,7 @@ inline BenchmarkConfig get_accuracy_config(RunMode mode = RunMode::FULL) {
   BenchmarkConfig config;
   config.preset = BenchmarkPreset::ACCURACY;
   config.run_mode = mode;
+  config.exec_mode = ExecutorConfig::ExecutionMode::STREAMING;
   config.nfft = 2048;
   config.channels = 1;  // Single channel for reference test
   config.overlap = 0.0f;  // 0% overlap
@@ -255,7 +263,7 @@ inline void apply_iono_variant(BenchmarkConfig& config) {
       break;
 
     case BenchmarkPreset::THROUGHPUT:
-      // Iono throughput: 16384 NFFT, large batch for ULF/VLF detection
+      // Iono throughput: 16384 NFFT, large channel count for ULF/VLF detection
       config.nfft = 16384;
       config.channels = 32;
       break;
@@ -268,7 +276,7 @@ inline void apply_iono_variant(BenchmarkConfig& config) {
       break;
 
     case BenchmarkPreset::ACCURACY:
-      // Iono accuracy: 4096 NFFT, single batch
+      // Iono accuracy: 4096 NFFT, single channel
       config.nfft = 4096;
       config.channels = 1;
       break;
@@ -375,6 +383,25 @@ inline RunMode string_to_mode(const std::string& str) {
   if (str == "full")
     return RunMode::FULL;
   return RunMode::FULL;  // Default
+}
+
+inline std::string exec_mode_to_string(ExecutorConfig::ExecutionMode mode) {
+  switch (mode) {
+    case ExecutorConfig::ExecutionMode::BATCH:
+      return "BATCH";
+    case ExecutorConfig::ExecutionMode::STREAMING:
+      return "STREAMING";
+    default:
+      return "UNKNOWN";
+  }
+}
+
+inline ExecutorConfig::ExecutionMode string_to_exec_mode(const std::string& str) {
+  if (str == "batch" || str == "BATCH")
+    return ExecutorConfig::ExecutionMode::BATCH;
+  if (str == "streaming" || str == "STREAMING")
+    return ExecutorConfig::ExecutionMode::STREAMING;
+  return ExecutorConfig::ExecutionMode::STREAMING;  // Default
 }
 
 }  // namespace benchmark

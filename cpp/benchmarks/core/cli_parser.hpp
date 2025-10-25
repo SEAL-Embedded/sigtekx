@@ -54,6 +54,7 @@ inline BenchmarkConfig parse_args(int argc, char* argv[]) {
     bool has_duration = false;
     bool has_warmup = false;
     bool has_seed = false;
+    bool has_exec_mode = false;
     int nfft = 0;
     int channels = 0;
     float overlap = 0.0f;
@@ -63,6 +64,7 @@ inline BenchmarkConfig parse_args(int argc, char* argv[]) {
     float duration_seconds = 0.0f;
     int warmup_iterations = 0;
     int random_seed = 0;
+    ExecutorConfig::ExecutionMode exec_mode;
   } overrides;
 
   for (int i = 1; i < argc; ++i) {
@@ -91,10 +93,13 @@ IONOSPHERE VARIANTS (mutually exclusive):
 
 ENGINE PARAMETERS:
   --nfft <value>        FFT size (default: preset-dependent)
-  --channels <value>       Batch size (default: preset-dependent)
+  --channels <value>    Number of signal channels (default: preset-dependent)
   --overlap <value>     Overlap ratio 0-1 (default: preset-dependent)
   --sample-rate <hz>    Sample rate in Hz (default: 48000)
   --streams <n>         CUDA streams (default: 3)
+  --exec-mode <mode>    Execution mode: batch or streaming (default: preset-dependent)
+                        latency/realtime/accuracy → streaming (low-latency)
+                        throughput → batch (high-throughput)
 
 BENCHMARK PARAMETERS:
   --iterations <n>      Number of iterations (iteration-based benchmarks)
@@ -183,6 +188,9 @@ IONOSPHERE PARAMETER REFERENCE:
     } else if (arg == "--streams" && i + 1 < argc) {
       overrides.stream_count = std::stoi(argv[++i]);
       overrides.has_streams = true;
+    } else if (arg == "--exec-mode" && i + 1 < argc) {
+      overrides.exec_mode = string_to_exec_mode(argv[++i]);
+      overrides.has_exec_mode = true;
     }
 
     // Benchmark parameters (overrides)
@@ -271,6 +279,7 @@ IONOSPHERE PARAMETER REFERENCE:
   if (overrides.has_duration) config.duration_seconds = overrides.duration_seconds;
   if (overrides.has_warmup) config.warmup_iterations = overrides.warmup_iterations;
   if (overrides.has_seed) config.random_seed = overrides.random_seed;
+  if (overrides.has_exec_mode) config.exec_mode = overrides.exec_mode;
 
   return config;
 }

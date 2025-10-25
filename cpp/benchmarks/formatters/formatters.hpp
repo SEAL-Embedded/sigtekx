@@ -212,7 +212,8 @@ inline void print_latency_results(const BenchmarkConfig& config,
     std::cout << "\n";
     std::cout << "  Run Mode    : " << mode_to_string(config.run_mode) << "\n";
     std::cout << "  NFFT        : " << config.nfft << "\n";
-    std::cout << "  Batch       : " << config.channels << "\n";
+    std::cout << "  Channels    : " << config.channels << "\n";
+    std::cout << "  Exec Mode   : " << exec_mode_to_string(config.exec_mode) << "\n";
     std::cout << "  Overlap     : " << config.overlap << "\n";
     std::cout << "  Iterations  : " << config.iterations << "\n\n";
 
@@ -292,12 +293,13 @@ inline void print_latency_results(const BenchmarkConfig& config,
     if (config.output_format == OutputFormat::TABLE) {
       std::cout << "CSV Output:\n";
     }
-    std::cout << "preset,mode,ionosphere,nfft,batch,iterations,mean_us,p50_"
+    std::cout << "preset,mode,ionosphere,nfft,channels,exec_mode,iterations,mean_us,p50_"
                  "us,p95_us,p99_us,min_us,max_us,std_us\n";
     std::cout << preset_to_string(config.preset) << ","
               << mode_to_string(config.run_mode) << ","
               << (config.iono_variant == IonoVariant::IONO ? "iono" : config.iono_variant == IonoVariant::IONOX ? "ionox" : "none") << ","
-              << config.nfft << "," << config.channels << "," << config.iterations
+              << config.nfft << "," << config.channels << ","
+              << exec_mode_to_string(config.exec_mode) << "," << config.iterations
               << "," << results.mean_latency_us << "," << results.p50_latency_us
               << "," << results.p95_latency_us << "," << results.p99_latency_us
               << "," << results.min_latency_us << "," << results.max_latency_us
@@ -338,7 +340,8 @@ inline void print_throughput_results(const BenchmarkConfig& config,
     std::cout << "\n";
     std::cout << "  Run Mode    : " << mode_to_string(config.run_mode) << "\n";
     std::cout << "  NFFT        : " << config.nfft << "\n";
-    std::cout << "  Batch       : " << config.channels << "\n";
+    std::cout << "  Channels    : " << config.channels << "\n";
+    std::cout << "  Exec Mode   : " << exec_mode_to_string(config.exec_mode) << "\n";
     std::cout << "  Duration    : " << config.duration_seconds << "s\n\n";
 
     std::cout << "Runtime:\n";
@@ -390,12 +393,13 @@ inline void print_throughput_results(const BenchmarkConfig& config,
     if (config.output_format == OutputFormat::TABLE) {
       std::cout << "CSV Output:\n";
     }
-    std::cout << "preset,mode,ionosphere,nfft,batch,duration_s,fps,gb_per_s,"
+    std::cout << "preset,mode,ionosphere,nfft,channels,exec_mode,duration_s,fps,gb_per_s,"
                  "samples_per_s,total_frames\n";
     std::cout << preset_to_string(config.preset) << ","
               << mode_to_string(config.run_mode) << ","
               << (config.iono_variant == IonoVariant::IONO ? "iono" : config.iono_variant == IonoVariant::IONOX ? "ionox" : "none") << ","
               << config.nfft << "," << config.channels << ","
+              << exec_mode_to_string(config.exec_mode) << ","
               << results.test_duration_s << "," << results.frames_per_second
               << "," << results.gb_per_second << ","
               << results.samples_per_second << "," << results.total_frames
@@ -436,7 +440,8 @@ inline void print_realtime_results(const BenchmarkConfig& config,
     std::cout << "\n";
     std::cout << "  Run Mode    : " << mode_to_string(config.run_mode) << "\n";
     std::cout << "  NFFT        : " << config.nfft << "\n";
-    std::cout << "  Batch       : " << config.channels << "\n";
+    std::cout << "  Channels    : " << config.channels << "\n";
+    std::cout << "  Exec Mode   : " << exec_mode_to_string(config.exec_mode) << "\n";
     std::cout << "  Duration    : " << config.duration_seconds << "s\n\n";
 
     std::cout << "Runtime:\n";
@@ -491,12 +496,13 @@ inline void print_realtime_results(const BenchmarkConfig& config,
     if (config.output_format == OutputFormat::TABLE) {
       std::cout << "CSV Output:\n";
     }
-    std::cout << "preset,mode,ionosphere,nfft,batch,compliance_rate,mean_lat_"
+    std::cout << "preset,mode,ionosphere,nfft,channels,exec_mode,compliance_rate,mean_lat_"
                  "ms,p99_lat_ms,jitter_ms,frames,misses\n";
     std::cout << preset_to_string(config.preset) << ","
               << mode_to_string(config.run_mode) << ","
               << (config.iono_variant == IonoVariant::IONO ? "iono" : config.iono_variant == IonoVariant::IONOX ? "ionox" : "none") << ","
               << config.nfft << "," << config.channels << ","
+              << exec_mode_to_string(config.exec_mode) << ","
               << results.compliance_rate << "," << results.mean_latency_ms
               << "," << results.p99_latency_ms << "," << results.mean_jitter_ms
               << "," << results.frames_processed << ","

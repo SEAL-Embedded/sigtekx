@@ -37,7 +37,11 @@
 #include "../benchmarks/formatters/formatters.hpp"
 #include "../benchmarks/core/persistence.hpp"
 #include "../benchmarks/core/results.hpp"
-#include "../benchmarks/runners/all_runners.hpp"
+#include "../benchmarks/runners/warmup.hpp"
+#include "../benchmarks/runners/latency_runner.hpp"
+#include "../benchmarks/runners/throughput_runner.hpp"
+#include "../benchmarks/runners/realtime_runner.hpp"
+#include "../benchmarks/runners/accuracy_runner.hpp"
 #include "../benchmarks/core/cli_parser.hpp"
 #include "../benchmarks/utils/reference_compute.hpp"
 #include "../benchmarks/utils/signal_generator.hpp"
@@ -55,6 +59,99 @@ using namespace ionosense::benchmark;
 // ============================================================================
 // Helper Functions
 // ============================================================================
+
+/**
+ * @brief Run benchmarks with a given executor.
+ *
+ * Templated function to run warmup and benchmarks with any executor type.
+ *
+ * @tparam ExecutorT Executor type (BatchExecutor or StreamingExecutor)
+ * @param executor Executor instance
+ * @param config Benchmark configuration
+ * @param runtime_info Runtime information
+ */
+template<typename ExecutorT>
+static void run_benchmarks_with_executor(ExecutorT& executor,
+                                          const BenchmarkConfig& config,
+                                          const RuntimeInfo& runtime_info) {
+  // Warmup
+  if (!config.quiet && config.warmup_iterations > 0) {
+    std::cout << "Warmup (" << config.warmup_iterations << " iterations)...\n";
+  }
+  if (config.warmup_iterations > 0) {
+    run_warmup(executor, config);
+  }
+
+  // Run benchmark based on preset
+  if (!config.quiet) {
+    std::cout << "Running benchmark...\n";
+  }
+
+  switch (config.preset) {
+    case BenchmarkPreset::LATENCY:
+    case BenchmarkPreset::DEV: {
+      auto results = run_latency_benchmark(executor, config);
+      print_latency_results(config, results, runtime_info);
+
+      // Save baseline if requested
+      if (config.save_baseline) {
+        save_latency_baseline(config, results);
+        if (!config.quiet) {
+          std::cout << "Baseline saved to: " << get_baseline_path(config) << "\n";
+        }
+      }
+      break;
+    }
+
+    case BenchmarkPreset::THROUGHPUT: {
+      auto results = run_throughput_benchmark(executor, config);
+      print_throughput_results(config, results, runtime_info);
+
+      // Save baseline if requested
+      if (config.save_baseline) {
+        save_throughput_baseline(config, results);
+        if (!config.quiet) {
+          std::cout << "Baseline saved to: " << get_baseline_path(config) << "\n";
+        }
+      }
+      break;
+    }
+
+    case BenchmarkPreset::REALTIME: {
+      auto results = run_realtime_benchmark(executor, config);
+      print_realtime_results(config, results, runtime_info);
+
+      // Save baseline if requested
+      if (config.save_baseline) {
+        save_realtime_baseline(config, results);
+        if (!config.quiet) {
+          std::cout << "Baseline saved to: " << get_baseline_path(config) << "\n";
+        }
+      }
+      break;
+    }
+
+    case BenchmarkPreset::ACCURACY: {
+      auto results = run_accuracy_benchmark(executor, config);
+      print_accuracy_results(config, results, runtime_info);
+
+      // Save baseline if requested
+      if (config.save_baseline) {
+        save_accuracy_baseline(config, results);
+        if (!config.quiet) {
+          std::cout << "Baseline saved to: " << get_baseline_path(config) << "\n";
+        }
+      }
+      break;
+    }
+  }
+
+  // Cleanup
+  {
+    IONO_NVTX_RANGE("Cleanup", profiling::colors::RED);
+    executor.reset();
+  }
+}
 
 static RuntimeInfo get_cuda_runtime_info() {
   RuntimeInfo info;
@@ -107,12 +204,12 @@ int main(int argc, char* argv[]) {
         std::cout << " (ionox)";
       }
       std::cout << " | Mode: " << mode_to_string(config.run_mode) << "\n";
-      std::cout << "NFFT: " << config.nfft << " | Batch: " << config.channels
-                << " | Overlap: " << config.overlap << "\n\n";
+      std::cout << "NFFT: " << config.nfft << " | Channels: " << config.channels
+                << " | Overlap: " << config.overlap
+                << " | Exec Mode: " << exec_mode_to_string(config.exec_mode) << "\n\n";
     }
 
-    // Initialize executor (BatchExecutor for now)
-    BatchExecutor executor;
+    // Prepare executor configuration
     ExecutorConfig executor_config;
     executor_config.nfft = config.nfft;
     executor_config.channels = config.channels;
@@ -121,93 +218,28 @@ int main(int argc, char* argv[]) {
     executor_config.stream_count = config.stream_count;
     executor_config.pinned_buffer_count = config.pinned_buffer_count;
     executor_config.warmup_iters = 0;  // Manual warmup
-    executor_config.mode = ExecutorConfig::ExecutionMode::BATCH;
+    executor_config.mode = config.exec_mode;  // Use config, not hardcoded
     executor_config.device_id = -1;  // Auto-select
-
-    {
-      IONO_NVTX_RANGE("Executor Initialization", profiling::colors::DARK_GRAY);
-      auto stages = StageFactory::create_default_pipeline();
-      executor.initialize(executor_config, std::move(stages));
-    }
 
     RuntimeInfo runtime_info = get_cuda_runtime_info();
 
-    // Warmup
-    if (!config.quiet && config.warmup_iterations > 0) {
-      std::cout << "Warmup (" << config.warmup_iterations << " iterations)...\n";
-    }
-    if (config.warmup_iterations > 0) {
-      run_warmup(executor, config);
-    }
-
-    // Run benchmark based on preset
-    if (!config.quiet) {
-      std::cout << "Running benchmark...\n";
-    }
-
-    switch (config.preset) {
-      case BenchmarkPreset::LATENCY:
-      case BenchmarkPreset::DEV: {
-        auto results = run_latency_benchmark(executor, config);
-        print_latency_results(config, results, runtime_info);
-
-        // Save baseline if requested
-        if (config.save_baseline) {
-          save_latency_baseline(config, results);
-          if (!config.quiet) {
-            std::cout << "Baseline saved to: " << get_baseline_path(config) << "\n";
-          }
-        }
-        break;
+    // Initialize and run with appropriate executor based on execution mode
+    if (config.exec_mode == ExecutorConfig::ExecutionMode::BATCH) {
+      BatchExecutor executor;
+      {
+        IONO_NVTX_RANGE("Executor Initialization (BATCH)", profiling::colors::DARK_GRAY);
+        auto stages = StageFactory::create_default_pipeline();
+        executor.initialize(executor_config, std::move(stages));
       }
-
-      case BenchmarkPreset::THROUGHPUT: {
-        auto results = run_throughput_benchmark(executor, config);
-        print_throughput_results(config, results, runtime_info);
-
-        // Save baseline if requested
-        if (config.save_baseline) {
-          save_throughput_baseline(config, results);
-          if (!config.quiet) {
-            std::cout << "Baseline saved to: " << get_baseline_path(config) << "\n";
-          }
-        }
-        break;
+      run_benchmarks_with_executor(executor, config, runtime_info);
+    } else {
+      StreamingExecutor executor;
+      {
+        IONO_NVTX_RANGE("Executor Initialization (STREAMING)", profiling::colors::DARK_GRAY);
+        auto stages = StageFactory::create_default_pipeline();
+        executor.initialize(executor_config, std::move(stages));
       }
-
-      case BenchmarkPreset::REALTIME: {
-        auto results = run_realtime_benchmark(executor, config);
-        print_realtime_results(config, results, runtime_info);
-
-        // Save baseline if requested
-        if (config.save_baseline) {
-          save_realtime_baseline(config, results);
-          if (!config.quiet) {
-            std::cout << "Baseline saved to: " << get_baseline_path(config) << "\n";
-          }
-        }
-        break;
-      }
-
-      case BenchmarkPreset::ACCURACY: {
-        auto results = run_accuracy_benchmark(executor, config);
-        print_accuracy_results(config, results, runtime_info);
-
-        // Save baseline if requested
-        if (config.save_baseline) {
-          save_accuracy_baseline(config, results);
-          if (!config.quiet) {
-            std::cout << "Baseline saved to: " << get_baseline_path(config) << "\n";
-          }
-        }
-        break;
-      }
-    }
-
-    // Cleanup
-    {
-      IONO_NVTX_RANGE("Cleanup", profiling::colors::RED);
-      executor.reset();
+      run_benchmarks_with_executor(executor, config, runtime_info);
     }
 
     return 0;
