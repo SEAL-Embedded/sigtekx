@@ -1,16 +1,18 @@
 /**
- * @file engine_config.hpp
+ * @file signal_config.hpp
  * @version 0.9.4
  * @date 2025-10-23
  * @author [Kevin Rahsaz]
  *
  * @brief Core configuration structures for signal processing.
  *
- * Defines EngineConfig and utility functions used across the library.
+ * Defines SignalConfig and utility functions used across the library.
  *
- * ⚠️  BREAKING CHANGE (v0.9.4): 'batch' renamed to 'channels' for clarity.
- * - 'channels' = number of independent signal channels (e.g., dual antenna = 2)
- * - Industry-standard terminology alignment
+ * ⚠️  BREAKING CHANGE (v0.9.4): Terminology refactor for industry standards.
+ * - 'batch' → 'channels' (spatial dimension: independent signal streams)
+ * - Established 'frames' terminology (temporal dimension: FFT windows)
+ * - Clarified spatial vs temporal vs spectral dimensions
+ * - Renamed engine_config → signal_config (no "engine" abstraction in C++)
  */
 
 #pragma once
@@ -21,13 +23,13 @@
 namespace ionosense {
 
 /**
- * @struct EngineConfig
+ * @struct SignalConfig
  * @brief Core configuration for signal processing parameters.
  *
  * Contains fundamental signal processing parameters used by all executors.
  * For executor-specific settings (e.g., execution mode), see ExecutorConfig.
  */
-struct EngineConfig {
+struct SignalConfig {
   // Signal Parameters
   int nfft = 1024;
   int channels = 2;  // Renamed from 'batch' in v0.9.4 for clarity
@@ -56,14 +58,14 @@ struct EngineConfig {
 };
 
 /**
- * @namespace engine_utils
- * @brief Utility functions for engine and CUDA environment.
+ * @namespace signal_utils
+ * @brief Utility functions for signal processing config and CUDA environment.
  */
-namespace engine_utils {
+namespace signal_utils {
 std::vector<std::string> get_available_devices();
 int select_best_device();
-bool validate_config(const EngineConfig& config, std::string& error_msg);
-size_t estimate_memory_usage(const EngineConfig& config);
-}  // namespace engine_utils
+bool validate_config(const SignalConfig& config, std::string& error_msg);
+size_t estimate_memory_usage(const SignalConfig& config);
+}  // namespace signal_utils
 
 }  // namespace ionosense

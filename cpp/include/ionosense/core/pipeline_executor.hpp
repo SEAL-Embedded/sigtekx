@@ -32,13 +32,13 @@ class IProcessingStage;
 /**
  * @brief Callback function type for asynchronous processing results.
  * @param magnitude Pointer to the magnitude spectrum data on the host.
- * @param num_bins The number of bins in the spectrum.
- * @param batch_size The number of spectra in the batch.
+ * @param num_bins The number of frequency bins in one spectrum.
+ * @param num_frames The number of temporal frames in the result.
  * @param stats Performance statistics for the operation.
  */
 using ResultCallback =
     std::function<void(const float* magnitude, size_t num_bins,
-                       size_t batch_size, const ProcessingStats& stats)>;
+                       size_t num_frames, const ProcessingStats& stats)>;
 
 /**
  * @class IPipelineExecutor

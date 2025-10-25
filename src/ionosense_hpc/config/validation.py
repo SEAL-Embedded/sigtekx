@@ -136,20 +136,20 @@ def validate_input_array(
     return data
 
 
-def validate_batch_size(data: np.ndarray, config: EngineConfig) -> None:
-    """Validate that data matches the configured batch size.
+def validate_input_size(data: np.ndarray, config: EngineConfig) -> None:
+    """Validate that input data size matches engine configuration.
 
     Args:
         data: Input data array
         config: Engine configuration
 
     Raises:
-        ValidationError: If batch size doesn't match
+        ValidationError: If input size doesn't match nfft * channels
     """
     expected_samples = config.nfft * config.channels
     if data.size != expected_samples:
         raise ValidationError(
-            "Data size mismatch for batch processing",
-            expected=f"{expected_samples} samples ({config.channels} x {config.nfft})",
+            "Input data size mismatch",
+            expected=f"{expected_samples} samples ({config.channels} channels × {config.nfft} samples)",
             got=f"{data.size} samples"
         )

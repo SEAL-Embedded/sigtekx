@@ -202,32 +202,32 @@ PYBIND11_MODULE(_engine, m) {
       .export_values();
 
   // --- Bind Configuration Structs ---
-  py::class_<ionosense::EngineConfig>(m, "EngineConfig")
+  py::class_<ionosense::SignalConfig>(m, "SignalConfig")
       .def(py::init<>())
-      .def_readwrite("nfft", &ionosense::EngineConfig::nfft)
-      .def_readwrite("channels", &ionosense::EngineConfig::channels)
-      .def_readwrite("overlap", &ionosense::EngineConfig::overlap)
-      .def_readwrite("sample_rate_hz", &ionosense::EngineConfig::sample_rate_hz)
-      .def_readwrite("window_type", &ionosense::EngineConfig::window_type)
+      .def_readwrite("nfft", &ionosense::SignalConfig::nfft)
+      .def_readwrite("channels", &ionosense::SignalConfig::channels)
+      .def_readwrite("overlap", &ionosense::SignalConfig::overlap)
+      .def_readwrite("sample_rate_hz", &ionosense::SignalConfig::sample_rate_hz)
+      .def_readwrite("window_type", &ionosense::SignalConfig::window_type)
       .def_readwrite("window_symmetry",
-                     &ionosense::EngineConfig::window_symmetry)
-      .def_readwrite("window_norm", &ionosense::EngineConfig::window_norm)
-      .def_readwrite("scale_policy", &ionosense::EngineConfig::scale_policy)
-      .def_readwrite("output_mode", &ionosense::EngineConfig::output_mode)
-      .def_readwrite("stream_count", &ionosense::EngineConfig::stream_count)
+                     &ionosense::SignalConfig::window_symmetry)
+      .def_readwrite("window_norm", &ionosense::SignalConfig::window_norm)
+      .def_readwrite("scale_policy", &ionosense::SignalConfig::scale_policy)
+      .def_readwrite("output_mode", &ionosense::SignalConfig::output_mode)
+      .def_readwrite("stream_count", &ionosense::SignalConfig::stream_count)
       .def_readwrite("pinned_buffer_count",
-                     &ionosense::EngineConfig::pinned_buffer_count)
-      .def_readwrite("warmup_iters", &ionosense::EngineConfig::warmup_iters)
-      .def("num_output_bins", &ionosense::EngineConfig::num_output_bins)
-      .def("__repr__", [](const ionosense::EngineConfig& c) {
-        return "<EngineConfig nfft=" + std::to_string(c.nfft) +
+                     &ionosense::SignalConfig::pinned_buffer_count)
+      .def_readwrite("warmup_iters", &ionosense::SignalConfig::warmup_iters)
+      .def("num_output_bins", &ionosense::SignalConfig::num_output_bins)
+      .def("__repr__", [](const ionosense::SignalConfig& c) {
+        return "<SignalConfig nfft=" + std::to_string(c.nfft) +
                ", channels=" + std::to_string(c.channels) + ">";
       });
 
   // --- Bind ExecutorConfig (v0.9.3 architecture) ---
-  py::class_<ionosense::ExecutorConfig, ionosense::EngineConfig>(
+  py::class_<ionosense::ExecutorConfig, ionosense::SignalConfig>(
       m, "ExecutorConfig",
-      "Configuration for pipeline executors (extends EngineConfig)")
+      "Configuration for pipeline executors (extends SignalConfig)")
       .def(py::init<>())
       .def_readwrite("mode", &ionosense::ExecutorConfig::mode,
                      "Execution strategy (BATCH/STREAMING)")
@@ -306,9 +306,9 @@ PYBIND11_MODULE(_engine, m) {
 
   // --- Bind Utility Functions ---
   m.def("get_available_devices",
-        &ionosense::engine_utils::get_available_devices,
+        &ionosense::signal_utils::get_available_devices,
         "Gets a list of available CUDA devices.");
-  m.def("select_best_device", &ionosense::engine_utils::select_best_device,
+  m.def("select_best_device", &ionosense::signal_utils::select_best_device,
         "Selects the best available CUDA device.");
 
   m.attr("__version__") = "0.9.4";

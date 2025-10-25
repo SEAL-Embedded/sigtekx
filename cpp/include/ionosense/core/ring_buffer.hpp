@@ -1,7 +1,7 @@
 /**
  * @file ring_buffer.hpp
  * @version 0.9.4
- * @date 2025-10-18
+ * @date 2025-10-23
  * @author [Kevin Rahsaz]
  *
  * @brief Circular ring buffer for continuous streaming input accumulation.
@@ -51,8 +51,9 @@ class RingBuffer {
    * @brief Constructs a ring buffer with specified capacity.
    * @param capacity Maximum number of elements to store.
    *
-   * For STFT with batch processing, recommended size is:
-   * `capacity = nfft + (batch - 1) * hop_size + nfft` (extra for safety)
+   * For STFT with temporal frame processing, recommended size is:
+   * `capacity = nfft + (num_frames - 1) * hop_size + nfft` (extra for safety)
+   * where num_frames is the number of temporal frames to extract at once.
    */
   explicit RingBuffer(size_t capacity)
       : capacity_(capacity),
@@ -137,34 +138,38 @@ class RingBuffer {
   }
 
   /**
-   * @brief Extracts a batch of overlapping frames for STFT processing.
-   * @param output Destination buffer (must have space for nfft * batch
+   * @brief Extracts multiple overlapping temporal frames for STFT processing.
+   * @param output Destination buffer (must have space for nfft * num_frames
    * elements).
    * @param nfft Frame size (window size for FFT).
-   * @param batch Number of frames to extract.
+   * @param num_frames Number of temporal frames to extract.
    * @param hop_size Stride between consecutive frames (samples to advance).
    * @throws std::underflow_error if insufficient samples available.
    *
-   * Extracts `batch` frames, each of size `nfft`, with `hop_size` samples
-   * between frame starts. Handles STFT overlap (e.g., hop_size = nfft * (1 -
-   * overlap)).
+   * Extracts `num_frames` temporal frames, each of size `nfft`, with `hop_size`
+   * samples between frame starts. Handles STFT overlap (e.g., hop_size = nfft *
+   * (1 - overlap)).
    *
-   * Example: nfft=1024, batch=2, hop_size=512 (50% overlap)
+   * Note: This extracts frames in the temporal dimension. Each frame represents
+   * one FFT window in time. For multi-channel processing, maintain one ring
+   * buffer per spatial channel.
+   *
+   * Example: nfft=1024, num_frames=2, hop_size=512 (50% overlap)
    *   Frame 0: samples [0:1024)
    *   Frame 1: samples [512:1536)
    *   Total samples needed: 1024 + 512 = 1536
    */
-  void extract_batch(T* output, size_t nfft, size_t batch,
+  void extract_batch(T* output, size_t nfft, size_t num_frames,
                      size_t hop_size) const {
     // Calculate total samples needed
-    size_t total_needed = nfft + (batch - 1) * hop_size;
+    size_t total_needed = nfft + (num_frames - 1) * hop_size;
     if (available_ < total_needed) {
       throw std::underflow_error(
-          "Ring buffer underflow: insufficient samples for batch");
+          "Ring buffer underflow: insufficient samples for temporal frames");
     }
 
     // Extract each frame
-    for (size_t i = 0; i < batch; ++i) {
+    for (size_t i = 0; i < num_frames; ++i) {
       size_t frame_start = (read_pos_ + i * hop_size) % capacity_;
       T* frame_output = output + i * nfft;
 

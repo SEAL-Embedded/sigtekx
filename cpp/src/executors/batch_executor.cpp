@@ -51,7 +51,7 @@ class BatchExecutor::Impl {
       throw std::runtime_error("No CUDA-capable devices found.");
     }
 
-    device_id_ = engine_utils::select_best_device();
+    device_id_ = signal_utils::select_best_device();
     IONO_CUDA_CHECK(cudaSetDevice(device_id_));
     IONO_CUDA_CHECK(cudaGetDeviceProperties(&device_props_, device_id_));
   }
@@ -370,6 +370,10 @@ class BatchExecutor::Impl {
 
     if (callback) {
       IONO_NVTX_RANGE("Result Callback", profiling::colors::CYAN);
+      // Note: Third parameter is num_frames. Currently passes config_.channels
+      // because each submit() processes 1 temporal frame with N spatial channels,
+      // producing N spectra. In future versions with true temporal batching,
+      // this will represent the number of temporal frames processed.
       callback(output.data(), config_.num_output_bins(), config_.channels, stats_);
     }
   }

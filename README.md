@@ -109,6 +109,33 @@ with Engine(preset='default') as engine:
     print(f"Output shape: {spectrum.shape}")
 ```
 
+### Key Terminology
+
+Ionosense-HPC uses industry-standard terminology for signal processing dimensions (v0.9.5+):
+
+```
+┌──────────────────────────────────────────────────────┐
+│  Signal Processing Dimensions                        │
+├──────────────────────────────────────────────────────┤
+│  SPATIAL:  channels  (independent signal streams)    │
+│             Example: 2 channels = dual-antenna setup │
+│                                                       │
+│  TEMPORAL: frames    (time windows for STFT)         │
+│             Example: 512 frames = 512 FFT windows    │
+│                                                       │
+│  SPECTRAL: nfft      (FFT window size)               │
+│             Example: nfft=4096 → 2049 frequency bins │
+└──────────────────────────────────────────────────────┘
+```
+
+**Important parameters:**
+- `channels`: Number of independent signal streams (e.g., dual-antenna = 2)
+- `nfft`: FFT window size (must be power of 2)
+- `overlap`: Overlap between consecutive frames (0.0-1.0)
+- `hop_size`: Samples between frame starts = `nfft * (1 - overlap)`
+
+**Note:** In v0.9.4, `batch` was renamed to `channels` for clarity and industry alignment.
+
 ### Configuration Presets
 
 ```python

@@ -9,37 +9,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-#### BREAKING: Terminology Refactor - `batch` → `channels`
+#### BREAKING: Complete Terminology Refactor for Industry Standards
 
-**Motivation**: Aligned terminology with industry standards and eliminated confusion between:
-- **Number of signal channels** (dual antenna = 2 channels)
-- **Execution mode** (batch vs streaming)
-- **Temporal batching** (frames processed together)
+**Motivation**: Established clear, industry-standard terminology to eliminate fundamental mental model confusion between spatial, temporal, and execution dimensions. Previous "batch" terminology caused architecture errors by conflating unrelated concepts.
 
-**What Changed**:
-- `EngineConfig.batch` → `EngineConfig.channels`
-- `engine.batch` → `engine.channels` (in all YAML configs)
+**Phase 1: Spatial Dimension - `batch` → `channels`**
+- `EngineConfig.batch` → `SignalConfig.channels` (C++)
+- `engine.batch` → `engine.channels` (Python/YAML)
 - `experiment=batch_scaling` → `experiment=channels_scaling`
-- `nfft_batch_sweep.yaml` → `nfft_channels_sweep.yaml`
+- **Mental Model**: `channels` = number of independent signal streams (e.g., dual-antenna = 2)
+
+**Phase 2: Temporal Dimension - Established `frames` terminology**
+- `ResultCallback::batch_size` → `ResultCallback::num_frames` (C++)
+- `RingBuffer::extract_batch(batch)` → `RingBuffer::extract_batch(num_frames)`
+- `test_batch_sizes` → `test_channel_counts` (Python benchmarks)
+- `validate_batch_size()` → `validate_input_size()` (Python validation)
+- **Mental Model**: `frames` = number of temporal FFT windows processed
+
+**Phase 3: C++ Architecture Clarity - Removed "engine" misnomer**
+- `engine_config.hpp` → `signal_config.hpp` (no "engine" abstraction in C++)
+- `engine_utils` → `signal_utils` namespace
+- `EngineConfig` struct → `SignalConfig` struct
+- `ExecutorConfig` now extends `SignalConfig` (was `EngineConfig`)
+- **Rationale**: Only Python has an `Engine` abstraction; C++ only has executors
+
+**Complete Mental Model (v0.9.4)**:
+```
+SPATIAL:   channels  → Independent signal streams (dual-antenna = 2)
+TEMPORAL:  frames    → Time windows for STFT (512 FFT windows)
+SPECTRAL:  nfft      → FFT window size (4096 → 2049 frequency bins)
+EXECUTION: mode      → Processing strategy (batch vs streaming)
+```
 
 **Migration**:
 ```python
-# OLD (v0.9.3 and earlier)
-config = EngineConfig(nfft=4096, batch=8, overlap=0.5)
-engine = Engine(config=config)
-
-# NEW (v0.9.4+)
+# Python API (unchanged - uses EngineConfig from schemas.py)
 config = EngineConfig(nfft=4096, channels=8, overlap=0.5)
 engine = Engine(config=config)
 ```
 
-**Impact**:
-- ⚠️ **Zero backwards compatibility** - all old code using `batch` will fail with clear AttributeError
-- All C++ core, Python bindings, benchmarks, tests, and configs updated
-- Documentation updated to reflect industry-standard terminology
-- YAML experiment configs and Snakemake workflows updated
+```cpp
+// C++ API (struct names changed)
+SignalConfig config;  // Was EngineConfig
+config.channels = 8;  // Was config.batch
+```
 
-**Note**: The `mode='batch'` parameter (execution mode) is unchanged - it still refers to batch vs streaming execution strategy.
+**Impact**:
+- ⚠️ **Zero backwards compatibility** - breaking changes across all dimensions
+- 🔴 **C++ breaking**: `EngineConfig` → `SignalConfig`, `engine_utils::` → `signal_utils::`
+- 🟡 **C++ API change**: `ResultCallback` signature (`batch_size` → `num_frames`)
+- 🟡 **Python minor**: `validate_batch_size()` → `validate_input_size()` (internal)
+- ✅ **All 133 C++ tests passing**
+- ✅ **Documentation updated** with dimension reference in README
+- 📁 **Files changed**: 21 files (93 Phase 1 + architecture fixes)
+
+**Fixes**: This refactor resolves fundamental architecture errors caused by terminology confusion that led to incorrect mental models and implementation issues.
 
 ## [0.9.3] - 2025-10-15
 

@@ -30,7 +30,7 @@ from ionosense_hpc.config import (
     WindowNorm,
     WindowSymmetry,
     WindowType,
-    validate_batch_size,
+    validate_input_size,
     validate_config_device_compatibility,
     validate_input_array,
 )
@@ -445,8 +445,8 @@ class Engine:
                 got=str(validated.shape)
             )
 
-        # Validate batch size
-        validate_batch_size(validated, self._config)
+        # Validate input size
+        validate_input_size(validated, self._config)
 
         return cast(FloatArray, validated)
 

@@ -1,10 +1,10 @@
 /**
- * @file engine_utils.cpp
- * @version 0.9.3
- * @date 2025-10-09
+ * @file signal_utils.cpp
+ * @version 0.9.4
+ * @date 2025-10-23
  * @author [Kevin Rahsaz]
  *
- * @brief Utility functions for engine configuration and CUDA environment.
+ * @brief Utility functions for signal processing config and CUDA environment.
  *
  * Provides helper functions for device selection, configuration validation,
  * and memory estimation.
@@ -14,11 +14,11 @@
 #include <stdexcept>
 
 #include "ionosense/core/cuda_wrappers.hpp"
-#include "ionosense/core/engine_config.hpp"
+#include "ionosense/core/signal_config.hpp"
 #include "ionosense/profiling/nvtx.hpp"
 
 namespace ionosense {
-namespace engine_utils {
+namespace signal_utils {
 
 std::vector<std::string> get_available_devices() {
   IONO_NVTX_RANGE_FUNCTION(profiling::colors::CYAN);
@@ -59,7 +59,7 @@ int select_best_device() {
   return best_device;
 }
 
-bool validate_config(const EngineConfig& cfg, std::string& error_msg) {
+bool validate_config(const SignalConfig& cfg, std::string& error_msg) {
   IONO_NVTX_RANGE_FUNCTION(profiling::colors::CYAN);
   if (cfg.nfft <= 0 || (cfg.nfft & (cfg.nfft - 1)) != 0) {
     error_msg = "nfft must be a positive power of 2.";
@@ -89,7 +89,7 @@ bool validate_config(const EngineConfig& cfg, std::string& error_msg) {
   return true;
 }
 
-size_t estimate_memory_usage(const EngineConfig& cfg) {
+size_t estimate_memory_usage(const SignalConfig& cfg) {
   IONO_NVTX_RANGE_FUNCTION(profiling::colors::CYAN);
   size_t total = 0;
   const size_t input_bytes =

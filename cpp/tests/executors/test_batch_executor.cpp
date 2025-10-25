@@ -333,7 +333,7 @@ TEST_F(BatchExecutorTest, SubmitAsync) {
 
   executor.submit_async(input.data(), input_size,
                         [&](const float* magnitude, size_t num_bins,
-                            size_t batch_size, const ProcessingStats& stats) {
+                            size_t num_frames, const ProcessingStats& stats) {
                           callback_called = true;
                           received_bins = num_bins;
                           EXPECT_NE(magnitude, nullptr);

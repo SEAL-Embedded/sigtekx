@@ -43,7 +43,7 @@ Reading this taxonomy early helps you quickly interpret validation failures, run
 
 - [src/ionosense_hpc/config/validation.py](src/ionosense_hpc/config/validation.py)  
   **What it enforces:** NumPy-first checks to catch config/data issues before CUDA does.  
-  **Read in this order & why:** (1) `validate_config_device_compatibility` (headroom/compute-capability), (2) `estimate_memory_usage_mb` (buffer/workspace model), (3) `validate_input_array` (dtype/shape/contiguity/NaN-Inf), (4) `validate_batch_size` (buffers == `batch*nfft`).
+  **Read in this order & why:** (1) `validate_config_device_compatibility` (headroom/compute-capability), (2) `estimate_memory_usage_mb` (buffer/workspace model), (3) `validate_input_array` (dtype/shape/contiguity/NaN-Inf), (4) `validate_input_size` (input == `channels*nfft`).
 
 - [src/ionosense_hpc/config/presets.py](src/ionosense_hpc/config/presets.py)  
   **Why it matters:** Shared mental model for benchmark modes.  

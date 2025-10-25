@@ -34,7 +34,7 @@ class ThroughputBenchmarkConfig(BenchmarkConfig):
     data_size_gb: float | None = None  # Total data to process (overrides duration)
 
     # Scaling analysis
-    test_batch_sizes: list[int] = [1, 2, 4, 8, 16, 32, 64, 128]
+    test_channel_counts: list[int] = [1, 2, 4, 8, 16, 32, 64, 128]
     test_nfft_sizes: list[int] = [256, 512, 1024, 2048, 4096]
 
     # Memory analysis
@@ -307,16 +307,16 @@ class ScalingBenchmark(ThroughputBenchmark):
 
     def _test_batch_scaling(self) -> dict[str, Any]:
         """Test throughput scaling with batch size."""
-        logger.info("Testing batch size scaling...")
+        logger.info("Testing channel count scaling...")
 
-        batch_results = []
+        channel_results = []
         base_nfft = 2048  # Fixed FFT size
 
-        for batch_size in self.config.test_batch_sizes:
-            # Create config for this batch size
+        for num_channels in self.config.test_channel_counts:
+            # Create config for this channel count
             test_config = EngineConfig(
                 nfft=base_nfft,
-                channels=batch_size,
+                channels=num_channels,
                 warmup_iters=5
             )
 
@@ -336,21 +336,21 @@ class ScalingBenchmark(ThroughputBenchmark):
                 engine.process(test_data)
             elapsed = time.perf_counter() - start
 
-            samples_per_second = (n_iterations * base_nfft * batch_size) / elapsed
+            samples_per_second = (n_iterations * base_nfft * num_channels) / elapsed
 
-            batch_results.append({
-                'batch_size': batch_size,
+            channel_results.append({
+                'channels': num_channels,
                 'throughput_msps': samples_per_second / 1e6,
                 'time_per_batch_ms': (elapsed / n_iterations) * 1000
             })
 
             engine.close()
 
-            logger.info(f"  Batch {batch_size}: {samples_per_second/1e6:.2f} MS/s")
+            logger.info(f"  Channels {num_channels}: {samples_per_second/1e6:.2f} MS/s")
 
         return {
-            'results': batch_results,
-            'optimal_batch': max(batch_results, key=lambda x: x['throughput_msps'])['batch_size']
+            'results': channel_results,
+            'optimal_channels': max(channel_results, key=lambda x: x['throughput_msps'])['channels']
         }
 
     def _test_nfft_scaling(self) -> dict[str, Any]:

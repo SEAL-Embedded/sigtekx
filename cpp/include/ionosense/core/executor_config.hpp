@@ -6,13 +6,13 @@
  *
  * @brief Configuration structures for pipeline executors.
  *
- * Defines ExecutorConfig which extends EngineConfig with executor-specific
+ * Defines ExecutorConfig which extends SignalConfig with executor-specific
  * settings like execution mode, CUDA graph preferences, and resource hints.
  */
 
 #pragma once
 
-#include "ionosense/core/engine_config.hpp"  // For EngineConfig base
+#include "ionosense/core/signal_config.hpp"  // For SignalConfig base
 
 namespace ionosense {
 
@@ -20,10 +20,10 @@ namespace ionosense {
  * @struct ExecutorConfig
  * @brief Configuration for pipeline executor behavior and resource management.
  *
- * Extends EngineConfig with executor-specific settings that control how the
+ * Extends SignalConfig with executor-specific settings that control how the
  * pipeline is executed (batch vs streaming) and which optimizations to apply.
  */
-struct ExecutorConfig : EngineConfig {
+struct ExecutorConfig : SignalConfig {
   /**
    * @enum ExecutionMode
    * @brief Defines the execution strategy for the pipeline.
@@ -55,8 +55,8 @@ struct ExecutorConfig : EngineConfig {
    * @return True if configuration is valid, false otherwise.
    */
   bool validate(std::string& error_msg) const {
-    // First validate base EngineConfig
-    if (!engine_utils::validate_config(*this, error_msg)) {
+    // First validate base SignalConfig
+    if (!signal_utils::validate_config(*this, error_msg)) {
       return false;
     }
 

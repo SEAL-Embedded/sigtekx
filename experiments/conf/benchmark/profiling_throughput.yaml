@@ -4,7 +4,7 @@ iterations: 1
 warmup_iterations: 0
 test_duration_s: 3.0              # Reduced from 10s for fast profiling
 data_size_gb: null
-test_batch_sizes: [1, 2, 4, 8, 16, 32, 64, 128]
+test_channel_counts: [1, 2, 4, 8, 16, 32, 64, 128]
 test_nfft_sizes: [256, 512, 1024, 2048, 4096, 8192]
 measure_memory_bandwidth: false
 measure_pcie_bandwidth: false

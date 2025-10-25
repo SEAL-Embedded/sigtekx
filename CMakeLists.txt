@@ -159,7 +159,7 @@ add_library(ion_engine OBJECT
     # Core infrastructure
     cpp/src/core/processing_stage.cpp
     cpp/src/core/pipeline_builder.cpp
-    cpp/src/core/engine_utils.cpp
+    cpp/src/core/signal_utils.cpp
 
     # Executors
     cpp/src/executors/batch_executor.cpp
