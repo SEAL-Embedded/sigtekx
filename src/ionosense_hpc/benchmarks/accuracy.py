@@ -94,8 +94,9 @@ class AccuracyBenchmark(BaseBenchmark):
             if self.config.engine_config:
                 self.engine_config = EngineConfig(**self.config.engine_config)
             else:
-                # Use default preset with minimal batch for validation
+                # Use default preset with minimal channels for validation
                 self.engine_config = get_preset('default')
+                self.engine_config.mode = ExecutionMode.BATCH  # Batch mode for accuracy testing
                 self.engine_config.channels = 1
 
             # Accuracy validation is single-frame; force zero overlap for determinism.

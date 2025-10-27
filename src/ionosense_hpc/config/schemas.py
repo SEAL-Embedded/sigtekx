@@ -67,7 +67,7 @@ class EngineConfig(BaseModel):
     """Unified configuration for the Ionosense HPC signal processing engine.
 
     This single configuration class handles all aspects of engine behavior:
-    - Signal parameters (nfft, batch, overlap, sample rate)
+    - Signal parameters (nfft, channels, overlap, sample rate)
     - Pipeline parameters (window type, FFT scaling, output mode)
     - Execution parameters (mode, streams, buffers, device)
     - Performance tuning (warmup, profiling)
@@ -91,7 +91,7 @@ class EngineConfig(BaseModel):
         ...     overlap=0.9,
         ...     window=WindowType.BLACKMAN,
         ...     window_symmetry=WindowSymmetry.PERIODIC,
-        ...     mode=ExecutionMode.channels
+        ...     mode=ExecutionMode.BATCH
         ... )
 
         # From preset (using class method)
@@ -355,11 +355,11 @@ def _apply_mode_overrides(config: EngineConfig, mode: ExecutionMode) -> EngineCo
     overrides = {}
 
     if mode == ExecutionMode.STREAMING:
-        # Streaming: Minimize latency, reduce batch size, more streams
+        # Streaming: Minimize latency, reduce channels, more streams
         overrides['stream_count'] = 6
         overrides['pinned_buffer_count'] = 4
-        overrides['batch'] = max(2, config.channels // 2)  # Reduce batch for lower latency
-    elif mode == ExecutionMode.channels:
+        overrides['channels'] = max(2, config.channels // 2)  # Reduce channels for lower latency
+    elif mode == ExecutionMode.BATCH:
         # Batch: Maximize throughput, use more buffers
         overrides['stream_count'] = 4
         overrides['pinned_buffer_count'] = 4

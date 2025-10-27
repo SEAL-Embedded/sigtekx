@@ -134,7 +134,7 @@ class Engine:
             pipeline: Pre-built Pipeline from PipelineBuilder
             builder: Builder function for custom pipeline (advanced)
             mode: Execution mode override ('batch', 'streaming')
-            **overrides: Quick parameter overrides (nfft, batch, overlap, etc.)
+            **overrides: Quick parameter overrides (nfft, channels, overlap, etc.)
 
         Raises:
             ValueError: If configuration is invalid
@@ -286,7 +286,7 @@ class Engine:
             # Map Python config to C++ config
             # Copy all fields that exist in C++ ExecutorConfig (extends EngineConfig)
             cpp_fields = {
-                'nfft', 'batch', 'overlap', 'sample_rate_hz',
+                'nfft', 'channels', 'overlap', 'sample_rate_hz',
                 'stream_count', 'pinned_buffer_count', 'warmup_iters',
                 'device_id'
             }
@@ -361,10 +361,10 @@ class Engine:
         """Process input data through the signal processing pipeline.
 
         Args:
-            data: Input signal data (array-like, shape: nfft * batch)
+            data: Input signal data (array-like, shape: nfft * channels)
 
         Returns:
-            Magnitude spectrum array (shape: batch × num_output_bins)
+            Magnitude spectrum array (shape: channels × num_output_bins)
 
         Raises:
             EngineStateError: If engine is closed or not initialized
@@ -376,7 +376,7 @@ class Engine:
             >>> signal = np.random.randn(32768).astype(np.float32)  # 4096 × 8
             >>> spectrum = engine.process(signal)
             >>> spectrum.shape
-            (8, 2049)  # batch × (nfft//2 + 1)
+            (8, 2049)  # channels × (nfft//2 + 1)
         """
         if self._closed:
             raise EngineStateError(

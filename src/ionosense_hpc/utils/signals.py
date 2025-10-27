@@ -301,13 +301,13 @@ def make_test_batch(
 ) -> np.ndarray:
     """Create a batched signal array tailored to the engine configuration."""
     n_samples = int(n_samples or config.nfft)
-    batch = int(batch or config.channels)
+    channels_count = int(channels or config.channels)
     sample_rate = int(kwargs.pop("sample_rate", config.sample_rate_hz))
 
     if n_samples <= 0:
         raise ValueError("n_samples must be positive")
-    if batch <= 0:
-        raise ValueError("batch must be positive")
+    if channels_count <= 0:
+        raise ValueError("channels must be positive")
 
     signal_key = signal_type.lower()
     base_signal: np.ndarray | None = None
@@ -377,9 +377,9 @@ def make_test_batch(
     batch_data: np.ndarray
     if base_signal is not None:
         base_signal = np.asarray(base_signal, dtype=np.float64)
-        batch_data = np.empty((channels, n_samples), dtype=np.float64)
+        batch_data = np.empty((channels_count, n_samples), dtype=np.float64)
         variation_scale = float(max(channel_variation, 0.0))
-        for idx in range(batch):
+        for idx in range(channels_count):
             channel = base_signal.copy()
             if variation_scale > 0 and not np.allclose(base_signal, 0.0):
                 ref_level = float(np.mean(np.abs(base_signal)))
@@ -399,8 +399,8 @@ def make_test_batch(
         else:
             noise_kind = cast(NoiseKind, signal_key.replace("_noise", ""))
         amplitude = float(kwargs.pop("amplitude", 1.0))
-        batch_data = np.empty((channels, n_samples), dtype=np.float64)
-        for idx in range(batch):
+        batch_data = np.empty((channels_count, n_samples), dtype=np.float64)
+        for idx in range(channels_count):
             batch_data[idx] = make_noise(
                 n_samples,
                 noise_type=noise_kind,

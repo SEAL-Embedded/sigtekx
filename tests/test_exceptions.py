@@ -69,7 +69,7 @@ def test_engine_runtime_error():
     """Test the EngineRuntimeError exception."""
     # Out of memory error
     err_mem = EngineRuntimeError("CUDA Error", cuda_error="out of memory")
-    assert "Reduce batch size or nfft" in str(err_mem)
+    assert "Reduce channels or nfft" in str(err_mem)
 
     # Invalid configuration error
     err_config = EngineRuntimeError("CUDA Error", cuda_error="invalid configuration")

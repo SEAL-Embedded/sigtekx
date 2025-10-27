@@ -380,7 +380,7 @@ class TestConvenienceFunctions:
         # With default preset (requires larger data)
         large_data = np.random.randn(1024 * 2).astype(np.float32)
         output = process_signal(large_data, preset='default')
-        assert output.shape == (2, 513)  # default is 1024 FFT × 2 batch = 513 bins
+        assert output.shape == (2, 513)  # default is 1024 FFT × 2 channels = 513 bins
 
     def test_benchmark_latency(self):
         """Test benchmarking function."""

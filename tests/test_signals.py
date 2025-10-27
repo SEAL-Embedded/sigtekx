@@ -138,10 +138,10 @@ class TestBatchGenerator:
         assert batch_data.dtype == np.float32, "Batch data has incorrect dtype."
 
     def test_batch_channels_are_different(self) -> None:
-        """Channels in a batch should differ when expected."""
+        """Channels in a multichannel signal should differ when expected."""
         nfft = 1024
-        batch_size = 4
-        config = EngineConfig(nfft=nfft, channels=batch_size, sample_rate_hz=self.SAMPLE_RATE)
+        num_channels = 4
+        config = EngineConfig(nfft=nfft, channels=num_channels, sample_rate_hz=self.SAMPLE_RATE)
 
         sine_batch = make_test_batch(
             "sine",
@@ -151,7 +151,7 @@ class TestBatchGenerator:
         )
         ch1 = sine_batch[0:nfft]
         ch2 = sine_batch[nfft : 2 * nfft]
-        assert not np.array_equal(ch1, ch2), "Sine batch channels should be different."
+        assert not np.array_equal(ch1, ch2), "Sine multichannel channels should be different."
 
         noise_batch = make_test_batch(
             "noise",
@@ -163,10 +163,10 @@ class TestBatchGenerator:
         assert not np.array_equal(ch1_noise, ch2_noise), "Noise channels should be different."
 
     def test_batch_zeros_are_identical(self) -> None:
-        """Channels in a 'zeros' batch should be identical."""
+        """Channels in a 'zeros' multichannel signal should be identical."""
         nfft = 1024
-        batch_size = 4
-        config = EngineConfig(nfft=nfft, channels=batch_size, sample_rate_hz=self.SAMPLE_RATE)
+        num_channels = 4
+        config = EngineConfig(nfft=nfft, channels=num_channels, sample_rate_hz=self.SAMPLE_RATE)
         zeros_batch = make_test_batch(
             "zeros",
             config,
@@ -174,5 +174,5 @@ class TestBatchGenerator:
         )
         ch1 = zeros_batch[0:nfft]
         ch2 = zeros_batch[nfft : 2 * nfft]
-        assert np.array_equal(ch1, ch2), "Zeros batch channels should be identical."
+        assert np.array_equal(ch1, ch2), "Zeros multichannel channels should be identical."
 

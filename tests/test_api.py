@@ -99,8 +99,8 @@ class TestPresets:
         assert 'batch' in desc
         assert 'streaming' in desc
         # Contains NFFFTs for both variants
-        assert '16384' in desc  # batch
-        assert '4096' in desc  # streaming
+        assert '16384' in desc  # BATCH mode variant
+        assert '4096' in desc  # STREAMING mode variant
 
     def test_compare_presets(self):
         """Test preset comparison table."""
@@ -183,7 +183,7 @@ class TestEngineConfig:
         # Mode override should adjust stream/buffer counts for STREAMING
         assert config.stream_count == 6  # STREAMING mode override
         assert config.pinned_buffer_count == 4  # STREAMING mode override
-        assert config.channels == 2  # Minimal batch for lower latency
+        assert config.channels == 2  # Minimal channels for lower latency
 
     def test_computed_properties(self):
         """Test computed properties."""
@@ -240,7 +240,7 @@ class TestEngineConfig:
 
         assert isinstance(config_dict, dict)
         assert config_dict['nfft'] == 2048
-        assert config_dict['batch'] == 4
+        assert config_dict['channels'] == 4
 
 
 # =============================================================================

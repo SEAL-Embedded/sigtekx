@@ -107,9 +107,9 @@ class EngineRuntimeError(IonosenseError):
         hint = None
         if cuda_error:
             if "out of memory" in cuda_error.lower():
-                hint = "Reduce batch size or nfft, or use a GPU with more memory"
+                hint = "Reduce channels or nfft, or use a GPU with more memory"
             elif "invalid configuration" in cuda_error.lower():
-                hint = "Check that nfft is a power of 2 and batch > 0"
+                hint = "Check that nfft is a power of 2 and channels > 0"
         super().__init__(message, hint, cuda_error=cuda_error)
         self.cuda_error = cuda_error
 
@@ -269,7 +269,7 @@ class ResourceExhaustedError(IonosenseError):
 
         hint = None
         if resource_type.lower() == "gpu memory":
-            hint = "Reduce batch size or nfft"
+            hint = "Reduce channels or nfft"
         elif resource_type.lower() == "disk space":
             hint = "Clean up old results or increase storage"
 

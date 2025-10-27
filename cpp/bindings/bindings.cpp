@@ -145,7 +145,7 @@ PYBIND11_MODULE(_engine, m) {
             >>> config = _engine.ExecutorConfig()
             >>> config.nfft = 1024
             >>> config.channels = 4
-            >>> config.mode = _engine.ExecutionMode.channels
+            >>> config.mode = _engine.ExecutionMode.BATCH
             >>> executor = _engine.BatchExecutor()
             >>> executor.initialize(config)
             >>> output = executor.process(input_data)
@@ -195,7 +195,7 @@ PYBIND11_MODULE(_engine, m) {
   py::enum_<ionosense::ExecutorConfig::ExecutionMode>(m, "ExecutionMode",
                                                       "Execution strategy for "
                                                       "pipeline executors")
-      .value("channels", ionosense::ExecutorConfig::ExecutionMode::BATCH,
+      .value("BATCH", ionosense::ExecutorConfig::ExecutionMode::BATCH,
              "Process complete batches with maximum throughput")
       .value("STREAMING", ionosense::ExecutorConfig::ExecutionMode::STREAMING,
              "Continuous processing with low-latency via ring buffer (v0.9.4+)")
@@ -240,7 +240,7 @@ PYBIND11_MODULE(_engine, m) {
         std::string mode_str;
         switch (c.mode) {
           case ionosense::ExecutorConfig::ExecutionMode::BATCH:
-            mode_str = "channels";
+            mode_str = "BATCH";
             break;
           case ionosense::ExecutorConfig::ExecutionMode::STREAMING:
             mode_str = "STREAMING";

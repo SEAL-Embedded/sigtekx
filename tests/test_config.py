@@ -85,8 +85,8 @@ class TestPresets:
     def test_iono_preset_batch(self):
         """Test ionosphere preset configuration (batch - throughput)."""
         config = get_preset('iono', executor='batch')
-        assert config.nfft == 16384  # Higher resolution for batch
-        assert config.channels == 32    # Larger batch
+        assert config.nfft == 16384  # Higher resolution for throughput
+        assert config.channels == 32    # More channels
         assert config.overlap == 0.75
         assert config.pinned_buffer_count == 4
 
@@ -94,7 +94,7 @@ class TestPresets:
         """Test ionosphere preset configuration (streaming - latency)."""
         config = get_preset('iono', executor='streaming')
         assert config.nfft == 4096  # Lower resolution for latency
-        assert config.channels == 2    # Smaller batch
+        assert config.channels == 2    # Fewer channels
         assert config.overlap == 0.75
         assert config.stream_count == 6  # More streams for pipelining
 
@@ -102,7 +102,7 @@ class TestPresets:
         """Test extreme ionosphere preset configuration (batch)."""
         config = get_preset('ionox', executor='batch')
         assert config.nfft == 32768  # Maximum resolution
-        assert config.channels == 32    # Very large batch
+        assert config.channels == 32    # Many channels
         assert config.overlap == 0.9375
         assert config.warmup_iters == 10
 
@@ -170,16 +170,16 @@ class TestValidation:
             validate_input_array(data)
 
 
-@pytest.mark.parametrize("nfft,batch,expected_mb", [
+@pytest.mark.parametrize("nfft,channels,expected_mb", [
     (1024, 2, 0),     # Small config
     (4096, 32, 6),    # Medium config
     (16384, 128, 56) # REVISED: Corrected expected value from 104 to 56
 ])
-def test_memory_estimation(nfft, batch, expected_mb):
+def test_memory_estimation(nfft, channels, expected_mb):
     """Test memory usage estimation."""
     from ionosense_hpc.config import estimate_memory_usage_mb
 
-    config = EngineConfig(nfft=nfft, channels=batch)
+    config = EngineConfig(nfft=nfft, channels=channels)
     estimated = estimate_memory_usage_mb(config)
 
     # Should be within a reasonable range or both be small.
