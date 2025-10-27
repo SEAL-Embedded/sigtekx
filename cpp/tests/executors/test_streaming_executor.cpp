@@ -288,3 +288,50 @@ TEST_F(StreamingExecutorTest, DocumentedCapabilitiesAndLimitations) {
             << "  - True async submit_async() with background thread\n"
             << "  - CUDA graph optimization";
 }
+
+TEST_F(StreamingExecutorTest, ConsecutiveSubmitsWithoutSync) {
+  StreamingExecutor executor;
+
+  // Use benchmark parameters to reproduce the bug
+  ExecutorConfig bench_config;
+  bench_config.nfft = 2048;  // Match benchmark nfft
+  bench_config.channels = 2;
+  bench_config.overlap = 0.5f;
+  bench_config.sample_rate_hz = 100000;
+  bench_config.stream_count = 3;
+  bench_config.pinned_buffer_count = 2;
+  bench_config.warmup_iters = 0;
+  bench_config.mode = ExecutorConfig::ExecutionMode::STREAMING;
+
+  PipelineBuilder builder;
+  auto stages = builder.with_config(StageConfig{bench_config.nfft, bench_config.channels})
+                    .add_window(StageConfig::WindowType::HANN)
+                    .add_fft()
+                    .add_magnitude()
+                    .build();
+  executor.initialize(bench_config, std::move(stages));
+
+  const size_t input_size = bench_config.nfft * bench_config.channels;
+  const size_t output_size = bench_config.num_output_bins() * bench_config.channels;
+  auto input = generate_sinusoid(input_size, 10.0f);
+  std::vector<float> output(output_size);
+
+  // Regression test for bug: consecutive submit() calls should work
+  // Previously crashed on iteration 2 when frame_counter >= pinned_buffer_count
+  for (int i = 0; i < 5; ++i) {
+    std::cout << "Submit iteration " << i << " (nfft=" << bench_config.nfft << ")\n" << std::flush;
+    EXPECT_NO_THROW(executor.submit(input.data(), output.data(), input_size));
+  }
+
+  std::cout << "All submits completed, checking output...\n" << std::flush;
+
+  // Verify output has non-zero values
+  bool has_nonzero = false;
+  for (float val : output) {
+    if (val > 1e-6f) {
+      has_nonzero = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(has_nonzero);
+}

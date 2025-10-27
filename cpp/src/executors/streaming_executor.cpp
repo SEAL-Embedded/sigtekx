@@ -15,6 +15,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <iostream>
 #include <stdexcept>
 
 #include "ionosense/core/cuda_wrappers.hpp"
@@ -96,11 +97,17 @@ class StreamingExecutor::Impl {
 
     // Allocate per-channel ring buffers for true multi-channel streaming
     // Each channel maintains its own independent sample stream with overlap
-    // Size per channel: enough for one frame (nfft) + extra capacity for benchmarks
-    // Benchmarks may push nfft samples per channel at once
-    const size_t min_capacity_per_channel = static_cast<size_t>(config_.nfft);
-    const size_t benchmark_chunk_per_channel = static_cast<size_t>(config_.nfft);
-    const size_t ring_capacity_per_channel = min_capacity_per_channel + benchmark_chunk_per_channel;
+    //
+    // Capacity calculation (with drain-all-frames logic in submit()):
+    // - Each submit() pushes nfft samples, then drains ALL available frames
+    // - Maximum accumulation occurs before draining: incoming + residual
+    // - Worst case (high overlap, e.g., 93.75%): hop_size = nfft/16
+    //   * Start: nfft - 1 samples (not enough to process)
+    //   * Push nfft → available = 2*nfft - 1
+    //   * Drain all frames until < nfft remains
+    // - Maximum buffered: ~2*nfft
+    // - Conservative: 3*nfft provides safety margin for all overlap values
+    const size_t ring_capacity_per_channel = static_cast<size_t>(config_.nfft) * 3;
     {
       const std::string ring_msg = profiling::format_memory_range(
           "Allocate Per-Channel Ring Buffers",
@@ -270,11 +277,18 @@ class StreamingExecutor::Impl {
     // Samples needed per channel for one frame (no longer batch-dependent)
     const size_t samples_needed_per_channel = static_cast<size_t>(config_.nfft);
 
-    // Process all available frames (synchronized across channels)
-    // All channels must have enough samples to extract a frame
+    // Process ALL available frames to drain ring buffer (prevent ring buffer overflow)
+    // Each frame overwrites the output buffer, so only the LAST frame's result
+    // is returned to the caller (maintains API contract: one output per call)
+    //
+    // This prevents ring buffer overflow during warmup when many consecutive
+    // submit() calls accumulate samples faster than they're drained (due to overlap).
+    // Without this, after N warmup iterations: ring_buffer.available() ≈ N × hop_size,
+    // which quickly exceeds ring buffer capacity.
     size_t batches_processed = 0;
-    while (input_ring_buffers_[0]->available() >= samples_needed_per_channel) {
-      // Verify all channels have sufficient samples
+
+    while (true) {
+      // Check if all channels have enough samples for one frame
       bool all_channels_ready = true;
       for (int ch = 0; ch < config_.channels; ++ch) {
         if (input_ring_buffers_[ch]->available() < samples_needed_per_channel) {
@@ -287,8 +301,8 @@ class StreamingExecutor::Impl {
         break;
       }
 
-      process_one_batch(output + batches_processed * config_.num_output_bins() *
-                                     config_.channels);
+      // Process one frame (overwrites output buffer)
+      process_one_batch(output);
       batches_processed++;
     }
 
