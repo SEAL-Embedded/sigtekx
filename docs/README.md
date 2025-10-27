@@ -18,6 +18,7 @@ Comprehensive documentation for the ionosense-hpc CUDA-accelerated FFT processin
 
 ### Architecture & Design
 - [Architecture Overview](architecture/overview.md) - System design and components
+- **[Executor Architecture](architecture/executors.md)** - BatchExecutor vs StreamingExecutor deep dive
 - [Project Structure](architecture/project-structure.md) - Codebase organization
 - [Python Package Structure](architecture/python-package-structure.md) - Python package reading order
 - **[Thread Safety](architecture/thread-safety.md)** - Multi-threading guide and thread safety guarantees
@@ -45,8 +46,9 @@ Comprehensive documentation for the ionosense-hpc CUDA-accelerated FFT processin
 ### For Contributors
 1. [Development Guide](guides/development.md)
 2. [Architecture Overview](architecture/overview.md)
-3. [Thread Safety](architecture/thread-safety.md)
-4. [Contributing Guidelines](guides/contributing.md)
+3. [Executor Architecture](architecture/executors.md)
+4. [Thread Safety](architecture/thread-safety.md)
+5. [Contributing Guidelines](guides/contributing.md)
 
 ### For Performance Optimization
 1. **[Stability Improvements](performance/stability-improvements.md)** - Start here!
@@ -93,6 +95,7 @@ System design, structure, and visual documentation.
 
 **Key Topics**:
 - High-level architecture
+- **Executor deep dive** (BatchExecutor vs StreamingExecutor)
 - Component interactions
 - Codebase organization
 - **Thread safety and multi-threading**
@@ -193,6 +196,7 @@ See [Stability Improvements](performance/stability-improvements.md) for full sto
 - **API Usage** → `guides/api-reference.md`
 - **Benchmarking** → `guides/benchmarking.md` or `performance/`
 - **Performance** → `performance/stability-improvements.md` (start here!)
+- **Executors** → `architecture/executors.md` (BatchExecutor vs StreamingExecutor)
 - **Thread Safety** → `architecture/thread-safety.md`
 - **Architecture** → `architecture/overview.md`
 - **Contributing** → `guides/contributing.md`
