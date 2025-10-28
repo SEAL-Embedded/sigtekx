@@ -69,6 +69,9 @@ class RealtimeBenchmark(BaseBenchmark):
             # Get engine configuration
             if self.config.engine_config:
                 self.engine_config = EngineConfig(**self.config.engine_config)
+                # Default to STREAMING mode for realtime if not explicitly set in config
+                if 'mode' not in self.config.engine_config:
+                    self.engine_config.mode = ExecutionMode.STREAMING
             else:
                 self.engine_config = get_preset('default')
                 self.engine_config.mode = ExecutionMode.STREAMING

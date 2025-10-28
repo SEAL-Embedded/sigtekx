@@ -93,6 +93,9 @@ class AccuracyBenchmark(BaseBenchmark):
             # Get engine configuration
             if self.config.engine_config:
                 self.engine_config = EngineConfig(**self.config.engine_config)
+                # Default to BATCH mode for accuracy if not explicitly set in config
+                if 'mode' not in self.config.engine_config:
+                    self.engine_config.mode = ExecutionMode.BATCH
             else:
                 # Use default preset with minimal channels for validation
                 self.engine_config = get_preset('default')

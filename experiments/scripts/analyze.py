@@ -106,9 +106,9 @@ def analyze_throughput_data(df: pd.DataFrame) -> dict:
         nfft_scaling = df.groupby('engine_nfft')['frames_per_second'].agg(['mean', 'std', 'count'])
         analysis['nfft_scaling'] = nfft_scaling.to_dict('index')
 
-        # Group by batch size to see scaling
-        batch_scaling = df.groupby('engine_channels')['frames_per_second'].agg(['mean', 'std', 'count'])
-        analysis['batch_scaling'] = batch_scaling.to_dict('index')
+        # Group by channel count to see scaling
+        channel_scaling = df.groupby('engine_channels')['frames_per_second'].agg(['mean', 'std', 'count'])
+        analysis['channel_scaling'] = channel_scaling.to_dict('index')
 
         # Find optimal configuration
         best_fps_idx = df['frames_per_second'].idxmax()
@@ -272,10 +272,10 @@ def main():
             print(f"  Total runs: {analysis.get('total_runs', 0)}")
             if 'best_performance' in analysis:
                 best = analysis['best_performance']
-                print(f"  Best performance: NFFT={best['nfft']}, Batch={best['batch']}, FPS={best['fps']:.1f}")
+                print(f"  Best performance: NFFT={best['nfft']}, Channels={best['channels']}, FPS={best['fps']:.1f}")
             if 'best_latency' in analysis:
                 best = analysis['best_latency']
-                print(f"  Best latency: NFFT={best['nfft']}, Batch={best['batch']}, Latency={best['latency_us']:.1f}us")
+                print(f"  Best latency: NFFT={best['nfft']}, Channels={best['channels']}, Latency={best['latency_us']:.1f}us")
 
     # Create unified summary statistics
     print("\nCreating summary statistics...")

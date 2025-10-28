@@ -71,6 +71,9 @@ class LatencyBenchmark(BaseBenchmark):
             # Get engine config from preset or override
             if self.config.engine_config:
                 engine_config = EngineConfig(**self.config.engine_config)
+                # Default to STREAMING mode for latency if not explicitly set in config
+                if 'mode' not in self.config.engine_config:
+                    engine_config.mode = ExecutionMode.STREAMING
             else:
                 engine_config = get_preset('default')
                 engine_config.mode = ExecutionMode.STREAMING

@@ -1,3 +1,9 @@
+# Accuracy benchmark configuration
+# Override engine mode to BATCH for deterministic validation
+engine:
+  mode: batch
+
+# Benchmark parameters
 name: accuracy
 type: accuracy
 iterations: 10

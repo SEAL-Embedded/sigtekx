@@ -58,6 +58,12 @@ def run_throughput_benchmark(cfg: DictConfig) -> float:
         # Filter out metadata fields that aren't part of EngineConfig
         engine_dict = dict(cfg.engine)
         engine_dict.pop("name", None)  # Remove metadata field
+
+        # Merge engine overrides from benchmark config (if present)
+        if 'engine' in cfg.benchmark:
+            benchmark_engine_overrides = dict(cfg.benchmark.engine)
+            engine_dict.update(benchmark_engine_overrides)
+
         engine_config = EngineConfig(**engine_dict)
         benchmark_config = ThroughputBenchmarkConfig(**cfg.benchmark, engine_config=engine_config.model_dump())
 

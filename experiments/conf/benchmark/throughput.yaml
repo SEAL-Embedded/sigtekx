@@ -1,3 +1,9 @@
+# Throughput benchmark configuration
+# Override engine mode to BATCH for maximum throughput
+engine:
+  mode: batch
+
+# Benchmark parameters
 name: throughput
 type: throughput
 iterations: 1

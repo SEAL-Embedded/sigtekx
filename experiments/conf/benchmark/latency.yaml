@@ -1,3 +1,9 @@
+# Latency benchmark configuration
+# Override engine mode to STREAMING for low-latency ring buffer
+engine:
+  mode: streaming
+
+# Benchmark parameters
 name: latency
 type: latency
 iterations: 5000

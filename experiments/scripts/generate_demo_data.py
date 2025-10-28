@@ -326,13 +326,13 @@ class EnhancedDemoGenerator:
     def _analyze_scaling_patterns(self, metrics: list[dict]) -> dict:
         """Analyze performance scaling patterns."""
         nfft_values = [m["nfft"] for m in metrics]
-        batch_values = [m["batch"] for m in metrics]
+        channel_values = [m["channels"] for m in metrics]
 
         latencies = [m["measurements"]["latency"]["mean"] for m in metrics]
         throughputs = [m["measurements"]["throughput"]["frames_per_second"] for m in metrics]
 
         # Compute scaling factors
-        problem_sizes = [n * b for n, b in zip(nfft_values, batch_values, strict=False)]
+        problem_sizes = [n * b for n, b in zip(nfft_values, channel_values, strict=False)]
 
         # Latency scaling analysis
         lat_correlation = np.corrcoef(problem_sizes, latencies)[0, 1]
@@ -403,7 +403,7 @@ class EnhancedDemoGenerator:
                     (throughput["memory_bandwidth_gbs"] / self.theoretical_limits["memory_bandwidth_gbs"]) * 100, 1
                 ),
                 "parallelism_efficiency": round(
-                    (throughput["gpu_utilization"] / 100) * (config["batch"] / 64), 3
+                    (throughput["gpu_utilization"] / 100) * (config["channels"] / 64), 3
                 )
             })
 
@@ -429,7 +429,7 @@ class EnhancedDemoGenerator:
 
         # Outlier detection
         latency_means = [m["measurements"]["latency"]["mean"] for m in metrics]
-        expected_latencies = [m["nfft"] * m["batch"] * 0.01 for m in metrics]  # Simple model
+        expected_latencies = [m["nfft"] * m["channels"] * 0.01 for m in metrics]  # Simple model
 
         residuals = [abs(a - e) / e for a, e in zip(latency_means, expected_latencies, strict=False)]
         outliers = [metrics[i]["config"] for i, r in enumerate(residuals) if r > 0.5]
@@ -522,7 +522,7 @@ class EnhancedDemoGenerator:
     def _analyze_comparison(self, results: list[dict], study_name: str) -> dict:
         """Analyze comparison study results."""
         if "channel_scaling" in study_name:
-            channels = [r["batch"] for r in results]
+            channels = [r["channels"] for r in results]
             latencies = [r["metrics"]["latency"]["mean"] for r in results]
             throughputs = [r["metrics"]["throughput"]["frames_per_second"] for r in results]
 
