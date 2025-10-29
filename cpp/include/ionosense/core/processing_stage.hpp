@@ -37,8 +37,9 @@ namespace ionosense {
  */
 struct StageConfig {
   // --- FFT Parameters ---
-  int nfft = 1024;  ///< FFT size (number of points). Must be a power of 2.
-  int channels = 2;    ///< Number of independent signal channels (renamed from batch in v0.9.4).
+  int nfft = 1024;   ///< FFT size (number of points). Must be a power of 2.
+  int channels = 2;  ///< Number of independent signal channels (renamed from
+                     ///< batch in v0.9.4).
   float overlap =
       0.5f;  ///< Overlap factor between consecutive frames [0.0, 1.0).
   int sample_rate_hz = 48000;  ///< Sample rate of the input signal in Hz.

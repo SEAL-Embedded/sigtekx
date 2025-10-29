@@ -378,7 +378,7 @@ class ProfileSession:
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
         self.monitor_nsys_progress(process)
 
-        return_code = process.wait()
+        process.wait()
 
         # Check results
         expected_file = f"{report_path}.nsys-rep"
@@ -436,7 +436,7 @@ class ProfileSession:
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
         self.monitor_ncu_progress(process)
 
-        return_code = process.wait()
+        process.wait()
 
         # Check results
         expected_file = f"{report_path}.ncu-rep"

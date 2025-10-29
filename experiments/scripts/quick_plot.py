@@ -52,10 +52,7 @@ def find_data_files(data_dir: str = "artifacts/data", benchmark_type: str = None
     """Find experiment data files."""
     data_path = Path(data_dir)
 
-    if benchmark_type:
-        pattern = f"{benchmark_type}_summary_*.csv"
-    else:
-        pattern = "*_summary_*.csv"
+    pattern = f"{benchmark_type}_summary_*.csv" if benchmark_type else "*_summary_*.csv"
 
     files = list(data_path.glob(pattern))
     files.sort(key=lambda x: x.stat().st_mtime, reverse=True)  # Most recent first

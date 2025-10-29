@@ -7,6 +7,7 @@ Phase 1 of terminology refactor for v0.9.4
 import re
 from pathlib import Path
 
+
 def refactor_file(file_path, replacements):
     """Apply regex replacements to a file."""
     try:

@@ -13,7 +13,7 @@ from scipy.fft import rfft
 
 from ionosense_hpc import Engine
 from ionosense_hpc.benchmarks.base import BaseBenchmark, BenchmarkConfig, BenchmarkResult
-from ionosense_hpc.config import EngineConfig, get_preset
+from ionosense_hpc.config import EngineConfig, ExecutionMode, get_preset
 from ionosense_hpc.utils import logger, make_chirp, make_multitone, make_noise, make_sine
 from ionosense_hpc.utils.paths import get_benchmark_run_dir, normalize_benchmark_name
 from ionosense_hpc.utils.profiling import (

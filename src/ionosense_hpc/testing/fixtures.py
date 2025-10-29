@@ -194,7 +194,7 @@ def mock_engine(monkeypatch) -> Engine:
 
         def process(self, data):
             _ = data  # ensure interface compatibility while keeping mock lightweight
-            batch = self.config.channels
+            channels = self.config.channels
             bins = self.config.num_output_bins
             return np.random.randn(channels, bins).astype(np.float32)
 

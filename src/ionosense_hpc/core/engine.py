@@ -30,9 +30,9 @@ from ionosense_hpc.config import (
     WindowNorm,
     WindowSymmetry,
     WindowType,
-    validate_input_size,
     validate_config_device_compatibility,
     validate_input_array,
+    validate_input_size,
 )
 from ionosense_hpc.exceptions import (
     DeviceNotFoundError,

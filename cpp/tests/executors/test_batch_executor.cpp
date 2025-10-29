@@ -103,7 +103,8 @@ TEST_F(BatchExecutorTest, InitializeWithInvalidConfigFails) {
       {
         PipelineBuilder builder;
         auto stages =
-            builder.with_config(StageConfig{bad_config.nfft, bad_config.channels})
+            builder
+                .with_config(StageConfig{bad_config.nfft, bad_config.channels})
                 .add_fft()
                 .build();
         executor.initialize(bad_config, std::move(stages));
@@ -115,17 +116,19 @@ TEST_F(BatchExecutorTest, DoubleInitialization) {
   BatchExecutor executor;
 
   PipelineBuilder builder1;
-  auto stages1 = builder1.with_config(StageConfig{config_.nfft, config_.channels})
-                     .add_fft()
-                     .build();
+  auto stages1 =
+      builder1.with_config(StageConfig{config_.nfft, config_.channels})
+          .add_fft()
+          .build();
   executor.initialize(config_, std::move(stages1));
   EXPECT_TRUE(executor.is_initialized());
 
   // Re-initialize should work (triggers reset first)
   PipelineBuilder builder2;
-  auto stages2 = builder2.with_config(StageConfig{config_.nfft, config_.channels})
-                     .add_fft()
-                     .build();
+  auto stages2 =
+      builder2.with_config(StageConfig{config_.nfft, config_.channels})
+          .add_fft()
+          .build();
   EXPECT_NO_THROW(executor.initialize(config_, std::move(stages2)));
   EXPECT_TRUE(executor.is_initialized());
 }
@@ -421,4 +424,42 @@ TEST_F(BatchExecutorTest, MoveAssignment) {
   BatchExecutor executor2;
   executor2 = std::move(executor1);
   EXPECT_TRUE(executor2.is_initialized());
+}
+
+// ============================================================================
+//  Configuration Validation Tests
+// ============================================================================
+
+TEST_F(BatchExecutorTest, ConfigValidationInvalidMaxInflightBatches) {
+  ExecutorConfig invalid_config = config_;
+  invalid_config.max_inflight_batches = 0;  // Invalid: must be >= 1
+
+  std::string error_msg;
+  EXPECT_FALSE(invalid_config.validate(error_msg));
+  EXPECT_FALSE(error_msg.empty());
+  EXPECT_NE(error_msg.find("max_inflight_batches"), std::string::npos);
+}
+
+TEST_F(BatchExecutorTest, ConfigValidationStreamingModeInsufficientBuffers) {
+  ExecutorConfig invalid_config = config_;
+  invalid_config.mode = ExecutorConfig::ExecutionMode::STREAMING;
+  invalid_config.max_inflight_batches = 3;
+  invalid_config.pinned_buffer_count =
+      2;  // Invalid: must be >= max_inflight_batches
+
+  std::string error_msg;
+  EXPECT_FALSE(invalid_config.validate(error_msg));
+  EXPECT_FALSE(error_msg.empty());
+  EXPECT_NE(error_msg.find("pinned_buffer_count"), std::string::npos);
+}
+
+TEST_F(BatchExecutorTest, ConfigValidationSuccess) {
+  ExecutorConfig valid_config = config_;
+  valid_config.mode = ExecutorConfig::ExecutionMode::STREAMING;
+  valid_config.max_inflight_batches = 2;
+  valid_config.pinned_buffer_count = 3;  // Valid: >= max_inflight_batches
+
+  std::string error_msg;
+  EXPECT_TRUE(valid_config.validate(error_msg));
+  EXPECT_TRUE(error_msg.empty());
 }

@@ -28,7 +28,7 @@ def run_throughput_benchmark(cfg: DictConfig) -> float:
     try:
         # ===== ROBUSTNESS FIX: Auto-load default benchmark if missing =====
         if 'benchmark' not in cfg:
-            warnings.warn("⚠️  Benchmark config not specified. Defaulting to '+benchmark=throughput'.")
+            warnings.warn("⚠️  Benchmark config not specified. Defaulting to '+benchmark=throughput'.", stacklevel=2)
             # Get the original config directory to reliably find the default file
             config_dir = f"{hydra.utils.get_original_cwd()}/experiments/conf/benchmark"
             default_benchmark = OmegaConf.load(f"{config_dir}/throughput.yaml")
@@ -50,7 +50,7 @@ def run_throughput_benchmark(cfg: DictConfig) -> float:
             sys.path.append('experiments/conf')
             from validation import validate_engine_parameters
             if not validate_engine_parameters(nfft, batch, overlap):
-                warnings.warn("Parameter validation failed - proceeding anyway")
+                warnings.warn("Parameter validation failed - proceeding anyway", stacklevel=2)
         except ImportError:
             pass  # Validation module not available
 

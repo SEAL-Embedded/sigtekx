@@ -304,22 +304,26 @@ TEST_F(StreamingExecutorTest, ConsecutiveSubmitsWithoutSync) {
   bench_config.mode = ExecutorConfig::ExecutionMode::STREAMING;
 
   PipelineBuilder builder;
-  auto stages = builder.with_config(StageConfig{bench_config.nfft, bench_config.channels})
-                    .add_window(StageConfig::WindowType::HANN)
-                    .add_fft()
-                    .add_magnitude()
-                    .build();
+  auto stages =
+      builder.with_config(StageConfig{bench_config.nfft, bench_config.channels})
+          .add_window(StageConfig::WindowType::HANN)
+          .add_fft()
+          .add_magnitude()
+          .build();
   executor.initialize(bench_config, std::move(stages));
 
   const size_t input_size = bench_config.nfft * bench_config.channels;
-  const size_t output_size = bench_config.num_output_bins() * bench_config.channels;
+  const size_t output_size =
+      bench_config.num_output_bins() * bench_config.channels;
   auto input = generate_sinusoid(input_size, 10.0f);
   std::vector<float> output(output_size);
 
   // Regression test for bug: consecutive submit() calls should work
   // Previously crashed on iteration 2 when frame_counter >= pinned_buffer_count
   for (int i = 0; i < 5; ++i) {
-    std::cout << "Submit iteration " << i << " (nfft=" << bench_config.nfft << ")\n" << std::flush;
+    std::cout << "Submit iteration " << i << " (nfft=" << bench_config.nfft
+              << ")\n"
+              << std::flush;
     EXPECT_NO_THROW(executor.submit(input.data(), output.data(), input_size));
   }
 

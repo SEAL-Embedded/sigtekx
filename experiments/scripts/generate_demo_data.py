@@ -273,7 +273,7 @@ class EnhancedDemoGenerator:
             return float(val.get('mean', default))
         try:
             return float(val)
-        except:
+        except Exception:
             return float(default)
 
     def _generate_synthetic_latency(self, config: EngineConfig) -> dict:
@@ -343,7 +343,7 @@ class EnhancedDemoGenerator:
         tp_slope, tp_intercept = np.polyfit(np.log(problem_sizes[:5]), np.log(throughputs[:5]), 1)
 
         # Find optimal configurations
-        latency_per_sample = [l / p for l, p in zip(latencies, problem_sizes, strict=False)]
+        latency_per_sample = [lat / p for lat, p in zip(latencies, problem_sizes, strict=False)]
         optimal_latency_idx = np.argmin(latency_per_sample)
 
         throughput_per_watt = [t / m["measurements"]["throughput"]["power_consumption_w"]
@@ -534,7 +534,7 @@ class EnhancedDemoGenerator:
             return {
                 "scaling_efficiency": [round(e, 1) for e in scaling_efficiency],
                 "optimal_channels": channels[np.argmax(scaling_efficiency)],
-                "latency_penalty": [round(l / latencies[0], 2) for l in latencies],
+                "latency_penalty": [round(lat / latencies[0], 2) for lat in latencies],
                 "throughput_gain": [round(t / throughputs[0], 2) for t in throughputs]
             }
 
@@ -549,7 +549,7 @@ class EnhancedDemoGenerator:
             return {
                 "complexity_model": f"latency = {intercept:.1f} + {slope:.1f} * log2(nfft)",
                 "doubling_penalty_us": round(slope, 1),
-                "size_impact_factor": [round(l / latencies[0], 2) for l in latencies]
+                "size_impact_factor": [round(lat / latencies[0], 2) for lat in latencies]
             }
 
         else:
@@ -672,7 +672,7 @@ class EnhancedDemoGenerator:
 
         return insights
 
-    def _prepare_visualization_data(self, analysis: dict, comparisons: dict) -> dict:
+    def _prepare_visualization_data(self, analysis: dict, _comparisons: dict) -> dict:
         """Prepare data optimized for Chart.js visualization."""
         realtime_entries = []
         for config, metrics in zip(analysis["configurations"], analysis["performance_metrics"], strict=False):

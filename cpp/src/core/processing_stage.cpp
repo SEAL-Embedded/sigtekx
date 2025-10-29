@@ -268,8 +268,8 @@ class MagnitudeStage::Impl {
 
   void process(void* input, void* output, size_t num_elements,
                cudaStream_t stream) {
-    const std::string range_name =
-        profiling::format_stage_range("Magnitude", config_.channels, config_.nfft);
+    const std::string range_name = profiling::format_stage_range(
+        "Magnitude", config_.channels, config_.nfft);
     IONO_NVTX_RANGE(range_name.c_str(), profiling::colors::PURPLE);
     if (!initialized_) {
       throw std::runtime_error("MagnitudeStage not initialized");

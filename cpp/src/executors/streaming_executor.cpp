@@ -107,7 +107,8 @@ class StreamingExecutor::Impl {
     //   * Drain all frames until < nfft remains
     // - Maximum buffered: ~2*nfft
     // - Conservative: 3*nfft provides safety margin for all overlap values
-    const size_t ring_capacity_per_channel = static_cast<size_t>(config_.nfft) * 3;
+    const size_t ring_capacity_per_channel =
+        static_cast<size_t>(config_.nfft) * 3;
     {
       const std::string ring_msg = profiling::format_memory_range(
           "Allocate Per-Channel Ring Buffers",
@@ -117,7 +118,8 @@ class StreamingExecutor::Impl {
       // Create one ring buffer per channel
       input_ring_buffers_.resize(config_.channels);
       for (int ch = 0; ch < config_.channels; ++ch) {
-        input_ring_buffers_[ch] = std::make_unique<RingBuffer<float>>(ring_capacity_per_channel);
+        input_ring_buffers_[ch] =
+            std::make_unique<RingBuffer<float>>(ring_capacity_per_channel);
       }
     }
 
@@ -252,13 +254,15 @@ class StreamingExecutor::Impl {
       throw std::runtime_error("Executor not initialized");
     }
 
-    // Validate input size: must be multiple of channels for channel-major layout
-    // Expected layout: [ch0_sample0, ch0_sample1, ..., ch0_sampleN,
+    // Validate input size: must be multiple of channels for channel-major
+    // layout Expected layout: [ch0_sample0, ch0_sample1, ..., ch0_sampleN,
     //                   ch1_sample0, ch1_sample1, ..., ch1_sampleN, ...]
     if (num_samples % config_.channels != 0) {
       throw std::runtime_error(
-          "Input size must be a multiple of channels. Expected channel-major layout: "
-          "[ch0[0..N], ch1[0..N], ...]. Got num_samples=" + std::to_string(num_samples) +
+          "Input size must be a multiple of channels. Expected channel-major "
+          "layout: "
+          "[ch0[0..N], ch1[0..N], ...]. Got num_samples=" +
+          std::to_string(num_samples) +
           ", channels=" + std::to_string(config_.channels));
     }
 
@@ -267,7 +271,8 @@ class StreamingExecutor::Impl {
 
     // Push samples to per-channel ring buffers (channel-major layout)
     {
-      IONO_NVTX_RANGE("Push to Per-Channel Ring Buffers", profiling::colors::CYAN);
+      IONO_NVTX_RANGE("Push to Per-Channel Ring Buffers",
+                      profiling::colors::CYAN);
       for (int ch = 0; ch < config_.channels; ++ch) {
         const float* channel_input = input + ch * samples_per_channel;
         input_ring_buffers_[ch]->push(channel_input, samples_per_channel);
@@ -277,14 +282,16 @@ class StreamingExecutor::Impl {
     // Samples needed per channel for one frame (no longer batch-dependent)
     const size_t samples_needed_per_channel = static_cast<size_t>(config_.nfft);
 
-    // Process ALL available frames to drain ring buffer (prevent ring buffer overflow)
-    // Each frame overwrites the output buffer, so only the LAST frame's result
-    // is returned to the caller (maintains API contract: one output per call)
+    // Process ALL available frames to drain ring buffer (prevent ring buffer
+    // overflow) Each frame overwrites the output buffer, so only the LAST
+    // frame's result is returned to the caller (maintains API contract: one
+    // output per call)
     //
     // This prevents ring buffer overflow during warmup when many consecutive
-    // submit() calls accumulate samples faster than they're drained (due to overlap).
-    // Without this, after N warmup iterations: ring_buffer.available() ≈ N × hop_size,
-    // which quickly exceeds ring buffer capacity.
+    // submit() calls accumulate samples faster than they're drained (due to
+    // overlap). Without this, after N warmup iterations:
+    // ring_buffer.available() ≈ N × hop_size, which quickly exceeds ring buffer
+    // capacity.
     size_t batches_processed = 0;
 
     while (true) {
@@ -366,10 +373,11 @@ class StreamingExecutor::Impl {
       // v0.9.5+)
       if (callback) {
         IONO_NVTX_RANGE("Result Callback", profiling::colors::CYAN);
-        // Note: Third parameter is num_frames. Currently passes config_.channels
-        // because each processed batch is 1 temporal frame with N spatial channels,
-        // producing N spectra. In future versions with true temporal batching,
-        // this will represent the number of temporal frames processed.
+        // Note: Third parameter is num_frames. Currently passes
+        // config_.channels because each processed batch is 1 temporal frame
+        // with N spatial channels, producing N spectra. In future versions with
+        // true temporal batching, this will represent the number of temporal
+        // frames processed.
         callback(output.data(), config_.num_output_bins(), config_.channels,
                  stats_);
       }
@@ -437,7 +445,8 @@ class StreamingExecutor::Impl {
 
       // Push to per-channel buffers (channel-major layout)
       for (int ch = 0; ch < config_.channels; ++ch) {
-        const float* channel_input = dummy_input.data() + ch * samples_per_channel;
+        const float* channel_input =
+            dummy_input.data() + ch * samples_per_channel;
         input_ring_buffers_[ch]->push(channel_input, samples_per_channel);
       }
 
@@ -462,15 +471,18 @@ class StreamingExecutor::Impl {
         float* channel_staging = h_batch_staging_.get() + ch * config_.nfft;
 
         // Extract nfft samples from this channel's ring buffer
-        // Simple non-overlapping extraction (ring buffer handles the read position)
+        // Simple non-overlapping extraction (ring buffer handles the read
+        // position)
         input_ring_buffers_[ch]->extract_frame(channel_staging, config_.nfft);
       }
     }
 
     // Advance each channel's ring buffer read pointer by hop_size
-    // This implements the sliding window for STFT overlap independently per channel
+    // This implements the sliding window for STFT overlap independently per
+    // channel
     {
-      IONO_NVTX_RANGE("Advance Per-Channel Ring Buffers", profiling::colors::GREEN);
+      IONO_NVTX_RANGE("Advance Per-Channel Ring Buffers",
+                      profiling::colors::GREEN);
       for (int ch = 0; ch < config_.channels; ++ch) {
         input_ring_buffers_[ch]->advance(hop_size_);
       }
@@ -526,7 +538,8 @@ class StreamingExecutor::Impl {
 
       void* current_input = d_input.get();
       void* current_output = nullptr;
-      size_t current_size = static_cast<size_t>(config_.nfft) * config_.channels;
+      size_t current_size =
+          static_cast<size_t>(config_.nfft) * config_.channels;
 
       for (size_t stage_idx = 0; stage_idx < stages_.size(); ++stage_idx) {
         const auto& stage = stages_[stage_idx];

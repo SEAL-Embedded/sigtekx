@@ -371,10 +371,11 @@ class BatchExecutor::Impl {
     if (callback) {
       IONO_NVTX_RANGE("Result Callback", profiling::colors::CYAN);
       // Note: Third parameter is num_frames. Currently passes config_.channels
-      // because each submit() processes 1 temporal frame with N spatial channels,
-      // producing N spectra. In future versions with true temporal batching,
-      // this will represent the number of temporal frames processed.
-      callback(output.data(), config_.num_output_bins(), config_.channels, stats_);
+      // because each submit() processes 1 temporal frame with N spatial
+      // channels, producing N spectra. In future versions with true temporal
+      // batching, this will represent the number of temporal frames processed.
+      callback(output.data(), config_.num_output_bins(), config_.channels,
+               stats_);
     }
   }
 

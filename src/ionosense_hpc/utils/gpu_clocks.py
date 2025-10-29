@@ -25,7 +25,7 @@ Example:
 import json
 import platform
 import subprocess
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from pathlib import Path
 from typing import Any
 
@@ -303,10 +303,8 @@ class GpuClockManager:
     def __del__(self):
         """Cleanup on deletion (safety net)."""
         if self.locked:
-            try:
+            with suppress(Exception):  # Best effort only
                 self.unlock()
-            except Exception:
-                pass  # Best effort only
 
 
 def check_clock_locking_available() -> tuple[bool, str]:

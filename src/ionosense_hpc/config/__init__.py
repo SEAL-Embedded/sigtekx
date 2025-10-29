@@ -25,9 +25,9 @@ from .schemas import (
 )
 from .validation import (
     estimate_memory_usage_mb,
-    validate_input_size,
     validate_config_device_compatibility,
     validate_input_array,
+    validate_input_size,
 )
 
 __all__ = [

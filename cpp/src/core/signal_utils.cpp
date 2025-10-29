@@ -108,5 +108,5 @@ size_t estimate_memory_usage(const SignalConfig& cfg) {
   return total;
 }
 
-}  // namespace engine_utils
+}  // namespace signal_utils
 }  // namespace ionosense

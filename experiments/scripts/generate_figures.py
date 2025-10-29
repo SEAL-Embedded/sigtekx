@@ -254,7 +254,6 @@ def plot_latency_analysis(df: pd.DataFrame, output_dir: Path) -> None:
 
     # Add statistics text
     mean_lat = latency_data['mean_latency_us'].mean()
-    std_lat = latency_data['mean_latency_us'].std()
     ax3.axvline(mean_lat, color='red', linestyle='--', linewidth=2, label=f'Mean: {mean_lat:.1f}μs')
     ax3.legend()
 
@@ -428,7 +427,7 @@ def plot_accuracy_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         fig, ax = plt.subplots(figsize=(10, 6))
         ax.text(0.5, 0.5, 'No Accuracy Data Available\n\nRun accuracy benchmarks to generate this plot',
                 ha='center', va='center', fontsize=16, transform=ax.transAxes,
-                bbox=dict(boxstyle="round,pad=0.3", facecolor="lightgray", alpha=0.7))
+                bbox={'boxstyle': "round,pad=0.3", 'facecolor': "lightgray", 'alpha': 0.7})
         ax.set_xlim(0, 1)
         ax.set_ylim(0, 1)
         ax.axis('off')

@@ -142,7 +142,7 @@ class ConfigValidator:
 
         # Check for parameter explosion
         total_combinations = 1
-        for param_name, param_values in params.items():
+        for _param_name, param_values in params.items():
             if isinstance(param_values, str):
                 values = param_values.split(',')
                 total_combinations *= len(values)

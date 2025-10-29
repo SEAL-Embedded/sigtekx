@@ -27,7 +27,7 @@ def run_accuracy_benchmark(cfg: DictConfig) -> float:
     """
     # ===== ROBUSTNESS FIX: Auto-load default benchmark if missing =====
     if 'benchmark' not in cfg:
-        warnings.warn("⚠️  Benchmark config not specified. Defaulting to '+benchmark=accuracy'.")
+        warnings.warn("⚠️  Benchmark config not specified. Defaulting to '+benchmark=accuracy'.", stacklevel=2)
         # Get the original config directory to reliably find the default file
         config_dir = f"{hydra.utils.get_original_cwd()}/experiments/conf/benchmark"
         default_benchmark = OmegaConf.load(f"{config_dir}/accuracy.yaml")
