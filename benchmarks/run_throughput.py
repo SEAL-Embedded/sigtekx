@@ -105,13 +105,37 @@ def run_throughput_benchmark(cfg: DictConfig) -> float:
         output_dir = Path(cfg.paths.data)
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Save summary
+        # Calculate derived scientific metrics
+        hop_size = int(engine_config.nfft * (1 - engine_config.overlap))
+        time_resolution_ms = (engine_config.nfft / engine_config.sample_rate_hz) * 1000
+        freq_resolution_hz = engine_config.sample_rate_hz / engine_config.nfft
+
+        # Real-Time Factor (RTF): ratio of processing speed to signal speed
+        # RTF = (fps * hop_size) / sample_rate_hz
+        # RTF = 1.0 means exactly real-time, RTF > 1.0 means faster than real-time
+        rtf = (fps * hop_size) / engine_config.sample_rate_hz if fps > 0 else 0.0
+
+        # Save enriched summary with scientific metrics
         summary = {
+            # Core engine parameters
             'engine_nfft': engine_config.nfft,
             'engine_channels': engine_config.channels,
+            'engine_overlap': engine_config.overlap,
+            'engine_sample_rate_hz': engine_config.sample_rate_hz,
+            'engine_mode': engine_config.mode.value if hasattr(engine_config.mode, 'value') else str(engine_config.mode),
+
+            # Derived parameters
+            'hop_size': hop_size,
+            'time_resolution_ms': time_resolution_ms,
+            'freq_resolution_hz': freq_resolution_hz,
+
+            # Performance metrics
             'frames_per_second': fps,
             'gb_per_second': result.statistics.get('gb_per_second', {}).get('mean', 0),
             'gpu_utilization': result.statistics.get('gpu_utilization_mean', 0),
+
+            # Scientific metrics for ionosphere research
+            'rtf': rtf,  # Real-Time Factor - critical for real-time processing capability
         }
 
         summary_df = pd.DataFrame([summary])

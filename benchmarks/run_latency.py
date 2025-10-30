@@ -105,10 +105,26 @@ def run_latency_benchmark(cfg: DictConfig) -> float:
             # Log artifact to MLflow
             mlflow.log_artifact(str(output_path))
 
-        # Also save summary
+        # Calculate derived scientific metrics
+        hop_size = int(engine_config.nfft * (1 - engine_config.overlap))
+        time_resolution_ms = (engine_config.nfft / engine_config.sample_rate_hz) * 1000
+        freq_resolution_hz = engine_config.sample_rate_hz / engine_config.nfft
+
+        # Save enriched summary with scientific metrics
         summary = {
+            # Core engine parameters
             'engine_nfft': engine_config.nfft,
             'engine_channels': engine_config.channels,
+            'engine_overlap': engine_config.overlap,
+            'engine_sample_rate_hz': engine_config.sample_rate_hz,
+            'engine_mode': engine_config.mode.value if hasattr(engine_config.mode, 'value') else str(engine_config.mode),
+
+            # Derived parameters
+            'hop_size': hop_size,
+            'time_resolution_ms': time_resolution_ms,
+            'freq_resolution_hz': freq_resolution_hz,
+
+            # Latency metrics
             'mean_latency_us': mean_latency,
             'p95_latency_us': result.statistics.get('latency_us', {}).get('p95', 0),
             'p99_latency_us': result.statistics.get('latency_us', {}).get('p99', 0),
