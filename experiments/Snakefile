@@ -44,12 +44,24 @@ rule run_ionosphere_latency:
             +benchmark=latency
         """
 
+# Run ionosphere streaming sweep (dual-channel real-time performance)
+rule run_ionosphere_streaming:
+    output:
+        touch("artifacts/data/ionosphere_streaming.done")
+    shell:
+        """
+        python benchmarks/run_realtime.py --multirun \
+            experiment=ionosphere_streaming \
+            +benchmark=realtime
+        """
+
 # Generate analysis summary using new analysis system
 rule analyze_results:
     input:
         "artifacts/data/ionosphere_resolution.done",
         "artifacts/data/ionosphere_temporal.done",
-        "artifacts/data/ionosphere_latency.done"
+        "artifacts/data/ionosphere_latency.done",
+        "artifacts/data/ionosphere_streaming.done"
     output:
         "artifacts/analysis/summary.json"
     shell:
@@ -64,7 +76,8 @@ rule generate_plots:
     input:
         "artifacts/data/ionosphere_resolution.done",
         "artifacts/data/ionosphere_temporal.done",
-        "artifacts/data/ionosphere_latency.done"
+        "artifacts/data/ionosphere_latency.done",
+        "artifacts/data/ionosphere_streaming.done"
     output:
         "artifacts/reports/plots/latency_vs_nfft.html",
         "artifacts/reports/plots/rtf_vs_freq_resolution.html"
@@ -80,7 +93,8 @@ rule generate_reports:
     input:
         "artifacts/data/ionosphere_resolution.done",
         "artifacts/data/ionosphere_temporal.done",
-        "artifacts/data/ionosphere_latency.done"
+        "artifacts/data/ionosphere_latency.done",
+        "artifacts/data/ionosphere_streaming.done"
     output:
         "artifacts/reports/general_performance_report.html",
         "artifacts/reports/ionosphere_research_report.html"

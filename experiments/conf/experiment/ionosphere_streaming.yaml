@@ -1,0 +1,75 @@
+# @package _global_
+# Ionosphere Streaming Performance Sweep
+# ========================================
+# Dual-channel streaming antenna system optimized for real-time ionosphere monitoring.
+# Focus on streaming executor performance with deadline compliance analysis.
+
+defaults:
+  - override /engine: ionosphere_realtime
+
+experiment:
+  name: ionosphere_streaming_sweep
+  description: >-
+    Dual-channel streaming antenna system performance analysis.
+    Optimizes NFFT and overlap for real-time ionosphere phenomena detection
+    using streaming executor with deadline compliance monitoring.
+  tags: [ionosphere, streaming, realtime, dual-channel, antenna-pair, direction-finding]
+
+# Hydra multirun configuration for parameter sweep
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      # NFFT sweep: balance between time/frequency resolution and real-time capability
+      # 2048: Fast transients (lightning, sprites)
+      # 4096: Balanced (standard ionosphere real-time)
+      # 8192: High frequency resolution (Schumann resonances, SIDs)
+      engine.nfft: 2048,4096,8192
+
+      # Overlap sweep: temporal resolution vs computational load trade-off
+      # 0.5: Lower load, faster processing
+      # 0.625: Standard ionosphere real-time
+      # 0.75: Better temporal resolution
+      # 0.875: High temporal resolution, high load
+      engine.overlap: 0.5,0.625,0.75,0.875
+
+      # Fixed dual-channel configuration
+      # Represents E-W and N-S antenna pair for direction finding
+      engine.channels: 2
+
+# Analysis configuration for streaming-focused insights
+analysis:
+  statistical_tests: [shapiro, kruskal, mann_whitney]
+  confidence_level: 0.95
+  min_samples: 50
+
+  # Streaming-specific focus metrics
+  focus_metrics:
+    - deadline_compliance_rate  # Primary: >99% target
+    - mean_jitter_ms            # Timing stability
+    - p99_jitter_ms             # Worst-case jitter
+    - frames_dropped            # Data loss indicator
+    - rtf                       # Real-time factor
+    - mean_latency_ms           # Processing latency
+
+  # Streaming performance thresholds
+  thresholds:
+    min_compliance_rate: 0.99   # 99% deadline compliance required
+    max_mean_jitter_ms: 2.0     # Stable timing required
+    max_frame_drops: 0          # Zero data loss target
+    min_rtf: 1.5                # Headroom for I/O and overhead
+
+# Dual-channel antenna system parameters (metadata)
+antenna_system:
+  configuration: ew_ns_pair      # East-West, North-South dipole pair
+  baseline_m: 100                # Antenna separation (meters)
+  direction_finding: true        # Primary use case
+  polarization_analysis: false   # Requires 3+ channels
+
+  # Ionosphere phenomena targets
+  target_phenomena:
+    - lightning_sprites          # <10ms time resolution
+    - sids                       # <1Hz frequency resolution
+    - schumann_resonances        # ~8Hz, 14Hz, 20Hz detection
+    - whistlers                  # Dispersive VLF signals
+    - general_vlf                # General VLF monitoring

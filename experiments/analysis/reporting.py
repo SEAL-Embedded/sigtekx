@@ -86,6 +86,13 @@ class GeneralPerformanceReport:
             'figure': self._plot_parameter_heatmap(data)
         })
 
+        # Multi-Channel Scaling Analysis (if multiple channel counts present)
+        if 'engine_channels' in data.columns and len(data['engine_channels'].unique()) > 1:
+            sections.append({
+                'title': 'Multi-Channel Scaling',
+                'content': self._generate_multichannel_scaling(data)
+            })
+
         # Configuration Recommendations
         sections.append({
             'title': 'Configuration Recommendations',
@@ -213,6 +220,87 @@ class GeneralPerformanceReport:
 
         return analysis
 
+    def _generate_multichannel_scaling(self, data: pd.DataFrame) -> str:
+        """Generate multi-channel scaling analysis."""
+        analysis = "<h3>Channel Scaling Performance</h3>"
+        analysis += "<p>Analysis of how performance scales with increasing channel count.</p>"
+
+        channel_counts = sorted(data['engine_channels'].unique())
+
+        # Throughput scaling by channel
+        if 'throughput' in data['benchmark_type'].values and 'frames_per_second' in data.columns:
+            throughput_data = data[data['benchmark_type'] == 'throughput']
+
+            analysis += "<h4>Throughput Scaling</h4><table style='margin: 10px 0; border-collapse: collapse;'>"
+            analysis += "<tr><th style='border: 1px solid #ddd; padding: 8px;'>Channels</th>"
+            analysis += "<th style='border: 1px solid #ddd; padding: 8px;'>Mean FPS</th>"
+            analysis += "<th style='border: 1px solid #ddd; padding: 8px;'>Scaling Efficiency</th></tr>"
+
+            baseline_fps = None
+            for channels in channel_counts:
+                channel_data = throughput_data[throughput_data['engine_channels'] == channels]
+                if not channel_data.empty:
+                    mean_fps = channel_data['frames_per_second'].mean()
+
+                    if baseline_fps is None:
+                        baseline_fps = mean_fps
+                        efficiency = 100.0
+                    else:
+                        # Ideal scaling would maintain same FPS per channel
+                        ideal_fps = baseline_fps
+                        efficiency = (mean_fps / ideal_fps) * 100
+
+                    analysis += f"<tr><td style='border: 1px solid #ddd; padding: 8px;'>{int(channels)}</td>"
+                    analysis += f"<td style='border: 1px solid #ddd; padding: 8px;'>{mean_fps:.1f}</td>"
+                    analysis += f"<td style='border: 1px solid #ddd; padding: 8px;'>{efficiency:.1f}%</td></tr>"
+
+            analysis += "</table>"
+
+        # Latency scaling by channel
+        if 'latency' in data['benchmark_type'].values and 'mean_latency_us' in data.columns:
+            latency_data = data[data['benchmark_type'] == 'latency']
+
+            analysis += "<h4>Latency Scaling</h4><table style='margin: 10px 0; border-collapse: collapse;'>"
+            analysis += "<tr><th style='border: 1px solid #ddd; padding: 8px;'>Channels</th>"
+            analysis += "<th style='border: 1px solid #ddd; padding: 8px;'>Mean Latency (μs)</th>"
+            analysis += "<th style='border: 1px solid #ddd; padding: 8px;'>Increase vs Baseline</th></tr>"
+
+            baseline_latency = None
+            for channels in channel_counts:
+                channel_data = latency_data[latency_data['engine_channels'] == channels]
+                if not channel_data.empty:
+                    mean_latency = channel_data['mean_latency_us'].mean()
+
+                    if baseline_latency is None:
+                        baseline_latency = mean_latency
+                        increase = "baseline"
+                    else:
+                        increase_pct = ((mean_latency / baseline_latency) - 1) * 100
+                        increase = f"+{increase_pct:.1f}%" if increase_pct > 0 else f"{increase_pct:.1f}%"
+
+                    analysis += f"<tr><td style='border: 1px solid #ddd; padding: 8px;'>{int(channels)}</td>"
+                    analysis += f"<td style='border: 1px solid #ddd; padding: 8px;'>{mean_latency:.1f}</td>"
+                    analysis += f"<td style='border: 1px solid #ddd; padding: 8px;'>{increase}</td></tr>"
+
+            analysis += "</table>"
+
+        # Key insights
+        analysis += "<h4>Key Insights</h4><ul>"
+        if len(channel_counts) >= 2:
+            analysis += f"<li>Tested configurations range from {min(channel_counts)} to {max(channel_counts)} channels</li>"
+
+            # Check if latency increases linearly
+            if 'latency' in data['benchmark_type'].values and 'mean_latency_us' in data.columns:
+                analysis += "<li>Latency scaling shows impact of multi-channel processing overhead</li>"
+
+            # Check if throughput is maintained
+            if 'throughput' in data['benchmark_type'].values and 'frames_per_second' in data.columns:
+                analysis += "<li>Throughput analysis helps identify optimal channel count for batch processing</li>"
+
+        analysis += "</ul>"
+
+        return analysis
+
     def _generate_recommendations(self, data: pd.DataFrame) -> str:
         """Generate configuration recommendations."""
         recommendations = "<h3>Optimal Configurations by Use Case</h3>"
@@ -297,13 +385,32 @@ class IonosphereReport:
         title: str = "Ionosphere Research Report"
     ) -> None:
         """
-        Generate ionosphere-focused report.
+        Generate ionosphere-focused report for dual-channel antenna system.
 
         Args:
             data: Combined benchmark data with scientific metrics
             output_path: Output HTML file path
             title: Report title
         """
+        # Filter to dual-channel data only (ionosphere antenna pair)
+        if 'engine_channels' in data.columns:
+            dual_channel_data = data[data['engine_channels'] == 2].copy()
+
+            if dual_channel_data.empty:
+                print("WARNING: No dual-channel (channels=2) data found for ionosphere report.")
+                print("Ionosphere report is designed for dual-channel antenna systems.")
+                print("Skipping ionosphere report generation.")
+                return
+
+            n_filtered = len(data) - len(dual_channel_data)
+            if n_filtered > 0:
+                print(f"INFO: Filtered {n_filtered} non-dual-channel measurements from ionosphere report.")
+                print(f"INFO: Using {len(dual_channel_data)} dual-channel measurements for ionosphere analysis.")
+
+            data = dual_channel_data
+        else:
+            print("WARNING: 'engine_channels' column not found in data. Proceeding without filtering.")
+
         sections = []
 
         # Introduction
@@ -340,18 +447,25 @@ class IonosphereReport:
             'content': self._generate_phenomena_suitability(data)
         })
 
-        # Multi-Channel Performance
-        if len(data['engine_channels'].unique()) > 1:
+        # Dual-Channel Streaming Performance
+        sections.append({
+            'title': 'Dual-Channel Streaming Performance',
+            'content': self._generate_dual_channel_streaming(data)
+        })
+
+        # Real-Time Compliance & Reliability (if streaming metrics available)
+        if 'deadline_compliance_rate' in data.columns:
             sections.append({
-                'title': 'Multi-Channel Performance',
-                'content': self._generate_multichannel_analysis(data)
+                'title': 'Real-Time Compliance & Reliability',
+                'content': self._generate_compliance_analysis(data)
             })
 
-        # High-NFFT/High-Overlap Performance
-        sections.append({
-            'title': 'High-Resolution Configuration Analysis',
-            'content': self._generate_highres_analysis(data)
-        })
+        # Streaming vs Batch Comparison (if both modes present)
+        if 'mode' in data.columns and len(data['mode'].unique()) > 1:
+            sections.append({
+                'title': 'Streaming vs Batch Mode Comparison',
+                'content': self._generate_streaming_vs_batch(data)
+            })
 
         # Computational Performance Context
         sections.append({
@@ -503,60 +617,176 @@ class IonosphereReport:
 
         return analysis
 
-    def _generate_multichannel_analysis(self, data: pd.DataFrame) -> str:
-        """Generate multi-channel performance analysis."""
-        analysis = "<h3>Multi-Channel Capabilities</h3>"
+    def _generate_dual_channel_streaming(self, data: pd.DataFrame) -> str:
+        """Generate dual-channel streaming performance analysis."""
+        # Filter to dual-channel data
+        if 'engine_channels' in data.columns:
+            dual_data = data[data['engine_channels'] == 2].copy()
+        else:
+            dual_data = data.copy()
 
-        channel_counts = sorted(data['engine_channels'].unique())
-        analysis += f"<p><strong>Channel counts tested:</strong> {channel_counts}</p>"
+        if len(dual_data) == 0:
+            return "<p>No dual-channel (2-channel) data available for streaming analysis.</p>"
 
-        # Performance by channel count
-        if 'frames_per_second' in data.columns:
-            analysis += "<p><strong>Throughput by Channel Count:</strong></p><ul>"
-            for channels in channel_counts:
-                subset = data[data['engine_channels'] == channels]
-                mean_fps = subset['frames_per_second'].mean() if 'frames_per_second' in subset.columns else 0
-                analysis += f"<li>{channels} channels: {mean_fps:.1f} FPS average</li>"
-            analysis += "</ul>"
+        analysis = """
+        <h3>Dual-Channel Antenna System</h3>
+        <p>The ionosense system uses a dual-channel configuration representing an E-W and N-S dipole antenna pair
+        for direction finding and ionosphere monitoring.</p>
+        """
 
-        analysis += """
-        <p><strong>Multi-Channel Use Cases:</strong></p>
+        # Configuration summary
+        nfft_values = sorted(dual_data['engine_nfft'].unique())
+        overlap_values = sorted(dual_data['engine_overlap'].unique()) if 'engine_overlap' in dual_data.columns else []
+
+        analysis += f"""
+        <p><strong>Tested Configurations:</strong></p>
         <ul>
-            <li><strong>2 channels:</strong> Direction finding (E-W, N-S antenna pairs)</li>
-            <li><strong>3 channels:</strong> 2D direction finding + H-field</li>
-            <li><strong>4+ channels:</strong> Advanced beamforming and polarization analysis</li>
+            <li><strong>NFFT values:</strong> {nfft_values}</li>
+            <li><strong>Overlap values:</strong> {overlap_values}</li>
+            <li><strong>Channel count:</strong> 2 (fixed dual-channel)</li>
         </ul>
         """
 
+        # Performance metrics
+        if 'frames_per_second' in dual_data.columns:
+            fps_stats = dual_data['frames_per_second'].describe()
+            analysis += f"""
+            <p><strong>Throughput Performance:</strong></p>
+            <ul>
+                <li>Mean: {fps_stats['mean']:.1f} FPS</li>
+                <li>Range: {fps_stats['min']:.1f} - {fps_stats['max']:.1f} FPS</li>
+            </ul>
+            """
+
+        if 'mean_latency_us' in dual_data.columns:
+            lat_stats = dual_data['mean_latency_us'].describe()
+            analysis += f"""
+            <p><strong>Latency Performance:</strong></p>
+            <ul>
+                <li>Mean: {lat_stats['mean']:.1f} μs</li>
+                <li>Range: {lat_stats['min']:.1f} - {lat_stats['max']:.1f} μs</li>
+            </ul>
+            """
+
+        if 'rtf' in dual_data.columns:
+            rtf_stats = dual_data['rtf'].describe()
+            realtime_capable = (dual_data['rtf'] >= 1.0).sum()
+            analysis += f"""
+            <p><strong>Real-Time Factor:</strong></p>
+            <ul>
+                <li>Mean RTF: {rtf_stats['mean']:.2f}x real-time</li>
+                <li>Real-time capable configs: {realtime_capable}/{len(dual_data)}</li>
+            </ul>
+            """
+
         return analysis
 
-    def _generate_highres_analysis(self, data: pd.DataFrame) -> str:
-        """Generate high-resolution configuration analysis."""
-        # High-res configs: NFFT >= 4096 and overlap >= 0.75
-        highres_data = data[
-            (data['engine_nfft'] >= 4096) &
-            (data['engine_overlap'] >= 0.75)
-        ] if 'engine_overlap' in data.columns else data[data['engine_nfft'] >= 4096]
+    def _generate_compliance_analysis(self, data: pd.DataFrame) -> str:
+        """Generate real-time compliance and reliability analysis."""
+        if 'deadline_compliance_rate' not in data.columns:
+            return "<p>No deadline compliance data available.</p>"
 
-        if len(highres_data) == 0:
-            return "<p>No high-resolution configurations (NFFT ≥ 4096, overlap ≥ 0.75) tested</p>"
-
-        analysis = f"""
-        <h3>High-Resolution Configurations</h3>
-        <p>Analyzed {len(highres_data)} high-resolution configurations (NFFT ≥ 4096, overlap ≥ 0.75)</p>
+        analysis = """
+        <h3>Deadline Compliance</h3>
+        <p>For real-time streaming, deadline compliance measures the ability to process frames
+        within their required time window. Target: >99% compliance for stable operation.</p>
         """
 
-        if 'frames_per_second' in highres_data.columns:
-            fps_mean = highres_data['frames_per_second'].mean()
-            analysis += f"<p><strong>Mean Throughput:</strong> {fps_mean:.1f} FPS</p>"
+        compliance_stats = data['deadline_compliance_rate'].describe()
+        high_compliance = (data['deadline_compliance_rate'] >= 0.99).sum()
 
-        if 'rtf' in highres_data.columns:
-            rtf_mean = highres_data['rtf'].mean()
-            realtime_capable = (highres_data['rtf'] >= 1.0).sum()
+        analysis += f"""
+        <p><strong>Compliance Statistics:</strong></p>
+        <ul>
+            <li>Mean compliance rate: {compliance_stats['mean']*100:.1f}%</li>
+            <li>Min compliance rate: {compliance_stats['min']*100:.1f}%</li>
+            <li>Configs with >99% compliance: {high_compliance}/{len(data)}</li>
+        </ul>
+        """
+
+        # Jitter analysis
+        if 'mean_jitter_ms' in data.columns:
+            jitter_stats = data['mean_jitter_ms'].describe()
             analysis += f"""
-            <p><strong>Mean RTF:</strong> {rtf_mean:.2f}x real-time</p>
-            <p><strong>Real-time capable:</strong> {realtime_capable}/{len(highres_data)} configs</p>
+            <h3>Timing Stability (Jitter)</h3>
+            <p><strong>Mean Jitter:</strong></p>
+            <ul>
+                <li>Average: {jitter_stats['mean']:.2f} ms</li>
+                <li>Range: {jitter_stats['min']:.2f} - {jitter_stats['max']:.2f} ms</li>
+            </ul>
             """
+
+        if 'p99_jitter_ms' in data.columns:
+            p99_jitter_stats = data['p99_jitter_ms'].describe()
+            analysis += f"""
+            <p><strong>P99 Jitter (worst-case):</strong></p>
+            <ul>
+                <li>Average P99: {p99_jitter_stats['mean']:.2f} ms</li>
+                <li>Max P99: {p99_jitter_stats['max']:.2f} ms</li>
+            </ul>
+            """
+
+        # Frame drops
+        if 'frames_dropped' in data.columns:
+            total_drops = data['frames_dropped'].sum()
+            configs_with_drops = (data['frames_dropped'] > 0).sum()
+            analysis += f"""
+            <h3>Data Loss Assessment</h3>
+            <p><strong>Frame Drops:</strong></p>
+            <ul>
+                <li>Total frames dropped: {int(total_drops)}</li>
+                <li>Configurations with drops: {configs_with_drops}/{len(data)}</li>
+            </ul>
+            """
+
+        return analysis
+
+    def _generate_streaming_vs_batch(self, data: pd.DataFrame) -> str:
+        """Generate streaming vs batch mode comparison."""
+        if 'mode' not in data.columns:
+            return "<p>No execution mode data available for comparison.</p>"
+
+        modes = data['mode'].unique()
+        if len(modes) < 2:
+            return "<p>Only one execution mode tested - cannot compare streaming vs batch.</p>"
+
+        analysis = """
+        <h3>Execution Mode Comparison</h3>
+        <p>Comparing streaming executor (real-time processing) vs batch executor (throughput-optimized).</p>
+        """
+
+        # Compare modes
+        for mode in ['streaming', 'batch']:
+            mode_data = data[data['mode'] == mode]
+            if len(mode_data) == 0:
+                continue
+
+            analysis += f"""
+            <h4>{mode.title()} Mode ({len(mode_data)} measurements)</h4>
+            """
+
+            if 'frames_per_second' in mode_data.columns:
+                fps_mean = mode_data['frames_per_second'].mean()
+                analysis += f"<p><strong>Throughput:</strong> {fps_mean:.1f} FPS (mean)</p>"
+
+            if 'mean_latency_us' in mode_data.columns:
+                lat_mean = mode_data['mean_latency_us'].mean()
+                analysis += f"<p><strong>Latency:</strong> {lat_mean:.1f} μs (mean)</p>"
+
+            if 'deadline_compliance_rate' in mode_data.columns and mode == 'streaming':
+                compliance_mean = mode_data['deadline_compliance_rate'].mean()
+                analysis += f"<p><strong>Deadline Compliance:</strong> {compliance_mean*100:.1f}%</p>"
+
+        # Trade-off summary
+        analysis += """
+        <h4>Trade-off Summary</h4>
+        <ul>
+            <li><strong>Streaming mode:</strong> Lower throughput, better latency, deadline compliance monitoring</li>
+            <li><strong>Batch mode:</strong> Higher throughput, slightly higher latency, no real-time guarantees</li>
+        </ul>
+        <p><strong>Recommendation:</strong> Use streaming mode for real-time ionosphere monitoring where
+        deadline compliance is critical. Use batch mode for offline analysis where maximum throughput is needed.</p>
+        """
 
         return analysis
 

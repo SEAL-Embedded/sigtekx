@@ -367,3 +367,205 @@ def plot_ionosphere_metrics(data: pd.DataFrame, output_dir: Path) -> List[Path]:
         paths.append(output_dir / 'freq_res_vs_nfft.html')
 
     return paths
+
+
+def plot_deadline_compliance(data: pd.DataFrame, output_dir: Path) -> List[Path]:
+    """Generate deadline compliance visualizations for streaming benchmarks."""
+    if 'deadline_compliance_rate' not in data.columns:
+        return []
+
+    plotter = PerformancePlotter()
+    paths = []
+
+    # Compliance rate vs NFFT
+    if 'engine_nfft' in data.columns:
+        fig = go.Figure()
+
+        for nfft in sorted(data['engine_nfft'].unique()):
+            nfft_data = data[data['engine_nfft'] == nfft]
+            fig.add_trace(go.Bar(
+                x=[str(nfft)],
+                y=[nfft_data['deadline_compliance_rate'].mean() * 100],
+                name=f"NFFT={nfft}",
+                error_y=dict(
+                    type='data',
+                    array=[nfft_data['deadline_compliance_rate'].std() * 100]
+                )
+            ))
+
+        # Add 99% target line
+        fig.add_hline(y=99, line_dash="dash", line_color="red",
+                      annotation_text="99% Target")
+
+        fig.update_layout(
+            title="Deadline Compliance Rate by NFFT",
+            xaxis_title="NFFT Size",
+            yaxis_title="Compliance Rate (%)",
+            yaxis_range=[95, 100],
+            showlegend=True
+        )
+
+        output_path = output_dir / 'compliance_vs_nfft.html'
+        fig.write_html(str(output_path))
+        paths.append(output_path)
+
+    # Compliance rate vs overlap
+    if 'engine_overlap' in data.columns:
+        fig = plotter.plot_scaling(
+            data, 'engine_overlap', 'deadline_compliance_rate',
+            output_path=output_dir / 'compliance_vs_overlap.html'
+        )
+        paths.append(output_dir / 'compliance_vs_overlap.html')
+
+    return paths
+
+
+def plot_jitter_analysis(data: pd.DataFrame, output_dir: Path) -> List[Path]:
+    """Generate jitter analysis visualizations."""
+    paths = []
+
+    # Jitter heatmap
+    if all(col in data.columns for col in ['engine_nfft', 'engine_overlap', 'mean_jitter_ms']):
+        plotter = PerformancePlotter()
+        fig = plotter.plot_heatmap(
+            data, 'engine_nfft', 'engine_overlap', 'mean_jitter_ms',
+            output_path=output_dir / 'jitter_heatmap.html'
+        )
+        paths.append(output_dir / 'jitter_heatmap.html')
+
+    # Mean vs P99 jitter comparison
+    if all(col in data.columns for col in ['mean_jitter_ms', 'p99_jitter_ms']):
+        fig = go.Figure()
+
+        fig.add_trace(go.Scatter(
+            x=data['mean_jitter_ms'],
+            y=data['p99_jitter_ms'],
+            mode='markers',
+            marker=dict(size=10, color=data.index, colorscale='Viridis'),
+            text=[f"NFFT={row['engine_nfft']}" if 'engine_nfft' in data.columns else ""
+                  for _, row in data.iterrows()],
+            name="Configurations"
+        ))
+
+        # Add diagonal line
+        max_val = max(data['mean_jitter_ms'].max(), data['p99_jitter_ms'].max())
+        fig.add_trace(go.Scatter(
+            x=[0, max_val],
+            y=[0, max_val],
+            mode='lines',
+            line=dict(dash='dash', color='red'),
+            name="Mean=P99 line"
+        ))
+
+        fig.update_layout(
+            title="Mean vs P99 Jitter",
+            xaxis_title="Mean Jitter (ms)",
+            yaxis_title="P99 Jitter (ms)",
+            showlegend=True
+        )
+
+        output_path = output_dir / 'jitter_comparison.html'
+        fig.write_html(str(output_path))
+        paths.append(output_path)
+
+    return paths
+
+
+def plot_streaming_vs_batch(data: pd.DataFrame, output_dir: Path) -> List[Path]:
+    """Generate streaming vs batch mode comparison visualizations."""
+    if 'mode' not in data.columns or len(data['mode'].unique()) < 2:
+        return []
+
+    paths = []
+
+    # Latency distribution comparison
+    if 'mean_latency_us' in data.columns:
+        fig = go.Figure()
+
+        for mode in ['streaming', 'batch']:
+            mode_data = data[data['mode'] == mode]
+            if len(mode_data) > 0:
+                fig.add_trace(go.Violin(
+                    y=mode_data['mean_latency_us'],
+                    name=mode.title(),
+                    box_visible=True,
+                    meanline_visible=True
+                ))
+
+        fig.update_layout(
+            title="Latency Distribution: Streaming vs Batch",
+            yaxis_title="Latency (μs)",
+            showlegend=True
+        )
+
+        output_path = output_dir / 'latency_streaming_vs_batch.html'
+        fig.write_html(str(output_path))
+        paths.append(output_path)
+
+    # Throughput comparison
+    if 'frames_per_second' in data.columns:
+        fig = go.Figure()
+
+        modes = []
+        fps_means = []
+        fps_stds = []
+
+        for mode in ['streaming', 'batch']:
+            mode_data = data[data['mode'] == mode]
+            if len(mode_data) > 0:
+                modes.append(mode.title())
+                fps_means.append(mode_data['frames_per_second'].mean())
+                fps_stds.append(mode_data['frames_per_second'].std())
+
+        fig.add_trace(go.Bar(
+            x=modes,
+            y=fps_means,
+            error_y=dict(type='data', array=fps_stds),
+            marker_color=['lightblue', 'lightgreen']
+        ))
+
+        fig.update_layout(
+            title="Throughput Comparison: Streaming vs Batch",
+            yaxis_title="Frames per Second",
+            showlegend=False
+        )
+
+        output_path = output_dir / 'fps_streaming_vs_batch.html'
+        fig.write_html(str(output_path))
+        paths.append(output_path)
+
+    return paths
+
+
+def plot_frame_drop_analysis(data: pd.DataFrame, output_dir: Path) -> List[Path]:
+    """Generate frame drop analysis visualizations."""
+    if 'frames_dropped' not in data.columns:
+        return []
+
+    paths = []
+    plotter = PerformancePlotter()
+
+    # Frame drops by configuration
+    if 'engine_nfft' in data.columns:
+        fig = go.Figure()
+
+        for nfft in sorted(data['engine_nfft'].unique()):
+            nfft_data = data[data['engine_nfft'] == nfft]
+            fig.add_trace(go.Bar(
+                x=[str(nfft)],
+                y=[nfft_data['frames_dropped'].sum()],
+                name=f"NFFT={nfft}"
+            ))
+
+        fig.update_layout(
+            title="Total Frame Drops by NFFT",
+            xaxis_title="NFFT Size",
+            yaxis_title="Total Frames Dropped",
+            showlegend=True
+        )
+
+        output_path = output_dir / 'frame_drops_by_nfft.html'
+        fig.write_html(str(output_path))
+        paths.append(output_path)
+
+    return paths

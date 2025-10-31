@@ -117,6 +117,14 @@ class BenchmarkMetadata(BaseModel):
     freq_resolution_hz: Optional[float] = None
     rtf: Optional[float] = None  # Real-Time Factor (throughput only)
 
+    # Streaming-specific metrics (realtime benchmark only)
+    deadline_compliance_rate: Optional[float] = None  # Fraction of frames meeting deadline
+    mean_jitter_ms: Optional[float] = None  # Mean timing jitter
+    p99_jitter_ms: Optional[float] = None  # 99th percentile jitter
+    frames_dropped: Optional[int] = None  # Number of frames dropped
+    stream_duration_s: Optional[float] = None  # Total stream duration
+    mode: Optional[str] = None  # Execution mode: 'streaming' or 'batch'
+
 
 class BenchmarkResult(BaseModel):
     """Single benchmark measurement result."""
