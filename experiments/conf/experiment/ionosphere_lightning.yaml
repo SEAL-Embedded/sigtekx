@@ -1,0 +1,80 @@
+# @package _global_
+# Lightning and Sprites Detection (Ultra-Fast Time Resolution)
+# ==============================================================
+# Optimized for fast transient detection in VLF/ULF ionosphere monitoring.
+# Uses ultra-low NFFT values (256, 512) for <10ms time resolution.
+
+defaults:
+  - override /engine: ionosphere_realtime  # streaming mode for real-time detection
+
+experiment:
+  name: ionosphere_lightning
+  description: >-
+    Ultra-fast time resolution configuration for lightning and sprites detection
+    in VLF/ULF ionosphere monitoring (48 kHz sampling). Uses very small NFFT
+    values (256, 512) to achieve <10ms time resolution required for transient
+    ionosphere phenomena. Sacrifices frequency resolution for maximum temporal
+    precision.
+  tags: [ionosphere, lightning, sprites, fast-transients, ultra-low-nfft, vlf-ulf]
+
+# Hydra multirun configuration
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      # Ultra-low NFFT for fast transients at 48 kHz
+      # 256: 5.33ms time resolution (optimal for lightning/sprites)
+      # 512: 10.67ms time resolution (marginal, slightly exceeds 10ms)
+      engine.nfft: 256,512
+
+      # Overlap sweep for temporal detail
+      # 0.5: Standard 50% overlap
+      # 0.75: High temporal coverage
+      engine.overlap: 0.5,0.75
+
+      # Dual-channel antenna system (E-W, N-S pair)
+      engine.channels: 2
+
+      # Fixed VLF/ULF sampling rate
+      engine.sample_rate_hz: 48000
+
+# Analysis configuration
+analysis:
+  statistical_tests: [shapiro]
+  confidence_level: 0.95
+  min_samples: 1000  # Fast iterations due to small NFFT
+
+  focus_metrics:
+    - time_resolution_ms  # Primary: must be <10ms
+    - mean_latency_us     # Processing latency
+    - frames_per_second   # Throughput
+    - deadline_compliance_rate  # Real-time compliance
+
+  thresholds:
+    max_time_resolution_ms: 10.0  # Critical for lightning/sprites
+    min_compliance_rate: 0.99      # 99% deadline compliance
+
+# Lightning detection parameters (VLF/ULF ionosphere)
+lightning:
+  target_phenomena:
+    - lightning_discharges   # Cloud-to-ground strikes
+    - sprites                # High-altitude red flashes (50-90 km)
+    - elves                  # Expanding light rings
+    - blue_jets              # Upward streamers
+
+  time_scale: milliseconds   # Fast transients (1-10ms)
+  freq_band: 3-30_kHz        # VLF band (frequency resolution not critical)
+
+  # At 48 kHz sampling with NFFT=256:
+  # - Time resolution: 5.33 ms (excellent for transients)
+  # - Freq resolution: 187.5 Hz (poor, but acceptable - we care about "when" not "what freq")
+
+notes: >-
+  NFFT=256 provides 5.33ms time resolution at 48kHz sampling, ideal for
+  capturing lightning and sprites in VLF/ULF ionosphere monitoring. Frequency
+  resolution will be poor (~187Hz) but this is acceptable for transient
+  detection - we prioritize temporal precision over spectral detail.
+
+  This configuration complements higher-NFFT experiments (Schumann, whistlers)
+  by covering the fast-transient detection regime that requires sub-10ms
+  time resolution.

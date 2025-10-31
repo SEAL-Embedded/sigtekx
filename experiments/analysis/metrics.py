@@ -136,16 +136,16 @@ def assess_ionosphere_suitability(
             'reason': 'Requires <10ms time resolution for fast transients'
         },
         'sids': {
-            'suitable': time_resolution_ms < 100.0 and freq_resolution_hz < 1.0,
-            'reason': 'Requires <100ms time resolution and <1Hz frequency resolution'
+            'suitable': freq_resolution_hz < 1.0,
+            'reason': 'Requires <1Hz frequency resolution for narrowband VLF transmitter detection'
         },
         'schumann_resonances': {
             'suitable': freq_resolution_hz < 0.5,
             'reason': 'Requires <0.5Hz frequency resolution for fine spectral features'
         },
         'whistlers': {
-            'suitable': time_resolution_ms < 50.0 and freq_resolution_hz < 10.0,
-            'reason': 'VLF phenomena require <50ms time resolution and <10Hz frequency resolution'
+            'suitable': time_resolution_ms < 50.0 and freq_resolution_hz < 25.0,
+            'reason': 'VLF phenomena require <50ms time resolution and <25Hz frequency resolution'
         },
         'general_vlf': {
             'suitable': freq_resolution_hz < 100.0,

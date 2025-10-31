@@ -341,11 +341,11 @@ class ScientificMetricsAnalyzer(AnalyzerBase):
     def _assess_phenomena_suitability(self, time_res_ms: float, freq_res_hz: float) -> Dict[str, bool]:
         """Assess suitability for different ionosphere phenomena."""
         return {
-            'lightning_sprites': time_res_ms < 10.0,  # Fast transients
-            'sids': time_res_ms < 100.0 and freq_res_hz < 1.0,  # Slower variations
-            'schumann_resonances': freq_res_hz < 0.5,  # Fine frequency resolution
-            'whistlers': time_res_ms < 50.0 and freq_res_hz < 10.0,  # VLF phenomena
-            'general_vlf': freq_res_hz < 100.0,  # Broad VLF band
+            'lightning_sprites': time_res_ms < 10.0,  # Fast transients (<10ms time resolution)
+            'sids': freq_res_hz < 1.0,  # Narrowband VLF transmitter detection (<1Hz freq resolution)
+            'schumann_resonances': freq_res_hz < 0.5,  # Fine frequency resolution for resonant peaks
+            'whistlers': time_res_ms < 50.0 and freq_res_hz < 25.0,  # VLF dispersive phenomena
+            'general_vlf': freq_res_hz < 100.0,  # Broad VLF band (3-30 kHz)
         }
 
 

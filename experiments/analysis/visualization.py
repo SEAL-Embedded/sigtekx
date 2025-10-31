@@ -188,7 +188,7 @@ class PerformancePlotter:
 
         # Force categorical y-axis tick labels (prevents interpolation for sparse data)
         # Important for channel counts: shows "2, 16, 32, 128" instead of "50, 100, 150"
-        fig.update_yaxis(
+        fig.update_yaxes(
             tickmode='array',
             tickvals=list(range(len(pivot.index))),
             ticktext=[str(int(val)) if isinstance(val, (int, float)) else str(val) for val in pivot.index]
