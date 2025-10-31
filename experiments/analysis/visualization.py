@@ -186,6 +186,14 @@ class PerformancePlotter:
             yaxis_title=y_col
         )
 
+        # Force categorical y-axis tick labels (prevents interpolation for sparse data)
+        # Important for channel counts: shows "2, 16, 32, 128" instead of "50, 100, 150"
+        fig.update_yaxis(
+            tickmode='array',
+            tickvals=list(range(len(pivot.index))),
+            ticktext=[str(int(val)) if isinstance(val, (int, float)) else str(val) for val in pivot.index]
+        )
+
         if output_path:
             fig.write_html(str(output_path))
 
@@ -473,7 +481,7 @@ def plot_jitter_analysis(data: pd.DataFrame, output_dir: Path) -> List[Path]:
 
 def plot_streaming_vs_batch(data: pd.DataFrame, output_dir: Path) -> List[Path]:
     """Generate streaming vs batch mode comparison visualizations."""
-    if 'mode' not in data.columns or len(data['mode'].unique()) < 2:
+    if 'engine_mode' not in data.columns or len(data['engine_mode'].unique()) < 2:
         return []
 
     paths = []
@@ -483,7 +491,7 @@ def plot_streaming_vs_batch(data: pd.DataFrame, output_dir: Path) -> List[Path]:
         fig = go.Figure()
 
         for mode in ['streaming', 'batch']:
-            mode_data = data[data['mode'] == mode]
+            mode_data = data[data['engine_mode'] == mode]
             if len(mode_data) > 0:
                 fig.add_trace(go.Violin(
                     y=mode_data['mean_latency_us'],
@@ -511,7 +519,7 @@ def plot_streaming_vs_batch(data: pd.DataFrame, output_dir: Path) -> List[Path]:
         fps_stds = []
 
         for mode in ['streaming', 'batch']:
-            mode_data = data[data['mode'] == mode]
+            mode_data = data[data['engine_mode'] == mode]
             if len(mode_data) > 0:
                 modes.append(mode.title())
                 fps_means.append(mode_data['frames_per_second'].mean())

@@ -55,13 +55,61 @@ rule run_ionosphere_streaming:
             +benchmark=realtime
         """
 
+# Run ionosphere batch throughput (dual-channel high-NFFT)
+rule run_ionosphere_batch_throughput:
+    output:
+        touch("artifacts/data/ionosphere_batch_throughput.done")
+    shell:
+        """
+        python benchmarks/run_throughput.py --multirun \
+            experiment=ionosphere_batch_throughput \
+            +benchmark=throughput
+        """
+
+# Run ionosphere streaming latency (dual-channel 4096/8192)
+rule run_ionosphere_streaming_latency:
+    output:
+        touch("artifacts/data/ionosphere_streaming_latency.done")
+    shell:
+        """
+        python benchmarks/run_latency.py --multirun \
+            experiment=ionosphere_streaming_latency \
+            +benchmark=latency
+        """
+
+# Run accuracy validation (single-channel, zero-overlap, both modes)
+rule run_accuracy_validation:
+    output:
+        touch("artifacts/data/accuracy_validation.done")
+    shell:
+        """
+        python benchmarks/run_accuracy.py --multirun \
+            experiment=accuracy_validation \
+            +benchmark=accuracy
+        """
+
+# Run comprehensive NFFT × channels grid (for general report heatmap)
+rule run_ionosphere_nfft_channels_grid:
+    output:
+        touch("artifacts/data/ionosphere_nfft_channels_grid.done")
+    shell:
+        """
+        python benchmarks/run_throughput.py --multirun \
+            experiment=ionosphere_nfft_channels_grid \
+            +benchmark=throughput
+        """
+
 # Generate analysis summary using new analysis system
 rule analyze_results:
     input:
         "artifacts/data/ionosphere_resolution.done",
         "artifacts/data/ionosphere_temporal.done",
         "artifacts/data/ionosphere_latency.done",
-        "artifacts/data/ionosphere_streaming.done"
+        "artifacts/data/ionosphere_streaming.done",
+        "artifacts/data/ionosphere_batch_throughput.done",
+        "artifacts/data/ionosphere_streaming_latency.done",
+        "artifacts/data/accuracy_validation.done",
+        "artifacts/data/ionosphere_nfft_channels_grid.done"
     output:
         "artifacts/analysis/summary.json"
     shell:
@@ -77,7 +125,11 @@ rule generate_plots:
         "artifacts/data/ionosphere_resolution.done",
         "artifacts/data/ionosphere_temporal.done",
         "artifacts/data/ionosphere_latency.done",
-        "artifacts/data/ionosphere_streaming.done"
+        "artifacts/data/ionosphere_streaming.done",
+        "artifacts/data/ionosphere_batch_throughput.done",
+        "artifacts/data/ionosphere_streaming_latency.done",
+        "artifacts/data/accuracy_validation.done",
+        "artifacts/data/ionosphere_nfft_channels_grid.done"
     output:
         "artifacts/reports/plots/latency_vs_nfft.html",
         "artifacts/reports/plots/rtf_vs_freq_resolution.html"
@@ -94,7 +146,11 @@ rule generate_reports:
         "artifacts/data/ionosphere_resolution.done",
         "artifacts/data/ionosphere_temporal.done",
         "artifacts/data/ionosphere_latency.done",
-        "artifacts/data/ionosphere_streaming.done"
+        "artifacts/data/ionosphere_streaming.done",
+        "artifacts/data/ionosphere_batch_throughput.done",
+        "artifacts/data/ionosphere_streaming_latency.done",
+        "artifacts/data/accuracy_validation.done",
+        "artifacts/data/ionosphere_nfft_channels_grid.done"
     output:
         "artifacts/reports/general_performance_report.html",
         "artifacts/reports/ionosphere_research_report.html"

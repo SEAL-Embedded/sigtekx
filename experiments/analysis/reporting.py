@@ -195,12 +195,75 @@ class GeneralPerformanceReport:
         pass_rate_stats = data['pass_rate'].describe()
 
         analysis = f"""
-        <h3>Accuracy Statistics</h3>
+        <h3>Accuracy Validation Results</h3>
+        <p>Single-channel, zero-overlap accuracy validation against reference NumPy FFT implementation.</p>
+        <h4>Overall Statistics</h4>
         <ul>
-            <li><strong>Mean Pass Rate:</strong> {pass_rate_stats['mean']*100:.1f}%</li>
-            <li><strong>Min Pass Rate:</strong> {pass_rate_stats['min']*100:.1f}%</li>
+            <li><strong>Mean Pass Rate:</strong> {pass_rate_stats['mean']*100:.2f}%</li>
+            <li><strong>Min Pass Rate:</strong> {pass_rate_stats['min']*100:.2f}%</li>
+            <li><strong>Max Pass Rate:</strong> {pass_rate_stats['max']*100:.2f}%</li>
+            <li><strong>Configurations Tested:</strong> {len(data)}</li>
         </ul>
         """
+
+        # Error metrics if available
+        if 'max_relative_error' in data.columns:
+            error_stats = data['max_relative_error'].describe()
+            analysis += f"""
+            <h4>Error Metrics</h4>
+            <ul>
+                <li><strong>Mean Max Error:</strong> {error_stats['mean']:.2e}</li>
+                <li><strong>Worst-Case Error:</strong> {error_stats['max']:.2e}</li>
+            </ul>
+            """
+
+        # Mode comparison if both modes tested
+        if 'engine_mode' in data.columns and len(data['engine_mode'].unique()) > 1:
+            analysis += "<h4>Executor Comparison</h4><table style='margin: 10px 0; border-collapse: collapse;'>"
+            analysis += "<tr><th style='border: 1px solid #ddd; padding: 8px;'>Mode</th>"
+            analysis += "<th style='border: 1px solid #ddd; padding: 8px;'>Mean Pass Rate</th>"
+            analysis += "<th style='border: 1px solid #ddd; padding: 8px;'>Configs</th></tr>"
+
+            for mode in ['streaming', 'batch']:
+                mode_data = data[data['engine_mode'] == mode]
+                if len(mode_data) > 0:
+                    mean_pass = mode_data['pass_rate'].mean() * 100
+                    analysis += f"<tr><td style='border: 1px solid #ddd; padding: 8px;'>{mode.title()}</td>"
+                    analysis += f"<td style='border: 1px solid #ddd; padding: 8px;'>{mean_pass:.2f}%</td>"
+                    analysis += f"<td style='border: 1px solid #ddd; padding: 8px;'>{len(mode_data)}</td></tr>"
+
+            analysis += "</table>"
+            analysis += "<p><em>Both executors should produce identical results within error threshold.</em></p>"
+
+        # NFFT scaling
+        if 'engine_nfft' in data.columns:
+            analysis += "<h4>Accuracy vs NFFT</h4><table style='margin: 10px 0; border-collapse: collapse;'>"
+            analysis += "<tr><th style='border: 1px solid #ddd; padding: 8px;'>NFFT</th>"
+            analysis += "<th style='border: 1px solid #ddd; padding: 8px;'>Pass Rate</th></tr>"
+
+            for nfft in sorted(data['engine_nfft'].unique()):
+                nfft_data = data[data['engine_nfft'] == nfft]
+                pass_rate = nfft_data['pass_rate'].mean() * 100
+                analysis += f"<tr><td style='border: 1px solid #ddd; padding: 8px;'>{int(nfft)}</td>"
+                analysis += f"<td style='border: 1px solid #ddd; padding: 8px;'>{pass_rate:.2f}%</td></tr>"
+
+            analysis += "</table>"
+
+        # Validation summary
+        all_pass = (data['pass_rate'] >= 0.99).all()
+        if all_pass:
+            analysis += """
+            <h4>✓ Validation Summary</h4>
+            <p style='color: green;'><strong>All configurations passed validation</strong> (≥99% pass rate).
+            GPU FFT implementation is numerically correct across all tested NFFT values and execution modes.</p>
+            """
+        else:
+            failed_configs = data[data['pass_rate'] < 0.99]
+            analysis += f"""
+            <h4>⚠ Validation Summary</h4>
+            <p style='color: orange;'><strong>{len(failed_configs)} configurations failed validation</strong> (< 99% pass rate).
+            Review failed configurations for potential numerical issues.</p>
+            """
 
         return analysis
 
@@ -461,7 +524,7 @@ class IonosphereReport:
             })
 
         # Streaming vs Batch Comparison (if both modes present)
-        if 'mode' in data.columns and len(data['mode'].unique()) > 1:
+        if 'engine_mode' in data.columns and len(data['engine_mode'].unique()) > 1:
             sections.append({
                 'title': 'Streaming vs Batch Mode Comparison',
                 'content': self._generate_streaming_vs_batch(data)
@@ -743,10 +806,10 @@ class IonosphereReport:
 
     def _generate_streaming_vs_batch(self, data: pd.DataFrame) -> str:
         """Generate streaming vs batch mode comparison."""
-        if 'mode' not in data.columns:
+        if 'engine_mode' not in data.columns:
             return "<p>No execution mode data available for comparison.</p>"
 
-        modes = data['mode'].unique()
+        modes = data['engine_mode'].unique()
         if len(modes) < 2:
             return "<p>Only one execution mode tested - cannot compare streaming vs batch.</p>"
 
@@ -757,7 +820,7 @@ class IonosphereReport:
 
         # Compare modes
         for mode in ['streaming', 'batch']:
-            mode_data = data[data['mode'] == mode]
+            mode_data = data[data['engine_mode'] == mode]
             if len(mode_data) == 0:
                 continue
 

@@ -1,0 +1,62 @@
+# @package _global_
+# Ionosphere Batch Throughput Sweep (Dual-Channel)
+# =================================================
+# Dual-channel batch throughput for high-NFFT offline analysis.
+# Complements streaming benchmarks with batch executor performance.
+
+defaults:
+  - override /engine: throughput  # batch mode executor
+
+experiment:
+  name: ionosphere_batch_throughput_dual
+  description: >-
+    Dual-channel batch throughput analysis for high-resolution offline processing.
+    Tests high NFFT values (8192-32768) with batch executor to complement
+    streaming benchmarks and enable batch vs streaming comparison.
+  tags: [ionosphere, batch, throughput, dual-channel, offline-analysis]
+
+# Hydra multirun configuration for parameter sweep
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      # High NFFT sweep for offline analysis
+      # 8192: Standard offline analysis
+      # 16384: High-resolution VLF/ULF analysis
+      # 32768: Ultra-high-resolution (missile detection, Schumann)
+      engine.nfft: 8192,16384,32768
+
+      # Overlap sweep for time/frequency resolution trade-off
+      engine.overlap: 0.5,0.75,0.875
+
+      # Fixed dual-channel configuration (E-W, N-S antenna pair)
+      engine.channels: 2
+
+# Analysis configuration
+analysis:
+  statistical_tests: [shapiro, kruskal, mann_whitney]
+  confidence_level: 0.95
+  min_samples: 30
+
+  focus_metrics:
+    - frames_per_second  # Throughput
+    - rtf                # Real-time factor
+    - gb_per_second      # Memory bandwidth
+    - gpu_utilization    # GPU efficiency
+
+  thresholds:
+    min_fps: 100         # Minimum acceptable throughput
+    min_rtf: 1.0         # Must exceed real-time
+
+# Dual-channel antenna system parameters (metadata)
+antenna_system:
+  configuration: ew_ns_pair      # East-West, North-South dipole pair
+  baseline_m: 100                # Antenna separation (meters)
+  direction_finding: true        # Primary use case
+  processing_mode: batch         # Offline analysis
+
+  # Use cases for batch processing
+  use_cases:
+    - offline_analysis           # Post-collection analysis
+    - archive_reprocessing       # Historical data
+    - high_resolution_studies    # Research requiring max resolution

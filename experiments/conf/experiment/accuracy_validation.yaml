@@ -1,0 +1,71 @@
+# @package _global_
+# Accuracy Validation Sweep
+# ==========================
+# Single-channel, zero-overlap accuracy validation across NFFT values.
+# Tests both batch and streaming executors to ensure numerical correctness.
+
+defaults:
+  - override /engine: validation  # single channel, zero overlap base
+
+experiment:
+  name: accuracy_validation
+  description: >-
+    Accuracy validation across NFFT values and execution modes.
+    Single-channel, zero-overlap configuration for reference FFT comparison.
+    Tests both batch and streaming executors to ensure numerical correctness.
+  tags: [accuracy, validation, single-channel, zero-overlap, correctness]
+
+# Hydra multirun configuration for parameter sweep
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      # NFFT sweep for accuracy validation
+      # 1024: Small FFT (quick validation)
+      # 2048: Standard validation
+      # 4096: Ionosphere standard
+      # 8192: High-resolution validation
+      # 16384: Ultra-high-resolution validation
+      engine.nfft: 1024,2048,4096,8192,16384
+
+      # Zero overlap (fixed) - no window overlap for reference comparison
+      engine.overlap: 0.0
+
+      # Single channel (fixed) - simplifies reference comparison
+      engine.channels: 1
+
+      # Test both executors for accuracy validation
+      engine.mode: batch,streaming
+
+# Analysis configuration
+analysis:
+  statistical_tests: [shapiro]
+  confidence_level: 0.95
+  min_samples: 10  # Fewer iterations needed for accuracy validation
+
+  focus_metrics:
+    - pass_rate              # Primary: accuracy pass rate
+    - max_relative_error     # Maximum relative error
+    - mean_relative_error    # Mean relative error
+
+  thresholds:
+    min_pass_rate: 0.99      # 99% pass rate required
+    max_mean_error: 1e-5     # Tight error bound for numerical correctness
+
+# Accuracy validation parameters
+accuracy:
+  error_threshold: 1e-4      # Relative error threshold for pass/fail
+  reference_signals:
+    - sine_1khz              # Pure sine wave
+    - chirp                  # Linear chirp signal
+    - multitone              # Multiple frequency components
+
+  validation_method: numpy_fft  # Reference implementation
+
+# Notes for accuracy benchmarking
+notes: >-
+  Accuracy benchmarks validate numerical correctness of GPU FFT implementation
+  against reference NumPy FFT. Zero overlap ensures clean FFT frames with no
+  windowing artifacts. Single channel simplifies comparison and reduces
+  execution time. Both batch and streaming executors are tested to ensure
+  both code paths produce identical results.
