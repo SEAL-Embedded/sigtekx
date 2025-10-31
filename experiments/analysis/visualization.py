@@ -296,7 +296,7 @@ class ReportGenerator:
             f"</html>"
         ])
 
-        output_path.write_text('\n'.join(html_parts))
+        output_path.write_text('\n'.join(html_parts), encoding='utf-8')
 
 
 # Convenience functions for common plots

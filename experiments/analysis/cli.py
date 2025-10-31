@@ -67,7 +67,7 @@ def cmd_analyze(args):
     summary = analyzer.generate_summary(data, experiment_name=args.experiment_name or "Benchmark Analysis")
 
     # Save summary
-    output_path.write_text(summary.model_dump_json(indent=2))
+    output_path.write_text(summary.model_dump_json(indent=2), encoding='utf-8')
     print(f"Summary saved to {output_path}")
 
     # Print key insights

@@ -1,98 +1,94 @@
 # Snakefile
-# Simple workflow orchestration following one-tool-one-job principle
+# Modern workflow orchestration with ionosphere-focused analysis
 
 configfile: "experiments/conf/config.yaml"
 
-# Define the final outputs we want (both PNG and SVG formats)
+# Define the final outputs we want (new analysis system with dual reports)
 rule all:
     input:
-        "artifacts/figures/latency_vs_nfft.png",
-        "artifacts/figures/throughput_scaling.png",
-        "artifacts/figures/accuracy_heatmap.png",
-        "artifacts/figures/combined_analysis.png",
-        "artifacts/figures/latency_vs_nfft.svg",
-        "artifacts/figures/throughput_scaling.svg",
-        "artifacts/figures/accuracy_heatmap.svg",
-        "artifacts/figures/combined_analysis.svg",
-        "artifacts/reports/final_report.html"
+        "artifacts/reports/general_performance_report.html",
+        "artifacts/reports/ionosphere_research_report.html",
+        "artifacts/reports/plots/latency_vs_nfft.html",
+        "artifacts/reports/plots/rtf_vs_freq_resolution.html"
 
-# Run latency benchmark sweep
-rule run_latency_sweep:
+# Run ionosphere resolution sweep (high-resolution analysis)
+rule run_ionosphere_resolution:
     output:
-        touch("artifacts/data/latency_sweep.done")
-    shell:
-        """
-        python benchmarks/run_latency.py --multirun \
-            experiment=baseline \
-            +benchmark=latency \
-            "engine.nfft=256,512,1024,2048,4096,8192"
-        """
-
-# Run throughput benchmark sweep
-rule run_throughput_sweep:
-    output:
-        touch("artifacts/data/throughput_sweep.done")
+        touch("artifacts/data/ionosphere_resolution.done")
     shell:
         """
         python benchmarks/run_throughput.py --multirun \
-            experiment=baseline \
-            +benchmark=throughput \
-            "engine.channels=1,2,4,8,16,32,64"
+            experiment=ionosphere_resolution \
+            +benchmark=throughput
         """
 
-# Run accuracy benchmark sweep
-rule run_accuracy_sweep:
+# Run ionosphere temporal characteristics sweep
+rule run_ionosphere_temporal:
     output:
-        touch("artifacts/data/accuracy_sweep.done")
+        touch("artifacts/data/ionosphere_temporal.done")
     shell:
         """
-        python benchmarks/run_accuracy.py --multirun \
-            experiment=baseline \
-            +benchmark=accuracy \
-            "engine.nfft=1024,2048,4096" \
-            "benchmark.iterations=100"
+        python benchmarks/run_throughput.py --multirun \
+            experiment=ionosphere_temporal \
+            +benchmark=throughput
         """
 
-# Analyze all results and create summary statistics
+# Run ionosphere latency sweep
+rule run_ionosphere_latency:
+    output:
+        touch("artifacts/data/ionosphere_latency.done")
+    shell:
+        """
+        python benchmarks/run_latency.py --multirun \
+            experiment=ionosphere_resolution \
+            +benchmark=latency
+        """
+
+# Generate analysis summary using new analysis system
 rule analyze_results:
     input:
-        "artifacts/data/latency_sweep.done",
-        "artifacts/data/throughput_sweep.done",
-        "artifacts/data/accuracy_sweep.done"
+        "artifacts/data/ionosphere_resolution.done",
+        "artifacts/data/ionosphere_temporal.done",
+        "artifacts/data/ionosphere_latency.done"
     output:
-        "artifacts/data/summary_statistics.csv"
-    shell:
-        "python experiments/scripts/analyze.py"
-
-# Generate figures from summary statistics
-rule generate_figures:
-    input:
-        "artifacts/data/summary_statistics.csv"
-    output:
-        "artifacts/figures/latency_vs_nfft.png",
-        "artifacts/figures/throughput_scaling.png",
-        "artifacts/figures/accuracy_heatmap.png",
-        "artifacts/figures/combined_analysis.png",
-        "artifacts/figures/latency_vs_nfft.svg",
-        "artifacts/figures/throughput_scaling.svg",
-        "artifacts/figures/accuracy_heatmap.svg",
-        "artifacts/figures/combined_analysis.svg"
-    shell:
-        "python experiments/scripts/generate_figures.py"
-
-# Generate final HTML report
-rule generate_report:
-    input:
-        "artifacts/data/summary_statistics.csv",
-        "artifacts/figures/combined_analysis.png"
-    output:
-        "artifacts/reports/final_report.html"
+        "artifacts/analysis/summary.json"
     shell:
         """
-        python experiments/scripts/generate_report.py \
-            --input artifacts/data/summary_statistics.csv \
-            --figures-dir artifacts/figures \
-            --output artifacts/reports/final_report.html
+        python -m experiments.analysis.cli analyze artifacts/data \
+            --output artifacts/analysis/summary.json \
+            --experiment-name "Ionosphere HPC Analysis"
+        """
+
+# Generate interactive plots
+rule generate_plots:
+    input:
+        "artifacts/data/ionosphere_resolution.done",
+        "artifacts/data/ionosphere_temporal.done",
+        "artifacts/data/ionosphere_latency.done"
+    output:
+        "artifacts/reports/plots/latency_vs_nfft.html",
+        "artifacts/reports/plots/rtf_vs_freq_resolution.html"
+    shell:
+        """
+        python -m experiments.analysis.cli report artifacts/data \
+            --output-dir artifacts/reports \
+            --generate-plots
+        """
+
+# Generate both reports (general performance + ionosphere research)
+rule generate_reports:
+    input:
+        "artifacts/data/ionosphere_resolution.done",
+        "artifacts/data/ionosphere_temporal.done",
+        "artifacts/data/ionosphere_latency.done"
+    output:
+        "artifacts/reports/general_performance_report.html",
+        "artifacts/reports/ionosphere_research_report.html"
+    shell:
+        """
+        python -m experiments.analysis.cli report artifacts/data \
+            --output-dir artifacts/reports \
+            --generate-plots
         """
 
 # Clean all artifacts
@@ -114,11 +110,12 @@ print('All artifacts cleaned')
 "
         """
 
-# Quick test run with minimal parameters
+# Quick test run with ionosphere test config
 rule test:
     shell:
         """
-        python benchmarks/run_latency.py engine.nfft=512 engine.channels=1 +benchmark=latency benchmark.iterations=10
-        python experiments/scripts/analyze.py
-        python experiments/scripts/generate_figures.py
+        python benchmarks/run_throughput.py experiment=ionosphere_test +benchmark=throughput
+        python benchmarks/run_latency.py experiment=ionosphere_test +benchmark=latency
+        python -m experiments.analysis.cli analyze artifacts/data
+        python -m experiments.analysis.cli report artifacts/data --output-dir artifacts/reports
         """

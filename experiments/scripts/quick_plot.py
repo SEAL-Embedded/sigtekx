@@ -9,7 +9,7 @@ Great for debugging, exploration, and quick checks during experiments.
 Usage:
     python quick_plot.py                          # Plot all available data
     python quick_plot.py --type throughput        # Plot only throughput data
-    python quick_plot.py --config 1024 2          # Plot specific NFFT/batch config
+    python quick_plot.py --config 1024 2          # Plot specific NFFT/channels config
     python quick_plot.py --latest                 # Plot only most recent data
 
 Examples:
@@ -111,18 +111,18 @@ def plot_throughput_quick(df: pd.DataFrame, save: bool = False, show: bool = Tru
     axes[0].set_xscale('log', base=2)
     axes[0].grid(True, alpha=0.3)
 
-    # Add colorbar for batch size
+    # Add colorbar for number of channels
     scatter = axes[0].collections[0]
     cbar = plt.colorbar(scatter, ax=axes[0])
-    cbar.set_label('Batch Size')
+    cbar.set_label('Number of Channels')
 
-    # FPS vs Batch Size
+    # FPS vs Number of Channels
     if 'gb_per_second' in throughput_data.columns:
         axes[1].scatter(throughput_data['engine_channels'], throughput_data['gb_per_second'],
                        c=throughput_data['engine_nfft'], cmap='plasma', s=100, alpha=0.7)
-        axes[1].set_xlabel('Batch Size')
+        axes[1].set_xlabel('Number of Channels')
         axes[1].set_ylabel('GB/Second')
-        axes[1].set_title('Throughput: GB/s vs Batch Size')
+        axes[1].set_title('Throughput: GB/s vs Number of Channels')
 
         scatter2 = axes[1].collections[0]
         cbar2 = plt.colorbar(scatter2, ax=axes[1])
@@ -130,9 +130,9 @@ def plot_throughput_quick(df: pd.DataFrame, save: bool = False, show: bool = Tru
     else:
         axes[1].scatter(throughput_data['engine_channels'], throughput_data['frames_per_second'],
                        c=throughput_data['engine_nfft'], cmap='plasma', s=100, alpha=0.7)
-        axes[1].set_xlabel('Batch Size')
+        axes[1].set_xlabel('Number of Channels')
         axes[1].set_ylabel('Frames Per Second')
-        axes[1].set_title('Throughput: FPS vs Batch Size')
+        axes[1].set_title('Throughput: FPS vs Number of Channels')
 
     axes[1].grid(True, alpha=0.3)
 
@@ -168,7 +168,7 @@ def plot_latency_quick(df: pd.DataFrame, save: bool = False, show: bool = True, 
 
     scatter = axes[0].collections[0]
     cbar = plt.colorbar(scatter, ax=axes[0])
-    cbar.set_label('Batch Size')
+    cbar.set_label('Number of Channels')
 
     # P95 vs Mean latency (if available)
     if 'p95_latency_us' in latency_data.columns:
@@ -182,12 +182,12 @@ def plot_latency_quick(df: pd.DataFrame, save: bool = False, show: bool = True, 
                     'r--', alpha=0.5, label='y=x')
         axes[1].legend()
     else:
-        # Latency vs batch size
+        # Latency vs number of channels
         axes[1].scatter(latency_data['engine_channels'], latency_data['mean_latency_us'],
                        c=latency_data['engine_nfft'], cmap='plasma', s=100, alpha=0.7)
-        axes[1].set_xlabel('Batch Size')
+        axes[1].set_xlabel('Number of Channels')
         axes[1].set_ylabel('Mean Latency (us)')
-        axes[1].set_title('Latency: Mean vs Batch Size')
+        axes[1].set_title('Latency: Mean vs Number of Channels')
 
     axes[1].grid(True, alpha=0.3)
 
@@ -222,7 +222,7 @@ def plot_accuracy_quick(df: pd.DataFrame, save: bool = False, show: bool = True,
 
     scatter = axes[0].collections[0]
     cbar = plt.colorbar(scatter, ax=axes[0])
-    cbar.set_label('Batch Size')
+    cbar.set_label('Number of Channels')
 
     # SNR vs Pass Rate (if available)
     if 'mean_snr_db' in accuracy_data.columns:
@@ -232,12 +232,12 @@ def plot_accuracy_quick(df: pd.DataFrame, save: bool = False, show: bool = True,
         axes[1].set_ylabel('Pass Rate')
         axes[1].set_title('Accuracy: Pass Rate vs SNR')
     else:
-        # Pass rate vs batch size
+        # Pass rate vs number of channels
         axes[1].scatter(accuracy_data['engine_channels'], accuracy_data['pass_rate'],
                        c=accuracy_data['engine_nfft'], cmap='plasma', s=100, alpha=0.7)
-        axes[1].set_xlabel('Batch Size')
+        axes[1].set_xlabel('Number of Channels')
         axes[1].set_ylabel('Pass Rate')
-        axes[1].set_title('Accuracy: Pass Rate vs Batch Size')
+        axes[1].set_title('Accuracy: Pass Rate vs Number of Channels')
 
     axes[1].grid(True, alpha=0.3)
 
@@ -320,9 +320,9 @@ def print_data_summary(df: pd.DataFrame):
 
             if len(subset) > 0:
                 configs = subset[['engine_nfft', 'engine_channels']].drop_duplicates()
-                print(f"    Configurations: {len(configs)} unique NFFT/batch combinations")
+                print(f"    Configurations: {len(configs)} unique NFFT/channels combinations")
                 print(f"    NFFT range: {subset['engine_nfft'].min()}-{subset['engine_nfft'].max()}")
-                print(f"    Batch range: {subset['engine_channels'].min()}-{subset['engine_channels'].max()}")
+                print(f"    Channel range: {subset['engine_channels'].min()}-{subset['engine_channels'].max()}")
 
     print()
 
@@ -332,8 +332,8 @@ def main():
 
     parser.add_argument('--type', choices=['throughput', 'latency', 'accuracy', 'overview'],
                        help='Type of plot to generate')
-    parser.add_argument('--config', nargs=2, type=int, metavar=('NFFT', 'BATCH'),
-                       help='Plot specific NFFT and batch configuration')
+    parser.add_argument('--config', nargs=2, type=int, metavar=('NFFT', 'CHANNELS'),
+                       help='Plot specific NFFT and channels configuration')
     parser.add_argument('--latest', action='store_true',
                        help='Plot only most recent data files')
     parser.add_argument('--save', action='store_true',
@@ -367,9 +367,9 @@ def main():
 
     # Filter by specific configuration if requested
     if args.config:
-        nfft, batch = args.config
-        df = df[(df['engine_nfft'] == nfft) & (df['engine_channels'] == batch)]
-        print(f"Filtered to NFFT={nfft}, Batch={batch}: {len(df)} measurements")
+        nfft, channels = args.config
+        df = df[(df['engine_nfft'] == nfft) & (df['engine_channels'] == channels)]
+        print(f"Filtered to NFFT={nfft}, Channels={channels}: {len(df)} measurements")
         if df.empty:
             print("No data matches the specified configuration")
             return
