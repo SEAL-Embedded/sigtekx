@@ -77,7 +77,33 @@ def cmd_analyze(args):
 
 
 def cmd_report(args):
-    """Generate HTML reports."""
+    """Generate HTML reports.
+
+    ⚠️ DEPRECATED: Use Streamlit dashboard instead (iono dashboard)
+    """
+    print("\n" + "=" * 70)
+    print("⚠️  DEPRECATION WARNING")
+    print("=" * 70)
+    print("HTML report generation is DEPRECATED and will be removed in a future version.")
+    print()
+    print("Please use the interactive Streamlit dashboard instead:")
+    print("  streamlit run experiments/streamlit/app.py")
+    print("Or:")
+    print("  iono dashboard")
+    print()
+    print("The Streamlit dashboard provides all HTML report features plus:")
+    print("  - Interactive filtering and exploration")
+    print("  - Real-time data updates")
+    print("  - Side-by-side configuration comparison")
+    print("  - CSV export capabilities")
+    print("=" * 70)
+    print()
+
+    response = input("Continue with deprecated HTML generation? (y/N): ")
+    if response.lower() != 'y':
+        print("Aborted. Please use the Streamlit dashboard instead.")
+        return
+
     data_path = Path(args.data_path)
     output_dir = Path(args.output_dir) if args.output_dir else Path("artifacts/reports")
     output_dir.mkdir(parents=True, exist_ok=True)

@@ -660,6 +660,7 @@ ESSENTIAL DEVELOPMENT
   clean [-All]            Remove artifacts/ directory (use -All to also remove build/)
   doctor                  Check development environment health
   ui                      Launch MLflow UI for experiment tracking
+  dashboard               Launch Streamlit interactive dashboard
 
 GPU PROFILING
   profile [tool] [target] Profile GPU performance with Nsight tools
@@ -877,6 +878,19 @@ try {
             # Use Start-Process to launch without blocking the terminal
             Start-Process mlflow @("ui", "--backend-store-uri", $uri, "--port", "5000")
             Write-Success "MLflow UI launched at http://localhost:5000"
+        }
+        "dashboard" {
+            Write-Status "Launching Streamlit dashboard..."
+            $streamlitApp = Join-Path $script:ProjectRoot "experiments\streamlit\app.py"
+            if (-not (Test-Path $streamlitApp)) {
+                Write-Error "Streamlit app not found at: $streamlitApp"
+                exit 1
+            }
+            Write-Status "Dashboard: $streamlitApp"
+            Write-Status "Opening browser at http://localhost:8501"
+            # Use Start-Process to launch without blocking the terminal
+            Start-Process streamlit @("run", $streamlitApp, "--server.port", "8501")
+            Write-Success "Streamlit dashboard launched at http://localhost:8501"
         }
         "profile"  {
             $params = @{}

@@ -33,20 +33,61 @@ python benchmarks/run_throughput.py --multirun experiment=ionosphere_test +bench
 
 ### Complete Research Workflow
 ```bash
-# Run experiments (IMPORTANT: add +benchmark=throughput)
-python benchmarks/run_throughput.py --multirun experiment=ionosphere_resolution +benchmark=throughput
-
-# Execute analysis pipeline
+# 1. Run benchmark experiments
 snakemake --cores 4 --snakefile experiments/Snakefile
-snakemake --cores 4 generate_figures --snakefile experiments/Snakefile
 
-# View results
+# 2. Launch interactive dashboard to view results
+iono dashboard
+# OR: streamlit run experiments/streamlit/app.py
+
+# 3. View experiment tracking (optional)
 mlflow ui --backend-store-uri file://./artifacts/mlruns
 
-# Data versioning
+# 4. Data versioning (optional)
 dvc status
 dvc repro
 ```
+
+### Interactive Dashboard (Streamlit)
+
+The **Streamlit dashboard** is the primary interface for exploring benchmark results.
+
+```bash
+# Launch dashboard (recommended)
+iono dashboard
+
+# OR launch manually
+streamlit run experiments/streamlit/app.py
+
+# Dashboard automatically loads data from artifacts/data/
+# Access at http://localhost:8501
+```
+
+**Dashboard Features:**
+- **General Performance**: Throughput, latency, accuracy, scaling analysis with 6 interactive tabs
+- **Ionosphere Research**: VLF/ULF phenomena detection, RTF analysis, resolution trade-offs
+- **Configuration Explorer**: Interactive filtering by NFFT, channels, overlap, and mode
+- **Performance Visualizations**: Dynamic charts with user-selectable axes
+- **Side-by-side Comparison**: Compare two configurations with delta metrics
+- **Data Export**: Download filtered results as CSV
+- **Real-time Updates**: Refresh data when new benchmarks complete
+
+**Complete Workflow:**
+```bash
+# 1. Run benchmarks (generates CSV data in artifacts/data/)
+snakemake --cores 4 --snakefile experiments/Snakefile
+
+# 2. Launch dashboard
+iono dashboard
+
+# 3. Explore results interactively
+#    - Filter by parameters
+#    - Compare configurations
+#    - Export filtered data
+#    - View scientific metrics
+```
+
+**Note:** HTML report generation has been deprecated. Use the Streamlit dashboard for all analysis and reporting.
 
 ## Available Engine Configurations
 

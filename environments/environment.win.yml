@@ -63,6 +63,8 @@ dependencies:
 
   # Documentation and reporting
   - plotly>=5.18
+  - streamlit>=1.30.0
+  - watchdog>=3.0
   - papermill>=2.5
   - nbconvert>=7.16
 

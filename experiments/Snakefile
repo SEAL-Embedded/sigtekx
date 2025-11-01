@@ -3,13 +3,22 @@
 
 configfile: "experiments/conf/config.yaml"
 
-# Define the final outputs we want (new analysis system with dual reports)
+# Define the final outputs we want (benchmark data generation only)
+# For interactive analysis and reporting, use Streamlit dashboard:
+#   streamlit run experiments/streamlit/app.py
+#   OR: iono dashboard
 rule all:
     input:
-        "artifacts/reports/general_performance_report.html",
-        "artifacts/reports/ionosphere_research_report.html",
-        "artifacts/reports/plots/latency_vs_nfft.html",
-        "artifacts/reports/plots/rtf_vs_freq_resolution.html"
+        "artifacts/data/ionosphere_resolution.done",
+        "artifacts/data/ionosphere_temporal.done",
+        "artifacts/data/ionosphere_latency.done",
+        "artifacts/data/ionosphere_streaming.done",
+        "artifacts/data/ionosphere_batch_throughput.done",
+        "artifacts/data/ionosphere_streaming_latency.done",
+        "artifacts/data/accuracy_validation.done",
+        "artifacts/data/ionosphere_nfft_channels_grid.done",
+        "artifacts/data/ionosphere_lightning.done",
+        "artifacts/data/ionosphere_schumann.done"
 
 # Run ionosphere resolution sweep (high-resolution analysis)
 rule run_ionosphere_resolution:
@@ -121,73 +130,11 @@ rule run_ionosphere_schumann:
             +benchmark=throughput
         """
 
-# Generate analysis summary using new analysis system
-rule analyze_results:
-    input:
-        "artifacts/data/ionosphere_resolution.done",
-        "artifacts/data/ionosphere_temporal.done",
-        "artifacts/data/ionosphere_latency.done",
-        "artifacts/data/ionosphere_streaming.done",
-        "artifacts/data/ionosphere_batch_throughput.done",
-        "artifacts/data/ionosphere_streaming_latency.done",
-        "artifacts/data/accuracy_validation.done",
-        "artifacts/data/ionosphere_nfft_channels_grid.done",
-        "artifacts/data/ionosphere_lightning.done",
-        "artifacts/data/ionosphere_schumann.done"
-    output:
-        "artifacts/analysis/summary.json"
-    shell:
-        """
-        python -m experiments.analysis.cli analyze artifacts/data \
-            --output artifacts/analysis/summary.json \
-            --experiment-name "Ionosphere HPC Analysis"
-        """
-
-# Generate interactive plots
-rule generate_plots:
-    input:
-        "artifacts/data/ionosphere_resolution.done",
-        "artifacts/data/ionosphere_temporal.done",
-        "artifacts/data/ionosphere_latency.done",
-        "artifacts/data/ionosphere_streaming.done",
-        "artifacts/data/ionosphere_batch_throughput.done",
-        "artifacts/data/ionosphere_streaming_latency.done",
-        "artifacts/data/accuracy_validation.done",
-        "artifacts/data/ionosphere_nfft_channels_grid.done",
-        "artifacts/data/ionosphere_lightning.done",
-        "artifacts/data/ionosphere_schumann.done"
-    output:
-        "artifacts/reports/plots/latency_vs_nfft.html",
-        "artifacts/reports/plots/rtf_vs_freq_resolution.html"
-    shell:
-        """
-        python -m experiments.analysis.cli report artifacts/data \
-            --output-dir artifacts/reports \
-            --generate-plots
-        """
-
-# Generate both reports (general performance + ionosphere research)
-rule generate_reports:
-    input:
-        "artifacts/data/ionosphere_resolution.done",
-        "artifacts/data/ionosphere_temporal.done",
-        "artifacts/data/ionosphere_latency.done",
-        "artifacts/data/ionosphere_streaming.done",
-        "artifacts/data/ionosphere_batch_throughput.done",
-        "artifacts/data/ionosphere_streaming_latency.done",
-        "artifacts/data/accuracy_validation.done",
-        "artifacts/data/ionosphere_nfft_channels_grid.done",
-        "artifacts/data/ionosphere_lightning.done",
-        "artifacts/data/ionosphere_schumann.done"
-    output:
-        "artifacts/reports/general_performance_report.html",
-        "artifacts/reports/ionosphere_research_report.html"
-    shell:
-        """
-        python -m experiments.analysis.cli report artifacts/data \
-            --output-dir artifacts/reports \
-            --generate-plots
-        """
+# NOTE: HTML report generation has been deprecated in favor of Streamlit dashboard
+# To view results, use:
+#   streamlit run experiments/streamlit/app.py
+# Or:
+#   iono dashboard
 
 # Clean all artifacts
 rule clean:
@@ -214,6 +161,5 @@ rule test:
         """
         python benchmarks/run_throughput.py experiment=ionosphere_test +benchmark=throughput
         python benchmarks/run_latency.py experiment=ionosphere_test +benchmark=latency
-        python -m experiments.analysis.cli analyze artifacts/data
-        python -m experiments.analysis.cli report artifacts/data --output-dir artifacts/reports
+        echo "Test benchmarks complete. View results with: iono dashboard"
         """

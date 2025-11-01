@@ -1,14 +1,35 @@
 """
-Report Generation
-=================
+Report Generation (DEPRECATED)
+===============================
 
-Generate HTML reports for benchmark analysis.
-Supports both general performance reports and ionosphere-specific reports.
+⚠️ DEPRECATION NOTICE ⚠️
+
+This module is DEPRECATED and will be removed in a future version.
+
+HTML report generation has been replaced by the interactive Streamlit dashboard.
+For interactive exploration and reporting, use:
+
+    streamlit run experiments/streamlit/app.py
+
+Or:
+
+    iono dashboard
+
+The Streamlit dashboard provides all the functionality of the HTML reports with:
+- Interactive filtering and parameter exploration
+- Real-time data updates
+- Side-by-side configuration comparison
+- Dynamic visualizations with user-selectable axes
+- CSV export capabilities
+
+This module is maintained for backwards compatibility only and may be removed
+without notice in a future release.
 """
 
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -23,9 +44,18 @@ from .visualization import (
 
 
 class GeneralPerformanceReport:
-    """Generate general performance report for all benchmarks."""
+    """Generate general performance report for all benchmarks.
+
+    ⚠️ DEPRECATED: Use Streamlit dashboard instead (iono dashboard)
+    """
 
     def __init__(self, config: Optional[VisualizationConfig] = None):
+        warnings.warn(
+            "GeneralPerformanceReport is deprecated. Use Streamlit dashboard instead: "
+            "streamlit run experiments/streamlit/app.py",
+            DeprecationWarning,
+            stacklevel=2
+        )
         self.config = config or VisualizationConfig()
         self.report_gen = ReportGenerator(self.config)
         self.perf_plotter = PerformancePlotter(self.config)
@@ -39,6 +69,8 @@ class GeneralPerformanceReport:
     ) -> None:
         """
         Generate comprehensive performance report.
+
+        ⚠️ DEPRECATED: Use Streamlit dashboard instead.
 
         Args:
             data: Combined benchmark data
@@ -479,9 +511,18 @@ class GeneralPerformanceReport:
 
 
 class IonosphereReport:
-    """Generate ionosphere research-specific report."""
+    """Generate ionosphere research-specific report.
+
+    ⚠️ DEPRECATED: Use Streamlit dashboard instead (iono dashboard)
+    """
 
     def __init__(self, config: Optional[VisualizationConfig] = None):
+        warnings.warn(
+            "IonosphereReport is deprecated. Use Streamlit dashboard instead: "
+            "streamlit run experiments/streamlit/app.py",
+            DeprecationWarning,
+            stacklevel=2
+        )
         self.config = config or VisualizationConfig()
         self.report_gen = ReportGenerator(self.config)
         self.perf_plotter = PerformancePlotter(self.config)
@@ -494,6 +535,8 @@ class IonosphereReport:
     ) -> None:
         """
         Generate ionosphere-focused report for dual-channel antenna system.
+
+        ⚠️ DEPRECATED: Use Streamlit dashboard instead.
 
         Args:
             data: Combined benchmark data with scientific metrics
@@ -982,6 +1025,8 @@ def generate_both_reports(
     """
     Generate both general and ionosphere reports.
 
+    ⚠️ DEPRECATED: Use Streamlit dashboard instead (iono dashboard)
+
     Args:
         data: Combined benchmark data
         output_dir: Directory for output reports
@@ -989,6 +1034,12 @@ def generate_both_reports(
     Returns:
         Tuple of (general_report_path, ionosphere_report_path)
     """
+    warnings.warn(
+        "generate_both_reports is deprecated. Use Streamlit dashboard instead: "
+        "streamlit run experiments/streamlit/app.py",
+        DeprecationWarning,
+        stacklevel=2
+    )
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # General report

@@ -1,5 +1,23 @@
 # Ionosense HPC Analysis System
 
+⚠️ **DEPRECATION NOTICE** ⚠️
+
+**HTML report generation in this module is DEPRECATED.**
+
+For interactive data exploration and reporting, use the **Streamlit dashboard**:
+```bash
+iono dashboard
+# OR: streamlit run experiments/streamlit/app.py
+```
+
+The Streamlit dashboard provides all HTML report features plus:
+- Interactive filtering and parameter exploration
+- Real-time data updates
+- Side-by-side configuration comparison
+- CSV export capabilities
+
+---
+
 Modern, modular analysis framework for ionosphere research benchmarks.
 
 ## Architecture Overview
@@ -25,17 +43,18 @@ experiments/analysis/
 - **Hop Size**: Frame advance between STFT windows
 - Domain-specific suitability assessment for ionosphere phenomena
 
-### 2. **Dual Report System**
-- **General Performance Report**: Comprehensive benchmark analysis
-  - Throughput, latency, accuracy statistics
-  - Scaling analysis and parameter heatmaps
-  - Configuration recommendations
-- **Ionosphere Research Report**: Domain-specific analysis
-  - RTF vs frequency resolution trade-offs
-  - Time/frequency resolution trade-off space
-  - Phenomena detection suitability (lightning, SIDs, Schumann, whistlers)
-  - Multi-channel performance for direction finding
-  - High-resolution configuration analysis
+### 2. **Reporting System**
+⚠️ **HTML reports are DEPRECATED. Use Streamlit dashboard instead.**
+
+- **Streamlit Dashboard** (RECOMMENDED): Interactive web-based analysis
+  - General Performance page: Throughput, latency, accuracy, scaling
+  - Ionosphere Research page: RTF, resolution trade-offs, phenomena suitability
+  - Configuration Explorer: Interactive filtering and comparison
+  - Real-time updates and CSV export
+
+- **Legacy HTML Reports** (DEPRECATED): Static HTML generation
+  - `reporting.py` module will be removed in future release
+  - Use `iono dashboard` for all analysis needs
 
 ### 3. **Statistical Rigor**
 - Confidence intervals (95% default)
@@ -54,19 +73,32 @@ experiments/analysis/
 
 ## Usage
 
-### Generate Reports
+### Interactive Dashboard (RECOMMENDED)
 
 ```bash
-# Generate both reports (general + ionosphere)
+# Launch Streamlit dashboard
+iono dashboard
+
+# OR manually
+streamlit run experiments/streamlit/app.py
+```
+
+**Features:**
+- Three interactive pages: General Performance, Ionosphere Research, Configuration Explorer
+- Real-time data loading from `artifacts/data/`
+- Interactive filtering, comparison, and export
+- Access at http://localhost:8501
+
+### Generate Reports (DEPRECATED)
+
+⚠️ **HTML report generation is deprecated. Use Streamlit dashboard instead.**
+
+```bash
+# Legacy HTML report generation (will be removed)
 python -m experiments.analysis.cli report artifacts/data \
     --output-dir artifacts/reports \
     --generate-plots
 ```
-
-**Outputs:**
-- `artifacts/reports/general_performance_report.html`
-- `artifacts/reports/ionosphere_research_report.html`
-- `artifacts/reports/plots/*.html` (interactive Plotly plots)
 
 ### Analyze Data
 
@@ -113,14 +145,18 @@ python -m experiments.analysis.cli scaling artifacts/data \
 ### Snakemake Pipeline
 
 ```bash
-# Run complete ionosphere analysis workflow
+# Run complete benchmark workflow (generates data only)
 snakemake --cores 4 --snakefile experiments/Snakefile
 
-# Individual steps
+# View results in interactive dashboard
+iono dashboard
+
+# Individual benchmark steps
 snakemake run_ionosphere_resolution  # High-res analysis
 snakemake run_ionosphere_temporal    # Temporal characteristics
-snakemake analyze_results            # Generate summary
-snakemake generate_reports           # Create HTML reports
+
+# NOTE: HTML report generation rules have been removed
+# Use Streamlit dashboard for all analysis and reporting
 ```
 
 ### Experiment Configs
@@ -244,23 +280,19 @@ pytest tests/test_cli.py
 ## Quick Start Example
 
 ```bash
-# 1. Run ionosphere experiments
-python benchmarks/run_throughput.py --multirun \
-    experiment=ionosphere_resolution +benchmark=throughput
+# 1. Run complete benchmark workflow
+snakemake --cores 4 --snakefile experiments/Snakefile
 
-python benchmarks/run_latency.py --multirun \
-    experiment=ionosphere_resolution +benchmark=latency
+# 2. Launch interactive dashboard
+iono dashboard
 
-# 2. Generate analysis and reports
-python -m experiments.analysis.cli analyze artifacts/data
-python -m experiments.analysis.cli report artifacts/data \
-    --output-dir artifacts/reports --generate-plots
+# 3. Explore results interactively
+#    - Navigate to General Performance, Ionosphere Research, or Configuration Explorer
+#    - Filter by NFFT, channels, overlap
+#    - Compare configurations side-by-side
+#    - Export filtered data as CSV
 
-# 3. View reports
-# Open artifacts/reports/general_performance_report.html
-# Open artifacts/reports/ionosphere_research_report.html
-
-# 4. Compare configurations
+# 4. (Optional) Statistical comparison via CLI
 python -m experiments.analysis.cli compare artifacts/data \
     "engine_nfft=4096,engine_channels=2" \
     "engine_nfft=8192,engine_channels=2" \
