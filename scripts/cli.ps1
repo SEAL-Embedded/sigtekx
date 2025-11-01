@@ -443,19 +443,21 @@ function Invoke-TypeCheck {
 function Invoke-Clean {
     param([bool]$All = $false)
 
-    Write-Status "Cleaning build artifacts..."
+    Write-Status "Cleaning artifacts..."
 
-    if (Test-Path $script:BuildDir) {
-        Remove-Item $script:BuildDir -Recurse -Force
-        Write-Status "Removed build directory"
+    # Default: clean artifacts directory only
+    $artifactsDir = Join-Path $script:ProjectRoot "artifacts"
+    if (Test-Path $artifactsDir) {
+        Remove-Item $artifactsDir -Recurse -Force
+        Write-Status "Removed artifacts directory"
     }
 
+    # With -All: also clean build directory
     if ($All) {
-        Write-Status "Cleaning all artifacts..."
-        $artifactsDir = Join-Path $script:ProjectRoot "artifacts"
-        if (Test-Path $artifactsDir) {
-            Remove-Item $artifactsDir -Recurse -Force
-            Write-Status "Removed artifacts directory"
+        Write-Status "Cleaning build directory..."
+        if (Test-Path $script:BuildDir) {
+            Remove-Item $script:BuildDir -Recurse -Force
+            Write-Status "Removed build directory"
         }
     }
 
@@ -655,7 +657,7 @@ ESSENTIAL DEVELOPMENT
                           Format C++ code with clang-format
   lint [all|python|cpp] [-Fix] [--verbose]
                           Lint code with ruff
-  clean [-All]            Remove build artifacts
+  clean [-All]            Remove artifacts/ directory (use -All to also remove build/)
   doctor                  Check development environment health
   ui                      Launch MLflow UI for experiment tracking
 

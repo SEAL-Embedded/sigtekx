@@ -20,13 +20,15 @@ hydra:
   mode: MULTIRUN
   sweeper:
     params:
-      # NFFT sweep for accuracy validation
+      # NFFT sweep for accuracy validation (extended range)
+      # 512: Ultra-small FFT (edge case testing)
       # 1024: Small FFT (quick validation)
       # 2048: Standard validation
       # 4096: Ionosphere standard
       # 8192: High-resolution validation
       # 16384: Ultra-high-resolution validation
-      engine.nfft: 1024,2048,4096,8192,16384
+      # 32768: Extreme resolution validation
+      engine.nfft: 512,1024,2048,4096,8192,16384,32768
 
       # Zero overlap (fixed) - no window overlap for reference comparison
       engine.overlap: 0.0
@@ -34,14 +36,14 @@ hydra:
       # Single channel (fixed) - simplifies reference comparison
       engine.channels: 1
 
-      # Test both executors for accuracy validation
-      engine.mode: batch,streaming
+      # Test both executors for accuracy validation (quoted key for string enum)
+      'engine.mode': batch,streaming
 
 # Analysis configuration
 analysis:
   statistical_tests: [shapiro]
   confidence_level: 0.95
-  min_samples: 10  # Fewer iterations needed for accuracy validation
+  min_samples: 20  # Increased from 10 for better statistical confidence
 
   focus_metrics:
     - pass_rate              # Primary: accuracy pass rate

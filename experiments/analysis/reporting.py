@@ -148,7 +148,8 @@ class GeneralPerformanceReport:
         analysis = f"""
         <h3>Throughput Statistics</h3>
         <ul>
-            <li><strong>Mean FPS:</strong> {fps_stats['mean']:.1f}</li>
+            <li><strong>Mean FPS:</strong> {fps_stats['mean']:.1f}
+            <em style='color: #666; font-size: 0.9em;'>(frames per second - FFT processing rate)</em></li>
             <li><strong>Median FPS:</strong> {fps_stats['50%']:.1f}</li>
             <li><strong>Max FPS:</strong> {fps_stats['max']:.1f}</li>
             <li><strong>Standard Deviation:</strong> {fps_stats['std']:.1f}</li>
@@ -161,7 +162,8 @@ class GeneralPerformanceReport:
             analysis += f"""
             <h3>Data Throughput</h3>
             <ul>
-                <li><strong>Mean:</strong> {gb_stats['mean']:.2f} GB/s</li>
+                <li><strong>Mean:</strong> {gb_stats['mean']:.2f} GB/s
+                <em style='color: #666; font-size: 0.9em;'>(memory bandwidth - indicates GPU utilization efficiency)</em></li>
                 <li><strong>Max:</strong> {gb_stats['max']:.2f} GB/s</li>
             </ul>
             """
@@ -178,7 +180,8 @@ class GeneralPerformanceReport:
         analysis = f"""
         <h3>Latency Statistics</h3>
         <ul>
-            <li><strong>Mean Latency:</strong> {lat_stats['mean']:.1f} μs</li>
+            <li><strong>Mean Latency:</strong> {lat_stats['mean']:.1f} μs
+            <em style='color: #666; font-size: 0.9em;'>(time to process one FFT frame - critical for real-time responsiveness)</em></li>
             <li><strong>Median Latency:</strong> {lat_stats['50%']:.1f} μs</li>
             <li><strong>Min Latency:</strong> {lat_stats['min']:.1f} μs</li>
             <li><strong>P95 Latency:</strong> {lat_stats['75%']:.1f} μs</li>
@@ -199,7 +202,8 @@ class GeneralPerformanceReport:
         <p>Single-channel, zero-overlap accuracy validation against reference NumPy FFT implementation.</p>
         <h4>Overall Statistics</h4>
         <ul>
-            <li><strong>Mean Pass Rate:</strong> {pass_rate_stats['mean']*100:.2f}%</li>
+            <li><strong>Mean Pass Rate:</strong> {pass_rate_stats['mean']*100:.2f}%
+            <em style='color: #666; font-size: 0.9em;'>(percentage of FFT frames within error tolerance - indicates numerical correctness)</em></li>
             <li><strong>Min Pass Rate:</strong> {pass_rate_stats['min']*100:.2f}%</li>
             <li><strong>Max Pass Rate:</strong> {pass_rate_stats['max']*100:.2f}%</li>
             <li><strong>Configurations Tested:</strong> {len(data)}</li>
@@ -607,11 +611,13 @@ class IonosphereReport:
 
         if 'time_resolution_ms' in data.columns:
             time_res_range = f"{data['time_resolution_ms'].min():.2f} - {data['time_resolution_ms'].max():.2f} ms"
-            overview += f"<li><strong>Time Resolution:</strong> {time_res_range}</li>"
+            overview += f"<li><strong>Time Resolution:</strong> {time_res_range} "
+            overview += "<em style='color: #666; font-size: 0.9em;'>(FFT frame duration - ability to resolve fast transients)</em></li>"
 
         if 'freq_resolution_hz' in data.columns:
             freq_res_range = f"{data['freq_resolution_hz'].min():.3f} - {data['freq_resolution_hz'].max():.3f} Hz"
-            overview += f"<li><strong>Frequency Resolution:</strong> {freq_res_range}</li>"
+            overview += f"<li><strong>Frequency Resolution:</strong> {freq_res_range} "
+            overview += "<em style='color: #666; font-size: 0.9em;'>(spectral bin width - ability to resolve close frequencies)</em></li>"
 
         if 'rtf' in data.columns:
             rtf_range = f"{data['rtf'].min():.2f} - {data['rtf'].max():.2f}"
@@ -636,7 +642,8 @@ class IonosphereReport:
         analysis = f"""
         <h3>Real-Time Processing Capability</h3>
         <ul>
-            <li><strong>Mean RTF:</strong> {rtf_stats['mean']:.2f}x real-time</li>
+            <li><strong>Mean RTF:</strong> {rtf_stats['mean']:.2f}x real-time
+            <em style='color: #666; font-size: 0.9em;'>(Real-Time Factor - ratio of processing speed to data rate, &gt;1.0 means faster than real-time)</em></li>
             <li><strong>Median RTF:</strong> {rtf_stats['50%']:.2f}x real-time</li>
             <li><strong>Max RTF:</strong> {rtf_stats['max']:.2f}x real-time</li>
             <li><strong>Real-time capable configs:</strong> {realtime_count}/{total_count} ({realtime_pct:.1f}%)</li>
@@ -802,7 +809,8 @@ class IonosphereReport:
         analysis += f"""
         <p><strong>Compliance Statistics:</strong></p>
         <ul>
-            <li>Mean compliance rate: {compliance_stats['mean']*100:.1f}%</li>
+            <li>Mean compliance rate: {compliance_stats['mean']*100:.1f}%
+            <em style='color: #666; font-size: 0.9em;'>(fraction of frames processed within timing deadline - critical for real-time systems)</em></li>
             <li>Min compliance rate: {compliance_stats['min']*100:.1f}%</li>
             <li>Configs with >99% compliance: {high_compliance}/{len(data)}</li>
         </ul>
@@ -815,7 +823,8 @@ class IonosphereReport:
             <h3>Timing Stability (Jitter)</h3>
             <p><strong>Mean Jitter:</strong></p>
             <ul>
-                <li>Average: {jitter_stats['mean']:.2f} ms</li>
+                <li>Average: {jitter_stats['mean']:.2f} ms
+                <em style='color: #666; font-size: 0.9em;'>(timing variability between frames - lower means more consistent latency)</em></li>
                 <li>Range: {jitter_stats['min']:.2f} - {jitter_stats['max']:.2f} ms</li>
             </ul>
             """
