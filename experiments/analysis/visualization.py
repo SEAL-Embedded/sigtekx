@@ -172,10 +172,20 @@ class PerformancePlotter:
         """Plot 2D heatmap of performance metrics."""
         pivot = data.pivot_table(values=z_col, index=y_col, columns=x_col, aggfunc='mean')
 
+        # Dynamically adjust figure height based on number of y-axis values
+        # More rows = taller figure for better readability
+        num_y_values = len(pivot.index)
+        figure_height = max(400, 50 * num_y_values + 150)  # Minimum 400px, ~50px per row + margins
+        figure_width = max(600, 80 * len(pivot.columns) + 200)  # Scale width with columns too
+
+        # Use INDICES for y-axis to ensure equal spacing (not actual values)
+        # This prevents exponential spacing for powers-of-2 like channels (2, 4, 8, 16, 32, 64, 128)
+        y_indices = list(range(len(pivot.index)))
+
         fig = go.Figure(data=go.Heatmap(
             z=pivot.values,
             x=pivot.columns,
-            y=pivot.index,
+            y=y_indices,  # Use indices (0, 1, 2, ...) not actual values
             colorscale='Viridis',
             colorbar=dict(title=z_col)
         ))
@@ -183,15 +193,24 @@ class PerformancePlotter:
         fig.update_layout(
             title=f"{z_col} Heatmap",
             xaxis_title=x_col,
-            yaxis_title=y_col
+            yaxis_title=y_col,
+            height=figure_height,
+            width=figure_width,
+            margin=dict(l=80, r=80, t=100, b=80)  # Adequate margins for tick labels
         )
 
-        # Force categorical y-axis tick labels (prevents interpolation for sparse data)
-        # Important for channel counts: shows "2, 16, 32, 128" instead of "50, 100, 150"
+        # Map indices to actual values with categorical tick labels
+        # This gives equal visual spacing for all values (fixes exponential spacing issue)
         fig.update_yaxes(
             tickmode='array',
-            tickvals=list(range(len(pivot.index))),
-            ticktext=[str(int(val)) if isinstance(val, (int, float)) else str(val) for val in pivot.index]
+            tickvals=y_indices,  # Show all values
+            ticktext=[str(int(val)) if isinstance(val, (int, float)) else str(val) for val in pivot.index],
+            tickfont=dict(size=11)  # Readable font size
+        )
+
+        # Also improve x-axis readability
+        fig.update_xaxes(
+            tickfont=dict(size=11)
         )
 
         if output_path:

@@ -281,6 +281,42 @@ class GeneralPerformanceReport:
         </ul>
         """
 
+        # Note about ultra-high NFFT configurations
+        ultra_high_nfft = [n for n in nfft_range if n > 32768]
+        if ultra_high_nfft:
+            analysis += """
+            <p><strong>Note:</strong> Ultra-high NFFT configurations (65536, 131072) are tested
+            for dual-channel only (Schumann resonances detection). These require extremely high
+            frequency resolution (&lt;0.5Hz) and are shown separately from the main scaling heatmap
+            to avoid NaN skewing.</p>
+            """
+
+            # Show ultra-high NFFT data in a small table
+            if 'throughput' in data['benchmark_type'].values:
+                throughput_data = data[data['benchmark_type'] == 'throughput']
+                ultra_data = throughput_data[throughput_data['engine_nfft'] > 32768].copy()
+
+                if len(ultra_data) > 0 and 'frames_per_second' in ultra_data.columns:
+                    analysis += "<h4>Ultra-High NFFT Performance (Dual-Channel)</h4>"
+                    analysis += "<table style='margin: 10px 0; border-collapse: collapse;'>"
+                    analysis += "<tr><th style='border: 1px solid #ddd; padding: 8px;'>NFFT</th>"
+                    analysis += "<th style='border: 1px solid #ddd; padding: 8px;'>Channels</th>"
+                    analysis += "<th style='border: 1px solid #ddd; padding: 8px;'>FPS</th>"
+                    analysis += "<th style='border: 1px solid #ddd; padding: 8px;'>Freq Res (Hz)</th></tr>"
+
+                    for _, row in ultra_data.iterrows():
+                        nfft = int(row['engine_nfft'])
+                        channels = int(row['engine_channels'])
+                        fps = row['frames_per_second']
+                        freq_res = row.get('freq_resolution_hz', 48000.0 / nfft)
+
+                        analysis += f"<tr><td style='border: 1px solid #ddd; padding: 8px;'>{nfft}</td>"
+                        analysis += f"<td style='border: 1px solid #ddd; padding: 8px;'>{channels}</td>"
+                        analysis += f"<td style='border: 1px solid #ddd; padding: 8px;'>{fps:.1f}</td>"
+                        analysis += f"<td style='border: 1px solid #ddd; padding: 8px;'>{freq_res:.3f}</td></tr>"
+
+                    analysis += "</table>"
+
         return analysis
 
     def _generate_multichannel_scaling(self, data: pd.DataFrame) -> str:
@@ -426,9 +462,14 @@ class GeneralPerformanceReport:
         if 'throughput' in data['benchmark_type'].values:
             throughput_data = data[data['benchmark_type'] == 'throughput']
             if 'frames_per_second' in throughput_data.columns:
-                return self.perf_plotter.plot_heatmap(
-                    throughput_data, 'engine_nfft', 'engine_channels', 'frames_per_second'
-                )
+                # Filter to NFFT <= 32768 for main heatmap (avoids NaN skewing from ultra-high NFFT)
+                # Ultra-high NFFT (65536, 131072) only tested for channels=2 (Schumann resonances)
+                filtered_data = throughput_data[throughput_data['engine_nfft'] <= 32768].copy()
+
+                if len(filtered_data) > 0:
+                    return self.perf_plotter.plot_heatmap(
+                        filtered_data, 'engine_nfft', 'engine_channels', 'frames_per_second'
+                    )
 
         return None
 
