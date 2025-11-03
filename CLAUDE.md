@@ -48,9 +48,20 @@ dvc status
 dvc repro
 ```
 
-### Interactive Dashboard (Streamlit)
+## Report Generation Architecture
 
-The **Streamlit dashboard** is the primary interface for exploring benchmark results.
+Ionosense uses **two complementary reporting solutions**:
+
+| Solution | Type | Purpose | Command |
+|----------|------|---------|---------|
+| **Streamlit** | Interactive | Daily analysis, exploration | `iono dashboard` |
+| **Quarto** | Static | Publications, archival | `snakemake quarto_reports` |
+
+Both solutions share core analysis modules from `experiments/analysis/`.
+
+### 1. Streamlit Dashboard (Interactive)
+
+Primary tool for daily exploration and analysis.
 
 ```bash
 # Launch dashboard (recommended)
@@ -59,35 +70,54 @@ iono dashboard
 # OR launch manually
 streamlit run experiments/streamlit/app.py
 
-# Dashboard automatically loads data from artifacts/data/
 # Access at http://localhost:8501
 ```
 
-**Dashboard Features:**
-- **General Performance**: Throughput, latency, accuracy, scaling analysis with 6 interactive tabs
-- **Ionosphere Research**: VLF/ULF phenomena detection, RTF analysis, resolution trade-offs
-- **Configuration Explorer**: Interactive filtering by NFFT, channels, overlap, and mode
-- **Performance Visualizations**: Dynamic charts with user-selectable axes
-- **Side-by-side Comparison**: Compare two configurations with delta metrics
-- **Data Export**: Download filtered results as CSV
-- **Real-time Updates**: Refresh data when new benchmarks complete
+**Features:**
+- **Three Interactive Pages**:
+  - General Performance: Throughput, latency, accuracy, scaling (6 tabs)
+  - Ionosphere Research: VLF/ULF phenomena detection, RTF analysis, resolution trade-offs (7 tabs)
+  - Configuration Explorer: Interactive filtering and comparison
+- **Real-time Data**: Loads from `artifacts/data/` automatically
+- **Interactive Filtering**: Multi-select by NFFT, channels, overlap, mode
+- **Side-by-side Comparison**: Compare configurations with delta metrics
+- **CSV Export**: Download filtered results
+- **Dynamic Charts**: User-selectable axes and parameters
 
-**Complete Workflow:**
+**Typical Workflow:**
 ```bash
-# 1. Run benchmarks (generates CSV data in artifacts/data/)
+# 1. Run benchmarks (generates CSV data)
 snakemake --cores 4 --snakefile experiments/Snakefile
 
 # 2. Launch dashboard
 iono dashboard
 
-# 3. Explore results interactively
+# 3. Explore interactively
+#    - Navigate between pages
 #    - Filter by parameters
 #    - Compare configurations
-#    - Export filtered data
-#    - View scientific metrics
+#    - Export results
 ```
 
-**Note:** HTML report generation has been deprecated. Use the Streamlit dashboard for all analysis and reporting.
+### 2. Quarto Reports (Static)
+
+Publication-quality reports for papers and presentations (coming soon).
+
+```bash
+# Generate publication reports (future)
+snakemake quarto_reports
+
+# Outputs: artifacts/reports/general_performance.pdf
+#          artifacts/reports/ionosphere_research.pdf
+```
+
+**Features:**
+- **Professional Output**: PDF/HTML/Word with LaTeX typesetting
+- **Publication-ready**: Cross-references, bibliographies, equations
+- **Reproducible**: Git-tracked templates
+- **Shared Analysis**: Reuses same modules as Streamlit
+
+**Location:** `experiments/quarto/` (placeholder structure ready)
 
 ## Available Engine Configurations
 

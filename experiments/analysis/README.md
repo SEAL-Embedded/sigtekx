@@ -1,79 +1,95 @@
 # Ionosense HPC Analysis System
 
-⚠️ **DEPRECATION NOTICE** ⚠️
+Core analysis modules shared by **two primary reporting solutions**.
 
-**HTML report generation in this module is DEPRECATED.**
+## 🎯 Reporting Solutions
 
-For interactive data exploration and reporting, use the **Streamlit dashboard**:
-```bash
-iono dashboard
-# OR: streamlit run experiments/streamlit/app.py
-```
+Ionosense uses two complementary approaches for presenting benchmark results:
 
-The Streamlit dashboard provides all HTML report features plus:
-- Interactive filtering and parameter exploration
-- Real-time data updates
-- Side-by-side configuration comparison
+### 1. Streamlit Dashboard (Interactive)
+**Location:** `experiments/streamlit/`
+**Purpose:** Daily exploration, parameter tuning, interactive analysis
+**Launch:** `iono dashboard`
+
+**Features:**
+- Three interactive pages: General Performance, Ionosphere Research, Configuration Explorer
+- Real-time data loading from `artifacts/data/`
+- Interactive filtering, sorting, and comparison
 - CSV export capabilities
+- Dynamic visualizations with user-selectable axes
+
+### 2. Quarto Reports (Static)
+**Location:** `experiments/quarto/` (coming soon)
+**Purpose:** Publication-quality reports, archival, presentations
+**Launch:** `snakemake quarto_reports`
+
+**Features:**
+- PDF/HTML/Word output with LaTeX typesetting
+- Cross-references and bibliographies
+- Professional formatting for papers and presentations
+- Git-tracked templates for reproducibility
 
 ---
 
-Modern, modular analysis framework for ionosphere research benchmarks.
+## 📦 Shared Analysis Modules
 
-## Architecture Overview
+Both reporting solutions import from `experiments/analysis/`:
+
+### Core Modules
 
 ```
 experiments/analysis/
-├── __init__.py          # Package exports
+├── analyzer.py          # Statistical analysis engine
+│   └── AnalysisEngine   # Orchestrator for all analyzers
+│       ├── LatencyAnalyzer
+│       ├── ThroughputAnalyzer
+│       ├── AccuracyAnalyzer
+│       ├── RealtimeAnalyzer
+│       └── ScientificMetricsAnalyzer
+│
+├── visualization.py     # Plotly charts
+│   ├── PerformancePlotter
+│   └── StatisticalPlotter
+│
+├── metrics.py           # Scientific metrics
+│   └── assess_ionosphere_suitability()
+│
 ├── models.py            # Pydantic data models
-├── analyzer.py          # Analysis engine and analyzers
-├── metrics.py           # Scientific metrics for ionosphere research
-├── visualization.py     # Interactive Plotly + matplotlib plots
-├── spectrograms.py      # Spectrogram generation (optional)
-├── reporting.py         # Dual HTML report generators
+│   ├── BenchmarkResult
+│   ├── ExperimentSummary
+│   └── ComparisonResult
+│
 └── cli.py               # Command-line interface
+    ├── analyze
+    ├── compare
+    └── scaling
 ```
 
-## Key Features
+### Key Features
 
-### 1. **Scientific Metrics**
+**Scientific Metrics:**
 - **Real-Time Factor (RTF)**: Processing speed vs signal speed
 - **Time Resolution**: Temporal granularity (ms)
 - **Frequency Resolution**: Spectral detail (Hz)
 - **Hop Size**: Frame advance between STFT windows
-- Domain-specific suitability assessment for ionosphere phenomena
+- Domain-specific suitability for ionosphere phenomena
 
-### 2. **Reporting System**
-⚠️ **HTML reports are DEPRECATED. Use Streamlit dashboard instead.**
-
-- **Streamlit Dashboard** (RECOMMENDED): Interactive web-based analysis
-  - General Performance page: Throughput, latency, accuracy, scaling
-  - Ionosphere Research page: RTF, resolution trade-offs, phenomena suitability
-  - Configuration Explorer: Interactive filtering and comparison
-  - Real-time updates and CSV export
-
-- **Legacy HTML Reports** (DEPRECATED): Static HTML generation
-  - `reporting.py` module will be removed in future release
-  - Use `iono dashboard` for all analysis needs
-
-### 3. **Statistical Rigor**
+**Statistical Rigor:**
 - Confidence intervals (95% default)
 - Hypothesis testing (t-test, Mann-Whitney U)
 - Effect sizes (Cohen's d)
 - Scaling analysis (linear, logarithmic, power-law, saturation detection)
-- MD5-based caching for performance
 
-### 4. **Interactive Visualizations**
-- Plotly-based interactive plots
-- Scaling curves with log axes
-- Performance heatmaps
-- RTF vs frequency resolution
-- Time vs frequency resolution trade-offs
-- Statistical distributions and comparisons
+**Performance:**
+- MD5-based caching for expensive analyses
+- Automatic cache invalidation on data changes
+- Configurable cache directory
+
+---
 
 ## Usage
 
-### Interactive Dashboard (RECOMMENDED)
+### Interactive Dashboard (Primary Method)
 
 ```bash
 # Launch Streamlit dashboard
@@ -83,24 +99,9 @@ iono dashboard
 streamlit run experiments/streamlit/app.py
 ```
 
-**Features:**
-- Three interactive pages: General Performance, Ionosphere Research, Configuration Explorer
-- Real-time data loading from `artifacts/data/`
-- Interactive filtering, comparison, and export
-- Access at http://localhost:8501
+Access at http://localhost:8501
 
-### Generate Reports (DEPRECATED)
-
-⚠️ **HTML report generation is deprecated. Use Streamlit dashboard instead.**
-
-```bash
-# Legacy HTML report generation (will be removed)
-python -m experiments.analysis.cli report artifacts/data \
-    --output-dir artifacts/reports \
-    --generate-plots
-```
-
-### Analyze Data
+### Statistical Analysis (CLI)
 
 ```bash
 # Generate analysis summary
@@ -109,7 +110,7 @@ python -m experiments.analysis.cli analyze artifacts/data \
     --experiment-name "Ionosphere HPC Analysis"
 ```
 
-### Compare Configurations
+### Configuration Comparison
 
 ```bash
 # Statistical comparison between two configs
@@ -140,6 +141,8 @@ python -m experiments.analysis.cli scaling artifacts/data \
 - Correlation and R² values
 - Saturation point (if detected)
 
+---
+
 ## Workflow Integration
 
 ### Snakemake Pipeline
@@ -154,9 +157,6 @@ iono dashboard
 # Individual benchmark steps
 snakemake run_ionosphere_resolution  # High-res analysis
 snakemake run_ionosphere_temporal    # Temporal characteristics
-
-# NOTE: HTML report generation rules have been removed
-# Use Streamlit dashboard for all analysis and reporting
 ```
 
 ### Experiment Configs
@@ -165,11 +165,13 @@ snakemake run_ionosphere_temporal    # Temporal characteristics
 - `ionosphere_temporal`: Overlap optimization (0.25-0.9375)
 - `ionosphere_test`: Quick validation (smaller parameters)
 
+---
+
 ## Data Format
 
 ### Input CSV Structure
 
-Benchmark runners now save enriched CSVs with scientific metrics:
+Benchmark runners save enriched CSVs with scientific metrics:
 
 ```csv
 benchmark_type,engine_nfft,engine_channels,engine_overlap,engine_sample_rate_hz,
@@ -183,6 +185,8 @@ latency,8192,2,0.875,48000,...
 - **Core engine params**: nfft, channels, overlap, sample_rate_hz
 - **Performance metrics**: frames_per_second, mean_latency_us, pass_rate
 - **Scientific metrics**: time_resolution_ms, freq_resolution_hz, rtf, hop_size
+
+---
 
 ## Architecture Highlights
 
@@ -205,22 +209,7 @@ latency,8192,2,0.875,48000,...
 - Plugin architecture for custom metrics
 - Flexible visualization system
 
-## Migration from Legacy System
-
-### Removed Components
-- ❌ `experiments/scripts/analyze.py` (replaced by CLI)
-- ❌ `experiments/scripts/generate_figures.py` (replaced by visualization module)
-- ❌ `experiments/scripts/generate_report.py` (replaced by dual report system)
-- ❌ Legacy Snakemake rules (`analyze_legacy`, `generate_figures_legacy`)
-
-### New Components
-- ✅ Modular `experiments/analysis/` package
-- ✅ Pydantic data models with validation
-- ✅ Statistical rigor (confidence intervals, hypothesis testing)
-- ✅ Domain-specific ionosphere metrics
-- ✅ Interactive Plotly visualizations
-- ✅ Dual report system (general + ionosphere)
-- ✅ Comprehensive CLI with subcommands
+---
 
 ## Dependencies
 
@@ -230,52 +219,25 @@ benchmark = [
   "scikit-learn>=1.3.0",  # Scaling analysis, metrics (r2_score, RMSE)
   # ... existing deps
 ]
+
+visualization = [
+  "streamlit>=1.30.0",    # Interactive dashboard
+  "watchdog>=3.0",        # Auto-reload support
+  # ... existing deps
+]
 ```
+
+---
 
 ## Terminology
 
 **Consistent terminology throughout:**
-- "Channels" (not "Batch Size") - refers to simultaneous data streams
+- "Channels" - refers to simultaneous data streams
 - "NFFT" - FFT window size
 - "Overlap" - fraction of window overlap (0.0-1.0)
 - "RTF" - Real-Time Factor (processing speed ratio)
 
-## Future Enhancements
-
-### Optional: Spectrogram Support (Phase 3.3)
-Requires FFT magnitude data saving:
-1. Modify benchmark runners to save FFT output (adds storage overhead)
-2. Implement `spectrograms.py` data loading
-3. Integrate into reports
-
-**Current Status:** Skeleton implemented, marked optional
-
-### Potential Additions
-- MLflow experiment tracking integration
-- DVC data versioning workflows
-- Automated performance regression detection
-- Multi-GPU benchmarking support
-- Cloud artifact storage (S3, GCS)
-
-## Testing
-
-Integration tests pending (Phase 6.1):
-```bash
-# Test analysis pipeline end-to-end
-pytest tests/test_analysis_integration.py
-
-# Test report generation
-pytest tests/test_reporting.py
-
-# Test CLI commands
-pytest tests/test_cli.py
-```
-
-## Documentation
-
-- **Architecture Deep Dive**: `docs/analysis/architecture.md` (TODO)
-- **Metrics Reference**: `docs/analysis/metrics.md` (TODO)
-- **Ionosphere Research Guide**: `docs/analysis/ionosphere.md` (TODO)
+---
 
 ## Quick Start Example
 
@@ -299,6 +261,8 @@ python -m experiments.analysis.cli compare artifacts/data \
     --metric rtf
 ```
 
+---
+
 ## Contact
 
 For questions or contributions:
@@ -307,5 +271,5 @@ For questions or contributions:
 
 ---
 
-**Last Updated**: 2025-10-30
-**System Version**: 0.9.4
+**Last Updated**: 2025-11-03
+**System Version**: 0.9.5

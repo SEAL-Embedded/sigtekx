@@ -880,17 +880,33 @@ try {
             Write-Success "MLflow UI launched at http://localhost:5000"
         }
         "dashboard" {
-            Write-Status "Launching Streamlit dashboard..."
+            Write-Host ""
+            Write-Host "🚀 Launching Streamlit Dashboard (Primary Interactive Reporting)" -ForegroundColor Cyan
+            Write-Host ""
+            Write-Host "Ionosense uses TWO reporting solutions:" -ForegroundColor Yellow
+            Write-Host "  1. Streamlit (interactive) - iono dashboard" -ForegroundColor Green
+            Write-Host "  2. Quarto (static, future) - snakemake quarto_reports" -ForegroundColor Gray
+            Write-Host ""
+
             $streamlitApp = Join-Path $script:ProjectRoot "experiments\streamlit\app.py"
             if (-not (Test-Path $streamlitApp)) {
                 Write-Error "Streamlit app not found at: $streamlitApp"
                 exit 1
             }
+
             Write-Status "Dashboard: $streamlitApp"
             Write-Status "Opening browser at http://localhost:8501"
+
             # Use Start-Process to launch without blocking the terminal
             Start-Process streamlit @("run", $streamlitApp, "--server.port", "8501")
+
             Write-Success "Streamlit dashboard launched at http://localhost:8501"
+            Write-Host ""
+            Write-Host "Three interactive pages:" -ForegroundColor Cyan
+            Write-Host "  • General Performance - Throughput, latency, accuracy" -ForegroundColor White
+            Write-Host "  • Ionosphere Research - VLF/ULF phenomena, RTF analysis" -ForegroundColor White
+            Write-Host "  • Configuration Explorer - Filter and compare" -ForegroundColor White
+            Write-Host ""
         }
         "profile"  {
             $params = @{}

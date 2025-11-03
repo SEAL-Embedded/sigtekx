@@ -268,64 +268,6 @@ class PerformancePlotter:
         return fig
 
 
-class ReportGenerator:
-    """Generate HTML reports with embedded visualizations."""
-
-    def __init__(self, config: Optional[VisualizationConfig] = None):
-        self.config = config or VisualizationConfig()
-
-    def generate_html_report(
-        self,
-        title: str,
-        sections: List[Dict[str, Any]],
-        output_path: Path
-    ) -> None:
-        """
-        Generate HTML report with sections.
-
-        Args:
-            title: Report title
-            sections: List of dicts with 'title', 'content', 'figure' keys
-            output_path: Output file path
-        """
-        html_parts = [
-            f"<!DOCTYPE html>",
-            f"<html>",
-            f"<head>",
-            f"<title>{title}</title>",
-            f"<style>",
-            f"body {{ font-family: Arial, sans-serif; margin: 40px; }}",
-            f"h1 {{ color: #333; }}",
-            f"h2 {{ color: #666; margin-top: 30px; }}",
-            f".section {{ margin-bottom: 40px; }}",
-            f"</style>",
-            f"</head>",
-            f"<body>",
-            f"<h1>{title}</h1>"
-        ]
-
-        for section in sections:
-            html_parts.append(f"<div class='section'>")
-            html_parts.append(f"<h2>{section['title']}</h2>")
-
-            if 'content' in section:
-                html_parts.append(f"<p>{section['content']}</p>")
-
-            if 'figure' in section and section['figure']:
-                # Embed Plotly figure as HTML
-                fig_html = section['figure'].to_html(include_plotlyjs='cdn', full_html=False)
-                html_parts.append(fig_html)
-
-            html_parts.append(f"</div>")
-
-        html_parts.extend([
-            f"</body>",
-            f"</html>"
-        ])
-
-        output_path.write_text('\n'.join(html_parts), encoding='utf-8')
-
-
 # Convenience functions for common plots
 def plot_latency_analysis(data: pd.DataFrame, output_dir: Path) -> List[Path]:
     """Generate standard latency analysis plots."""

@@ -1,12 +1,21 @@
 # Snakefile
 # Modern workflow orchestration with ionosphere-focused analysis
+#
+# REPORTING ARCHITECTURE:
+#   1. Streamlit Dashboard (interactive) - experiments/streamlit/
+#      Launch: iono dashboard
+#      Purpose: Daily exploration, parameter tuning, interactive analysis
+#
+#   2. Quarto Reports (static, future) - experiments/quarto/
+#      Generate: snakemake quarto_reports
+#      Purpose: Publication-quality reports, archival, presentations
 
 configfile: "experiments/conf/config.yaml"
 
-# Define the final outputs we want (benchmark data generation only)
-# For interactive analysis and reporting, use Streamlit dashboard:
-#   streamlit run experiments/streamlit/app.py
-#   OR: iono dashboard
+# Default target: benchmark data generation only
+# For reporting:
+#   - Interactive: iono dashboard (Streamlit)
+#   - Static: snakemake quarto_reports (Quarto, future)
 rule all:
     input:
         "artifacts/data/ionosphere_resolution.done",
@@ -130,11 +139,39 @@ rule run_ionosphere_schumann:
             +benchmark=throughput
         """
 
-# NOTE: HTML report generation has been deprecated in favor of Streamlit dashboard
-# To view results, use:
-#   streamlit run experiments/streamlit/app.py
-# Or:
-#   iono dashboard
+# ============================================================================
+# REPORTING
+# ============================================================================
+#
+# Ionosense uses TWO reporting solutions:
+#
+# 1. Streamlit Dashboard (PRIMARY) - Interactive exploration
+#    Launch: iono dashboard
+#    Location: experiments/streamlit/
+#
+# 2. Quarto Reports (FUTURE) - Publication-quality static reports
+#    Generate: snakemake quarto_reports
+#    Location: experiments/quarto/
+#
+# Both solutions share core analysis modules from experiments/analysis/
+#
+# To add Quarto report generation (future):
+#
+# rule general_performance_report:
+#     input:
+#         data="artifacts/data/ionosphere_resolution.done",
+#         template="experiments/quarto/templates/general_performance.qmd"
+#     output:
+#         "artifacts/reports/general_performance.pdf"
+#     shell:
+#         "quarto render {input.template} --output {output}"
+#
+# rule quarto_reports:
+#     input:
+#         "artifacts/reports/general_performance.pdf",
+#         "artifacts/reports/ionosphere_research.pdf"
+#
+# ============================================================================
 
 # Clean all artifacts
 rule clean:

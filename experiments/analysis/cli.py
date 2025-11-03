@@ -4,10 +4,12 @@ Analysis CLI
 
 Command-line interface for benchmark analysis.
 
+For interactive reporting, use the Streamlit dashboard: iono dashboard
+
 Usage:
     python -m experiments.analysis.cli analyze <data_dir>
-    python -m experiments.analysis.cli report <data_file> --output report.html
     python -m experiments.analysis.cli compare <config1> <config2> --metric latency
+    python -m experiments.analysis.cli scaling <data_dir> --parameter engine_nfft --metric latency
 """
 
 import argparse
@@ -18,7 +20,6 @@ import pandas as pd
 
 from .analyzer import AnalysisEngine
 from .models import BenchmarkType
-from .reporting import generate_both_reports
 from .visualization import plot_latency_analysis, plot_throughput_analysis, plot_ionosphere_metrics
 
 
@@ -74,69 +75,6 @@ def cmd_analyze(args):
     print("\nKey Insights:")
     for insight in summary.key_insights:
         print(f"  - {insight}")
-
-
-def cmd_report(args):
-    """Generate HTML reports.
-
-    ⚠️ DEPRECATED: Use Streamlit dashboard instead (iono dashboard)
-    """
-    print("\n" + "=" * 70)
-    print("⚠️  DEPRECATION WARNING")
-    print("=" * 70)
-    print("HTML report generation is DEPRECATED and will be removed in a future version.")
-    print()
-    print("Please use the interactive Streamlit dashboard instead:")
-    print("  streamlit run experiments/streamlit/app.py")
-    print("Or:")
-    print("  iono dashboard")
-    print()
-    print("The Streamlit dashboard provides all HTML report features plus:")
-    print("  - Interactive filtering and exploration")
-    print("  - Real-time data updates")
-    print("  - Side-by-side configuration comparison")
-    print("  - CSV export capabilities")
-    print("=" * 70)
-    print()
-
-    response = input("Continue with deprecated HTML generation? (y/N): ")
-    if response.lower() != 'y':
-        print("Aborted. Please use the Streamlit dashboard instead.")
-        return
-
-    data_path = Path(args.data_path)
-    output_dir = Path(args.output_dir) if args.output_dir else Path("artifacts/reports")
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    print(f"Loading data from {data_path}...")
-    data = load_data(data_path)
-    print(f"Loaded {len(data)} measurements")
-
-    print("Generating reports...")
-    general_path, iono_path = generate_both_reports(data, output_dir)
-
-    print(f"\nReports generated:")
-    print(f"  General: {general_path}")
-    print(f"  Ionosphere: {iono_path}")
-
-    # Generate visualizations
-    if args.generate_plots:
-        plot_dir = output_dir / "plots"
-        plot_dir.mkdir(parents=True, exist_ok=True)
-
-        print("\nGenerating plots...")
-
-        if 'mean_latency_us' in data.columns:
-            paths = plot_latency_analysis(data, plot_dir)
-            print(f"  Latency plots: {len(paths)} generated")
-
-        if 'frames_per_second' in data.columns:
-            paths = plot_throughput_analysis(data, plot_dir)
-            print(f"  Throughput plots: {len(paths)} generated")
-
-        if 'rtf' in data.columns and 'freq_resolution_hz' in data.columns:
-            paths = plot_ionosphere_metrics(data, plot_dir)
-            print(f"  Ionosphere plots: {len(paths)} generated")
 
 
 def cmd_compare(args):
@@ -220,12 +158,6 @@ def main():
     analyze_parser.add_argument('--experiment-name', type=str, help='Experiment name')
     analyze_parser.add_argument('--cache-dir', type=str, help='Cache directory for analysis results')
 
-    # Report command
-    report_parser = subparsers.add_parser('report', help='Generate HTML reports')
-    report_parser.add_argument('data_path', type=str, help='Path to data file or directory')
-    report_parser.add_argument('--output-dir', '-o', type=str, help='Output directory')
-    report_parser.add_argument('--generate-plots', action='store_true', help='Generate visualization plots')
-
     # Compare command
     compare_parser = subparsers.add_parser('compare', help='Compare two configurations')
     compare_parser.add_argument('data_path', type=str, help='Path to data file or directory')
@@ -250,8 +182,6 @@ def main():
     # Dispatch to command handlers
     if args.command == 'analyze':
         cmd_analyze(args)
-    elif args.command == 'report':
-        cmd_report(args)
     elif args.command == 'compare':
         cmd_compare(args)
     elif args.command == 'scaling':

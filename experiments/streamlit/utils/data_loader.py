@@ -50,20 +50,27 @@ def get_available_configurations(data: pd.DataFrame) -> dict[str, list]:
     """
     config_params = {}
 
+    # Numeric columns: ensure proper typing before sorting
     if 'engine_nfft' in data.columns:
-        config_params['nfft'] = sorted(data['engine_nfft'].unique())
+        unique_vals = pd.to_numeric(data['engine_nfft'], errors='coerce').dropna().unique()
+        config_params['nfft'] = sorted(unique_vals)
 
     if 'engine_channels' in data.columns:
-        config_params['channels'] = sorted(data['engine_channels'].unique())
+        unique_vals = pd.to_numeric(data['engine_channels'], errors='coerce').dropna().unique()
+        config_params['channels'] = sorted(unique_vals)
 
     if 'engine_overlap' in data.columns:
-        config_params['overlap'] = sorted(data['engine_overlap'].unique())
+        unique_vals = pd.to_numeric(data['engine_overlap'], errors='coerce').dropna().unique()
+        config_params['overlap'] = sorted(unique_vals)
 
+    # String columns: can sort directly
     if 'engine_mode' in data.columns:
-        config_params['mode'] = sorted(data['engine_mode'].unique())
+        unique_vals = data['engine_mode'].dropna().unique()
+        config_params['mode'] = sorted([str(v) for v in unique_vals])
 
     if 'benchmark_type' in data.columns:
-        config_params['benchmark_type'] = sorted(data['benchmark_type'].unique())
+        unique_vals = data['benchmark_type'].dropna().unique()
+        config_params['benchmark_type'] = sorted([str(v) for v in unique_vals])
 
     return config_params
 
