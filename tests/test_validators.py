@@ -1,4 +1,4 @@
-# tests/test_validation.py
+# tests/test_validators.py
 
 import numpy as np
 import pytest

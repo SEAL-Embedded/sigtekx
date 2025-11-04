@@ -278,11 +278,9 @@ class EngineConfig(BaseModel):
 
     @property
     def memory_estimate_mb(self) -> float:
-        """Estimated GPU memory usage in MB (rough estimate)."""
-        bytes_per_input = self.nfft * self.channels * 4
-        bytes_per_output = self.num_output_bins * self.channels * 4
-        total_bytes = (bytes_per_input + bytes_per_output) * self.pinned_buffer_count * 4
-        return total_bytes / (1024 * 1024)
+        """Memory estimate in MB. Delegates to validation.estimate.memory.usage.mb()"""
+        from ionosense_hpc.config.validation import estimate_memory_usage_mb
+        return estimate_memory_usage_mb(self)
 
     # ========================================================================
     # Preset Factory

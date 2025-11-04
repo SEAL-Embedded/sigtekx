@@ -49,7 +49,9 @@ def validate_config_device_compatibility(
         )
 
 
-def estimate_memory_usage_mb(config: EngineConfig) -> int:
+def estimate_memory_usage_mb(config: EngineConfig,
+    include_workspace: bool = True,
+    safety_margin: bool = True) -> float:
     """Estimate GPU memory usage for a configuration.
 
     Args:
