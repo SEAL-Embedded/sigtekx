@@ -67,7 +67,8 @@ tabs = st.tabs([
     "Resolution Trade-offs",
     "Phenomena Detection",
     "Streaming Performance",
-    "Compliance & Reliability"
+    "Compliance & Reliability",
+    "Spectrogram Viewer"
 ])
 
 # Initialize plotter
@@ -530,6 +531,202 @@ with tabs[6]:
                 use_container_width=True,
                 hide_index=True
             )
+
+# ============================================================================
+# TAB 8: SPECTROGRAM VIEWER
+# ============================================================================
+with tabs[7]:
+    st.header("Spectrogram Viewer")
+
+    st.markdown("""
+    Visualize time-frequency spectrograms from benchmark runs. Spectrograms are generated
+    from raw magnitude FFT data and provide insight into signal characteristics and
+    processing accuracy.
+    """)
+
+    # Import spectrogram utilities
+    from utils.data_loader import (
+        list_available_spectrograms,
+        load_spectrogram,
+        get_spectrogram_filters
+    )
+    from analysis.visualization import plot_spectrogram_interactive
+
+    # Check if spectrograms directory exists and has data
+    from pathlib import Path
+    spec_dir = Path("artifacts/data/spectrograms")
+
+    if not spec_dir.exists():
+        st.info(
+            "📊 **No spectrograms found yet.** To generate spectrograms, run benchmarks with "
+            "`save_spectrogram=true` in the benchmark configuration.\n\n"
+            "Example:\n```python\n"
+            "python benchmarks/run_latency.py experiment=ionosphere_resolution "
+            "+benchmark=latency benchmark.save_spectrogram=true\n```"
+        )
+    else:
+        # Load available spectrograms
+        available_specs = list_available_spectrograms(spec_dir)
+
+        if not available_specs:
+            st.info(
+                "📊 **No spectrogram files found in `artifacts/data/spectrograms/`.** "
+                "Run benchmarks with spectrogram capture enabled to generate data."
+            )
+        else:
+            st.success(f"Found {len(available_specs)} spectrograms")
+
+            # Get filter values
+            filters = get_spectrogram_filters(spec_dir)
+
+            # Filter controls
+            st.subheader("Filter Spectrograms")
+            col1, col2, col3, col4 = st.columns(4)
+
+            with col1:
+                selected_nfft = st.selectbox(
+                    "NFFT Size",
+                    options=["All"] + filters['nfft'],
+                    index=0
+                )
+
+            with col2:
+                selected_channels = st.selectbox(
+                    "Channels",
+                    options=["All"] + filters['channels'],
+                    index=0
+                )
+
+            with col3:
+                selected_overlap = st.selectbox(
+                    "Overlap",
+                    options=["All"] + filters['overlap'],
+                    index=0
+                )
+
+            with col4:
+                selected_benchmark = st.selectbox(
+                    "Benchmark",
+                    options=["All"] + filters['benchmarks'],
+                    index=0
+                )
+
+            # Apply filters
+            filtered_specs = available_specs
+            if selected_nfft != "All":
+                filtered_specs = [s for s in filtered_specs if s['nfft'] == selected_nfft]
+            if selected_channels != "All":
+                filtered_specs = [s for s in filtered_specs if s['channels'] == selected_channels]
+            if selected_overlap != "All":
+                filtered_specs = [s for s in filtered_specs if s['overlap'] == selected_overlap]
+            if selected_benchmark != "All":
+                filtered_specs = [s for s in filtered_specs if s['benchmark'] == selected_benchmark]
+
+            if not filtered_specs:
+                st.warning("No spectrograms match the selected filters.")
+            else:
+                st.info(f"Showing {len(filtered_specs)} spectrograms after filtering")
+
+                # Spectrogram selection
+                st.subheader("Select Spectrogram")
+
+                # Create readable labels for dropdown
+                spec_labels = []
+                for spec in filtered_specs:
+                    label = f"{spec['benchmark']} | NFFT={spec['nfft']} | Ch={spec['channels']} | "
+                    label += f"Ovlp={spec['overlap']:.2f} | {spec['timestamp'].strftime('%Y-%m-%d %H:%M')}"
+                    spec_labels.append(label)
+
+                selected_spec_idx = st.selectbox(
+                    "Choose a spectrogram to visualize:",
+                    options=range(len(filtered_specs)),
+                    format_func=lambda i: spec_labels[i]
+                )
+
+                if selected_spec_idx is not None:
+                    selected_spec = filtered_specs[selected_spec_idx]
+
+                    # Visualization controls
+                    st.subheader("Visualization Options")
+                    col1, col2, col3 = st.columns(3)
+
+                    with col1:
+                        db_scale = st.checkbox("Use dB scale", value=True)
+
+                    with col2:
+                        colorscale = st.selectbox(
+                            "Color scale",
+                            options=["Viridis", "Plasma", "Jet", "Hot", "Cividis", "Inferno"],
+                            index=0
+                        )
+
+                    with col3:
+                        height = st.slider("Figure height (px)", 400, 1000, 600, 50)
+
+                    # Load and display spectrogram
+                    try:
+                        spec_data = load_spectrogram(selected_spec['path'])
+
+                        # Show metadata
+                        with st.expander("Spectrogram Metadata"):
+                            col1, col2, col3, col4 = st.columns(4)
+                            col1.metric("NFFT", spec_data['config']['nfft'])
+                            col2.metric("Channels", spec_data['config']['channels'])
+                            col3.metric("Overlap", f"{spec_data['config']['overlap']:.2f}")
+                            col4.metric("Sample Rate", f"{spec_data['config']['sample_rate_hz']} Hz")
+
+                            col1, col2, col3 = st.columns(3)
+                            col1.metric("Time Steps", spec_data['spectrogram'].shape[0])
+                            col2.metric("Freq Bins", spec_data['spectrogram'].shape[1])
+                            col3.metric("Duration", f"{spec_data['times'][-1]:.2f} s")
+
+                        # Plot spectrogram
+                        title = (
+                            f"Spectrogram - {selected_spec['benchmark']} "
+                            f"(NFFT={spec_data['config']['nfft']}, "
+                            f"overlap={spec_data['config']['overlap']:.2f})"
+                        )
+
+                        fig = plot_spectrogram_interactive(
+                            spec_data['spectrogram'],
+                            spec_data['times'],
+                            spec_data['frequencies'],
+                            title=title,
+                            db_scale=db_scale,
+                            colorscale=colorscale,
+                            height=height,
+                            width=1200
+                        )
+
+                        st.plotly_chart(fig, use_container_width=True)
+
+                        # Analysis insights
+                        st.subheader("Analysis Insights")
+
+                        freq_res_hz = spec_data['config']['sample_rate_hz'] / spec_data['config']['nfft']
+                        hop_size = spec_data['config']['nfft'] * (1 - spec_data['config']['overlap'])
+                        time_res_ms = (hop_size / spec_data['config']['sample_rate_hz']) * 1000
+
+                        col1, col2, col3 = st.columns(3)
+                        col1.metric(
+                            "Frequency Resolution",
+                            f"{freq_res_hz:.2f} Hz",
+                            help="Δf = sample_rate / NFFT"
+                        )
+                        col2.metric(
+                            "Time Resolution",
+                            f"{time_res_ms:.2f} ms",
+                            help="Δt = hop_size / sample_rate"
+                        )
+                        col3.metric(
+                            "Time-Freq Product",
+                            f"{freq_res_hz * time_res_ms / 1000:.4f}",
+                            help="Lower is better (Heisenberg uncertainty limit)"
+                        )
+
+                    except Exception as e:
+                        st.error(f"Failed to load spectrogram: {e}")
+                        st.exception(e)
 
 # Footer
 st.divider()

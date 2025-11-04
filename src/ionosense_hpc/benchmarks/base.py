@@ -188,6 +188,11 @@ class BenchmarkConfig(BaseModel):
     gpu_index: int = Field(default=0, ge=0, description="GPU index to lock (use with lock_gpu_clocks)")
     use_max_clocks: bool = Field(default=False, description="Use max clocks vs recommended (use with lock_gpu_clocks)")
 
+    # Spectrogram generation
+    save_spectrogram: bool = Field(default=False, description="Generate and save spectrograms from benchmark data")
+    spectrogram_duration_sec: float = Field(default=5.0, gt=0, description="Duration of signal for spectrogram (seconds)")
+    spectrogram_output_dir: str = Field(default="artifacts/data/spectrograms", description="Output directory for spectrograms")
+
 
 class BaseBenchmark(abc.ABC):
     """
@@ -236,6 +241,81 @@ class BaseBenchmark(abc.ABC):
     def teardown(self) -> None:
         """Cleanup phase - release resources."""
         pass
+
+    def generate_spectrogram(
+        self,
+        engine_config: dict,
+        signal_data: np.ndarray | None = None,
+        channel: int = 0
+    ) -> Path | None:
+        """Generate and save a spectrogram using the benchmark's engine configuration.
+
+        This method uses the standalone spectrogram utility to generate spectrograms
+        from benchmark data. Can be called by subclasses after benchmark completion.
+
+        Args:
+            engine_config: Engine configuration dict with nfft, channels, overlap, etc.
+            signal_data: Optional pre-generated signal data. If None, generates synthetic signal.
+            channel: Channel index for multi-channel data
+
+        Returns:
+            Path to saved spectrogram NPZ file, or None if spectrogram generation is disabled
+
+        Example:
+            >>> # In a benchmark subclass after run():
+            >>> if self.config.save_spectrogram:
+            >>>     spec_path = self.generate_spectrogram(self.engine_config)
+            >>>     logger.info(f"Spectrogram saved to {spec_path}")
+        """
+        if not self.config.save_spectrogram:
+            return None
+
+        try:
+            # Import from experiments/analysis (add to path if needed)
+            import sys
+            from pathlib import Path as _Path
+            _experiments_path = _Path(__file__).parent.parent.parent.parent / "experiments"
+            if str(_experiments_path) not in sys.path:
+                sys.path.insert(0, str(_experiments_path))
+            from analysis.spectrogram import SpectrogramGenerator
+            from ionosense_hpc.config import EngineConfig
+
+            # Create EngineConfig from dict
+            eng_config = EngineConfig(**engine_config)
+
+            # Generate signal data if not provided
+            if signal_data is None:
+                # Generate synthetic signal for the specified duration
+                num_samples = int(eng_config.sample_rate_hz * self.config.spectrogram_duration_sec)
+                # Generate multi-channel signal
+                signal_data = np.random.randn(eng_config.channels, num_samples).astype(np.float32)
+
+            # Generate spectrogram
+            logger.info(f"Generating spectrogram (duration={self.config.spectrogram_duration_sec}s)...")
+            with SpectrogramGenerator(eng_config) as generator:
+                spec_data = generator.generate(signal_data, channel=channel)
+
+            # Create output filename
+            output_dir = Path(self.config.spectrogram_output_dir)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = (
+                f"{self.config.name}_"
+                f"nfft{eng_config.nfft}_"
+                f"ch{eng_config.channels}_"
+                f"ovlp{eng_config.overlap:.2f}_"
+                f"{timestamp}.npz"
+            )
+            output_path = output_dir / filename
+
+            # Save spectrogram
+            SpectrogramGenerator.save(spec_data, output_path)
+            logger.info(f"Spectrogram saved to: {output_path}")
+
+            return output_path
+
+        except Exception as e:
+            logger.warning(f"Failed to generate spectrogram: {e}")
+            return None
 
     def validate_environment(self) -> tuple[bool, list[str]]:
         """

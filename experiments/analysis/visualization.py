@@ -538,3 +538,325 @@ def plot_frame_drop_analysis(data: pd.DataFrame, output_dir: Path) -> List[Path]
         paths.append(output_path)
 
     return paths
+
+
+class SpectrogramPlotter:
+    """Interactive spectrogram visualization for Streamlit and web dashboards.
+
+    Provides Plotly-based interactive spectrogram plots with:
+    - Zoom and pan capabilities
+    - Hover tooltips with time/frequency/magnitude
+    - Configurable color scales and dB scaling
+    - Multiple spectrograms side-by-side comparison
+    """
+
+    def __init__(self, config: Optional[VisualizationConfig] = None):
+        self.config = config or VisualizationConfig()
+
+    def plot_spectrogram_interactive(
+        self,
+        spectrogram: Any,  # np.ndarray
+        times: Any,  # np.ndarray
+        frequencies: Any,  # np.ndarray
+        title: str = "Spectrogram",
+        db_scale: bool = True,
+        vmin: Optional[float] = None,
+        vmax: Optional[float] = None,
+        colorscale: str = 'Viridis',
+        output_path: Optional[Path] = None,
+        height: int = 600,
+        width: int = 1000
+    ) -> go.Figure:
+        """Create interactive Plotly spectrogram visualization.
+
+        Args:
+            spectrogram: 2D array (time_steps, freq_bins) of magnitude values
+            times: 1D array of time values in seconds
+            frequencies: 1D array of frequency values in Hz
+            title: Plot title
+            db_scale: If True, convert to dB scale (20*log10)
+            vmin: Minimum value for color scale (None = auto)
+            vmax: Maximum value for color scale (None = auto)
+            colorscale: Plotly colorscale name (Viridis, Plasma, Jet, etc.)
+            output_path: Optional path to save HTML file
+            height: Figure height in pixels
+            width: Figure width in pixels
+
+        Returns:
+            Plotly Figure object
+        """
+        import numpy as np
+
+        # Convert to dB scale if requested
+        if db_scale:
+            # Add small epsilon to avoid log(0)
+            spec_db = 20 * np.log10(spectrogram + 1e-10)
+            z_data = spec_db
+            colorbar_title = "Magnitude (dB)"
+        else:
+            z_data = spectrogram
+            colorbar_title = "Magnitude"
+
+        # Create heatmap
+        fig = go.Figure(data=go.Heatmap(
+            z=z_data.T,  # Transpose so frequency is on y-axis
+            x=times,
+            y=frequencies,
+            colorscale=colorscale,
+            zmin=vmin,
+            zmax=vmax,
+            colorbar=dict(title=colorbar_title),
+            hovertemplate='Time: %{x:.3f}s<br>Frequency: %{y:.1f}Hz<br>Magnitude: %{z:.1f}<extra></extra>'
+        ))
+
+        # Update layout
+        fig.update_layout(
+            title=title,
+            xaxis_title="Time (s)",
+            yaxis_title="Frequency (Hz)",
+            height=height,
+            width=width,
+            hovermode='closest'
+        )
+
+        # Save if path provided
+        if output_path:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            fig.write_html(str(output_path))
+
+        return fig
+
+    def plot_spectrogram_comparison(
+        self,
+        spectrograms: List[Dict[str, Any]],
+        db_scale: bool = True,
+        colorscale: str = 'Viridis',
+        output_path: Optional[Path] = None,
+        height: int = 400,
+        width: int = 1200
+    ) -> go.Figure:
+        """Create side-by-side comparison of multiple spectrograms.
+
+        Args:
+            spectrograms: List of dicts with keys:
+                - 'spectrogram': 2D array
+                - 'times': 1D array
+                - 'frequencies': 1D array
+                - 'title': Subplot title
+            db_scale: If True, convert to dB scale
+            colorscale: Plotly colorscale name
+            output_path: Optional path to save HTML file
+            height: Figure height in pixels
+            width: Figure width in pixels
+
+        Returns:
+            Plotly Figure with subplots
+        """
+        import numpy as np
+
+        num_specs = len(spectrograms)
+        if num_specs == 0:
+            raise ValueError("No spectrograms provided")
+
+        # Create subplots
+        fig = make_subplots(
+            rows=1,
+            cols=num_specs,
+            subplot_titles=[s['title'] for s in spectrograms],
+            horizontal_spacing=0.1
+        )
+
+        # Add each spectrogram
+        for idx, spec_data in enumerate(spectrograms, start=1):
+            spectrogram = spec_data['spectrogram']
+            times = spec_data['times']
+            frequencies = spec_data['frequencies']
+
+            # Convert to dB if requested
+            if db_scale:
+                z_data = 20 * np.log10(spectrogram + 1e-10)
+            else:
+                z_data = spectrogram
+
+            fig.add_trace(
+                go.Heatmap(
+                    z=z_data.T,
+                    x=times,
+                    y=frequencies,
+                    colorscale=colorscale,
+                    colorbar=dict(
+                        title="Magnitude (dB)" if db_scale else "Magnitude",
+                        x=1.0 + (idx - 1) * 0.05  # Offset colorbars
+                    ),
+                    hovertemplate='Time: %{x:.3f}s<br>Frequency: %{y:.1f}Hz<br>Magnitude: %{z:.1f}<extra></extra>'
+                ),
+                row=1,
+                col=idx
+            )
+
+            # Update axes
+            fig.update_xaxes(title_text="Time (s)", row=1, col=idx)
+            if idx == 1:
+                fig.update_yaxes(title_text="Frequency (Hz)", row=1, col=idx)
+
+        # Update layout
+        fig.update_layout(
+            height=height,
+            width=width,
+            hovermode='closest'
+        )
+
+        # Save if path provided
+        if output_path:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            fig.write_html(str(output_path))
+
+        return fig
+
+    def plot_spectrogram_with_slices(
+        self,
+        spectrogram: Any,  # np.ndarray
+        times: Any,  # np.ndarray
+        frequencies: Any,  # np.ndarray
+        time_slice_idx: Optional[int] = None,
+        freq_slice_idx: Optional[int] = None,
+        db_scale: bool = True,
+        colorscale: str = 'Viridis',
+        output_path: Optional[Path] = None
+    ) -> go.Figure:
+        """Create spectrogram with time and frequency slice views.
+
+        Shows main spectrogram plus:
+        - Frequency spectrum at a specific time
+        - Time series at a specific frequency
+
+        Args:
+            spectrogram: 2D array (time_steps, freq_bins)
+            times: 1D array of time values
+            frequencies: 1D array of frequency values
+            time_slice_idx: Index for time slice (None = middle)
+            freq_slice_idx: Index for frequency slice (None = middle)
+            db_scale: If True, convert to dB scale
+            colorscale: Plotly colorscale name
+            output_path: Optional path to save HTML file
+
+        Returns:
+            Plotly Figure with subplots
+        """
+        import numpy as np
+
+        # Default to middle slices
+        if time_slice_idx is None:
+            time_slice_idx = len(times) // 2
+        if freq_slice_idx is None:
+            freq_slice_idx = len(frequencies) // 2
+
+        # Convert to dB if requested
+        if db_scale:
+            z_data = 20 * np.log10(spectrogram + 1e-10)
+            y_label = "Magnitude (dB)"
+        else:
+            z_data = spectrogram
+            y_label = "Magnitude"
+
+        # Create subplots: main spectrogram + 2 slice plots
+        fig = make_subplots(
+            rows=2, cols=2,
+            subplot_titles=(
+                "Spectrogram",
+                f"Spectrum at t={times[time_slice_idx]:.3f}s",
+                f"Time series at f={frequencies[freq_slice_idx]:.1f}Hz",
+                ""
+            ),
+            specs=[[{"rowspan": 2}, {}], [None, {}]],
+            horizontal_spacing=0.15,
+            vertical_spacing=0.12
+        )
+
+        # Main spectrogram
+        fig.add_trace(
+            go.Heatmap(
+                z=z_data.T,
+                x=times,
+                y=frequencies,
+                colorscale=colorscale,
+                colorbar=dict(title=y_label),
+                hovertemplate='Time: %{x:.3f}s<br>Frequency: %{y:.1f}Hz<br>Magnitude: %{z:.1f}<extra></extra>'
+            ),
+            row=1, col=1
+        )
+
+        # Frequency spectrum at specific time
+        fig.add_trace(
+            go.Scatter(
+                x=frequencies,
+                y=z_data[time_slice_idx, :],
+                mode='lines',
+                name='Spectrum'
+            ),
+            row=1, col=2
+        )
+
+        # Time series at specific frequency
+        fig.add_trace(
+            go.Scatter(
+                x=times,
+                y=z_data[:, freq_slice_idx],
+                mode='lines',
+                name='Time series',
+                line=dict(color='orange')
+            ),
+            row=2, col=2
+        )
+
+        # Update axes
+        fig.update_xaxes(title_text="Time (s)", row=1, col=1)
+        fig.update_yaxes(title_text="Frequency (Hz)", row=1, col=1)
+        fig.update_xaxes(title_text="Frequency (Hz)", row=1, col=2)
+        fig.update_yaxes(title_text=y_label, row=1, col=2)
+        fig.update_xaxes(title_text="Time (s)", row=2, col=2)
+        fig.update_yaxes(title_text=y_label, row=2, col=2)
+
+        # Update layout
+        fig.update_layout(
+            height=800,
+            width=1400,
+            showlegend=False
+        )
+
+        # Save if path provided
+        if output_path:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            fig.write_html(str(output_path))
+
+        return fig
+
+
+# Convenience functions for spectrogram visualization
+def plot_spectrogram_interactive(
+    spectrogram: Any,
+    times: Any,
+    frequencies: Any,
+    title: str = "Spectrogram",
+    db_scale: bool = True,
+    output_path: Optional[Path] = None,
+    **kwargs
+) -> go.Figure:
+    """Create interactive Plotly spectrogram (convenience function).
+
+    Args:
+        spectrogram: 2D array (time_steps, freq_bins)
+        times: 1D array of time values in seconds
+        frequencies: 1D array of frequency values in Hz
+        title: Plot title
+        db_scale: If True, convert to dB scale
+        output_path: Optional path to save HTML file
+        **kwargs: Additional arguments passed to SpectrogramPlotter.plot_spectrogram_interactive()
+
+    Returns:
+        Plotly Figure object
+    """
+    plotter = SpectrogramPlotter()
+    return plotter.plot_spectrogram_interactive(
+        spectrogram, times, frequencies, title, db_scale, output_path=output_path, **kwargs
+    )
