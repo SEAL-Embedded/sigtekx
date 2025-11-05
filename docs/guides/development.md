@@ -141,18 +141,19 @@ ilearn                # Learning guides (iono learn)
 ```bash
 # Start development session
 cd ionosense-hpc
-.\scripts\cli.ps1 doctor         # Check environment health
+iono doctor                      # Check environment health
 
 # Make changes to code...
 
 # Verify changes with essential CLI tools
-.\scripts\cli.ps1 check          # Format, lint, typecheck
-.\scripts\cli.ps1 build          # Build with changes
+iono format && iono lint         # Format and lint code
+iono typecheck                   # Type check Python code
+iono build                       # Build with changes
 pytest tests/ -v                 # Run tests
 
 # Performance validation with direct tools
 python benchmarks/run_latency.py experiment=baseline  # Performance validation
-.\scripts\cli.ps1 profile nsys latency               # Detailed profiling
+iono profile nsys latency        # Detailed profiling
 ```
 
 **Windows Enhanced Shell (Optional):**
@@ -164,7 +165,8 @@ iono doctor                     # Check environment health
 # Make changes to code...
 
 # Verify changes (using aliases)
-iono check                      # Format, lint, typecheck
+ifmt && ilint                  # Format and lint code
+iono typecheck                 # Type check Python code
 ib                             # Build with changes
 pytest tests/ -v               # Run tests
 
@@ -239,20 +241,20 @@ ionosense-hpc-lib/
 **All Platforms:**
 ```bash
 # Clean build
-.\scripts\cli.ps1 clean
-.\scripts\cli.ps1 build
+iono clean
+iono build
 
 # Debug build
-.\scripts\cli.ps1 build -Debug
+iono build -Debug
 
 # Release build (default)
-.\scripts\cli.ps1 build -Release
+iono build -Release
 
 # Verbose build with all output
-.\scripts\cli.ps1 build -Verbose
+iono build -Verbose
 
 # Build without NVTX profiling
-.\scripts\cli.ps1 build -NoNvtx
+iono build -NoNvtx
 ```
 
 **Windows Enhanced Shell (Optional Aliases):**
@@ -453,8 +455,7 @@ class TestEngine:
 **Environment Debugging:**
 ```bash
 # All platforms
-.\scripts\cli.ps1 doctor          # Comprehensive environment check
-.\scripts\cli.ps1 info system     # System information
+iono doctor                       # Comprehensive environment check
 $env:IONO_LOG_LEVEL="DEBUG"      # Enable debug logging (Windows)
 export IONO_LOG_LEVEL=DEBUG      # Enable debug logging (Linux/WSL)
 ```
@@ -462,8 +463,8 @@ export IONO_LOG_LEVEL=DEBUG      # Enable debug logging (Linux/WSL)
 **Build Debugging:**
 ```bash
 # All platforms
-.\scripts\cli.ps1 build -Debug     # Debug build
-.\scripts\cli.ps1 build -Verbose   # Verbose build output
+iono build -Debug                 # Debug build
+iono build -Verbose               # Verbose build output
 
 # Windows enhanced shell (optional aliases)
 iono build -Debug         # Debug build
@@ -480,7 +481,7 @@ export CUDA_LAUNCH_BLOCKING=1
 cuda-memcheck python your_script.py
 
 # Profile with Nsight (both platforms)
-.\scripts\cli.ps1 profile nsys latency       # Essential CLI
+iono profile nsys latency                   # Essential CLI
 iprof nsys latency                           # Windows alias (optional)
 ```
 
@@ -491,12 +492,12 @@ iprof nsys latency                           # Windows alias (optional)
    - Windows: Use `.\scripts\open_dev_pwsh.ps1` for enhanced shell
 
 2. **Build Failures**
-   - Run `.\scripts\cli.ps1 doctor` first
+   - Run `iono doctor` first
    - Check CUDA toolkit installation
    - Verify conda environment activation
 
 3. **Import Errors**
-   - Rebuild: `.\scripts\cli.ps1 clean` then `.\scripts\cli.ps1 build`
+   - Rebuild: `iono clean` then `iono build`
    - Check Python path in conda environment
 
 ## Contributing
@@ -508,7 +509,7 @@ iprof nsys latency                           # Windows alias (optional)
    # All platforms
    git clone --recursive https://github.com/your-org/ionosense-hpc.git
    cd ionosense-hpc
-   .\scripts\cli.ps1 setup
+   iono setup
 
    # Optional: Windows enhanced shell with aliases
    .\scripts\open_dev_pwsh.ps1
@@ -523,12 +524,14 @@ iprof nsys latency                           # Windows alias (optional)
 3. **Development Loop**
    ```bash
    # All platforms - Essential CLI
-   .\scripts\cli.ps1 check         # Format, lint, typecheck
-   .\scripts\cli.ps1 build         # Build changes
+   iono format && iono lint        # Format and lint code
+   iono typecheck                  # Type check Python code
+   iono build                      # Build changes
    pytest tests/ -v               # Run tests
 
    # Windows enhanced shell (optional aliases)
-   iono check                     # Format, lint, typecheck
+   ifmt && ilint                  # Format and lint code
+   iono typecheck                 # Type check Python code
    ib                            # Build changes
    pytest tests/ -v              # Run tests
    ```
@@ -548,12 +551,14 @@ The CLI provides aggregated checks for code quality:
 
 ```bash
 # All platforms - Essential CLI
-.\scripts\cli.ps1 check           # Format, lint, typecheck
-.\scripts\cli.ps1 check -Staged   # Only check staged files
+iono format -Check                # Verify C++ formatting
+iono lint                         # Lint Python and C++ code
+iono typecheck                    # Type check Python code
 
 # Windows enhanced shell (optional aliases)
-iono check                       # Format, lint, typecheck
-iono check -Staged               # Only check staged files
+ifmt -Check                      # Verify C++ formatting
+ilint                            # Lint code
+iono typecheck                   # Type check
 ```
 
 This runs:
@@ -569,12 +574,12 @@ For tests, run `pytest tests/ -v` separately to have full control over test exec
 
 ```bash
 # All platforms
-.\scripts\cli.ps1 info            # Check current version
+# Version is managed in src/ionosense_hpc/__version__.py
 pytest tests/ -v                 # Full test suite
 python benchmarks/run_latency.py experiment=baseline  # Performance regression check
 
 # Windows enhanced shell (optional aliases)
-iono info                        # Check current version
+# Version is in src/ionosense_hpc/__version__.py
 pytest tests/ -v                 # Full test suite
 python benchmarks/run_latency.py experiment=baseline  # Performance regression check
 ```
@@ -583,8 +588,8 @@ python benchmarks/run_latency.py experiment=baseline  # Performance regression c
 
 ```bash
 # All platforms - Essential CLI
-.\scripts\cli.ps1 clean -All     # Clean everything
-.\scripts\cli.ps1 build          # Fresh release build
+iono clean -All                  # Clean everything
+iono build                       # Fresh release build
 pytest tests/ -v                 # Verify build
 
 # Windows enhanced shell (optional aliases)
@@ -613,10 +618,10 @@ Override them in CI or custom setups if you need different paths.
 ## Resources
 
 ### Essential CLI Commands
-- **CLI Help**: `.\scripts\cli.ps1 help`
-- **Environment Check**: `.\scripts\cli.ps1 doctor`
-- **System Info**: `.\scripts\cli.ps1 info`
-- **Learning Guides**: `.\scripts\cli.ps1 learn`
+- **CLI Help**: `iono help`
+- **Environment Check**: `iono doctor`
+- **C++ Benchmarking**: `ionoc help`
+- **Python Profiling**: `iprof --help`
 
 ### Direct Tools Documentation
 - [Hydra Configuration](https://hydra.cc/) - Experiment configuration management

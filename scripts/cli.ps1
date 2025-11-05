@@ -640,105 +640,110 @@ function Show-Help {
     Write-Host @"
 ╔════════════════════════════════════════════════════════════════════════╗
 ║  IONOSENSE-HPC DEVELOPMENT CLI                                         ║
-║  Essential development tasks - research tools use native CLIs directly ║
+║  Custom tooling for C++ builds, profiling, and development workflows   ║
 ╚════════════════════════════════════════════════════════════════════════╝
 
-USAGE: .\scripts\cli.ps1 <command> [options]
+USAGE: iono <command> [options]
+   OR: .\scripts\cli.ps1 <command> [options]  (explicit path for automation)
 
-ESSENTIAL DEVELOPMENT
+═══════════════════════════════════════════════════════════════════════════
+CORE DEVELOPMENT COMMANDS
+═══════════════════════════════════════════════════════════════════════════
+
   setup [-Clean]          Create/update conda environment & install package
   build [-Preset <name>] [-Clean] [--debug|--release] [--verbose]
-                          Configure and build project with CMake
+                          Configure and build C++ project with CMake
   test [all|python|cpp] [-Pattern] [-Coverage] [--verbose]
-                          Run tests (use -Coverage for C++ coverage)
-  coverage [-NoOpen] [--verbose]
-                          Run C++ tests with code coverage report
-  format [paths] [-Check] [--verbose]
-                          Format C++ code with clang-format
-  lint [all|python|cpp] [-Fix] [--verbose]
-                          Lint code with ruff
-  clean [-All]            Remove artifacts/ directory (use -All to also remove build/)
+                          Run Python and/or C++ test suites
+  coverage [-NoOpen]      Run C++ tests with code coverage report (OpenCppCoverage)
+  clean [-All]            Remove artifacts/ (use -All to also remove build/)
   doctor                  Check development environment health
-  ui                      Launch MLflow UI for experiment tracking
-  dashboard               Launch Streamlit interactive dashboard
 
-GPU PROFILING
-  profile [tool] [target] Profile GPU performance with Nsight tools
-                          Tools: nsys (Systems), ncu (Compute)
-                          Targets: latency, throughput, accuracy, realtime, custom
-                          Interactive mode if no args provided
+═══════════════════════════════════════════════════════════════════════════
+CODE QUALITY
+═══════════════════════════════════════════════════════════════════════════
 
-GPU CLOCK LOCKING (Python Benchmarks)
-  Enable GPU clock locking for stable Python benchmarks via Hydra config:
+  format [paths] [-Check]     Format C++ code with clang-format
+  lint [all|python|cpp] [-Fix] Lint code with ruff (Python) or clang-tidy (C++)
+  typecheck [-Strict]         Run mypy type checking on Python code
 
-  Via CLI override (temporary):
-    python benchmarks/run_latency.py +benchmark=latency benchmark.lock_gpu_clocks=true
+═══════════════════════════════════════════════════════════════════════════
+GPU PROFILING & PERFORMANCE
+═══════════════════════════════════════════════════════════════════════════
 
-  Via YAML config (persistent):
-    Edit experiments/conf/benchmark/latency.yaml:
-      lock_gpu_clocks: true     # Enable clock locking
-      gpu_index: 0              # GPU to lock (default: 0)
-      use_max_clocks: false     # Use recommended clocks (default)
+  profile [tool] [target]     Profile GPU performance with Nsight tools
+      Tools:   nsys (Nsight Systems - timeline, API calls, NVTX)
+               ncu (Nsight Compute - kernel analysis, roofline)
+      Targets: latency, throughput, accuracy, realtime, custom
 
-  Works with profiling:
-    iprof nsys latency          # With lock_gpu_clocks=true in YAML
+  Examples:
+    iono profile nsys latency           # Profile end-to-end latency benchmark
+    iono profile ncu throughput         # Deep kernel analysis of throughput
+    iono profile                        # Interactive mode (prompts for options)
 
-  Requires administrator privileges (UAC prompt will appear automatically)
-  Reduces CV from 20-40% → 5-15% (50-75% better stability)
-  Full docs: docs/performance/gpu-clock-locking.md
+GPU CLOCK LOCKING (Benchmark Stability)
+  Reduce coefficient of variation from 20-40% → 5-15%
 
-  For C++ benchmarks, use: ionoc bench --lock-clocks
+  Python benchmarks (via Hydra config):
+    python benchmarks/run_latency.py +benchmark=latency \\
+        benchmark.lock_gpu_clocks=true
 
-PROFILING EXAMPLES:
-  .\scripts\cli.ps1 profile nsys latency      # Profile latency benchmark
-  .\scripts\cli.ps1 profile ncu throughput   # Profile throughput with NCU
-  .\scripts\cli.ps1 profile                   # Interactive mode
-  .\scripts\cli.ps1 profile nsys latency -Full -Duration 30
-  .\scripts\cli.ps1 profile ncu custom -Script "my_script.py"
+  C++ benchmarks (via ionoc):
+    ionoc bench --preset latency --full --lock-clocks
 
-C++ DEVELOPMENT (Advanced - Pre-Python Integration):
-  For C++ kernel development before Python integration, use standalone benchmark:
+  See: docs/performance/gpu-clock-locking.md for full details
 
-  .\build\windows-rel\benchmark_engine.exe --quick
+═══════════════════════════════════════════════════════════════════════════
+C++ DEVELOPMENT WORKFLOW (Pre-Python Integration)
+═══════════════════════════════════════════════════════════════════════════
 
-  # Before profiling, ensure directory exists (use backslashes!):
-  New-Item -ItemType Directory -Path artifacts\profiling -Force | Out-Null
-  nsys profile -o artifacts\profiling\cpp_dev .\build\windows-rel\benchmark_engine.exe --profile
+  Use 'ionoc' CLI for C++ kernel development iteration:
+    ionoc bench                         # Quick validation (~10s)
+    ionoc bench --preset latency --full # Production benchmark
+    ionoc profile nsys --stats          # Profile C++ directly
+    ionoc help                          # Full ionoc documentation
 
-  IMPORTANT: Use backslashes (\) in paths, not forward slashes (/)
-  See CLAUDE.md "C++ Development Workflow" section for full documentation.
-  For production profiling, always use 'profile' command above (Python end-to-end).
+  See: CLAUDE.md "C++ Development Workflow" section
 
-PYTHON SCRIPT RUNNER
-  run <script.py> [args...]
-                          Run Python script with proper environment
+═══════════════════════════════════════════════════════════════════════════
+TYPICAL WORKFLOWS
+═══════════════════════════════════════════════════════════════════════════
 
-DEVELOPMENT WORKFLOW:
-  .\scripts\cli.ps1 setup          # Environment setup
-  .\scripts\cli.ps1 build          # Build project
-  .\scripts\cli.ps1 test           # Run tests
-  .\scripts\cli.ps1 format         # Format code
-  .\scripts\cli.ps1 lint           # Lint code
+Development Setup:
+  iono setup                  # First-time environment setup
+  iono build                  # Build C++ components
+  iono test                   # Verify everything works
 
-RESEARCH WORKFLOW (Use native tools directly):
-  # 🔬 Ionosphere research - ALWAYS specify +benchmark=
-  python benchmarks/run_throughput.py --multirun experiment=ionosphere_resolution +benchmark=throughput
-  python benchmarks/run_latency.py experiment=ionosphere_multiscale +benchmark=latency
+Code Quality Check:
+  iono format && iono lint    # Format and lint all code
+  iono typecheck              # Check Python types
+  iono test -Coverage         # Run tests with coverage
 
-  # ⚠️  CRITICAL: Must specify +benchmark=latency or +benchmark=throughput
-  #     Without it, you'll get: Key 'benchmark' is not in struct
+Research & Benchmarking:
+  # Run benchmarks (native Hydra CLI)
+  python benchmarks/run_throughput.py --multirun \\
+      experiment=ionosphere_resolution +benchmark=throughput
 
-  # 🐍 Analysis pipeline
+  # Analysis pipeline (native Snakemake)
   snakemake --cores 4 --snakefile experiments/Snakefile
 
-  # 📈 View results
-  .\iono.ps1 ui
-  # OR: mlflow ui --backend-store-uri artifacts/mlruns
+  # View results (native tools)
+  mlflow ui --backend-store-uri artifacts/mlruns
+  streamlit run experiments/streamlit/app.py
 
-  # 📊 Data management
+  # Data versioning (native DVC)
   dvc status && dvc repro
 
-For detailed research workflow, see: CLAUDE.md
+═══════════════════════════════════════════════════════════════════════════
+ADDITIONAL RESOURCES
+═══════════════════════════════════════════════════════════════════════════
+
+  CLAUDE.md                              Complete development & research guide
+  docs/performance/gpu-clock-locking.md  GPU stability optimization
+  docs/guides/development.md             Detailed development workflows
+
+For C++ benchmarking: ionoc help
+For Python profiling:  iprof --help
 "@
 }
 
@@ -843,21 +848,6 @@ try {
             if ($commonVerbose -or $normalizedArgs -contains "-verbose" -or $normalizedArgs -contains "--verbose") { $params.Verbose = $true }
             Invoke-Coverage @params
         }
-        "analysis" {
-            $params = @{}
-            if ($CommandArgs -icontains "-DryRun") { $params.DryRun = $true }
-
-            for ($i = 0; $i -lt $CommandArgs.Count; $i++) {
-                if ($CommandArgs[$i] -eq "-Cores" -and $i+1 -lt $CommandArgs.Count) {
-                    $params.Cores = [int]$CommandArgs[$i+1]
-                }
-                if ($CommandArgs[$i] -eq "-Target" -and $i+1 -lt $CommandArgs.Count) {
-                    $params.Target = $CommandArgs[$i+1]
-                }
-            }
-
-            Invoke-Analysis @params
-        }
         "typecheck" {
             $params = @{}
             if ($normalizedArgs -contains "-strict" -or $normalizedArgs -contains "--strict") { $params.Strict = $true }
@@ -867,46 +857,6 @@ try {
             if ($paths) { $params.Paths = $paths }
 
             Invoke-TypeCheck @params
-        }
-        "info"     { Show-Info }
-        "status"   { Show-Status }
-        "learn"    { Show-Learn }
-        "ui"       {
-            Write-Status "Starting MLflow UI..."
-            $uri = Join-Path $script:ProjectRoot "artifacts/mlruns"
-            Write-Status "Backend URI: $uri"
-            # Use Start-Process to launch without blocking the terminal
-            Start-Process mlflow @("ui", "--backend-store-uri", $uri, "--port", "5000")
-            Write-Success "MLflow UI launched at http://localhost:5000"
-        }
-        "dashboard" {
-            Write-Host ""
-            Write-Host "🚀 Launching Streamlit Dashboard (Primary Interactive Reporting)" -ForegroundColor Cyan
-            Write-Host ""
-            Write-Host "Ionosense uses TWO reporting solutions:" -ForegroundColor Yellow
-            Write-Host "  1. Streamlit (interactive) - iono dashboard" -ForegroundColor Green
-            Write-Host "  2. Quarto (static, future) - snakemake quarto_reports" -ForegroundColor Gray
-            Write-Host ""
-
-            $streamlitApp = Join-Path $script:ProjectRoot "experiments\streamlit\app.py"
-            if (-not (Test-Path $streamlitApp)) {
-                Write-Error "Streamlit app not found at: $streamlitApp"
-                exit 1
-            }
-
-            Write-Status "Dashboard: $streamlitApp"
-            Write-Status "Opening browser at http://localhost:8501"
-
-            # Use Start-Process to launch without blocking the terminal
-            Start-Process streamlit @("run", $streamlitApp, "--server.port", "8501")
-
-            Write-Success "Streamlit dashboard launched at http://localhost:8501"
-            Write-Host ""
-            Write-Host "Three interactive pages:" -ForegroundColor Cyan
-            Write-Host "  • General Performance - Throughput, latency, accuracy" -ForegroundColor White
-            Write-Host "  • Ionosphere Research - VLF/ULF phenomena, RTF analysis" -ForegroundColor White
-            Write-Host "  • Configuration Explorer - Filter and compare" -ForegroundColor White
-            Write-Host ""
         }
         "profile"  {
             $params = @{}
@@ -937,18 +887,6 @@ try {
 
             Invoke-Profile @params
         }
-        "run"      {
-            if ($CommandArgs.Count -eq 0) {
-                Write-Error "Usage: .\scripts\cli.ps1 run <script.py> [args...]"
-                exit 1
-            }
-
-            $script = $CommandArgs[0]
-            $args = $CommandArgs[1..($CommandArgs.Count-1)]
-
-            Write-Status "Running Python script: $script"
-            & python $script @args
-        }
         default {
             Write-Error "Unknown command: $Command"
             Write-Host "Run '.\scripts\cli.ps1 help' for available commands"
@@ -958,7 +896,7 @@ try {
 
     # Only check exit code for commands that actually set it
     # Clean command doesn't set LASTEXITCODE, so don't check it
-    if ($Command -notin @("clean", "doctor", "help", "ui", "info", "status", "learn") -and $LASTEXITCODE -ne 0) {
+    if ($Command -notin @("clean", "doctor", "help") -and $LASTEXITCODE -ne 0) {
         Write-Error "Command failed with exit code $LASTEXITCODE"
         exit $LASTEXITCODE
     }
