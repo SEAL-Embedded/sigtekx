@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 # Import EngineConfig from core to avoid duplication
 from ionosense_hpc.config import EngineConfig
@@ -54,8 +54,9 @@ class StatisticalMetrics(BaseModel):
     n_outliers: int = 0
     confidence_interval: tuple[float, float] = Field(default=(0.0, 0.0))
 
-    @validator('cv')
-    def validate_cv(cls, v, values):
+    @field_validator('cv')
+    @classmethod
+    def validate_cv(cls, v):
         """Ensure CV is non-negative."""
         if v < 0:
             raise ValueError("Coefficient of variation must be non-negative")

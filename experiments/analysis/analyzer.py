@@ -94,7 +94,7 @@ class LatencyAnalyzer(AnalyzerBase):
             stability = 1.0 / (1.0 + stats_metrics.cv) if stats_metrics.cv >= 0 else 0.0
 
             results[config_key] = {
-                'statistics': stats_metrics.dict(),
+                'statistics': stats_metrics.model_dump(),
                 'jitter_us': float(jitter),
                 'stability_score': float(stability),
                 'outlier_ratio': stats_metrics.n_outliers / stats_metrics.n_samples
@@ -154,7 +154,7 @@ class ThroughputAnalyzer(AnalyzerBase):
             efficiency_score = stats_metrics.mean / theoretical_max_fps
 
             results[config_key] = {
-                'statistics': stats_metrics.dict(),
+                'statistics': stats_metrics.model_dump(),
                 'memory_efficiency': float(memory_efficiency),
                 'efficiency_score': float(min(efficiency_score, 1.0)),
                 'theoretical_max_fps': float(theoretical_max_fps),
@@ -199,7 +199,7 @@ class AccuracyAnalyzer(AnalyzerBase):
             reliability = stats_metrics.mean * (1.0 - stats_metrics.cv)
 
             results[config_key] = {
-                'statistics': stats_metrics.dict(),
+                'statistics': stats_metrics.model_dump(),
                 'reliability_score': float(reliability),
                 'all_passed': bool(np.all(pass_rates >= 0.99))
             }
@@ -208,7 +208,7 @@ class AccuracyAnalyzer(AnalyzerBase):
             if 'mean_snr_db' in group.columns:
                 results[config_key]['snr_statistics'] = StatisticalMetrics.from_array(
                     group['mean_snr_db'].values
-                ).dict()
+                ).model_dump()
 
         return results
 
@@ -251,7 +251,7 @@ class RealtimeAnalyzer(AnalyzerBase):
             rt_score = stats_metrics.mean * stats_metrics.median  # Penalize outliers
 
             results[config_key] = {
-                'statistics': stats_metrics.dict(),
+                'statistics': stats_metrics.model_dump(),
                 'rt_capability_score': float(rt_score),
                 'fully_compliant': bool(np.all(compliance >= 0.99))
             }
@@ -259,7 +259,7 @@ class RealtimeAnalyzer(AnalyzerBase):
             # Jitter analysis
             if 'mean_jitter_ms' in group.columns:
                 jitter = group['mean_jitter_ms'].values
-                results[config_key]['jitter_statistics'] = StatisticalMetrics.from_array(jitter).dict()
+                results[config_key]['jitter_statistics'] = StatisticalMetrics.from_array(jitter).model_dump()
 
         return results
 
@@ -309,7 +309,7 @@ class ScientificMetricsAnalyzer(AnalyzerBase):
             # RTF (Real-Time Factor) - only meaningful for throughput benchmarks
             if 'rtf' in group.columns:
                 rtf = group['rtf'].values
-                results[config_key]['rtf_statistics'] = StatisticalMetrics.from_array(rtf).dict()
+                results[config_key]['rtf_statistics'] = StatisticalMetrics.from_array(rtf).model_dump()
                 results[config_key]['rtf_mean'] = float(rtf.mean())
 
                 # Classify real-time capability
