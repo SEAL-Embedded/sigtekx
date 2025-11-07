@@ -430,11 +430,26 @@ class Engine:
 
     def _prepare_input(self, data: NDArray[Any]) -> FloatArray:
         """Validate and prepare input array for processing."""
+        from ionosense_hpc.config.schemas import ValidationMode
+
+        # Fast path: disabled validation (C++ still validates)
+        if self._config.validation_mode == ValidationMode.DISABLED:
+            # Minimal conversion only
+            if not isinstance(data, np.ndarray):
+                data = np.asarray(data, dtype=np.float32)
+            elif data.dtype != np.float32:
+                data = data.astype(np.float32, copy=False)
+            return cast(FloatArray, data)
+
+        # Basic validation: type/shape/contiguity only (skip NaN check)
+        skip_nan = self._config.validation_mode == ValidationMode.BASIC
+
         # Validate using utility function
         validated = validate_input_array(
             data,
             expected_dtype=np.dtype(np.float32),
             name="input",
+            skip_nan_check=skip_nan,
         )
 
         # Ensure 1D

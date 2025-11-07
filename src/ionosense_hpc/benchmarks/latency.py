@@ -71,12 +71,11 @@ class LatencyBenchmark(BaseBenchmark):
             # Get engine config from preset or override
             if self.config.engine_config:
                 engine_config = EngineConfig(**self.config.engine_config)
-                # Default to STREAMING mode for latency if not explicitly set in config
-                if 'mode' not in self.config.engine_config:
-                    engine_config.mode = ExecutionMode.STREAMING
+                # Mode is now controlled by config (defaults to BATCH for latency)
+                # Use BATCH for single-frame latency, STREAMING for continuous streams
             else:
                 engine_config = get_preset('default')
-                engine_config.mode = ExecutionMode.STREAMING
+                # Default preset already uses BATCH mode
 
             # Initialize engine
             with nvtx_range("InitializeEngine", color=ProfileColor.DARK_GRAY):
@@ -111,11 +110,9 @@ class LatencyBenchmark(BaseBenchmark):
         """Execute single iteration with comprehensive timing and NVTX markers."""
         assert self.engine is not None
         assert self.test_data is not None
-        # Pre-iteration synchronization for accurate timing
-        with nvtx_range("PreIterationSync", color=ProfileColor.YELLOW):
-            self.engine.synchronize()
 
         # Start timing
+        # Note: Pre-iteration sync removed - C++ executor handles buffer availability
         t_start_ns = time.perf_counter_ns()
 
         # Process data
@@ -124,7 +121,9 @@ class LatencyBenchmark(BaseBenchmark):
         ):
             output = self.engine.process(self.test_data)
 
-        # Post-processing synchronization
+        # Post-processing synchronization to ensure GPU work is complete
+        # Note: With BATCH mode, this may be redundant as executor already syncs internally
+        # Kept for compatibility with STREAMING mode and external synchronization needs
         with nvtx_range("PostIterationSync", color=ProfileColor.YELLOW):
             self.engine.synchronize()
 

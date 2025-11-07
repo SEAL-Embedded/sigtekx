@@ -41,6 +41,7 @@ tabs = st.tabs([
     "Latency Analysis",
     "Accuracy Analysis",
     "Scaling Analysis",
+    "Execution Mode Overhead",
     "Configuration Recommendations"
 ])
 
@@ -366,9 +367,192 @@ with tabs[4]:
                     )
 
 # ============================================================================
-# TAB 6: CONFIGURATION RECOMMENDATIONS
+# TAB 6: EXECUTION MODE OVERHEAD
 # ============================================================================
 with tabs[5]:
+    st.header("Execution Mode Overhead Analysis")
+
+    st.markdown("""
+    ### BATCH vs STREAMING Mode Comparison
+
+    The Ionosense HPC library supports two execution modes:
+    - **BATCH Mode**: Direct buffer processing for discrete frames (minimal overhead)
+    - **STREAMING Mode**: Ring buffer management for continuous real-time streams
+    """)
+
+    # Check if we have execution mode comparison data
+    has_mode_column = 'engine_mode' in data.columns
+    has_latency_data = 'latency' in data['benchmark_type'].values
+
+    if not has_mode_column:
+        st.warning("⚠️ No execution mode data available. Run the `execution_mode_comparison` experiment to analyze overhead.")
+        st.code("""
+# Run execution mode comparison experiment:
+python benchmarks/run_latency.py experiment=execution_mode_comparison +benchmark=latency
+        """)
+    elif not has_latency_data:
+        st.info("ℹ️ No latency benchmark data available for execution mode comparison.")
+    else:
+        # Filter latency data with both modes
+        latency_data = data[data['benchmark_type'] == 'latency'].copy()
+
+        # Check if we have both modes
+        available_modes = latency_data['engine_mode'].unique() if 'engine_mode' in latency_data.columns else []
+
+        if len(available_modes) < 2:
+            st.info(f"ℹ️ Only {len(available_modes)} execution mode(s) tested: {', '.join(available_modes)}. "
+                   "Run `execution_mode_comparison` experiment to compare BATCH vs STREAMING overhead.")
+        else:
+            # Group by NFFT and mode to calculate overhead
+            if 'mean_latency_us' in latency_data.columns:
+                st.subheader("📊 Latency Comparison")
+
+                # Pivot table for side-by-side comparison
+                pivot_data = latency_data.pivot_table(
+                    index='engine_nfft',
+                    columns='engine_mode',
+                    values='mean_latency_us',
+                    aggfunc='mean'
+                )
+
+                # Calculate overhead if both modes exist
+                if 'batch' in pivot_data.columns and 'streaming' in pivot_data.columns:
+                    pivot_data['Overhead (µs)'] = pivot_data['streaming'] - pivot_data['batch']
+                    pivot_data['Overhead (%)'] = ((pivot_data['streaming'] / pivot_data['batch']) - 1) * 100
+
+                    # Display comparison table
+                    display_data = pivot_data.copy()
+                    display_data = display_data.reset_index()
+
+                    st.dataframe(
+                        display_data,
+                        use_container_width=True,
+                        hide_index=True,
+                        column_config={
+                            'engine_nfft': st.column_config.NumberColumn('NFFT', format='%d'),
+                            'batch': st.column_config.NumberColumn('BATCH (µs)', format='%.1f'),
+                            'streaming': st.column_config.NumberColumn('STREAMING (µs)', format='%.1f'),
+                            'Overhead (µs)': st.column_config.NumberColumn('Overhead (µs)', format='%.1f'),
+                            'Overhead (%)': st.column_config.NumberColumn('Overhead (%)', format='%.1f%%'),
+                        }
+                    )
+
+                    # Visualizations
+                    st.divider()
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+                        st.subheader("Absolute Latency")
+                        fig = plotter.plot_scaling(
+                            latency_data,
+                            x_col='engine_nfft',
+                            y_col='mean_latency_us',
+                            group_by='engine_mode',
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+
+                    with col2:
+                        st.subheader("Overhead Scaling")
+                        # Plot overhead vs NFFT
+                        import plotly.graph_objects as go
+                        overhead_data = pivot_data.reset_index()
+                        fig = go.Figure()
+                        fig.add_trace(go.Scatter(
+                            x=overhead_data['engine_nfft'],
+                            y=overhead_data['Overhead (µs)'],
+                            mode='lines+markers',
+                            name='Overhead (µs)',
+                            line=dict(width=3),
+                            marker=dict(size=10)
+                        ))
+                        fig.update_layout(
+                            xaxis_title='NFFT',
+                            yaxis_title='STREAMING Overhead (µs)',
+                            xaxis_type='log',
+                            template='plotly_white',
+                            height=400
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+
+                    # Summary statistics
+                    st.divider()
+                    st.subheader("📈 Overhead Summary")
+
+                    col1, col2, col3, col4 = st.columns(4)
+                    col1.metric(
+                        "Mean Overhead",
+                        f"{pivot_data['Overhead (µs)'].mean():.1f} µs",
+                        help="Average overhead of STREAMING vs BATCH mode"
+                    )
+                    col2.metric(
+                        "Mean Overhead %",
+                        f"{pivot_data['Overhead (%)'].mean():.1f}%"
+                    )
+                    col3.metric(
+                        "Min Overhead",
+                        f"{pivot_data['Overhead (µs)'].min():.1f} µs",
+                        help="Smallest overhead observed (low NFFT)"
+                    )
+                    col4.metric(
+                        "Max Overhead",
+                        f"{pivot_data['Overhead (µs)'].max():.1f} µs",
+                        help="Largest overhead observed (high NFFT)"
+                    )
+
+                    # Explanation
+                    st.divider()
+                    st.subheader("🔍 Understanding the Overhead")
+
+                    st.markdown("""
+                    **STREAMING mode overhead** comes from:
+                    - Per-channel ring buffer allocation and management
+                    - `extract_frame()` memory copies from ring buffers
+                    - `advance()` pointer management for overlap handling
+                    - Additional synchronization points
+
+                    **When to use each mode:**
+                    """)
+
+                    mode_table = pd.DataFrame([
+                        {
+                            'Use Case': '📊 Single-frame latency benchmarks',
+                            'Recommended Mode': 'BATCH',
+                            'Reason': 'Minimal overhead, measures pure processing time'
+                        },
+                        {
+                            'Use Case': '🚀 Throughput benchmarks',
+                            'Recommended Mode': 'BATCH',
+                            'Reason': 'Maximum throughput for discrete frame processing'
+                        },
+                        {
+                            'Use Case': '🌊 Ionosphere research (continuous)',
+                            'Recommended Mode': 'STREAMING',
+                            'Reason': 'Ring buffer essential for overlap management & continuous data'
+                        },
+                        {
+                            'Use Case': '📡 Real-time streaming applications',
+                            'Recommended Mode': 'STREAMING',
+                            'Reason': 'Seamless continuous data flow handling'
+                        },
+                        {
+                            'Use Case': '📦 Batch processing (offline)',
+                            'Recommended Mode': 'BATCH',
+                            'Reason': 'Higher efficiency for discrete frame sets'
+                        }
+                    ])
+
+                    st.dataframe(
+                        mode_table,
+                        use_container_width=True,
+                        hide_index=True
+                    )
+                else:
+                    st.warning("Not enough mode data for comparison. Expected both 'batch' and 'streaming' modes.")
+
+# ============================================================================
+# TAB 7: CONFIGURATION RECOMMENDATIONS
+# ============================================================================
+with tabs[6]:
     st.header("Configuration Recommendations")
 
     st.markdown("""

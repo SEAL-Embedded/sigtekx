@@ -59,6 +59,13 @@ class ExecutionMode(str, Enum):
     STREAMING = 'streaming'  # Low-latency streaming with ring buffer
 
 
+class ValidationMode(str, Enum):
+    """Input validation strictness levels."""
+    STRICT = 'strict'      # Full validation including NaN/Inf checks (safest)
+    BASIC = 'basic'        # Type/shape/contiguity only (faster)
+    DISABLED = 'disabled'  # Skip Python validation (C++ still validates)
+
+
 # ============================================================================
 # Unified Engine Configuration
 # ============================================================================
@@ -206,6 +213,11 @@ class EngineConfig(BaseModel):
     enable_profiling: bool = Field(
         default=False,
         description="Enable internal profiling and metrics collection"
+    )
+
+    validation_mode: ValidationMode = Field(
+        default=ValidationMode.STRICT,
+        description="Input validation strictness (strict=full checks, basic=type/shape only, disabled=skip Python validation)"
     )
 
     # ========================================================================

@@ -26,6 +26,18 @@ st.set_page_config(page_title="Ionosphere Research", page_icon="🔬", layout="w
 
 st.title("🔬 Ionosphere Research Report")
 
+# Execution mode badge
+st.info("""
+🌊 **STREAMING MODE** - All ionosphere experiments use STREAMING execution mode for continuous real-time data processing.
+
+The STREAMING executor provides essential ring buffer management for:
+- Seamless overlap handling in continuous antenna streams
+- Zero data loss in real-time monitoring applications
+- Optimized memory management for long-duration observations
+
+For discrete frame latency measurements, see the General Performance report.
+""")
+
 # Load data
 try:
     data = load_benchmark_data("artifacts/data")

@@ -83,7 +83,8 @@ def validate_input_array(
     data: np.ndarray,
     expected_shape: tuple[int, ...] | None = None,
     expected_dtype: np.dtype | None = None,
-    name: str = "input"
+    name: str = "input",
+    skip_nan_check: bool = False
 ) -> np.ndarray:
     """Validate and prepare a NumPy array for processing.
 
@@ -92,6 +93,7 @@ def validate_input_array(
         expected_shape: Expected shape (None to skip)
         expected_dtype: Expected dtype (None to skip)
         name: Name for error messages
+        skip_nan_check: Skip expensive NaN/Inf check (for performance)
 
     Returns:
         Validated array (possibly with dtype conversion)
@@ -129,11 +131,12 @@ def validate_input_array(
     if not data.flags['C_CONTIGUOUS']:
         data = np.ascontiguousarray(data)
 
-    # Check for NaN/Inf
-    if np.issubdtype(data.dtype, np.floating) and not np.isfinite(data).all():
-        warnings.warn(
-            f"{name} contains NaN or Inf values", RuntimeWarning, stacklevel=2
-        )
+    # Check for NaN/Inf (can be skipped for performance in hot paths)
+    if not skip_nan_check:
+        if np.issubdtype(data.dtype, np.floating) and not np.isfinite(data).all():
+            warnings.warn(
+                f"{name} contains NaN or Inf values", RuntimeWarning, stacklevel=2
+            )
 
     return data
 

@@ -1,0 +1,84 @@
+# @package _global_
+# Execution Mode Comparison Experiment
+# ======================================
+# Compares BATCH vs STREAMING mode performance to quantify ring buffer overhead.
+# Helps users understand when to use each execution mode.
+
+defaults:
+  - override /engine: profiling
+
+experiment:
+  name: execution_mode_comparison
+  description: >-
+    Compare BATCH vs STREAMING execution mode performance across multiple NFFT sizes.
+    Quantifies ring buffer management overhead in STREAMING mode.
+    Results help users choose the right execution mode for their use case.
+  tags: [performance, execution-mode, overhead, batch-vs-streaming]
+
+# Hydra multirun configuration for parameter sweep
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      # Execution mode sweep: BATCH (direct) vs STREAMING (ring buffer)
+      engine.mode: batch,streaming
+
+      # NFFT sweep: see how overhead scales with transform size
+      # 1024: Small FFT, baseline overhead
+      # 2048: Lightning detection, fast transients
+      # 4096: Standard ionosphere real-time
+      # 8192: High-resolution analysis
+      # 16384: VLF/ULF phenomena
+      engine.nfft: 1024,2048,4096,8192,16384
+
+      # Fixed parameters for fair comparison
+      engine.channels: 2
+      engine.overlap: 0.75
+
+# Analysis configuration
+analysis:
+  statistical_tests: [shapiro, mann_whitney, kruskal]
+  confidence_level: 0.95
+  min_samples: 50
+
+  # Focus metrics for execution mode comparison
+  focus_metrics:
+    - mean_latency_ms      # Primary metric: processing latency
+    - p50_latency_ms       # Median latency
+    - p95_latency_ms       # 95th percentile
+    - p99_latency_ms       # 99th percentile
+    - std_latency_ms       # Latency variability
+    - frames_per_second    # Throughput impact
+    - memory_usage_mb      # Memory overhead
+    - rtf                  # Real-time factor
+
+  # Thresholds
+  thresholds:
+    max_overhead_percent: 50  # Alert if STREAMING >50% slower than BATCH
+
+# Execution mode comparison metadata
+comparison:
+  baseline_mode: batch  # BATCH is the baseline (minimal overhead)
+
+  # Expected characteristics
+  batch_characteristics:
+    - "Direct buffer processing"
+    - "Minimal synchronization overhead"
+    - "Best for discrete frame processing"
+    - "Ideal for latency measurement"
+    - "Maximum throughput"
+
+  streaming_characteristics:
+    - "Ring buffer management per channel"
+    - "Continuous data flow handling"
+    - "Best for real-time streams"
+    - "Essential for ionosphere research"
+    - "Seamless overlap management"
+
+  # Overhead components (for documentation)
+  streaming_overhead_sources:
+    - "Per-channel ring buffer allocation"
+    - "extract_frame() memory copies"
+    - "advance() pointer management"
+    - "Additional synchronization"
+    - "Multi-batch processing in loops"

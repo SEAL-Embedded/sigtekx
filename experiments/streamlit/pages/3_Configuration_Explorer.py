@@ -86,7 +86,7 @@ if 'mode' in config_params:
         "Execution Mode",
         options=config_params['mode'],
         default=config_params['mode'],
-        help="Batch (throughput-optimized) vs Streaming (real-time)"
+        help="BATCH: discrete frames (minimal overhead), STREAMING: continuous real-time (ring buffer management)"
     )
 else:
     selected_modes = None
@@ -155,6 +155,7 @@ column_config = {
     "engine_nfft": st.column_config.NumberColumn("NFFT", format="%d"),
     "engine_channels": st.column_config.NumberColumn("Channels", format="%d"),
     "engine_overlap": st.column_config.NumberColumn("Overlap", format="%.3f"),
+    "engine_mode": st.column_config.TextColumn("Mode", help="BATCH (discrete frames) vs STREAMING (continuous real-time)"),
     "frames_per_second": st.column_config.NumberColumn("FPS", format="%.1f"),
     "mean_latency_us": st.column_config.NumberColumn("Latency (μs)", format="%.1f"),
     "rtf": st.column_config.NumberColumn("RTF", format="%.2f"),
@@ -307,13 +308,19 @@ if len(filtered_data) >= 2:
 
     col1, col2 = st.columns(2)
 
+    # Helper function to format config label
+    def format_config(i):
+        row = filtered_data.iloc[i]
+        label = f"NFFT={row['engine_nfft']}, Ch={row['engine_channels']}, Overlap={row['engine_overlap']:.2f}"
+        if 'engine_mode' in row:
+            label += f", {row['engine_mode'].upper()}"
+        return label
+
     with col1:
         config1_idx = st.selectbox(
             "Configuration 1",
             options=range(len(filtered_data)),
-            format_func=lambda i: f"NFFT={filtered_data.iloc[i]['engine_nfft']}, "
-                                   f"Ch={filtered_data.iloc[i]['engine_channels']}, "
-                                   f"Overlap={filtered_data.iloc[i]['engine_overlap']:.2f}",
+            format_func=format_config,
             key="config1"
         )
 
@@ -322,9 +329,7 @@ if len(filtered_data) >= 2:
             "Configuration 2",
             options=range(len(filtered_data)),
             index=min(1, len(filtered_data) - 1),
-            format_func=lambda i: f"NFFT={filtered_data.iloc[i]['engine_nfft']}, "
-                                   f"Ch={filtered_data.iloc[i]['engine_channels']}, "
-                                   f"Overlap={filtered_data.iloc[i]['engine_overlap']:.2f}",
+            format_func=format_config,
             key="config2"
         )
 

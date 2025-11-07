@@ -132,7 +132,8 @@ def run_latency_benchmark(cfg: DictConfig) -> float:
 
         summary_df = pd.DataFrame([summary])
         summary_path = output_dir / f"latency_summary_{engine_config.nfft}_{engine_config.channels}.csv"
-        summary_df.to_csv(summary_path, index=False)
+        # Append to CSV if exists (for execution mode comparison), otherwise create new
+        summary_df.to_csv(summary_path, mode='a', header=not summary_path.exists(), index=False)
         mlflow.log_artifact(str(summary_path))
 
     return mean_latency

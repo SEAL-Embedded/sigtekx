@@ -1,8 +1,6 @@
-# Latency benchmark configuration
-# Use BATCH mode for single-frame latency measurement (discrete frame processing)
-# For continuous streaming latency, use latency_streaming.yaml instead
-engine:
-  mode: batch
+# Latency benchmark configuration for execution mode comparison
+# Does NOT set engine.mode - allows experiment to control it via sweep
+# Based on latency.yaml but mode-agnostic
 
 # Benchmark parameters
 name: latency

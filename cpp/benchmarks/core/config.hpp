@@ -124,7 +124,9 @@ inline BenchmarkConfig get_latency_config(RunMode mode = RunMode::FULL) {
   BenchmarkConfig config;
   config.preset = BenchmarkPreset::LATENCY;
   config.run_mode = mode;
-  config.exec_mode = ExecutorConfig::ExecutionMode::STREAMING;
+  // BATCH mode for single-frame latency measurement (discrete processing)
+  // Use --exec-mode streaming for continuous stream latency profiling
+  config.exec_mode = ExecutorConfig::ExecutionMode::BATCH;
   config.nfft = 2048;
   config.channels = 2;  // Low channel count for minimal latency
   config.overlap = 0.5f;  // 50% overlap for regular benchmarks

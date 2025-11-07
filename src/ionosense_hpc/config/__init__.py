@@ -19,6 +19,7 @@ from .schemas import (
     ExecutionMode,
     OutputMode,
     ScalePolicy,
+    ValidationMode,
     WindowNorm,
     WindowSymmetry,
     WindowType,
@@ -41,6 +42,7 @@ __all__ = [
     'ScalePolicy',
     'OutputMode',
     'ExecutionMode',
+    'ValidationMode',
 
     # Preset functions
     'get_preset',
