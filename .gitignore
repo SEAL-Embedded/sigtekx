@@ -21,6 +21,7 @@ CMakeCache.txt
 *.cmake
 *.rsp
 compile_commands.json    # Generated; re-create as needed
+data archive/
 
 # --- Compiled Binaries & Objects (C/C++/CUDA) ---
 *.o

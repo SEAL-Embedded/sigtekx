@@ -1,7 +1,7 @@
 /**
  * @file executor_config.hpp
- * @version 0.9.3
- * @date 2025-10-09
+ * @version 0.9.5
+ * @date 2025-11-07
  * @author [Kevin Rahsaz]
  *
  * @brief Configuration structures for pipeline executors.
@@ -44,6 +44,12 @@ struct ExecutorConfig : SignalConfig {
 
   /// Device ID to use (defaults to best available)
   int device_id = -1;  // -1 means auto-select
+
+  /// Enable background thread for async producer-consumer pattern (v0.9.5+)
+  /// When true, submit() returns immediately after pushing to ring buffer.
+  /// Background thread continuously processes available frames.
+  /// When false, submit() processes synchronously (current behavior).
+  bool enable_background_thread = false;
 
   // NOTE: prefer_cuda_graphs removed in v0.9.3 - deferred to v0.9.4+
   // CUDA graph optimization will be added when async/streaming features
