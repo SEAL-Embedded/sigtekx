@@ -1,0 +1,32 @@
+# Streaming Executor with Async Producer-Consumer
+# =================================================
+# Enables background thread for asynchronous frame processing.
+# Main thread pushes to ring buffer and returns quickly.
+# Background thread continuously drains buffers and processes on GPU.
+
+name: streaming_async
+nfft: 4096
+channels: 2
+overlap: 0.75
+sample_rate_hz: 48000
+
+# Execution mode: STREAMING with async processing
+mode: streaming
+enable_background_thread: true  # KEY: Enable async producer-consumer
+
+# Resource allocation
+stream_count: 3
+pinned_buffer_count: 3
+max_inflight_batches: 2
+
+# Async-specific tuning
+warmup_iters: 5
+timeout_ms: 2000
+
+# GPU settings
+use_cuda_graphs: false
+enable_profiling: true
+
+# Note: Async mode requires v0.9.5+ with atomic ring buffers
+# Background thread will continuously process available frames
+# Expected benefit: 20-40% latency reduction from CPU/GPU overlap
