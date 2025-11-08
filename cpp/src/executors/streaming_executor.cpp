@@ -1,22 +1,28 @@
 /**
  * @file streaming_executor.cpp
- * @version 0.9.4
- * @date 2025-10-23
+ * @version 0.9.5
+ * @date 2025-11-07
  * @author [Kevin Rahsaz]
  *
  * @brief Implementation of StreamingExecutor with ring buffer support.
  *
  * Implements continuous streaming with ring buffer for input accumulation,
  * frame-by-frame processing with overlap, and CUDA stream pipelining for
- * low-latency operation.
+ * low-latency operation. Supports optional async producer-consumer pattern
+ * with background thread for improved throughput.
  */
 
 #include "ionosense/executors/streaming_executor.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <iostream>
+#include <mutex>
+#include <queue>
 #include <stdexcept>
+#include <thread>
 
 #include "ionosense/core/cuda_wrappers.hpp"
 #include "ionosense/core/ring_buffer.hpp"
@@ -212,12 +218,34 @@ class StreamingExecutor::Impl {
 
     stats_ = ProcessingStats{};
     stats_.is_warmup = false;
+
+    // Start consumer thread if async mode is enabled (v0.9.5+)
+    if (config_.enable_background_thread) {
+      IONO_NVTX_RANGE("Start Consumer Thread", profiling::colors::PURPLE);
+      stop_flag_.store(false, std::memory_order_release);
+      consumer_thread_ = std::thread(&Impl::consumer_loop, this);
+    }
+
     IONO_NVTX_MARK("Initialization Complete", profiling::colors::CYAN);
   }
 
   void reset() {
     IONO_NVTX_RANGE_FUNCTION(profiling::colors::RED);
     if (!initialized_) return;
+
+    // Stop consumer thread if running (v0.9.5+)
+    if (consumer_thread_.joinable()) {
+      IONO_NVTX_RANGE("Stop Consumer Thread", profiling::colors::PURPLE);
+      stop_flag_.store(true, std::memory_order_release);
+      cv_data_ready_.notify_all();  // Wake up consumer thread if waiting
+      consumer_thread_.join();      // Wait for thread to exit cleanly
+
+      // Clear any remaining results
+      std::lock_guard<std::mutex> lock(result_mutex_);
+      while (!result_queue_.empty()) {
+        result_queue_.pop();
+      }
+    }
 
     {
       IONO_NVTX_RANGE("Synchronize All Streams", profiling::colors::YELLOW);
@@ -282,47 +310,104 @@ class StreamingExecutor::Impl {
     // Samples needed per channel for one frame (no longer batch-dependent)
     const size_t samples_needed_per_channel = static_cast<size_t>(config_.nfft);
 
-    // Process ALL available frames to drain ring buffer (prevent ring buffer
-    // overflow) Each frame overwrites the output buffer, so only the LAST
-    // frame's result is returned to the caller (maintains API contract: one
-    // output per call)
-    //
-    // This prevents ring buffer overflow during warmup when many consecutive
-    // submit() calls accumulate samples faster than they're drained (due to
-    // overlap). Without this, after N warmup iterations:
-    // ring_buffer.available() ≈ N × hop_size, which quickly exceeds ring buffer
-    // capacity.
-    size_t batches_processed = 0;
+    // Dual-mode processing: async producer-consumer or synchronous
+    if (config_.enable_background_thread) {
+      // ===== ASYNC MODE: Producer-consumer pattern (v0.9.5+) =====
+      IONO_NVTX_RANGE("Async Mode: Notify Consumer", profiling::colors::PURPLE);
 
-    while (true) {
-      // Check if all channels have enough samples for one frame
-      bool all_channels_ready = true;
-      for (int ch = 0; ch < config_.channels; ++ch) {
-        if (input_ring_buffers_[ch]->available() < samples_needed_per_channel) {
-          all_channels_ready = false;
-          break;
+      // Notify consumer thread that new data is available
+      cv_data_ready_.notify_one();
+
+      // Wait for result from consumer thread (with timeout for safety)
+      std::vector<float> result;
+      bool got_result = false;
+      {
+        IONO_NVTX_RANGE("Wait for Consumer Result", profiling::colors::PURPLE);
+        std::unique_lock<std::mutex> lock(result_mutex_);
+
+        // Wait up to 2 seconds for result (config_.timeout_ms or default 2000ms)
+        const auto timeout = std::chrono::milliseconds(
+            config_.timeout_ms > 0 ? config_.timeout_ms : 2000);
+        const auto deadline = std::chrono::steady_clock::now() + timeout;
+
+        while (result_queue_.empty() &&
+               std::chrono::steady_clock::now() < deadline) {
+          // Wait with timeout, checking periodically
+          if (std::cv_status::timeout ==
+              std::condition_variable_any().wait_until(lock, deadline)) {
+            break;  // Timeout reached
+          }
+        }
+
+        if (!result_queue_.empty()) {
+          result = std::move(result_queue_.front());
+          result_queue_.pop();
+          got_result = true;
         }
       }
 
-      if (!all_channels_ready) {
-        break;
+      if (got_result) {
+        // Copy result to output buffer
+        const size_t output_size =
+            static_cast<size_t>(config_.num_output_bins()) * config_.channels;
+        std::memcpy(output, result.data(), output_size * sizeof(float));
+
+        // Update statistics
+        const auto end_time = std::chrono::high_resolution_clock::now();
+        const auto duration =
+            std::chrono::duration<float, std::micro>(end_time - start_time);
+        stats_.latency_us = duration.count();
+        stats_.frames_processed++;
+        stats_.throughput_gbps = calculate_throughput(num_samples, duration.count());
+      } else {
+        throw std::runtime_error(
+            "Async processing timeout: consumer thread did not produce result");
       }
 
-      // Process one frame (overwrites output buffer)
-      process_one_batch(output);
-      batches_processed++;
-    }
+    } else {
+      // ===== SYNC MODE: Process inline (current behavior) =====
+      // Process ALL available frames to drain ring buffer (prevent ring buffer
+      // overflow) Each frame overwrites the output buffer, so only the LAST
+      // frame's result is returned to the caller (maintains API contract: one
+      // output per call)
+      //
+      // This prevents ring buffer overflow during warmup when many consecutive
+      // submit() calls accumulate samples faster than they're drained (due to
+      // overlap). Without this, after N warmup iterations:
+      // ring_buffer.available() ≈ N × hop_size, which quickly exceeds ring buffer
+      // capacity.
+      size_t batches_processed = 0;
 
-    // Update statistics (for last processed batch)
-    if (batches_processed > 0) {
-      const auto end_time = std::chrono::high_resolution_clock::now();
-      const auto duration =
-          std::chrono::duration<float, std::micro>(end_time - start_time);
-      stats_.latency_us =
-          duration.count() / static_cast<float>(batches_processed);
-      stats_.frames_processed += batches_processed;
-      stats_.throughput_gbps = calculate_throughput(
-          num_samples * batches_processed, duration.count());
+      while (true) {
+        // Check if all channels have enough samples for one frame
+        bool all_channels_ready = true;
+        for (int ch = 0; ch < config_.channels; ++ch) {
+          if (input_ring_buffers_[ch]->available() < samples_needed_per_channel) {
+            all_channels_ready = false;
+            break;
+          }
+        }
+
+        if (!all_channels_ready) {
+          break;
+        }
+
+        // Process one frame (overwrites output buffer)
+        process_one_batch(output);
+        batches_processed++;
+      }
+
+      // Update statistics (for last processed batch)
+      if (batches_processed > 0) {
+        const auto end_time = std::chrono::high_resolution_clock::now();
+        const auto duration =
+            std::chrono::duration<float, std::micro>(end_time - start_time);
+        stats_.latency_us =
+            duration.count() / static_cast<float>(batches_processed);
+        stats_.frames_processed += batches_processed;
+        stats_.throughput_gbps = calculate_throughput(
+            num_samples * batches_processed, duration.count());
+      }
     }
   }
 
@@ -618,6 +703,73 @@ class StreamingExecutor::Impl {
     return (static_cast<float>(bytes) / (1024.0f * 1024.0f * 1024.0f)) / secs;
   }
 
+  /**
+   * @brief Background thread consumer loop for async processing.
+   *
+   * Continuously drains ring buffers and processes frames on GPU.
+   * Runs until stop_flag_ is set. Uses condition variable for efficient waiting.
+   */
+  void consumer_loop() {
+    IONO_NVTX_RANGE("Consumer Thread", profiling::colors::PURPLE);
+
+    // Set CUDA context for this thread
+    IONO_CUDA_CHECK(cudaSetDevice(device_id_));
+
+    const size_t samples_needed_per_channel = static_cast<size_t>(config_.nfft);
+    const size_t output_size =
+        static_cast<size_t>(config_.num_output_bins()) * config_.channels;
+
+    while (!stop_flag_.load(std::memory_order_acquire)) {
+      // Wait for data or stop signal
+      {
+        std::unique_lock<std::mutex> lock(cv_mutex_);
+        cv_data_ready_.wait(lock, [this, samples_needed_per_channel] {
+          // Check if we have enough samples in ALL channels
+          bool have_data = true;
+          for (int ch = 0; ch < config_.channels; ++ch) {
+            if (input_ring_buffers_[ch]->available() < samples_needed_per_channel) {
+              have_data = false;
+              break;
+            }
+          }
+          return have_data || stop_flag_.load(std::memory_order_acquire);
+        });
+
+        if (stop_flag_.load(std::memory_order_acquire)) {
+          break;  // Exit cleanly
+        }
+      }
+
+      // Process all available frames
+      while (!stop_flag_.load(std::memory_order_acquire)) {
+        // Check if all channels have enough samples
+        bool all_ready = true;
+        for (int ch = 0; ch < config_.channels; ++ch) {
+          if (input_ring_buffers_[ch]->available() < samples_needed_per_channel) {
+            all_ready = false;
+            break;
+          }
+        }
+
+        if (!all_ready) {
+          break;  // No more complete frames, go back to waiting
+        }
+
+        // Allocate result buffer
+        std::vector<float> result(output_size);
+
+        // Process one batch (this calls process_one_batch internally)
+        process_one_batch(result.data());
+
+        // Store result in queue
+        {
+          std::lock_guard<std::mutex> lock(result_mutex_);
+          result_queue_.push(std::move(result));
+        }
+      }
+    }
+  }
+
   // Member variables
   ExecutorConfig config_{};
   int device_id_ = 0;
@@ -643,6 +795,14 @@ class StreamingExecutor::Impl {
   bool initialized_ = false;
   uint64_t frame_counter_ = 0;
   ProcessingStats stats_{};
+
+  // Async producer-consumer infrastructure (v0.9.5+)
+  std::thread consumer_thread_;                    // Background processing thread
+  std::atomic<bool> stop_flag_{false};             // Signal to stop consumer thread
+  std::condition_variable cv_data_ready_;          // Notify consumer of new data
+  std::mutex cv_mutex_;                            // Mutex for condition variable only
+  std::queue<std::vector<float>> result_queue_;    // Completed results from consumer
+  std::mutex result_mutex_;                        // Protects result_queue_
 };
 
 // ============================================================================

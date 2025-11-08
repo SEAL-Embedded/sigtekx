@@ -27,7 +27,8 @@ rule all:
         "artifacts/data/accuracy_validation.done",
         "artifacts/data/ionosphere_nfft_channels_grid.done",
         "artifacts/data/ionosphere_lightning.done",
-        "artifacts/data/ionosphere_schumann.done"
+        "artifacts/data/ionosphere_schumann.done",
+        "artifacts/data/execution_mode_comparison.done"
 
 # Run ionosphere resolution sweep (high-resolution analysis)
 rule run_ionosphere_resolution:
@@ -104,6 +105,17 @@ rule run_accuracy_validation:
         python benchmarks/run_accuracy.py --multirun \
             experiment=accuracy_validation \
             +benchmark=accuracy
+        """
+
+# Run execution mode comparison (BATCH vs STREAMING overhead analysis)
+rule run_execution_mode_comparison:
+    output:
+        touch("artifacts/data/execution_mode_comparison.done")
+    shell:
+        """
+        python benchmarks/run_latency.py \
+            experiment=execution_mode_comparison \
+            +benchmark=latency_mode_comparison
         """
 
 # Run comprehensive NFFT × channels grid (for general report heatmap)
