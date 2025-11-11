@@ -62,13 +62,23 @@ def get_output_root() -> Path:
     """Alias for artifact root for backwards compatibility."""
     return get_artifacts_root()
 
+def _get_path_with_env_override(env_var: str, default_subdir: str) -> Path:
+    """Get path with environment variable override report.
+    
+    Args: Environment variable name to check
+    default_subdir: Subdirectory name under output root if env var not set
+    
+    Returns:
+        Path object - either from env var or default location
+    """
+    env_path = os.environ.get(env_var)
+    if env_path:
+        return Path(env_path)
+    return get_output_root() / default_subdir
 
 def get_benchmarks_root() -> Path:
     """Root for benchmark result directories."""
-    env = os.environ.get("IONO_BENCH_DIR")
-    if env:
-        return _ensure(Path(env))
-    return _ensure(get_artifacts_root() / "benchmarks")
+    return _get_path_with_env_override("IONO_BENCH_DIR", "benchmark_results")
 
 
 def get_benchmark_run_dir(name: str) -> Path:
@@ -93,15 +103,9 @@ def get_benchmark_result_path(
 
 def get_experiments_root() -> Path:
     """Root for research workflow experiment directories."""
-    env = os.environ.get("IONO_EXPERIMENTS_DIR")
-    if env:
-        return _ensure(Path(env))
-    return _ensure(get_artifacts_root() / "experiments")
+    return _get_path_with_env_override("IONO_EXPERIMENTS_DIR", "experiments")
 
 
 def get_reports_root() -> Path:
     """Root for top-level reports (test, lint, etc.)."""
-    env = os.environ.get("IONO_REPORTS_DIR")
-    if env:
-        return _ensure(Path(env))
-    return _ensure(get_artifacts_root() / "reports")
+    return _get_path_with_env_override("IONO_REPORTS_DIR", "reports")
