@@ -375,6 +375,7 @@ function global:iono {
         $processedArgs += $Args[1..($Args.Count-1)]
     }
 
+    # Use splatting (safe now - pattern detection handles Hydra args, no "--" to consume)
     & $global:IONO_CLI @processedArgs
 }
 
@@ -486,6 +487,52 @@ function global:iprof {
     [CmdletBinding()]
     param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
 
+    if ($Args.Count -eq 0) {
+        Write-Host "Usage: iprof <tool> <target> [--flags] [hydra=configs]" -ForegroundColor Yellow
+        Write-Host "Example: iprof nsys latency --mode full engine.nfft=8192" -ForegroundColor Cyan
+        return
+    }
+
+    # Pattern-based argument classification
+    # Hydra uses distinct syntax that never overlaps with tool flags
+    $toolArgs = @()
+    $hydraArgs = @()
+
+    $i = 0
+    while ($i -lt $Args.Count) {
+        $arg = $Args[$i]
+
+        # Hydra config patterns: key=value, +key=value, ++key=value, ~key, ~key=value
+        if ($arg -match '^[\+~]{0,2}[\w\.\-/]+=' -or $arg -match '^~[\w\.\-/]+$') {
+            $hydraArgs += $arg
+        }
+        # Tool flags: --flag or --flag value
+        elseif ($arg -match '^--[\w\-]+$') {
+            $toolArgs += $arg
+            # Check if next arg is a value (not another flag or Hydra config)
+            if (($i + 1) -lt $Args.Count) {
+                $nextArg = $Args[$i + 1]
+                if ($nextArg -notmatch '^--' -and $nextArg -notmatch '^[\+~]{0,2}[\w\.\-/]+=') {
+                    $i++
+                    $toolArgs += $Args[$i]
+                }
+            }
+        }
+        # Positional arguments (tool name, target name)
+        else {
+            $toolArgs += $arg
+        }
+
+        $i++
+    }
+
+    # Build command: pass to iono with "profile" command
+    $ionoArgs = @("profile") + $toolArgs
+    if ($hydraArgs.Count -gt 0) {
+        $ionoArgs += $hydraArgs
+    }
+
+    # Handle common parameters (Debug, Verbose)
     $common = @{}
     foreach ($name in @('Debug','Verbose')) {
         if ($PSBoundParameters.ContainsKey($name)) {
@@ -493,10 +540,11 @@ function global:iprof {
         }
     }
 
+    # Call iono with splatting (safe now - no "--" to consume)
     if ($common.Count -gt 0) {
-        iono @common profile @Args
+        iono @common @ionoArgs
     } else {
-        iono profile @Args
+        iono @ionoArgs
     }
 }
 

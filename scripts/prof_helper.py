@@ -459,7 +459,68 @@ class ProfileSession:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="GPU Profiling Helper")
+    parser = argparse.ArgumentParser(
+        description="GPU Profiling Helper - Nsight Systems and Nsight Compute wrapper",
+        epilog="""
+ARGUMENT ORDER (IMPORTANT):
+  Flags MUST come before positional arguments:
+    ✓ Correct:   prof_helper.py --mode quick nsys latency -- engine.nfft=8192
+    ✗ Wrong:     prof_helper.py nsys latency --mode quick -- engine.nfft=8192
+
+  This is required by argparse when using REMAINDER for Hydra passthrough.
+
+EXAMPLES:
+  Quick profiling (auto-configured for fast iteration):
+    python prof_helper.py nsys latency
+    python prof_helper.py --mode full ncu throughput
+
+  Override engine parameters (default profiling config auto-loaded):
+    python prof_helper.py nsys latency -- engine.nfft=8192 engine.overlap=0.75
+    python prof_helper.py ncu latency -- engine.nfft=4096 benchmark.iterations=50
+
+  Use custom experiment/benchmark configs:
+    python prof_helper.py nsys latency -- +benchmark=latency benchmark.lock_gpu_clocks=true
+    python prof_helper.py nsys latency -- experiment=ionosphere_hires +benchmark=profiling
+
+  Advanced profiling options:
+    python prof_helper.py --kernel "fft_kernel" --mode full ncu latency
+    python prof_helper.py --duration 5 --export nsys throughput
+
+HYDRA PASSTHROUGH:
+  Everything after '--' is passed to the benchmark script as Hydra overrides.
+
+  Behavior:
+    - If you don't specify +benchmark=, the default profiling config is loaded
+    - Your overrides are applied on top of the defaults
+    - This allows overriding individual parameters without full config replacement
+
+  Common override parameters:
+    engine.nfft=<size>               FFT size (1024, 2048, 4096, 8192, 16384, 32768)
+    engine.overlap=<ratio>           Window overlap (0.5, 0.75, 0.875, 0.9375)
+    engine.mode=<mode>               Execution mode (batch, streaming)
+    engine.channels=<count>          Number of channels (1, 2, 4, 8)
+    benchmark.iterations=<count>     Number of iterations
+    benchmark.lock_gpu_clocks=<bool> Lock GPU clocks for stability (true/false)
+    +benchmark=<config>              Use specific benchmark config (profiling, latency, etc.)
+    experiment=<config>              Use specific experiment config
+
+PROFILING CONFIGS:
+  Default profiling configs (fast, for development):
+    latency:    profiling              (~20 iterations, ~30s)
+    throughput: profiling_throughput   (~3 seconds duration)
+    realtime:   profiling_realtime     (~3 seconds duration)
+    accuracy:   profiling_accuracy     (~2 iterations, 3 signals)
+
+  Production configs (slow, for final measurements):
+    latency:    latency                (~5000 iterations, ~2min)
+    throughput: throughput             (~10 seconds duration)
+    realtime:   realtime               (~10 seconds duration)
+    accuracy:   accuracy               (~10 iterations, 8 signals)
+
+For more info: iono help
+        """,
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument("tool", choices=["nsys", "ncu"], help="Profiling tool")
     parser.add_argument("target", help="Target script or module")
     parser.add_argument("--mode", choices=["quick", "full"], default="quick", help="Profiling mode")
@@ -554,22 +615,25 @@ def main():
         # Route to the correct benchmark script
         target_cmd = ["python", f"benchmarks/run_{args.target}.py"]
 
-        # If no arguments provided, use profiling defaults
-        if not args.args or (args.args and args.args[0] != "--"):
-            # Default to fast profiling configuration
-            # Use benchmark-specific profiling config if available
-            if args.target == "latency":
-                target_cmd.extend(["experiment=profiling", "+benchmark=profiling"])
-            elif args.target == "throughput":
-                target_cmd.extend(["experiment=profiling", "+benchmark=profiling_throughput"])
-            elif args.target == "realtime":
-                target_cmd.extend(["experiment=profiling", "+benchmark=profiling_realtime"])
-            elif args.target == "accuracy":
-                target_cmd.extend(["experiment=profiling", "+benchmark=profiling_accuracy"])
-        elif args.args and args.args[0] == "--":
-            # User provided custom arguments
-            target_cmd.extend(args.args[1:])
-        else:
+        # NOTE: argparse REMAINDER consumes the '--' separator, so args.args will NOT contain it
+        # Always load a benchmark config (so benchmark.* parameters exist), then apply overrides
+
+        # Check if user is providing their own +benchmark= config
+        user_has_benchmark = any(arg.startswith('+benchmark=') for arg in args.args) if args.args else False
+
+        if not user_has_benchmark:
+            # Load default profiling benchmark config (defines benchmark.* structure)
+            benchmark_config = {
+                "latency": "profiling",
+                "throughput": "profiling_throughput",
+                "realtime": "profiling_realtime",
+                "accuracy": "profiling_accuracy"
+            }.get(args.target, "profiling")
+
+            target_cmd.extend(["experiment=profiling", f"+benchmark={benchmark_config}"])
+
+        # Add user overrides (will override default benchmark config parameters)
+        if args.args:
             target_cmd.extend(args.args)
     elif args.target == "custom" and args.args:
         # Custom script path provided
@@ -586,9 +650,8 @@ def main():
             # Module format
             target_cmd = ["python", "-m", f"ionosense_hpc.benchmarks.{args.target}"]
 
-        if args.args and args.args[0] == "--":
-            target_cmd.extend(args.args[1:])
-        else:
+        # argparse REMAINDER already stripped the '--' separator
+        if args.args:
             target_cmd.extend(args.args)
 
     # Validate target script exists for preset targets
@@ -612,6 +675,48 @@ def main():
         report = session.run_nsys(target_cmd, output_name, duration=args.duration)
     else:
         report = session.run_ncu(target_cmd, output_name, kernel_filter=args.kernel)
+
+    # Display benchmark configuration summary
+    if report and args.target in ["latency", "throughput", "accuracy", "realtime"]:
+        print(f"\n{Colors.CYAN}{'='*60}{Colors.RESET}")
+        print(f"{Colors.CYAN}BENCHMARK CONFIGURATION{Colors.RESET}")
+        print(f"{Colors.CYAN}{'='*60}{Colors.RESET}")
+
+        # Parse Hydra arguments from target_cmd
+        # Skip first 2 elements (python and script path), rest are Hydra configs
+        hydra_args = {}
+        for arg in target_cmd[2:]:  # Skip ['python', 'benchmarks/run_X.py']
+            if "=" in arg:
+                key, value = arg.split("=", 1)
+                hydra_args[key] = value
+
+        # Display profiling target
+        print(f"{Colors.GREEN}Target:{Colors.RESET}     {args.target}")
+        print(f"{Colors.GREEN}Tool:{Colors.RESET}       {args.tool} ({args.mode} mode)")
+
+        # Display engine parameters if present
+        engine_params = {k.replace("engine.", ""): v for k, v in hydra_args.items() if k.startswith("engine.")}
+        if engine_params:
+            print(f"\n{Colors.YELLOW}Engine Configuration:{Colors.RESET}")
+            for key, value in engine_params.items():
+                print(f"  {key:20s} {value}")
+
+        # Display benchmark parameters if present
+        benchmark_params = {k.replace("benchmark.", ""): v for k, v in hydra_args.items() if k.startswith("benchmark.")}
+        if benchmark_params:
+            print(f"\n{Colors.YELLOW}Benchmark Configuration:{Colors.RESET}")
+            for key, value in benchmark_params.items():
+                print(f"  {key:20s} {value}")
+
+        # Display experiment config if present
+        experiment = hydra_args.get("experiment", "N/A")
+        benchmark_config = hydra_args.get("+benchmark", "N/A")
+        if experiment != "N/A" or benchmark_config != "N/A":
+            print(f"\n{Colors.YELLOW}Hydra Configuration:{Colors.RESET}")
+            print(f"  {'experiment':20s} {experiment}")
+            print(f"  {'+benchmark':20s} {benchmark_config}")
+
+        print(f"{Colors.CYAN}{'='*60}{Colors.RESET}")
 
     # Export if requested
     if args.export and report:

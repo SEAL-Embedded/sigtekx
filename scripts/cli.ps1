@@ -529,7 +529,8 @@ function Invoke-Profile {
         [string]$Kernel = "",
         [int]$Duration = 0,
         [bool]$OpenAfter = $true,
-        [bool]$Interactive = $false
+        [bool]$Interactive = $false,
+        [string[]]$HydraArgs = @()
     )
 
     Write-Status "Starting GPU profiling session..."
@@ -593,29 +594,39 @@ function Invoke-Profile {
     }
 
     # Build prof_helper command
-    $args = @($Tool)
+    # IMPORTANT: argparse with REMAINDER requires flags BEFORE positionals!
+    $args = @()
 
+    # Add flags first (before positional arguments)
+    $args += "--mode", $Mode
+    if ($Kernel) { $args += "--kernel", $Kernel }
+    if ($Duration -gt 0) { $args += "--duration", $Duration }
+
+    # Then add positional arguments
+    $args += $Tool
     if ($Script) {
         $args += $Script
     } else {
         $args += $Target
     }
 
-    $args += "--mode", $Mode
-
-    if ($Kernel) { $args += "--kernel", $Kernel }
-    if ($Duration -gt 0) { $args += "--duration", $Duration }
-
     # Add profiling config for preset benchmarks
     if ($Target -in @("latency", "throughput", "accuracy", "realtime")) {
-        # Map targets to their lightweight profiling benchmark configs
-        $benchmarkConfig = switch ($Target) {
-            "latency"    { "profiling" }
-            "throughput" { "profiling_throughput" }
-            "realtime"   { "profiling_realtime" }
-            "accuracy"   { "profiling_accuracy" }
+        # Only add defaults if user didn't provide custom Hydra overrides
+        if ($HydraArgs.Count -eq 0) {
+            # Map targets to their lightweight profiling benchmark configs
+            $benchmarkConfig = switch ($Target) {
+                "latency"    { "profiling" }
+                "throughput" { "profiling_throughput" }
+                "realtime"   { "profiling_realtime" }
+                "accuracy"   { "profiling_accuracy" }
+            }
+            $args += "--", "experiment=profiling", "+benchmark=$benchmarkConfig"
+        } else {
+            # User provided custom Hydra args - use them instead
+            $args += "--"
+            $args += $HydraArgs
         }
-        $args += "--", "experiment=profiling", "+benchmark=$benchmarkConfig"
     }
 
     Write-Status "Executing: python `"$profHelper`" $($args -join ' ')"
@@ -676,10 +687,36 @@ GPU PROFILING & PERFORMANCE
                ncu (Nsight Compute - kernel analysis, roofline)
       Targets: latency, throughput, accuracy, realtime, custom
 
-  Examples:
-    iono profile nsys latency           # Profile end-to-end latency benchmark
-    iono profile ncu throughput         # Deep kernel analysis of throughput
-    iono profile                        # Interactive mode (prompts for options)
+  Quick Examples (auto-uses fast profiling configs):
+    iprof nsys latency                  # Nsight Systems: ~20 iterations, ~30s
+    iprof nsys throughput               # Nsight Systems: ~3s duration
+    iprof ncu latency                   # Nsight Compute: ~5-10min kernel analysis
+
+  Override Parameters (profiling config auto-loaded, then overrides applied):
+    iprof nsys latency engine.nfft=8192 engine.overlap=0.75
+    iprof nsys latency engine.nfft=4096 benchmark.iterations=100
+    iprof ncu throughput engine.mode=streaming benchmark.lock_gpu_clocks=true
+
+  Custom Benchmark Configs (full control):
+    iprof nsys latency +benchmark=latency benchmark.lock_gpu_clocks=true
+    iprof nsys latency experiment=ionosphere_hires +benchmark=profiling
+
+  Common Override Parameters:
+    engine.nfft=<size>           FFT size (1024, 2048, 4096, 8192, 16384, 32768)
+    engine.overlap=<ratio>       Window overlap (0.5, 0.75, 0.875, 0.9375)
+    engine.mode=<mode>           Execution mode (batch, streaming)
+    engine.channels=<count>      Number of channels (1, 2, 4, 8)
+    benchmark.iterations=<n>     Number of iterations
+    benchmark.lock_gpu_clocks=<bool>  Lock GPU clocks (true/false)
+    +benchmark=<config>          Benchmark config (profiling, latency, throughput)
+    experiment=<config>          Experiment config (profiling, ionosphere_*, etc.)
+
+  How It Works:
+    • No custom args:      Uses fast profiling configs automatically
+    • With overrides:      Loads profiling config + applies your overrides
+    • With +benchmark=:    Uses your specified config + any overrides
+
+  See: python prof_helper.py --help  for detailed argument documentation
 
 GPU CLOCK LOCKING (Benchmark Stability)
   Reduce coefficient of variation from 20-40% → 5-15%
@@ -861,28 +898,49 @@ try {
         "profile"  {
             $params = @{}
 
-            # Parse tool and target from args
-            $nonFlagArgs = $CommandArgs | Where-Object { $_ -and $_ -notlike "-*" }
+            # Pattern-based argument classification (same as iprof)
+            # Separate tool args from Hydra configs by regex patterns
+            $profileArgs = @()
+            $hydraArgs = @()
+
+            foreach ($arg in $CommandArgs) {
+                # Hydra config patterns: key=value, +key=value, ++key=value, ~key, ~key=value
+                if ($arg -match '^[\+~]{0,2}[\w\.\-/]+=' -or $arg -match '^~[\w\.\-/]+$') {
+                    $hydraArgs += $arg
+                }
+                # Everything else is a profile argument (tool, target, flags)
+                else {
+                    $profileArgs += $arg
+                }
+            }
+
+            # Parse tool and target from profile args
+            $nonFlagArgs = $profileArgs | Where-Object { $_ -and $_ -notlike "-*" }
             if ($nonFlagArgs.Count -ge 1) { $params.Tool = $nonFlagArgs[0] }
             if ($nonFlagArgs.Count -ge 2) { $params.Target = $nonFlagArgs[1] }
 
-            # Parse flags
-            if ($CommandArgs -icontains "-Full") { $params.Mode = "full" }
-            if ($CommandArgs -icontains "-NoOpen") { $params.OpenAfter = $false }
+            # Parse flags from profile args
+            if ($profileArgs -icontains "-Full") { $params.Mode = "full" }
+            if ($profileArgs -icontains "-NoOpen") { $params.OpenAfter = $false }
 
-            for ($i = 0; $i -lt $CommandArgs.Count; $i++) {
-                if ($CommandArgs[$i] -eq "-Mode" -and $i+1 -lt $CommandArgs.Count) {
-                    $params.Mode = $CommandArgs[$i+1]
+            for ($i = 0; $i -lt $profileArgs.Count; $i++) {
+                if ($profileArgs[$i] -eq "-Mode" -and $i+1 -lt $profileArgs.Count) {
+                    $params.Mode = $profileArgs[$i+1]
                 }
-                if ($CommandArgs[$i] -eq "-Script" -and $i+1 -lt $CommandArgs.Count) {
-                    $params.Script = $CommandArgs[$i+1]
+                if ($profileArgs[$i] -eq "-Script" -and $i+1 -lt $profileArgs.Count) {
+                    $params.Script = $profileArgs[$i+1]
                 }
-                if ($CommandArgs[$i] -eq "-Kernel" -and $i+1 -lt $CommandArgs.Count) {
-                    $params.Kernel = $CommandArgs[$i+1]
+                if ($profileArgs[$i] -eq "-Kernel" -and $i+1 -lt $profileArgs.Count) {
+                    $params.Kernel = $profileArgs[$i+1]
                 }
-                if ($CommandArgs[$i] -eq "-Duration" -and $i+1 -lt $CommandArgs.Count) {
-                    $params.Duration = [int]$CommandArgs[$i+1]
+                if ($profileArgs[$i] -eq "-Duration" -and $i+1 -lt $profileArgs.Count) {
+                    $params.Duration = [int]$profileArgs[$i+1]
                 }
+            }
+
+            # Add Hydra passthrough args if present
+            if ($hydraArgs.Count -gt 0) {
+                $params.HydraArgs = @() + $hydraArgs  # Force array type
             }
 
             Invoke-Profile @params

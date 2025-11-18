@@ -454,6 +454,57 @@ iprof nsys throughput -- experiment=profiling +benchmark=throughput  # 10s durat
 iprof nsys accuracy -- experiment=profiling +benchmark=accuracy      # 10 iterations, 8 signals
 ```
 
+#### Configuration Overrides (Hydra Passthrough)
+
+Customize profiling parameters using Hydra config overrides:
+
+**Simple Overrides (profiling config auto-loaded):**
+```bash
+# Override engine parameters (auto-loads profiling config + applies overrides)
+iprof nsys latency engine.nfft=8192 engine.overlap=0.75
+iprof nsys throughput engine.nfft=4096 engine.channels=8 engine.mode=streaming
+
+# Override benchmark parameters (iterations, GPU clocks, etc.)
+iprof nsys latency engine.nfft=4096 benchmark.iterations=100
+iprof ncu latency engine.nfft=8192 benchmark.lock_gpu_clocks=true
+
+# Combine multiple overrides
+iprof nsys latency engine.nfft=4096 engine.overlap=0.875 \
+  benchmark.iterations=50 benchmark.lock_gpu_clocks=true
+```
+
+**Custom Benchmark Configs (full control):**
+```bash
+# Use production config instead of profiling config
+iprof nsys latency +benchmark=latency benchmark.lock_gpu_clocks=true
+
+# Use custom experiment + benchmark combination
+iprof nsys latency experiment=ionosphere_hires +benchmark=profiling
+
+# Production profiling with all custom settings
+iprof nsys latency +benchmark=latency \
+  benchmark.lock_gpu_clocks=true benchmark.use_max_clocks=true
+```
+
+**How It Works:**
+- **No overrides**: Uses fast profiling configs automatically (profiling, profiling_throughput, etc.)
+- **With simple overrides**: Auto-loads profiling config, then applies your overrides
+- **With +benchmark=**: Uses your specified benchmark config, ignores defaults
+
+**Common Override Parameters:**
+- **Engine**: `nfft` (1024-32768), `overlap` (0.5-0.9375), `channels` (1-8), `mode` (batch/streaming)
+- **Benchmark**: `iterations`, `warmup_iterations`, `lock_gpu_clocks`, `use_max_clocks`, `gpu_index`
+- **Config Groups**: `+benchmark=<config>`, `experiment=<config>`
+
+**When to Use:**
+- **Simple overrides**: Quick testing of different NFFT/overlap values
+- **Custom configs**: Production profiling or full benchmark runs
+- **Research**: Testing specific parameter combinations
+
+**See Also:**
+- `python scripts/prof_helper.py --help` for detailed argument documentation
+- `iono help` for quick reference
+
 #### Expected Profiling Times
 
 | Benchmark | Quick Config | Quick Params | nsys (quick) | ncu (quick) | Full Config | nsys (full) | ncu (full) |
