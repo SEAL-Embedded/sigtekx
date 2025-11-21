@@ -5,6 +5,13 @@
 # This diagram shows the complete memory layout for both BatchExecutor (high-throughput)
 # and StreamingExecutor (low-latency streaming) modes, highlighting the differences in
 # memory overhead and data flow patterns between the two execution modes.
+#
+# LAYOUT STRATEGY (prevents crossing and winding arrows):
+# 1. Invisible subgroups (input_flow, output_flow) - organize nodes into logical columns
+#    without visible container borders (style.opacity: 0)
+# 2. Ungrouped PCIe nodes - h2d/d2h float independently near their respective paths
+#    rather than being forced together in a central container
+# 3. Consistent top-to-bottom flow - ELK naturally routes connections cleanly
 
 direction: down
 layout-engine: elk
@@ -24,56 +31,69 @@ batch_memory: BatchExecutor Memory Layout {
     Total Memory: ~164 KB (nfft=2048, channels=2)
   |
 
-  # Host Memory Space
+  # Host Memory Space (organized in logical columns)
   batch_host: Host Memory Space {
     style: {
       fill: "#90EE90"
       stroke: "#228B22"
     }
 
-    host_input: |md
-      **Input Buffer**
-      (float*)
+    # Input Flow Column (left side)
+    # Note: Invisible container (opacity: 0) groups input-related nodes together
+    # This tells ELK to keep them in a logical column without crossing output flow
+    input_flow: {
+      style.opacity: 0
 
-      - size: nfft × channels
-      - layout: interleaved [ch0, ch1, ...]
-    |
-    host_input.shape: rectangle
+      host_input: |md
+        **Input Buffer**
+        (float*)
 
-    host_output: |md
-      **Output Buffer**
-      (float*)
+        - size: nfft × channels
+        - layout: interleaved [ch0, ch1, ...]
+      |
+      host_input.shape: rectangle
 
-      - size: (nfft/2+1) × channels × frames
-      - layout: magnitude spectrum
-    |
-    host_output.shape: rectangle
+      pinned0: |md
+        **PinnedHostBuffer[0]**
+        input_staging
+        «page-locked»
 
-    pinned0: |md
-      **PinnedHostBuffer[0]**
-      input_staging
-      «page-locked»
+        - size: nfft × channels
+        - purpose: double buffering
+      |
+      pinned0.shape: rectangle
+      pinned0.note: |md
+        **Page-locked memory**
+        Enables faster PCIe
+        transfers (~25 GB/s)
+        cudaHostAlloc()
+      |
+    }
 
-      - size: nfft × channels
-      - purpose: double buffering
-    |
-    pinned0.shape: rectangle
-    pinned0.note: |md
-      **Page-locked memory**
-      Enables faster PCIe
-      transfers (~25 GB/s)
-      cudaHostAlloc()
-    |
+    # Output Flow Column (right side)
+    # Note: Invisible container keeps output flow separate from input flow
+    output_flow: {
+      style.opacity: 0
 
-    pinned1: |md
-      **PinnedHostBuffer[1]**
-      output_staging
-      «page-locked»
+      host_output: |md
+        **Output Buffer**
+        (float*)
 
-      - size: (nfft/2+1) × channels
-      - purpose: double buffering
-    |
-    pinned1.shape: rectangle
+        - size: (nfft/2+1) × channels × frames
+        - layout: magnitude spectrum
+      |
+      host_output.shape: rectangle
+
+      pinned1: |md
+        **PinnedHostBuffer[1]**
+        output_staging
+        «page-locked»
+
+        - size: (nfft/2+1) × channels
+        - purpose: double buffering
+      |
+      pinned1.shape: rectangle
+    }
   }
 
   # Device Memory Space
@@ -147,22 +167,33 @@ batch_memory: BatchExecutor Memory Layout {
     work_area.shape: rectangle
   }
 
-  # PCIe Transfer
-  batch_pcie: PCIe Transfer {
+  # PCIe Transfer (ungrouped to prevent crossing)
+  # Note: h2d and d2h are separate nodes (not in a container) so they can float
+  # independently near their respective input/output paths. This prevents long
+  # winding arrows that would occur if they were grouped together in the center.
+  batch_h2d: "H2D Stream[0]\n«PCIe Transfer»" {
+    shape: rectangle
     style: {
       fill: "#FFE4E4"
       stroke: "#C00000"
     }
-
-    h2d: "H2D Stream[0]" {shape: rectangle}
-    d2h: "D2H Stream[2]" {shape: rectangle}
   }
 
-  # Data flow
-  batch_host.host_input -> batch_host.pinned0: memcpy
-  batch_host.pinned0 -> batch_pcie.h2d: async
-  batch_pcie.h2d -> batch_device.dev_input0: cudaMemcpyAsync
+  batch_d2h: "D2H Stream[2]\n«PCIe Transfer»" {
+    shape: rectangle
+    style: {
+      fill: "#FFE4E4"
+      stroke: "#C00000"
+    }
+  }
 
+  # Data flow (subgroups prevent crossing)
+  # Input path (left column)
+  batch_host.input_flow.host_input -> batch_host.input_flow.pinned0: memcpy
+  batch_host.input_flow.pinned0 -> batch_h2d: async
+  batch_h2d -> batch_device.dev_input0: cudaMemcpyAsync
+
+  # Processing on device
   batch_device.dev_input0 -> batch_device.dev_input0: "window\n(in-place)"
   batch_device.window_coef -> batch_device.dev_input0: "element-wise\nmult" {
     style.stroke-dash: 3
@@ -170,9 +201,10 @@ batch_memory: BatchExecutor Memory Layout {
   batch_device.dev_input0 -> batch_device.dev_intermediate: "FFT\n(R2C)"
   batch_device.dev_intermediate -> batch_device.dev_output: magnitude
 
-  batch_device.dev_output -> batch_pcie.d2h: async
-  batch_pcie.d2h -> batch_host.pinned1: cudaMemcpyAsync
-  batch_host.pinned1 -> batch_host.host_output: memcpy
+  # Output path (right column)
+  batch_device.dev_output -> batch_d2h: async
+  batch_d2h -> batch_host.output_flow.pinned1: cudaMemcpyAsync
+  batch_host.output_flow.pinned1 -> batch_host.output_flow.host_output: memcpy
 
   characteristics: |md
     **BatchExecutor Memory Characteristics**:
@@ -207,99 +239,112 @@ streaming_memory: StreamingExecutor Memory Layout {
     Total Memory: ~295 KB (nfft=2048, channels=2) **+80% vs BatchExecutor**
   |
 
-  # Host Memory Space
+  # Host Memory Space (organized in logical columns)
   streaming_host: Host Memory Space {
     style: {
       fill: "#E6FFE6"
       stroke: "#228B22"
     }
 
-    host_input: |md
-      **Input Chunk**
-      (float*)
+    # Input Flow Column (left side)
+    # Note: Invisible container (opacity: 0) groups input-related nodes together
+    # including ring buffers, staging, and pinned buffers for clean vertical flow
+    input_flow: {
+      style.opacity: 0
 
-      - size: variable (arbitrary)
-      - layout: per-channel chunks
-    |
-    host_input.shape: rectangle
+      host_input: |md
+        **Input Chunk**
+        (float*)
 
-    host_output: |md
-      **Output Buffer**
-      (float*)
+        - size: variable (arbitrary)
+        - layout: per-channel chunks
+      |
+      host_input.shape: rectangle
 
-      - size: (nfft/2+1) × channels
-      - layout: magnitude (per frame)
-    |
-    host_output.shape: rectangle
+      # Ring Buffers (nested within input_flow for proper grouping)
+      ring_buffers: Ring Buffers (Per-Channel) {
+        style: {
+          fill: "#C4E6C4"
+          stroke: "#228B22"
+        }
 
-    # Ring Buffers
-    ring_buffers: Ring Buffers (Per-Channel) {
-      style: {
-        fill: "#C4E6C4"
-        stroke: "#228B22"
+        ringbuf0: |md
+          **RingBuffer[0]**
+          «lock-free»
+
+          - capacity: 3 × nfft
+          - write_pos: atomic<size_t>
+          - read_pos: atomic<size_t>
+          - available: atomic<size_t>
+          - buffer: PinnedHostBuffer
+        |
+        ringbuf0.shape: rectangle
+        ringbuf0.note: |md
+          **Per-channel ring buffer**
+          - Accumulates arbitrary chunks
+          - 3× NFFT capacity prevents overflow
+          - Lock-free thread-safe (SPSC)
+          - Pinned memory for fast transfers
+        |
+
+        ringbuf1: |md
+          **RingBuffer[1]**
+          «lock-free»
+
+          - capacity: 3 × nfft
+          - write_pos: atomic<size_t>
+          - read_pos: atomic<size_t>
+          - available: atomic<size_t>
+          - buffer: PinnedHostBuffer
+        |
+        ringbuf1.shape: rectangle
       }
 
-      ringbuf0: |md
-        **RingBuffer[0]**
-        «lock-free»
+      staging: |md
+        **h_batch_staging**
+        «page-locked»
 
-        - capacity: 3 × nfft
-        - write_pos: atomic<size_t>
-        - read_pos: atomic<size_t>
-        - available: atomic<size_t>
-        - buffer: PinnedHostBuffer
+        - size: nfft × channels
+        - purpose: frame extraction buffer
+        - note: Extracted frames from ring buffers
       |
-      ringbuf0.shape: rectangle
-      ringbuf0.note: |md
-        **Per-channel ring buffer**
-        - Accumulates arbitrary chunks
-        - 3× NFFT capacity prevents overflow
-        - Lock-free thread-safe (SPSC)
-        - Pinned memory for fast transfers
-      |
+      staging.shape: rectangle
 
-      ringbuf1: |md
-        **RingBuffer[1]**
-        «lock-free»
+      pinned0: |md
+        **PinnedHostBuffer[0]**
+        input_staging
+        «page-locked»
 
-        - capacity: 3 × nfft
-        - write_pos: atomic<size_t>
-        - read_pos: atomic<size_t>
-        - available: atomic<size_t>
-        - buffer: PinnedHostBuffer
+        - size: nfft × channels
+        - purpose: double buffering
       |
-      ringbuf1.shape: rectangle
+      pinned0.shape: rectangle
     }
 
-    staging: |md
-      **h_batch_staging**
-      «page-locked»
+    # Output Flow Column (right side)
+    # Note: Invisible container keeps output flow separate from input flow
+    output_flow: {
+      style.opacity: 0
 
-      - size: nfft × channels
-      - purpose: frame extraction buffer
-      - note: Extracted frames from ring buffers
-    |
-    staging.shape: rectangle
+      host_output: |md
+        **Output Buffer**
+        (float*)
 
-    pinned0: |md
-      **PinnedHostBuffer[0]**
-      input_staging
-      «page-locked»
+        - size: (nfft/2+1) × channels
+        - layout: magnitude (per frame)
+      |
+      host_output.shape: rectangle
 
-      - size: nfft × channels
-      - purpose: double buffering
-    |
-    pinned0.shape: rectangle
+      pinned1: |md
+        **PinnedHostBuffer[1]**
+        output_staging
+        «page-locked»
 
-    pinned1: |md
-      **PinnedHostBuffer[1]**
-      output_staging
-      «page-locked»
-
-      - size: (nfft/2+1) × channels
-      - purpose: double buffering
-    |
-    pinned1.shape: rectangle
+        - size: (nfft/2+1) × channels
+        - purpose: double buffering
+      |
+      pinned1.shape: rectangle
+    }
   }
 
   # Device Memory Space
@@ -367,27 +412,38 @@ streaming_memory: StreamingExecutor Memory Layout {
     work_area.shape: rectangle
   }
 
-  # PCIe Transfer
-  streaming_pcie: PCIe Transfer {
+  # PCIe Transfer (ungrouped to prevent crossing)
+  # Note: h2d and d2h are separate nodes (not in a container) so they can float
+  # independently near their respective input/output paths. This prevents long
+  # winding arrows that would occur if they were grouped together in the center.
+  streaming_h2d: "H2D Stream[0]\n«PCIe Transfer»" {
+    shape: rectangle
     style: {
       fill: "#FFE4E4"
       stroke: "#C00000"
     }
-
-    h2d: "H2D Stream[0]" {shape: rectangle}
-    d2h: "D2H Stream[2]" {shape: rectangle}
   }
 
-  # Data flow - Streaming mode
-  streaming_host.host_input -> streaming_host.ring_buffers.ringbuf0: "push(chunk[ch0])"
-  streaming_host.host_input -> streaming_host.ring_buffers.ringbuf1: "push(chunk[ch1])"
+  streaming_d2h: "D2H Stream[2]\n«PCIe Transfer»" {
+    shape: rectangle
+    style: {
+      fill: "#FFE4E4"
+      stroke: "#C00000"
+    }
+  }
 
-  streaming_host.ring_buffers.ringbuf0 -> streaming_host.staging: "extract_batch\n(nfft, 1, hop_size)"
-  streaming_host.ring_buffers.ringbuf1 -> streaming_host.staging: "extract_batch\n(nfft, 1, hop_size)"
+  # Data flow - Streaming mode (subgroups prevent crossing)
+  # Input path: Host → Ring Buffers → Staging → Device
+  streaming_host.input_flow.host_input -> streaming_host.input_flow.ring_buffers.ringbuf0: "push(chunk[ch0])"
+  streaming_host.input_flow.host_input -> streaming_host.input_flow.ring_buffers.ringbuf1: "push(chunk[ch1])"
 
-  streaming_host.staging -> streaming_pcie.h2d: async
-  streaming_pcie.h2d -> streaming_device.dev_input0: cudaMemcpyAsync
+  streaming_host.input_flow.ring_buffers.ringbuf0 -> streaming_host.input_flow.staging: "extract_batch\n(nfft, 1, hop_size)"
+  streaming_host.input_flow.ring_buffers.ringbuf1 -> streaming_host.input_flow.staging: "extract_batch\n(nfft, 1, hop_size)"
 
+  streaming_host.input_flow.staging -> streaming_h2d: async
+  streaming_h2d -> streaming_device.dev_input0: cudaMemcpyAsync
+
+  # Processing on device
   streaming_device.dev_input0 -> streaming_device.dev_input0: "window\n(in-place)"
   streaming_device.window_coef -> streaming_device.dev_input0: "element-wise\nmult" {
     style.stroke-dash: 3
@@ -395,12 +451,14 @@ streaming_memory: StreamingExecutor Memory Layout {
   streaming_device.dev_input0 -> streaming_device.dev_intermediate: "FFT\n(R2C)"
   streaming_device.dev_intermediate -> streaming_device.dev_output: magnitude
 
-  streaming_device.dev_output -> streaming_pcie.d2h: async
-  streaming_pcie.d2h -> streaming_host.pinned1: cudaMemcpyAsync
-  streaming_host.pinned1 -> streaming_host.host_output: memcpy
+  # Output path: Device → Host
+  streaming_device.dev_output -> streaming_d2h: async
+  streaming_d2h -> streaming_host.output_flow.pinned1: cudaMemcpyAsync
+  streaming_host.output_flow.pinned1 -> streaming_host.output_flow.host_output: memcpy
 
-  streaming_host.ring_buffers.ringbuf0 -> streaming_host.ring_buffers.ringbuf0: "advance(hop_size)\nafter frame"
-  streaming_host.ring_buffers.ringbuf1 -> streaming_host.ring_buffers.ringbuf1: "advance(hop_size)\nafter frame"
+  # Ring buffer advance (self-loops)
+  streaming_host.input_flow.ring_buffers.ringbuf0 -> streaming_host.input_flow.ring_buffers.ringbuf0: "advance(hop_size)\nafter frame"
+  streaming_host.input_flow.ring_buffers.ringbuf1 -> streaming_host.input_flow.ring_buffers.ringbuf1: "advance(hop_size)\nafter frame"
 
   characteristics: |md
     **StreamingExecutor Memory Breakdown**:

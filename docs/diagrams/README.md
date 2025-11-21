@@ -4,6 +4,21 @@ This directory contains D2 source files for the Ionosense HPC architecture docum
 
 **Last Updated:** 2025-01-20 (v0.9.4+ executor-based architecture, D2 migration)
 
+## Quick Access
+
+| Section | Description |
+|---------|-------------|
+| **[CLI Usage](#quick-start-cli---recommended)** | Generate diagrams with `iono diagrams` - smart regeneration, format options, batch processing |
+| **[Available Diagrams](#available-diagrams)** | 8 technical diagrams: C++ architecture (4), Python layer (3), System overview (1) |
+| **[Direct D2 Commands](#direct-d2-commands)** | Manual single-diagram generation for development and advanced control |
+| **[Layout Engines](#layout-engines)** | dagre (hierarchical) vs elk (complex graphs) - when to use each |
+| **[Output Formats](#output-formats)** | SVG (default), PNG, PDF support |
+| **[VS Code Integration](#vs-code-integration)** | Live preview extension for editing D2 files |
+| **[Maintenance](#maintenance)** | How to update diagrams and keep documentation in sync |
+| **[Resources](#resources)** | Official D2 documentation, playground, examples |
+
+---
+
 ## Diagram Organization
 
 Diagrams are organized by prefix to indicate their scope:
