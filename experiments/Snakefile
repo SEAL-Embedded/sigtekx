@@ -28,7 +28,13 @@ rule all:
         "artifacts/data/ionosphere_nfft_channels_grid.done",
         "artifacts/data/ionosphere_lightning.done",
         "artifacts/data/ionosphere_schumann.done",
-        "artifacts/data/execution_mode_comparison.done"
+        "artifacts/data/execution_mode_comparison.done",
+        "artifacts/figures/spectrograms/general_spectrogram.png",
+        "artifacts/figures/spectrograms/general_spectrogram.json",
+        "artifacts/figures/spectrograms/accuracy_engine.png",
+        "artifacts/figures/spectrograms/accuracy_numpy.png",
+        "artifacts/figures/spectrograms/accuracy_difference.png",
+        "artifacts/figures/spectrograms/accuracy_metrics.json"
 
 # Run ionosphere resolution sweep (high-resolution analysis)
 rule run_ionosphere_resolution:
@@ -149,6 +155,37 @@ rule run_ionosphere_schumann:
         python benchmarks/run_throughput.py --multirun \
             experiment=ionosphere_schumann \
             +benchmark=throughput
+        """
+
+# ============================================================================
+# Static spectrogram artifacts for Streamlit dashboard
+# ============================================================================
+rule generate_general_spectrogram:
+    input:
+        "artifacts/data/ionosphere_resolution.done"
+    output:
+        png="artifacts/figures/spectrograms/general_spectrogram.png",
+        metadata="artifacts/figures/spectrograms/general_spectrogram.json"
+    shell:
+        """
+        python experiments/analysis/generate_static_spectrograms.py \
+            --targets general \
+            --output-dir artifacts/figures/spectrograms
+        """
+
+rule generate_accuracy_spectrograms:
+    input:
+        "artifacts/data/accuracy_validation.done"
+    output:
+        engine="artifacts/figures/spectrograms/accuracy_engine.png",
+        numpy="artifacts/figures/spectrograms/accuracy_numpy.png",
+        delta="artifacts/figures/spectrograms/accuracy_difference.png",
+        metadata="artifacts/figures/spectrograms/accuracy_metrics.json"
+    shell:
+        """
+        python experiments/analysis/generate_static_spectrograms.py \
+            --targets accuracy \
+            --output-dir artifacts/figures/spectrograms
         """
 
 # ============================================================================

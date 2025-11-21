@@ -6,6 +6,7 @@ Comprehensive performance analysis across all benchmark types:
 throughput, latency, accuracy, and scaling characteristics.
 """
 
+import json
 import streamlit as st
 import pandas as pd
 from pathlib import Path
@@ -18,6 +19,19 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from utils.data_loader import load_benchmark_data
 from analysis.visualization import PerformancePlotter, VisualizationConfig
+
+SPECTROGRAM_DIR = Path("artifacts/figures/spectrograms")
+
+
+def _load_spectrogram_metadata(filename: str) -> dict | None:
+    path = SPECTROGRAM_DIR / filename
+    if not path.exists():
+        return None
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            return json.load(f)
+    except json.JSONDecodeError:
+        return None
 
 # Page configuration
 st.set_page_config(page_title="General Performance", page_icon="🏆", layout="wide")
@@ -111,6 +125,32 @@ with tabs[0]:
                 f"{mean_accuracy:.1f}%",
                 help="Average pass rate across all accuracy tests"
             )
+
+    st.divider()
+    st.subheader("Reference Spectrogram Snapshot")
+    general_image = SPECTROGRAM_DIR / "general_spectrogram.png"
+    general_meta = _load_spectrogram_metadata("general_spectrogram.json")
+
+    if general_image.exists():
+        col_img, col_meta = st.columns([3, 1])
+        col_img.image(
+            str(general_image),
+            caption="Synthetic multi-tone signal (NFFT=4096, overlap=0.75)",
+            use_column_width=True
+        )
+
+        if general_meta:
+            config = general_meta.get("config", {})
+            col_meta.metric("NFFT", config.get("nfft", "—"))
+            col_meta.metric("Overlap", f"{config.get('overlap', 0.0):.2f}")
+            col_meta.metric("Duration", f"{general_meta.get('duration_sec', 0.0):.1f} s")
+        else:
+            col_meta.info("No metadata file detected.")
+    else:
+        st.info(
+            "?? General spectrogram PNG missing. Run "
+            "`snakemake generate_general_spectrogram` to refresh static plots."
+        )
 
 # ============================================================================
 # TAB 2: THROUGHPUT ANALYSIS
@@ -229,6 +269,46 @@ with tabs[3]:
             col2.metric("Min Pass Rate", f"{pass_rate_stats['min']*100:.2f}%")
             col3.metric("Max Pass Rate", f"{pass_rate_stats['max']*100:.2f}%")
             col4.metric("Configurations Tested", len(accuracy_data))
+
+            st.divider()
+            st.markdown("### Spectrogram Comparison Snapshot")
+            engine_img = SPECTROGRAM_DIR / "accuracy_engine.png"
+            numpy_img = SPECTROGRAM_DIR / "accuracy_numpy.png"
+            delta_img = SPECTROGRAM_DIR / "accuracy_difference.png"
+            accuracy_meta = _load_spectrogram_metadata("accuracy_metrics.json")
+
+            if engine_img.exists() and numpy_img.exists():
+                col_img1, col_img2 = st.columns(2)
+                col_img1.image(
+                    str(engine_img),
+                    caption="Ionosense Engine Spectrogram",
+                    use_column_width=True
+                )
+                col_img2.image(
+                    str(numpy_img),
+                    caption="NumPy STFT Reference",
+                    use_column_width=True
+                )
+
+                if delta_img.exists():
+                    st.image(
+                        str(delta_img),
+                        caption="Absolute difference (Engine vs NumPy)",
+                        use_column_width=True
+                    )
+
+                if accuracy_meta and "metrics" in accuracy_meta:
+                    metrics = accuracy_meta["metrics"]
+                    col_a, col_b, col_c, col_d = st.columns(4)
+                    col_a.metric("Mean Abs Error", f"{metrics.get('mean_absolute_error', 0.0):.3e}")
+                    col_b.metric("RMSE", f"{metrics.get('rmse', 0.0):.3e}")
+                    col_c.metric("Max Abs Error", f"{metrics.get('max_absolute_error', 0.0):.3e}")
+                    col_d.metric("SNR", f"{metrics.get('snr_db', 0.0):.1f} dB")
+            else:
+                st.info(
+                    "?? Accuracy spectrogram artifacts missing. "
+                    "Run `snakemake generate_accuracy_spectrograms` to regenerate static PNGs."
+                )
 
             # Error metrics
             if 'max_relative_error' in accuracy_data.columns:
