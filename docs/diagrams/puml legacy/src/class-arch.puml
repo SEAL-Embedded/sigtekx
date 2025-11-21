@@ -9,46 +9,42 @@ skinparam arrowColor #4169E1
 skinparam noteBackgroundColor #FFFACD
 skinparam noteBorderColor #FFD700
 
-title Ionosense HPC Library - C++ Architecture
-footer IEEE Publication Quality Diagram - © 2025
+' Spacing controls for better layout
+skinparam nodesep 100
+skinparam ranksep 80
+skinparam packageStyle rectangle
+
+title Ionosense HPC Library - C++ Architecture (v0.9.4+ Executor-Based)
+footer PlantUML Diagram - © 2025 | Updated: 2025-01-19
 
 ' Define packages for logical grouping
-package "Public API Layer" #E6F3FF {
-  interface IPipelineEngine {
-    {abstract} +initialize(config: EngineConfig): void
-    {abstract} +process(input: float*, output: float*, num_samples: size_t): void
-    {abstract} +process_async(input: float*, num_samples: size_t, callback: ResultCallback): void
+package "Executor API Layer" #E6F3FF {
+  interface IPipelineExecutor {
+    {abstract} +initialize(config: ExecutorConfig, stages: vector<IProcessingStage>): void
+    {abstract} +submit(input: float*, output: float*, num_samples: size_t): void
+    {abstract} +submit_async(input: float*, num_samples: size_t, callback: ResultCallback): void
     {abstract} +synchronize(): void
-    {abstract} +reset(): void
     {abstract} +get_stats(): ProcessingStats
     {abstract} +get_runtime_info(): RuntimeInfo
-    {abstract} +is_initialized(): bool
+    {abstract} +supports_streaming(): bool
   }
 
-  class ResearchEngine {
+  class BatchExecutor {
     -pImpl: unique_ptr<Impl>
     --
-    +ResearchEngine()
-    +~ResearchEngine()
-    +initialize(config: EngineConfig): void
-    +process(input: float*, output: float*, num_samples: size_t): void
-    +process_async(input: float*, num_samples: size_t, callback: ResultCallback): void
+    +BatchExecutor()
+    +~BatchExecutor()
+    +initialize(config: ExecutorConfig, stages: vector<IProcessingStage>): void
+    +submit(input: float*, output: float*, num_samples: size_t): void
+    +submit_async(input: float*, num_samples: size_t, callback: ResultCallback): void
     +synchronize(): void
-    +reset(): void
     +get_stats(): ProcessingStats
     +get_runtime_info(): RuntimeInfo
-    +is_initialized(): bool
-    +set_profiling_enabled(enabled: bool): void
-    +add_stage(stage: unique_ptr<IProcessingStage>): void
-    +clear_stages(): void
-    +num_stages(): size_t
-    +set_stage_config(config: StageConfig): void
-    +get_stage_config(): StageConfig
+    +supports_streaming(): bool  // returns false
   }
 
-  class "ResearchEngine::Impl" as ResearchEngineImpl <<(P,orchid) Pimpl>> {
-    -config_: EngineConfig
-    -stage_config_: StageConfig
+  class "BatchExecutor::Impl" as BatchExecutorImpl <<(P,orchid) Pimpl>> {
+    -config_: ExecutorConfig
     -device_id_: int
     -device_props_: cudaDeviceProp
     -stages_: vector<unique_ptr<IProcessingStage>>
@@ -60,17 +56,69 @@ package "Public API Layer" #E6F3FF {
     -h_input_staging_: PinnedHostBuffer<float>
     -h_output_staging_: PinnedHostBuffer<float>
     -initialized_: bool
-    -profiling_enabled_: bool
     -frame_counter_: uint64_t
     -stats_: ProcessingStats
     --
-    +initialize(config: EngineConfig): void
-    +process(input: float*, output: float*, num_samples: size_t): void
-    +process_async(input: float*, num_samples: size_t, callback: ResultCallback): void
+    +submit_impl(input: float*, output: float*, num_samples: size_t): void
+    +run_warmup(): void
+    +update_stats(start_event: CudaEvent&, end_event: CudaEvent&): void
+  }
+
+  class StreamingExecutor {
+    -pImpl: unique_ptr<Impl>
+    --
+    +StreamingExecutor()
+    +~StreamingExecutor()
+    +initialize(config: ExecutorConfig, stages: vector<IProcessingStage>): void
+    +submit(input: float*, output: float*, num_samples: size_t): void
+    +submit_async(input: float*, num_samples: size_t, callback: ResultCallback): void
     +synchronize(): void
-    +reset(): void
-    -run_warmup(): void
-    -calculate_throughput(num_samples: size_t, latency_us: float): float
+    +get_stats(): ProcessingStats
+    +get_runtime_info(): RuntimeInfo
+    +supports_streaming(): bool  // returns true
+  }
+
+  class "StreamingExecutor::Impl" as StreamingExecutorImpl <<(P,orchid) Pimpl>> {
+    -config_: ExecutorConfig
+    -device_id_: int
+    -device_props_: cudaDeviceProp
+    -stages_: vector<unique_ptr<IProcessingStage>>
+    -input_ring_buffers_: vector<RingBuffer<float>>
+    -streams_: vector<CudaStream>
+    -events_: vector<CudaEvent>
+    -d_input_buffers_: vector<DeviceBuffer<float>>
+    -d_intermediate_buffers_: vector<DeviceBuffer<float>>
+    -d_output_buffers_: vector<DeviceBuffer<float>>
+    -h_batch_staging_: PinnedHostBuffer<float>
+    -h_output_staging_: PinnedHostBuffer<float>
+    -initialized_: bool
+    -frame_counter_: uint64_t
+    -stats_: ProcessingStats
+    --
+    +submit_impl(input: float*, output: float*, num_samples: size_t): void
+    +run_warmup(): void
+    +process_accumulated_frames(): void
+    +update_stats(start_event: CudaEvent&, end_event: CudaEvent&): void
+  }
+}
+
+package "Ring Buffer for Streaming" #E6FFE6 {
+  class "RingBuffer<T>" as RingBuffer <<template>> {
+    -buffer_: PinnedHostBuffer<T>
+    -capacity_: size_t
+    -write_pos_: atomic<size_t>
+    -read_pos_: atomic<size_t>
+    -available_: atomic<size_t>
+    --
+    +RingBuffer(capacity: size_t)
+    +~RingBuffer()
+    +push(data: T*, count: size_t): void
+    +extract_frame(output: T*, frame_size: size_t): void
+    +extract_batch(output: T*, nfft: size_t, num_frames: size_t, hop_size: size_t): void
+    +advance(samples: size_t): void
+    +available(): size_t
+    +capacity(): size_t
+    +can_extract(frame_size: size_t): bool
   }
 }
 
@@ -219,28 +267,40 @@ package "CUDA Resource Management" #E6F3FF {
 }
 
 package "Configuration & Statistics" #E6F3FF {
-  class EngineConfig <<(D,lightblue) Data>> {
+  class SignalConfig <<(D,lightblue) Data>> {
     +nfft: int = 1024
-    +batch: int = 2
+    +channels: int = 2  // Renamed from 'batch' in v0.9.4
     +overlap: float = 0.5f
     +sample_rate_hz: int = 48000
     +stream_count: int = 3
     +pinned_buffer_count: int = 2
     +warmup_iters: int = 1
-    +timeout_ms: int = 1000
-    +use_cuda_graphs: bool = false
-    +enable_profiling: bool = false
     --
     +hop_size(): int
     +num_output_bins(): int
   }
 
+  class ExecutorConfig <<(D,lightblue) Data>> {
+    +mode: ExecutionMode = BATCH
+    +max_inflight_batches: int = 2
+    +enable_background_thread: bool = false
+    +timeout_ms: int = 1000
+    +use_cuda_graphs: bool = false
+    +enable_profiling: bool = false
+  }
+
+  enum ExecutionMode {
+    BATCH
+    STREAMING
+  }
+
   class StageConfig <<(D,lightblue) Data>> {
     +nfft: int = 1024
-    +batch: int = 2
+    +channels: int = 2  // Renamed from 'batch' in v0.9.4
     +overlap: float = 0.5f
     +sample_rate_hz: int = 48000
     +window_type: WindowType = HANN
+    +window_symmetry: WindowSymmetry = PERIODIC
     +window_norm: WindowNorm = UNITY
     +preload_window: bool = true
     +scale_policy: ScalePolicy = ONE_OVER_N
@@ -254,7 +314,7 @@ package "Configuration & Statistics" #E6F3FF {
   class ProcessingStats <<(D,lightblue) Data>> {
     +latency_us: float = 0.0f
     +throughput_gbps: float = 0.0f
-    +frames_processed: size_t = 0
+    +frames_processed: size_t = 0  // Temporal FFT windows
     +is_warmup: bool = true
   }
 
@@ -310,25 +370,45 @@ package "Exception Handling" #FFE6E6 {
   }
 }
 
-' Relationships
-ResearchEngine ..|> IPipelineEngine : implements
-ResearchEngine *--> ResearchEngineImpl : owns (Pimpl)
-ResearchEngineImpl o--> "1..*" IProcessingStage : manages
-ResearchEngineImpl *--> "1..*" CudaStream : owns
-ResearchEngineImpl *--> "1..*" CudaEvent : owns
-ResearchEngineImpl *--> "1..*" DeviceBuffer : owns
-ResearchEngineImpl *--> "2" PinnedHostBuffer : owns
-ResearchEngineImpl ..> EngineConfig : uses
-ResearchEngineImpl ..> StageConfig : uses
-ResearchEngineImpl ..> ProcessingStats : generates
+' Executor Relationships
+BatchExecutor ..|> IPipelineExecutor : implements
+StreamingExecutor ..|> IPipelineExecutor : implements
+BatchExecutor *--> BatchExecutorImpl : owns (Pimpl)
+StreamingExecutor *--> StreamingExecutorImpl : owns (Pimpl)
 
+BatchExecutorImpl o--> "1..*" IProcessingStage : manages
+BatchExecutorImpl *--> "1..*" CudaStream : owns
+BatchExecutorImpl *--> "1..*" CudaEvent : owns
+BatchExecutorImpl *--> "1..*" DeviceBuffer : owns
+BatchExecutorImpl *--> "2" PinnedHostBuffer : owns
+BatchExecutorImpl ..> ExecutorConfig : uses
+BatchExecutorImpl ..> ProcessingStats : generates
+
+StreamingExecutorImpl o--> "1..*" IProcessingStage : manages
+StreamingExecutorImpl *--> "channels" RingBuffer : owns (per-channel)
+StreamingExecutorImpl *--> "1..*" CudaStream : owns
+StreamingExecutorImpl *--> "1..*" CudaEvent : owns
+StreamingExecutorImpl *--> "1..*" DeviceBuffer : owns
+StreamingExecutorImpl *--> "2" PinnedHostBuffer : owns
+StreamingExecutorImpl ..> ExecutorConfig : uses
+StreamingExecutorImpl ..> ProcessingStats : generates
+
+RingBuffer *--> PinnedHostBuffer : owns buffer
+
+' Configuration Hierarchy
+ExecutorConfig --|> SignalConfig : extends
+
+' Stage Relationships
 WindowStage ..|> IProcessingStage : implements
 FFTStage ..|> IProcessingStage : implements
 MagnitudeStage ..|> IProcessingStage : implements
 
 WindowStage ..> DeviceBuffer : uses
+WindowStage ..> StageConfig : uses
 FFTStage ..> CufftPlan : uses
+FFTStage ..> StageConfig : uses
 MagnitudeStage ..> OpsFft : calls
+MagnitudeStage ..> StageConfig : uses
 
 StageFactory ..> WindowStage : creates
 StageFactory ..> FFTStage : creates
@@ -338,10 +418,35 @@ StageFactory ..> StageType : uses
 CufftPlan *--> DeviceBuffer : owns work_area
 
 ' Notes
-note right of ResearchEngine
-  **Design Pattern: Pimpl**
-  Hides CUDA dependencies
-  from public headers
+note right of IPipelineExecutor
+  **v0.9.3+ Executor Pattern**
+  Replaces old ResearchEngine.
+  Two implementations:
+  - BatchExecutor (high-throughput)
+  - StreamingExecutor (low-latency)
+end note
+
+note right of StreamingExecutor
+  **Ring Buffer Architecture**
+  Per-channel ring buffers enable:
+  - Arbitrary input chunk sizes
+  - Continuous streaming
+  - Independent channel processing
+  - 3× NFFT capacity prevents overflow
+end note
+
+note right of RingBuffer
+  **Lock-Free Thread-Safe**
+  Single-producer/single-consumer
+  Uses atomic operations for
+  thread-safe access
+end note
+
+note right of SignalConfig
+  **Terminology (v0.9.4)**
+  channels = spatial dimension
+  frames = temporal dimension
+  bins = spectral dimension
 end note
 
 note right of IProcessingStage

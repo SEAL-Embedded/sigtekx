@@ -1,0 +1,496 @@
+@startuml "Ionosense HPC - Experimental Workflow Sequence"
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam sequenceParticipantBackgroundColor #F0F8FF
+skinparam sequenceParticipantBorderColor #4169E1
+skinparam sequenceLifeLineBorderColor #4169E1
+skinparam sequenceArrowColor #4169E1
+skinparam noteBackgroundColor #FFFACD
+
+title Ionosense HPC - Experimental Workflow Sequence (v0.9.4+)
+footer IEEE Publication Quality Diagram - © 2025 | Updated: 2025-01-19
+
+' ============================================================================
+' Participants
+' ============================================================================
+actor Researcher
+participant "CLI\n(iono)" as CLI
+participant "ionoc\n(C++ CLI)" as Ionoc
+participant "iprof\n(Profiling)" as IProf
+participant "Streamlit\nDashboard" as Dashboard
+participant "GPU\nManager" as GPUMgr
+participant "Snakemake" as Snake
+participant "Hydra" as Hydra
+participant "Benchmark\nScripts" as Bench
+participant "Executor\n(C++/CUDA)" as Executor
+participant "Nsight\nTools" as Nsight
+participant "Analysis\nScripts" as Analysis
+database "Artifacts" as Artifacts
+database "MLflow" as MLflow
+participant "Report\nGenerator" as Report
+participant "DVC" as DVC
+
+' ============================================================================
+' Initialization Phase
+' ============================================================================
+== Initialization Phase ==
+
+Researcher -> CLI: iono info
+activate CLI
+CLI -> Artifacts: check experiments/
+CLI --> Researcher: show available experiments
+deactivate CLI
+
+Researcher -> CLI: iono status
+activate CLI
+CLI -> MLflow: check tracking data
+CLI -> DVC: check pipeline status
+CLI --> Researcher: show project status
+deactivate CLI
+
+' ============================================================================
+' C++ Development Workflow (Pre-Python Integration)
+' ============================================================================
+== C++ Development Workflow ==
+
+note over Researcher, Executor
+  **Use Case**: Iterative C++ kernel/executor development
+  **Before** integrating with Python benchmarks
+end note
+
+Researcher -> Ionoc: ionoc bench --preset latency --full --lock-clocks
+activate Ionoc
+
+Ionoc -> GPUMgr: lock GPU clocks (admin elevation)
+activate GPUMgr
+note right: Reduce CV from 20% → 5-10%\nStable performance measurement
+GPUMgr --> Ionoc: clocks locked
+deactivate GPUMgr
+
+Ionoc -> Executor: run C++ benchmark (5000 iterations)
+activate Executor
+Executor -> Executor: BatchExecutor\nor StreamingExecutor
+Executor --> Ionoc: latency metrics
+deactivate Executor
+
+Ionoc -> GPUMgr: restore GPU clocks (auto-cleanup)
+activate GPUMgr
+GPUMgr --> Ionoc: clocks restored
+deactivate GPUMgr
+
+Ionoc --> Researcher: Performance Card\n✓ NO CHANGE / ⚠ REGRESSION
+deactivate Ionoc
+
+note right of Ionoc
+  **ionoc Commands**:
+  - ionoc bench (quick validation)
+  - ionoc bench --preset <name> --full
+  - ionoc profile nsys/ncu
+  - ionoc bench --lock-clocks
+end note
+
+opt If profiling needed
+  Researcher -> Ionoc: ionoc profile nsys --stats
+  activate Ionoc
+  Ionoc -> Nsight: nsys profile with config
+  activate Nsight
+  Nsight -> Executor: run with profiling
+  activate Executor
+  Executor --> Nsight: trace data
+  deactivate Executor
+  Nsight -> Artifacts: save .nsys-rep
+  activate Artifacts
+  deactivate Artifacts
+  Nsight --> Ionoc: profiling complete
+  deactivate Nsight
+  Ionoc --> Researcher: artifacts/profiling/cpp_dev.nsys-rep
+  deactivate Ionoc
+
+  Researcher -> Researcher: nsys-ui (analyze timeline)
+end
+
+' ============================================================================
+' Profiling Workflow (Python End-to-End)
+' ============================================================================
+== Production Profiling Workflow ==
+
+note over Researcher, Nsight
+  **Use Case**: Profile complete Python → C++ pipeline
+  **After** C++ integration complete
+end note
+
+Researcher -> IProf: iprof nsys latency
+activate IProf
+
+IProf -> Hydra: auto-load profiling config (20 iter)
+activate Hydra
+Hydra --> IProf: ExecutorConfig + BenchmarkConfig
+deactivate Hydra
+
+opt With GPU clock locking
+  IProf -> GPUMgr: lock GPU clocks
+  activate GPUMgr
+  GPUMgr --> IProf: clocks locked
+  deactivate GPUMgr
+end
+
+IProf -> Bench: run_latency.py +benchmark=profiling
+activate Bench
+Bench -> Nsight: nsys profile wrapper
+activate Nsight
+Nsight -> Executor: run profiling workload
+activate Executor
+Executor --> Nsight: trace data
+deactivate Executor
+Nsight -> Artifacts: save .nsys-rep
+activate Artifacts
+deactivate Artifacts
+Nsight --> Bench: profiling complete
+deactivate Nsight
+Bench --> IProf: benchmark complete
+deactivate Bench
+
+opt With GPU clock locking
+  IProf -> GPUMgr: restore clocks
+  activate GPUMgr
+  GPUMgr --> IProf: clocks restored
+  deactivate GPUMgr
+end
+
+IProf --> Researcher: artifacts/profiling/latency_<timestamp>.nsys-rep
+deactivate IProf
+
+note right of IProf
+  **iprof Commands**:
+  - iprof nsys latency/throughput/realtime/accuracy
+  - iprof ncu latency (kernel analysis)
+  - Auto-selects profiling vs full benchmark config
+  - Supports Hydra overrides: engine.nfft=8192
+end note
+
+' ============================================================================
+' Experiment Execution Phase
+' ============================================================================
+== Experiment Execution Phase ==
+
+Researcher -> CLI: iono analysis
+activate CLI
+CLI -> Snake: snakemake --cores 4
+activate Snake
+
+Snake -> Snake: parse Snakefile
+Snake -> Snake: build DAG
+
+group Latency Sweep
+    Snake -> Bench: run_latency.py --multirun
+    activate Bench
+    
+    Bench -> Hydra: load config
+    activate Hydra
+    Hydra -> Hydra: compose configuration
+    Hydra -> Hydra: setup multirun sweep
+    Hydra --> Bench: config objects
+    deactivate Hydra
+    
+    loop For each parameter combination
+        Bench -> Executor: BatchExecutor/StreamingExecutor(config)
+        activate Executor
+        Executor -> Executor: initialize CUDA
+        Executor -> Executor: allocate buffers
+        Executor --> Bench: executor instance
+        deactivate Executor
+
+        Bench -> Executor: submit(test_data, output)
+        activate Executor
+        Executor -> Executor: GPU FFT processing
+        Executor --> Bench: results + metrics
+        deactivate Executor
+        
+        Bench -> MLflow: log_metrics()
+        activate MLflow
+        MLflow -> MLflow: store experiment
+        deactivate MLflow
+        
+        Bench -> Artifacts: save CSV
+        activate Artifacts
+        Artifacts -> Artifacts: write latency_summary_*.csv
+        deactivate Artifacts
+    end
+    
+    Bench --> Snake: latency_sweep.done
+    deactivate Bench
+end
+
+group Throughput Sweep
+    Snake -> Bench: run_throughput.py --multirun +benchmark=throughput
+    activate Bench
+    note right: Similar process as latency\nwith different parameters\nGPU clock locking optional
+    Bench -> Hydra: load config
+    Bench -> Executor: benchmark loop
+    Bench -> MLflow: log metrics
+    Bench -> Artifacts: save CSV
+    Bench --> Snake: throughput_sweep.done
+    deactivate Bench
+end
+
+group Accuracy Sweep
+    Snake -> Bench: run_accuracy.py --multirun +benchmark=accuracy
+    activate Bench
+    note right: Validates against\nreference implementation
+    Bench -> Hydra: load config
+    Bench -> Executor: benchmark loop
+    Bench -> MLflow: log metrics
+    Bench -> Artifacts: save CSV
+    Bench --> Snake: accuracy_sweep.done
+    deactivate Bench
+end
+
+Snake --> CLI: benchmarks complete
+deactivate Snake
+deactivate CLI
+
+' ============================================================================
+' Analysis Phase
+' ============================================================================
+== Analysis Phase ==
+
+CLI -> Snake: continue pipeline
+activate CLI
+activate Snake
+
+Snake -> Analysis: analyze.py
+activate Analysis
+
+Analysis -> Artifacts: load all CSVs
+activate Artifacts
+Artifacts --> Analysis: benchmark data
+deactivate Artifacts
+
+Analysis -> Analysis: aggregate results
+Analysis -> Analysis: compute statistics
+Analysis -> Analysis: identify optimal configs
+
+Analysis -> Artifacts: save summary_statistics.csv
+activate Artifacts
+Artifacts -> Artifacts: write aggregated data
+deactivate Artifacts
+
+Analysis --> Snake: analysis complete
+deactivate Analysis
+
+' ============================================================================
+' Visualization Phase
+' ============================================================================
+== Visualization Phase ==
+
+Snake -> Analysis: generate_figures.py
+activate Analysis
+
+Analysis -> Artifacts: load summary_statistics.csv
+activate Artifacts
+Artifacts --> Analysis: aggregated data
+deactivate Artifacts
+
+Analysis -> Analysis: create throughput plots
+Analysis -> Analysis: create latency plots
+Analysis -> Analysis: create accuracy heatmaps
+Analysis -> Analysis: create combined analysis
+
+Analysis -> Artifacts: save figures (PNG + SVG)
+activate Artifacts
+Artifacts -> Artifacts: write to figures/
+deactivate Artifacts
+
+Analysis --> Snake: figures complete
+deactivate Analysis
+
+' ============================================================================
+' Reporting Phase
+' ============================================================================
+== Reporting Phase ==
+
+Snake -> Report: generate_report.py
+activate Report
+
+Report -> Artifacts: load summary + figures
+activate Artifacts
+Artifacts --> Report: data + images
+deactivate Artifacts
+
+Report -> Report: generate HTML
+Report -> Report: embed figures (base64)
+Report -> Report: create tables
+Report -> Report: executive summary
+
+Report -> Artifacts: save final_report.html
+activate Artifacts
+Artifacts -> Artifacts: write to reports/
+deactivate Artifacts
+
+Report --> Snake: report complete
+deactivate Report
+
+Snake --> CLI: pipeline complete
+deactivate Snake
+
+' ============================================================================
+' Interactive Analysis (Streamlit Dashboard) - PRIMARY
+' ============================================================================
+== Interactive Analysis Phase ==
+
+note over Researcher, Dashboard
+  **PRIMARY Analysis Tool**: Streamlit Dashboard
+  Real-time exploration, filtering, comparison
+end note
+
+Researcher -> CLI: iono dashboard
+activate CLI
+CLI -> Dashboard: streamlit run experiments/streamlit/app.py
+activate Dashboard
+
+Dashboard -> Artifacts: load all CSV data
+activate Artifacts
+Artifacts --> Dashboard: latency, throughput,\naccuracy, realtime data
+deactivate Artifacts
+
+Dashboard --> Researcher: http://localhost:8501
+deactivate CLI
+
+Researcher -> Dashboard: select filters
+activate Dashboard
+note right: **Interactive Features:**\n- Multi-select: NFFT, channels, overlap\n- Side-by-side comparison\n- CSV export
+Dashboard -> Dashboard: apply filters
+Dashboard --> Researcher: update charts
+deactivate Dashboard
+
+Researcher -> Dashboard: navigate to Ionosphere Research page
+activate Dashboard
+Dashboard -> Dashboard: load VLF/ULF analysis
+Dashboard --> Researcher: Resolution vs RTF,\nTemporal characteristics
+deactivate Dashboard
+
+Researcher -> Dashboard: export filtered results
+activate Dashboard
+Dashboard -> Artifacts: save filtered_results.csv
+activate Artifacts
+deactivate Artifacts
+Dashboard --> Researcher: download CSV
+deactivate Dashboard
+
+note over Dashboard
+  **Three Pages:**
+  1. General Performance (6 tabs)
+  2. Ionosphere Research (7 tabs)
+  3. Configuration Explorer
+
+  **Real-time filtering** on all visualizations
+end note
+
+Researcher -> Researcher: iterative exploration\nand parameter tuning
+
+' ============================================================================
+' Review Phase
+' ============================================================================
+== Review Phase ==
+
+CLI -> DVC: track artifacts
+activate DVC
+DVC -> Artifacts: compute hashes
+DVC -> DVC: update dvc.lock
+DVC --> CLI: tracking updated
+deactivate DVC
+
+CLI --> Researcher: Analysis complete!
+deactivate CLI
+
+Researcher -> CLI: iono ui
+activate CLI
+CLI -> MLflow: mlflow ui
+activate MLflow
+MLflow --> Researcher: http://localhost:5000
+deactivate MLflow
+deactivate CLI
+
+Researcher -> Researcher: review results\nin MLflow UI
+
+' ============================================================================
+' Optional: Quick Iteration
+' ============================================================================
+== Optional: Quick Iteration ==
+
+Researcher -> Analysis: quick_plot.py --latest
+activate Analysis
+Analysis -> Artifacts: load recent data
+Analysis -> Analysis: generate plots
+Analysis --> Researcher: display plots
+deactivate Analysis
+
+note right: For rapid iteration\nand debugging
+
+' ============================================================================
+' Notes
+' ============================================================================
+note over Hydra
+  **Configuration Management**
+  - Composes configs from modular YAML files
+  - Enables parameter sweeps via multirun
+  - Supports Optuna for optimization
+end note
+
+note over Executor
+  **GPU Processing (v0.9.4+)**
+  - BatchExecutor (high-throughput, 86.79 µs)
+  - StreamingExecutor (low-latency, 122.25 µs)
+  - CUDA FFT kernels
+  - Optimized memory transfers
+  - Real-time capable
+end note
+
+note over Ionoc
+  **C++ Development CLI**
+  - Quick validation: ionoc bench
+  - Full benchmarks: ionoc bench --full
+  - Profiling: ionoc profile nsys/ncu
+  - GPU clock locking: --lock-clocks
+  - Baseline comparison for regression detection
+end note
+
+note over IProf
+  **Production Profiling**
+  - Auto-config selection (profiling vs full)
+  - Python → C++ end-to-end profiling
+  - Hydra override support
+  - GPU clock locking integration
+end note
+
+note over Dashboard
+  **Streamlit Dashboard (PRIMARY)**
+  - 3 pages: General, Ionosphere, Config Explorer
+  - Real-time filtering and comparison
+  - Interactive parameter exploration
+  - CSV export functionality
+end note
+
+note over GPUMgr
+  **GPU Clock Management**
+  - Reduces CV: 20-40% → 5-15%
+  - Auto-elevates to admin (UAC)
+  - Auto-cleanup (even on Ctrl+C)
+  - Supported GPUs: RTX 3090/4090, A100, V100
+end note
+
+note over MLflow
+  **Experiment Tracking**
+  - Every run tracked with parameters
+  - Metrics logged for comparison
+  - Web UI for visualization
+end note
+
+note over DVC
+  **Data Version Control**
+  - Tracks large artifacts
+  - Ensures reproducibility
+  - Pipeline dependencies
+end note
+
+@enduml

@@ -51,9 +51,11 @@ package "**RESEARCH APPLICATIONS**" <<Research>> #E8F5E9 {
 package "**IONOSENSE HPC PLATFORM**" <<Platform>> #E6F3FF {
   
   together {
-    rectangle "**GPU-Accelerated\nProcessing Engine**" as Engine #FFE4B5
+    rectangle "**GPU-Accelerated\nExecutor Architecture**" as Engine #FFE4B5
     note bottom of Engine
-      **Performance Achievements:**
+      **Performance Achievements (v0.9.4+):**
+      * BatchExecutor: 86.79 µs (high-throughput)
+      * StreamingExecutor: 122.25 µs (low-latency)
       * 100-1000× faster than CPU
       * Real-time capable
       * Energy efficient
@@ -132,7 +134,7 @@ end note
 ' ============================================================================
 ' Technical Foundation (simplified)
 ' ============================================================================
-rectangle "**Technical Foundation**\n---\n**Core Technologies:**\nCUDA 13.0 | cuFFT | C++17 | Python 3.11\n\n**Research Tools:**\nMLflow | Hydra | Snakemake | DVC" as TechBase
+rectangle "**Technical Foundation (v0.9.4+)**\n---\n**Core Technologies:**\nCUDA 13.0 | cuFFT | C++17 | Python 3.11\n\n**CLI Tools:**\nionoc (C++ dev) | iprof (profiling) | iono dashboard (analysis)\n\n**Research Tools:**\nMLflow | Hydra | Snakemake | Streamlit | DVC\n\n**Stability Features:**\nGPU Clock Locking (CV: 20% → 5-10%)" as TechBase
 
 ' ============================================================================
 ' Relationships

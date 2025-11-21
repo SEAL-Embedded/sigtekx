@@ -12,29 +12,32 @@ skinparam arrowColor #4169E1
 skinparam noteBackgroundColor #FFFACD
 skinparam noteBorderColor #FFD700
 
-title Ionosense HPC - Python Package Architecture
-footer IEEE Publication Quality Diagram - © 2025
+title Ionosense HPC - Python Package Architecture (v0.9.4+)
+footer IEEE Publication Quality Diagram - © 2025 | Updated: 2025-01-19
 
 ' ============================================================================
 ' Core Package
 ' ============================================================================
 package "ionosense_hpc" #E6F3FF {
-  
+
   package "core" #F0F8FF {
     class Engine <<(E,orchid) Primary API>> {
-      -_config: EngineConfig
-      -_cpp_engine: ResearchEngine
+      -_config: ExecutorConfig
+      -_cpp_executor: IPipelineExecutor
       -_initialized: bool
       -_validate_inputs: bool
+      -_mode: ExecutionMode
       --
-      +__init__(config)
-      +process(data): FloatArray
+      +__init__(config, mode=BATCH)
+      +submit(data, output): void
+      +submit_async(data, callback): void
+      +synchronize(): void
       +reset(): void
       +close(): void
-      +synchronize(): void
       ..Properties..
-      +config: EngineConfig {readonly}
+      +config: ExecutorConfig {readonly}
       +is_initialized: bool {readonly}
+      +supports_streaming: bool {readonly}
       +stats: dict {readonly}
       +device_info: dict {readonly}
       ..Context Manager..
@@ -45,44 +48,66 @@ package "ionosense_hpc" #E6F3FF {
       +enable_experimental_feature(feature: str): void
       +detailed_metrics: dict {readonly}
     }
-    
+
     interface "_engine (C++)" as CppEngine <<(I,pink) Extension>> {
-      ResearchEngine
-      EngineConfig
+      BatchExecutor
+      StreamingExecutor
+      ExecutorConfig
+      SignalConfig
       get_available_devices()
       select_best_device()
     }
   }
 
   package "config" #F0F8FF {
-    class EngineConfig <<(D,lightblue) Pydantic>> {
+    class SignalConfig <<(D,lightblue) Pydantic>> {
       +nfft: int = 1024
-      +batch: int = 2
+      +channels: int = 2
       +overlap: float = 0.5
       +sample_rate_hz: int = 48000
       +stream_count: int = 3
       +pinned_buffer_count: int = 2
       +warmup_iters: int = 1
+      --
+      +hop_size: int {computed}
+      +num_output_bins: int {computed}
+      +frame_duration_ms: float {computed}
+    }
+
+    class ExecutorConfig <<(D,lightblue) Pydantic>> {
+      +mode: ExecutionMode = BATCH
+      +max_inflight_batches: int = 2
+      +enable_background_thread: bool = False
       +timeout_ms: int = 1000
       +use_cuda_graphs: bool = False
       +enable_profiling: bool = False
       +experiment_id: str
       +tags: list
       --
-      +hop_size: int {computed}
-      +num_output_bins: int {computed}
-      +frame_duration_ms: float {computed}
       +memory_estimate_mb: float {computed}
       +to_experiment_dict(): dict
     }
-    
-    class Presets <<(S,#FF7700) Factory>> {
-      {static} +realtime(): EngineConfig
-      {static} +throughput(): EngineConfig
-      {static} +validation(): EngineConfig
-      {static} +profiling(): EngineConfig
-      {static} +custom(**kwargs): EngineConfig
+
+    class BenchmarkConfig <<(D,lightblue) Pydantic>> {
+      +iterations: int = 5000
+      +warmup_iterations: int = 10
+      +lock_gpu_clocks: bool = False
+      +use_max_clocks: bool = False
+      +gpu_index: int = 0
+      +min_run_duration_s: float = 1.0
+      --
+      +total_iterations: int {computed}
     }
+
+    class Presets <<(S,#FF7700) Factory>> {
+      {static} +realtime(): ExecutorConfig
+      {static} +throughput(): ExecutorConfig
+      {static} +validation(): ExecutorConfig
+      {static} +profiling(): ExecutorConfig
+      {static} +custom(**kwargs): ExecutorConfig
+    }
+
+    ExecutorConfig --|> SignalConfig : extends
 
     class ResearchConfig <<(D,lightblue) Pydantic>> {
       +metadata: ExperimentMetadata

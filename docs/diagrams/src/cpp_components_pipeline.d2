@@ -1,0 +1,334 @@
+# Ionosense HPC - C++ Component Architecture
+# Layout: dagre - hierarchical component relationships with clear top-down data flow
+# Render: See docs/diagrams/README.md for rendering instructions
+#
+# This diagram shows the high-level component architecture of the Ionosense HPC library,
+# focusing on the dual executor pattern (BatchExecutor and StreamingExecutor), their
+# relationships with processing stages, CUDA resources, and memory management.
+
+direction: down
+
+# ==============================================================================
+# Python Bindings Layer
+# ==============================================================================
+python_layer: Python Bindings Layer {
+  style: {
+    fill: "#FFE6E6"
+    stroke: "#C00000"
+  }
+
+  PyBatchExecutor: {
+    shape: rectangle
+    label: "PyBatchExecutor"
+  }
+
+  PyStreamingExecutor: {
+    shape: rectangle
+    label: "PyStreamingExecutor"
+  }
+
+  PyBind11: {
+    shape: rectangle
+    label: "pybind11 Module"
+  }
+
+  PyBatchExecutor -> PyBind11: wraps
+  PyStreamingExecutor -> PyBind11: wraps
+}
+
+# ==============================================================================
+# C++ Executor API
+# ==============================================================================
+executor_api: C++ Executor API {
+  style: {
+    fill: "#E6F3FF"
+    stroke: "#4169E1"
+  }
+
+  BatchExecutor: {
+    shape: rectangle
+    label: "BatchExecutor"
+
+    note: |md
+      **Batch Mode (High-Throughput)**
+      - Direct pipeline processing
+      - NumPy array interface
+      - Mean latency: 86.79 µs
+      - Direct H2D ’ Compute ’ D2H
+      - Pimpl idiom hides CUDA dependencies
+    |
+  }
+
+  StreamingExecutor: {
+    shape: rectangle
+    label: "StreamingExecutor"
+
+    note: |md
+      **Streaming Mode (Low-Latency)**
+      - Ring buffer accumulation
+      - Arbitrary chunk sizes
+      - Mean latency: 122.25 µs
+      - Ring buffer ’ Extract ’ Pipeline
+      - Pimpl idiom hides CUDA dependencies
+    |
+  }
+
+  ExecutorConfig: {
+    shape: rectangle
+    label: "ExecutorConfig"
+  }
+
+  SignalConfig: {
+    shape: rectangle
+    label: "SignalConfig"
+  }
+
+  ProcessingStats: {
+    shape: rectangle
+    label: "ProcessingStats"
+  }
+
+  # Executor configuration relationships
+  BatchExecutor <- ExecutorConfig: configured by
+  StreamingExecutor <- ExecutorConfig: configured by
+  ExecutorConfig -> SignalConfig: extends
+  BatchExecutor -> ProcessingStats: generates
+  StreamingExecutor -> ProcessingStats: generates
+}
+
+# ==============================================================================
+# Streaming Components
+# ==============================================================================
+streaming_components: Streaming Components {
+  style: {
+    fill: "#E6FFE6"
+    stroke: "#228B22"
+  }
+
+  RingBufferManager: {
+    shape: rectangle
+    label: "Ring Buffer Manager"
+
+    note: |md
+      Per-channel ring buffers
+      - Capacity: 3× NFFT
+      - Lock-free thread-safe
+
+      **Memory Overhead: +80%**
+      - 3× NFFT × channels (ring buffers)
+      - + nfft × channels (staging)
+      - = 295 KB vs 164 KB (batch)
+    |
+  }
+}
+
+# ==============================================================================
+# Processing Pipeline
+# ==============================================================================
+processing_pipeline: Processing Pipeline {
+  style: {
+    fill: "#E6F3FF"
+    stroke: "#4169E1"
+  }
+
+  WindowStage: {
+    shape: rectangle
+    label: "Window Stage"
+  }
+
+  FFTStage: {
+    shape: rectangle
+    label: "FFT Stage"
+  }
+
+  MagnitudeStage: {
+    shape: rectangle
+    label: "Magnitude Stage"
+  }
+
+  StageFactory: {
+    shape: rectangle
+    label: "Stage Factory"
+  }
+
+  # Stage creation
+  StageFactory -> WindowStage: creates
+  StageFactory -> FFTStage: creates
+  StageFactory -> MagnitudeStage: creates
+}
+
+# ==============================================================================
+# CUDA Resource Management
+# ==============================================================================
+cuda_resources: CUDA Resource Management {
+  style: {
+    fill: "#D4E6FF"
+    stroke: "#00008B"
+  }
+
+  CudaStream: {
+    shape: rectangle
+    label: "CudaStream"
+  }
+
+  CudaEvent: {
+    shape: rectangle
+    label: "CudaEvent"
+  }
+
+  DeviceBuffer: {
+    shape: rectangle
+    label: "DeviceBuffer"
+  }
+
+  PinnedHostBuffer: {
+    shape: rectangle
+    label: "PinnedHostBuffer"
+  }
+
+  CufftPlan: {
+    shape: rectangle
+    label: "CufftPlan"
+  }
+}
+
+# ==============================================================================
+# CUDA Kernels (Device Code)
+# ==============================================================================
+cuda_kernels: CUDA Kernels {
+  style: {
+    fill: "#FFE4B5"
+    stroke: "#DAA520"
+  }
+
+  WindowKernels: {
+    shape: rectangle
+    label: "Window Kernels"
+  }
+
+  FFTKernels: {
+    shape: rectangle
+    label: "FFT Kernels\n(cuFFT)"
+  }
+
+  MagnitudeKernels: {
+    shape: rectangle
+    label: "Magnitude Kernels"
+  }
+}
+
+# ==============================================================================
+# Profiling & Debug
+# ==============================================================================
+profiling_debug: Profiling & Debug {
+  style: {
+    fill: "#F0E6FF"
+    stroke: "#800080"
+  }
+
+  NVTX: {
+    shape: rectangle
+    label: "NVTX Profiling"
+  }
+
+  Metrics: {
+    shape: rectangle
+    label: "Performance Metrics"
+  }
+}
+
+# ==============================================================================
+# Memory Spaces
+# ==============================================================================
+gpu_memory: GPU Memory {
+  shape: cylinder
+  style: {
+    fill: "#FFD700"
+    stroke: "#B8860B"
+  }
+
+  note: |md
+    Device memory managed
+    via RAII wrappers
+  |
+}
+
+host_memory: Host Memory {
+  shape: cylinder
+  style: {
+    fill: "#90EE90"
+    stroke: "#228B22"
+  }
+}
+
+# ==============================================================================
+# Cross-layer Relationships
+# ==============================================================================
+
+# Python to C++ bindings
+python_layer.PyBind11 -> executor_api.BatchExecutor: binds
+python_layer.PyBind11 -> executor_api.StreamingExecutor: binds
+
+# Executor resource management
+executor_api.BatchExecutor -> cuda_resources.CudaStream: manages
+executor_api.StreamingExecutor -> cuda_resources.CudaStream: manages
+executor_api.BatchExecutor -> cuda_resources.CudaEvent: synchronizes
+executor_api.StreamingExecutor -> cuda_resources.CudaEvent: synchronizes
+executor_api.BatchExecutor -> cuda_resources.DeviceBuffer: allocates
+executor_api.StreamingExecutor -> cuda_resources.DeviceBuffer: allocates
+executor_api.BatchExecutor -> cuda_resources.PinnedHostBuffer: "stages\n(2 buffers)"
+executor_api.StreamingExecutor -> cuda_resources.PinnedHostBuffer: "stages\n(2 buffers)"
+
+# Streaming-specific components
+executor_api.StreamingExecutor -> streaming_components.RingBufferManager: uses
+streaming_components.RingBufferManager -> cuda_resources.PinnedHostBuffer: "owns ring\nbuffers"
+
+# Pipeline orchestration (dashed lines for orchestration)
+executor_api.BatchExecutor -> processing_pipeline.WindowStage: orchestrates {
+  style.stroke-dash: 3
+}
+executor_api.BatchExecutor -> processing_pipeline.FFTStage: orchestrates {
+  style.stroke-dash: 3
+}
+executor_api.BatchExecutor -> processing_pipeline.MagnitudeStage: orchestrates {
+  style.stroke-dash: 3
+}
+executor_api.StreamingExecutor -> processing_pipeline.WindowStage: orchestrates {
+  style.stroke-dash: 3
+}
+executor_api.StreamingExecutor -> processing_pipeline.FFTStage: orchestrates {
+  style.stroke-dash: 3
+}
+executor_api.StreamingExecutor -> processing_pipeline.MagnitudeStage: orchestrates {
+  style.stroke-dash: 3
+}
+
+# Stage to kernel relationships
+processing_pipeline.WindowStage -> cuda_kernels.WindowKernels: launches
+processing_pipeline.FFTStage -> cuda_kernels.FFTKernels: executes
+processing_pipeline.MagnitudeStage -> cuda_kernels.MagnitudeKernels: launches
+
+# Stage resource usage
+processing_pipeline.WindowStage -> cuda_resources.DeviceBuffer: uses
+processing_pipeline.FFTStage -> cuda_resources.CufftPlan: uses
+processing_pipeline.MagnitudeStage -> cuda_resources.DeviceBuffer: uses
+
+# Memory space relationships
+cuda_resources.CudaStream -> gpu_memory: commands
+cuda_resources.CudaEvent -> gpu_memory: synchronizes
+cuda_resources.DeviceBuffer -> gpu_memory: allocates
+cuda_resources.PinnedHostBuffer -> host_memory: allocates
+
+# Profiling integration
+executor_api.BatchExecutor -> profiling_debug.NVTX: instruments {
+  style.stroke-dash: 3
+}
+executor_api.StreamingExecutor -> profiling_debug.NVTX: instruments {
+  style.stroke-dash: 3
+}
+executor_api.BatchExecutor -> profiling_debug.Metrics: collects {
+  style.stroke-dash: 3
+}
+executor_api.StreamingExecutor -> profiling_debug.Metrics: collects {
+  style.stroke-dash: 3
+}

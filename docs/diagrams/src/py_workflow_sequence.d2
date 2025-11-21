@@ -1,0 +1,533 @@
+# Ionosense HPC - Experimental Workflow Sequence
+# Layout: elk - complex experimental workflow with many actors and parallel execution paths
+# Render: See docs/diagrams/README.md for rendering instructions
+#
+# This diagram shows the complete experimental workflow sequence including initialization,
+# C++ development workflow (ionoc), production profiling (iprof), experiment execution,
+# analysis, visualization, and interactive reporting with the Streamlit dashboard.
+
+direction: down
+
+# ==============================================================================
+# Actors and Participants
+# ==============================================================================
+Researcher: Researcher {shape: person}
+CLI: |md
+  **CLI**
+  (iono)
+|
+CLI.shape: rectangle
+
+Ionoc: |md
+  **ionoc**
+  (C++ CLI)
+|
+Ionoc.shape: rectangle
+Ionoc.note: |md
+  **C++ Development CLI**
+  - Quick validation: ionoc bench
+  - Full benchmarks: ionoc bench --full
+  - Profiling: ionoc profile nsys/ncu
+  - GPU clock locking: --lock-clocks
+  - Baseline comparison for regression detection
+|
+
+IProf: |md
+  **iprof**
+  (Profiling)
+|
+IProf.shape: rectangle
+IProf.note: |md
+  **Production Profiling**
+  - Auto-config selection (profiling vs full)
+  - Python → C++ end-to-end profiling
+  - Hydra override support
+  - GPU clock locking integration
+|
+
+Dashboard: |md
+  **Streamlit**
+  **Dashboard**
+|
+Dashboard.shape: rectangle
+Dashboard.note: |md
+  **Streamlit Dashboard (PRIMARY)**
+  - 3 pages: General, Ionosphere, Config Explorer
+  - Real-time filtering and comparison
+  - Interactive parameter exploration
+  - CSV export functionality
+
+  **Three Pages:**
+  1. General Performance (6 tabs)
+  2. Ionosphere Research (7 tabs)
+  3. Configuration Explorer
+
+  **Real-time filtering** on all visualizations
+|
+
+GPUMgr: |md
+  **GPU**
+  **Manager**
+|
+GPUMgr.shape: rectangle
+GPUMgr.note: |md
+  **GPU Clock Management**
+  - Reduces CV: 20-40% → 5-15%
+  - Auto-elevates to admin (UAC)
+  - Auto-cleanup (even on Ctrl+C)
+  - Supported GPUs: RTX 3090/4090, A100, V100
+|
+
+Snake: Snakemake {shape: rectangle}
+
+Hydra: Hydra {shape: rectangle}
+Hydra.note: |md
+  **Configuration Management**
+  - Composes configs from modular YAML files
+  - Enables parameter sweeps via multirun
+  - Supports Optuna for optimization
+|
+
+Bench: |md
+  **Benchmark**
+  **Scripts**
+|
+Bench.shape: rectangle
+
+Executor: |md
+  **Executor**
+  **(C++/CUDA)**
+|
+Executor.shape: rectangle
+Executor.note: |md
+  **GPU Processing (v0.9.4+)**
+  - BatchExecutor (high-throughput, 86.79 µs)
+  - StreamingExecutor (low-latency, 122.25 µs)
+  - CUDA FFT kernels
+  - Optimized memory transfers
+  - Real-time capable
+|
+
+Nsight: |md
+  **Nsight**
+  **Tools**
+|
+Nsight.shape: rectangle
+
+Analysis: |md
+  **Analysis**
+  **Scripts**
+|
+Analysis.shape: rectangle
+
+Artifacts: Artifacts {shape: cylinder}
+
+MLflow: MLflow {shape: cylinder}
+MLflow.note: |md
+  **Experiment Tracking**
+  - Every run tracked with parameters
+  - Metrics logged for comparison
+  - Web UI for visualization
+|
+
+Report: |md
+  **Report**
+  **Generator**
+|
+Report.shape: rectangle
+
+DVC: DVC {shape: rectangle}
+DVC.note: |md
+  **Data Version Control**
+  - Tracks large artifacts
+  - Ensures reproducibility
+  - Pipeline dependencies
+|
+
+# ==============================================================================
+# Phase 1: Initialization
+# ==============================================================================
+init_phase: Initialization Phase {
+  style: {
+    fill: "#E8F5E9"
+    stroke: "#4CAF50"
+  }
+
+  step1: "1: Researcher → CLI: iono info" {shape: rectangle}
+  step2: "2: CLI → Artifacts: check experiments/" {shape: rectangle}
+  step3: "3: CLI → Researcher: show available experiments" {shape: rectangle}
+  step4: "4: Researcher → CLI: iono status" {shape: rectangle}
+  step5: "5: CLI → MLflow: check tracking data" {shape: rectangle}
+  step6: "6: CLI → DVC: check pipeline status" {shape: rectangle}
+  step7: "7: CLI → Researcher: show project status" {shape: rectangle}
+
+  step1 -> step2 -> step3 -> step4 -> step5 -> step6 -> step7
+}
+
+# ==============================================================================
+# Phase 2: C++ Development Workflow (Pre-Python Integration)
+# ==============================================================================
+cpp_dev_phase: C++ Development Workflow {
+  style: {
+    fill: "#E6F3FF"
+    stroke: "#4169E1"
+  }
+
+  description: |md
+    **Use Case**: Iterative C++ kernel/executor development
+    **BEFORE** integrating with Python benchmarks
+  |
+
+  step1: "1: Researcher → Ionoc: ionoc bench --preset latency --full --lock-clocks" {shape: rectangle}
+  step2: "2: Ionoc → GPUMgr: lock GPU clocks (admin elevation)" {shape: rectangle}
+  step3: "3: GPUMgr → Ionoc: clocks locked (CV: 20% → 5-10%)" {shape: rectangle}
+  step4: "4: Ionoc → Executor: run C++ benchmark (5000 iterations)" {shape: rectangle}
+  step5: "5: Executor: BatchExecutor or StreamingExecutor processing" {shape: rectangle}
+  step6: "6: Executor → Ionoc: latency metrics" {shape: rectangle}
+  step7: "7: Ionoc → GPUMgr: restore GPU clocks (auto-cleanup)" {shape: rectangle}
+  step8: "8: GPUMgr → Ionoc: clocks restored" {shape: rectangle}
+  step9: "9: Ionoc → Researcher: Performance Card (✓ NO CHANGE / ⚠ REGRESSION)" {shape: rectangle}
+
+  step1 -> step2 -> step3 -> step4 -> step5 -> step6 -> step7 -> step8 -> step9
+
+  # Optional profiling branch
+  profiling: Optional: Profiling {
+    style: {
+      fill: "#FFF5E6"
+      stroke: "#FF8C00"
+      stroke-dash: 3
+    }
+
+    prof1: "10a: Researcher → Ionoc: ionoc profile nsys --stats" {shape: rectangle}
+    prof2: "10b: Ionoc → Nsight: nsys profile with config" {shape: rectangle}
+    prof3: "10c: Nsight → Executor: run with profiling" {shape: rectangle}
+    prof4: "10d: Executor → Nsight: trace data" {shape: rectangle}
+    prof5: "10e: Nsight → Artifacts: save .nsys-rep" {shape: rectangle}
+    prof6: "10f: Nsight → Ionoc: profiling complete" {shape: rectangle}
+    prof7: "10g: Ionoc → Researcher: artifacts/profiling/cpp_dev.nsys-rep" {shape: rectangle}
+    prof8: "10h: Researcher: nsys-ui (analyze timeline)" {shape: rectangle}
+
+    prof1 -> prof2 -> prof3 -> prof4 -> prof5 -> prof6 -> prof7 -> prof8
+  }
+
+  ionoc_cmds: |md
+    **ionoc Commands**:
+    - ionoc bench (quick validation)
+    - ionoc bench --preset \<name\> --full
+    - ionoc profile nsys/ncu
+    - ionoc bench --lock-clocks
+  |
+  ionoc_cmds.shape: text
+  ionoc_cmds.style.stroke-width: 0
+}
+
+# ==============================================================================
+# Phase 3: Production Profiling Workflow (Python End-to-End)
+# ==============================================================================
+prod_prof_phase: Production Profiling Workflow {
+  style: {
+    fill: "#FFE6E6"
+    stroke: "#C00000"
+  }
+
+  description: |md
+    **Use Case**: Profile complete Python → C++ pipeline
+    **AFTER** C++ integration complete
+  |
+
+  step1: "1: Researcher → IProf: iprof nsys latency" {shape: rectangle}
+  step2: "2: IProf → Hydra: auto-load profiling config (20 iter)" {shape: rectangle}
+  step3: "3: Hydra → IProf: ExecutorConfig + BenchmarkConfig" {shape: rectangle}
+
+  # Optional GPU lock
+  gpu_lock: Optional: GPU Clock Locking {
+    style.stroke-dash: 3
+    gl1: "4a: IProf → GPUMgr: lock GPU clocks" {shape: rectangle}
+    gl2: "4b: GPUMgr → IProf: clocks locked" {shape: rectangle}
+    gl1 -> gl2
+  }
+
+  step4: "5: IProf → Bench: run_latency.py +benchmark=profiling" {shape: rectangle}
+  step5: "6: Bench → Nsight: nsys profile wrapper" {shape: rectangle}
+  step6: "7: Nsight → Executor: run profiling workload" {shape: rectangle}
+  step7: "8: Executor → Nsight: trace data" {shape: rectangle}
+  step8: "9: Nsight → Artifacts: save .nsys-rep" {shape: rectangle}
+  step9: "10: Nsight → Bench: profiling complete" {shape: rectangle}
+  step10: "11: Bench → IProf: benchmark complete" {shape: rectangle}
+
+  # Optional GPU unlock
+  gpu_unlock: Optional: GPU Clock Unlock {
+    style.stroke-dash: 3
+    gu1: "12a: IProf → GPUMgr: restore clocks" {shape: rectangle}
+    gu2: "12b: GPUMgr → IProf: clocks restored" {shape: rectangle}
+    gu1 -> gu2
+  }
+
+  step11: "13: IProf → Researcher: artifacts/profiling/latency_<timestamp>.nsys-rep" {shape: rectangle}
+
+  step1 -> step2 -> step3 -> step4 -> step5 -> step6 -> step7 -> step8 -> step9 -> step10 -> step11
+
+  iprof_cmds: |md
+    **iprof Commands**:
+    - iprof nsys latency/throughput/realtime/accuracy
+    - iprof ncu latency (kernel analysis)
+    - Auto-selects profiling vs full benchmark config
+    - Supports Hydra overrides: engine.nfft=8192
+  |
+  iprof_cmds.shape: text
+  iprof_cmds.style.stroke-width: 0
+}
+
+# ==============================================================================
+# Phase 4: Experiment Execution
+# ==============================================================================
+experiment_phase: Experiment Execution Phase {
+  style: {
+    fill: "#E6FFE6"
+    stroke: "#228B22"
+  }
+
+  step1: "1: Researcher → CLI: iono analysis" {shape: rectangle}
+  step2: "2: CLI → Snake: snakemake --cores 4" {shape: rectangle}
+  step3: "3: Snake: parse Snakefile" {shape: rectangle}
+  step4: "4: Snake: build DAG" {shape: rectangle}
+
+  step1 -> step2 -> step3 -> step4
+
+  # Latency Sweep
+  latency_sweep: Latency Sweep {
+    style: {
+      fill: "#F0F8FF"
+      stroke: "#4169E1"
+    }
+
+    ls1: "5: Snake → Bench: run_latency.py --multirun" {shape: rectangle}
+    ls2: "6: Bench → Hydra: load config" {shape: rectangle}
+    ls3: "7: Hydra: compose configuration, setup multirun sweep" {shape: rectangle}
+    ls4: "8: Hydra → Bench: config objects" {shape: rectangle}
+
+    loop: "Loop: For each parameter combination" {
+      style: {
+        fill: "#E6F3FF"
+        stroke: "#4169E1"
+        stroke-dash: 3
+      }
+
+      l1: "9: Bench → Executor: BatchExecutor/StreamingExecutor(config)" {shape: rectangle}
+      l2: "10: Executor: initialize CUDA, allocate buffers" {shape: rectangle}
+      l3: "11: Executor → Bench: executor instance" {shape: rectangle}
+      l4: "12: Bench → Executor: submit(test_data, output)" {shape: rectangle}
+      l5: "13: Executor: GPU FFT processing" {shape: rectangle}
+      l6: "14: Executor → Bench: results + metrics" {shape: rectangle}
+      l7: "15: Bench → MLflow: log_metrics()" {shape: rectangle}
+      l8: "16: MLflow: store experiment" {shape: rectangle}
+      l9: "17: Bench → Artifacts: save CSV (latency_summary_*.csv)" {shape: rectangle}
+
+      l1 -> l2 -> l3 -> l4 -> l5 -> l6 -> l7 -> l8 -> l9
+    }
+
+    ls5: "18: Bench → Snake: latency_sweep.done" {shape: rectangle}
+
+    ls1 -> ls2 -> ls3 -> ls4 -> loop -> ls5
+  }
+
+  # Throughput Sweep
+  throughput_sweep: Throughput Sweep {
+    style: {
+      fill: "#FFF5E6"
+      stroke: "#FF8C00"
+    }
+
+    ts1: "19: Snake → Bench: run_throughput.py --multirun +benchmark=throughput" {shape: rectangle}
+    ts2: "20: Bench: Similar process (load config, loop, log metrics, save CSV)" {shape: rectangle}
+    ts3: "21: Bench → Snake: throughput_sweep.done" {shape: rectangle}
+
+    ts1 -> ts2 -> ts3
+
+    note: |md
+      Similar process as latency
+      with different parameters
+      GPU clock locking optional
+    |
+  }
+
+  # Accuracy Sweep
+  accuracy_sweep: Accuracy Sweep {
+    style: {
+      fill: "#FFE6F0"
+      stroke: "#C00000"
+    }
+
+    as1: "22: Snake → Bench: run_accuracy.py --multirun +benchmark=accuracy" {shape: rectangle}
+    as2: "23: Bench: Validates against reference implementation" {shape: rectangle}
+    as3: "24: Bench → Snake: accuracy_sweep.done" {shape: rectangle}
+
+    as1 -> as2 -> as3
+  }
+
+  step5: "25: Snake → CLI: benchmarks complete" {shape: rectangle}
+
+  step4 -> latency_sweep -> throughput_sweep -> accuracy_sweep -> step5
+}
+
+# ==============================================================================
+# Phase 5: Analysis
+# ==============================================================================
+analysis_phase: Analysis Phase {
+  style: {
+    fill: "#E6F3FF"
+    stroke: "#4169E1"
+  }
+
+  step1: "1: CLI → Snake: continue pipeline" {shape: rectangle}
+  step2: "2: Snake → Analysis: analyze.py" {shape: rectangle}
+  step3: "3: Analysis → Artifacts: load all CSVs" {shape: rectangle}
+  step4: "4: Artifacts → Analysis: benchmark data" {shape: rectangle}
+  step5: "5: Analysis: aggregate results, compute statistics, identify optimal configs" {shape: rectangle}
+  step6: "6: Analysis → Artifacts: save summary_statistics.csv" {shape: rectangle}
+  step7: "7: Analysis → Snake: analysis complete" {shape: rectangle}
+
+  step1 -> step2 -> step3 -> step4 -> step5 -> step6 -> step7
+}
+
+# ==============================================================================
+# Phase 6: Visualization
+# ==============================================================================
+visualization_phase: Visualization Phase {
+  style: {
+    fill: "#FFE6E6"
+    stroke: "#C00000"
+  }
+
+  step1: "1: Snake → Analysis: generate_figures.py" {shape: rectangle}
+  step2: "2: Analysis → Artifacts: load summary_statistics.csv" {shape: rectangle}
+  step3: "3: Artifacts → Analysis: aggregated data" {shape: rectangle}
+  step4: "4: Analysis: create throughput/latency/accuracy plots, combined analysis" {shape: rectangle}
+  step5: "5: Analysis → Artifacts: save figures (PNG + SVG) to figures/" {shape: rectangle}
+  step6: "6: Analysis → Snake: figures complete" {shape: rectangle}
+
+  step1 -> step2 -> step3 -> step4 -> step5 -> step6
+}
+
+# ==============================================================================
+# Phase 7: Reporting
+# ==============================================================================
+reporting_phase: Reporting Phase {
+  style: {
+    fill: "#E6FFE6"
+    stroke: "#228B22"
+  }
+
+  step1: "1: Snake → Report: generate_report.py" {shape: rectangle}
+  step2: "2: Report → Artifacts: load summary + figures" {shape: rectangle}
+  step3: "3: Artifacts → Report: data + images" {shape: rectangle}
+  step4: "4: Report: generate HTML, embed figures (base64), create tables, executive summary" {shape: rectangle}
+  step5: "5: Report → Artifacts: save final_report.html to reports/" {shape: rectangle}
+  step6: "6: Report → Snake: report complete" {shape: rectangle}
+  step7: "7: Snake → CLI: pipeline complete" {shape: rectangle}
+
+  step1 -> step2 -> step3 -> step4 -> step5 -> step6 -> step7
+}
+
+# ==============================================================================
+# Phase 8: Interactive Analysis (PRIMARY)
+# ==============================================================================
+interactive_phase: Interactive Analysis Phase {
+  style: {
+    fill: "#F0F8FF"
+    stroke: "#4169E1"
+    stroke-width: 3
+  }
+
+  description: |md
+    **PRIMARY Analysis Tool**: Streamlit Dashboard
+    Real-time exploration, filtering, comparison
+  |
+
+  step1: "1: Researcher → CLI: iono dashboard" {shape: rectangle}
+  step2: "2: CLI → Dashboard: streamlit run experiments/streamlit/app.py" {shape: rectangle}
+  step3: "3: Dashboard → Artifacts: load all CSV data" {shape: rectangle}
+  step4: "4: Artifacts → Dashboard: latency, throughput, accuracy, realtime data" {shape: rectangle}
+  step5: "5: Dashboard → Researcher: http://localhost:8501" {shape: rectangle}
+  step6: "6: Researcher → Dashboard: select filters (NFFT, channels, overlap)" {shape: rectangle}
+  step7: "7: Dashboard: apply filters, update charts" {shape: rectangle}
+  step8: "8: Dashboard → Researcher: updated visualizations" {shape: rectangle}
+  step9: "9: Researcher → Dashboard: navigate to Ionosphere Research page" {shape: rectangle}
+  step10: "10: Dashboard: load VLF/ULF analysis (Resolution vs RTF, Temporal)" {shape: rectangle}
+  step11: "11: Dashboard → Researcher: Ionosphere-specific visualizations" {shape: rectangle}
+  step12: "12: Researcher → Dashboard: export filtered results" {shape: rectangle}
+  step13: "13: Dashboard → Artifacts: save filtered_results.csv" {shape: rectangle}
+  step14: "14: Dashboard → Researcher: download CSV" {shape: rectangle}
+  step15: "15: Researcher: iterative exploration and parameter tuning" {shape: rectangle}
+
+  step1 -> step2 -> step3 -> step4 -> step5 -> step6 -> step7 -> step8 -> step9 -> step10 -> step11 -> step12 -> step13 -> step14 -> step15
+
+  features: |md
+    **Interactive Features:**
+    - Multi-select: NFFT, channels, overlap
+    - Side-by-side comparison
+    - CSV export
+  |
+  features.shape: text
+  features.style.stroke-width: 0
+}
+
+# ==============================================================================
+# Phase 9: Review
+# ==============================================================================
+review_phase: Review Phase {
+  style: {
+    fill: "#FFFACD"
+    stroke: "#FFD700"
+  }
+
+  step1: "1: CLI → DVC: track artifacts" {shape: rectangle}
+  step2: "2: DVC → Artifacts: compute hashes" {shape: rectangle}
+  step3: "3: DVC: update dvc.lock" {shape: rectangle}
+  step4: "4: DVC → CLI: tracking updated" {shape: rectangle}
+  step5: "5: CLI → Researcher: Analysis complete!" {shape: rectangle}
+  step6: "6: Researcher → CLI: iono ui" {shape: rectangle}
+  step7: "7: CLI → MLflow: mlflow ui" {shape: rectangle}
+  step8: "8: MLflow → Researcher: http://localhost:5000" {shape: rectangle}
+  step9: "9: Researcher: review results in MLflow UI" {shape: rectangle}
+
+  step1 -> step2 -> step3 -> step4 -> step5 -> step6 -> step7 -> step8 -> step9
+}
+
+# ==============================================================================
+# Optional: Quick Iteration
+# ==============================================================================
+quick_iteration: Optional: Quick Iteration {
+  style: {
+    fill: "#E8F5E9"
+    stroke: "#4CAF50"
+    stroke-dash: 3
+  }
+
+  step1: "1: Researcher → Analysis: quick_plot.py --latest" {shape: rectangle}
+  step2: "2: Analysis → Artifacts: load recent data" {shape: rectangle}
+  step3: "3: Analysis: generate plots" {shape: rectangle}
+  step4: "4: Analysis → Researcher: display plots" {shape: rectangle}
+
+  step1 -> step2 -> step3 -> step4
+
+  note: |md
+    For rapid iteration
+    and debugging
+  |
+}
+
+# ==============================================================================
+# Workflow Flow
+# ==============================================================================
+init_phase -> cpp_dev_phase: Sequential
+cpp_dev_phase -> prod_prof_phase: Sequential
+prod_prof_phase -> experiment_phase: Sequential
+experiment_phase -> analysis_phase: Sequential
+analysis_phase -> visualization_phase: Sequential
+visualization_phase -> reporting_phase: Sequential
+reporting_phase -> interactive_phase: PRIMARY path
+interactive_phase -> review_phase: Sequential
+review_phase -> quick_iteration: Optional {
+  style.stroke-dash: 3
+}

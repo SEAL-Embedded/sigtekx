@@ -14,8 +14,8 @@ skinparam noteBackgroundColor #FFFACD
 skinparam noteBorderColor #FFD700
 skinparam actorBackgroundColor #FFE4E1
 
-title Ionosense HPC - Experiment & Analysis Workflow Architecture
-footer IEEE Publication Quality Diagram - © 2025
+title Ionosense HPC - Experiment & Analysis Workflow Architecture (v0.9.4+)
+footer IEEE Publication Quality Diagram - © 2025 | Updated: 2025-01-19
 
 ' ============================================================================
 ' Actors
@@ -47,8 +47,8 @@ package "Configuration Layer (Hydra)" #E6F3FF {
     package "experiment/" <<Experiments>> {
       component [baseline.yaml] as ExpBaseline
       component [nfft_scaling.yaml] as ExpNFFT
-      component [batch_scaling.yaml] as ExpBatch
-      component "==ionosphere_*.yaml\n---\nionosphere_resolution\nionosphere_temporal\nionosphere_multiscale" as ExpIono
+      component [channel_scaling.yaml] as ExpChannel
+      component "==ionosphere_*.yaml\n---\nionosphere_resolution\nionosphere_temporal\nionosphere_multiscale\nionosphere_test" as ExpIono
     }
   }
   
@@ -67,7 +67,7 @@ package "Execution Layer" #FFE6E6 {
     component "==run_realtime.py\n---\n@hydra.main()\nRealtimeBenchmark\nMLflow_tracking\nCSV_output" as RunRealtime
   }
   
-  component "==Engine Instance\n<<C++/CUDA>>\n---\nResearchEngine\nGPU_execution\nPerformance_metrics" as EngineInstance
+  component "==Executor Instance\n<<C++/CUDA>>\n---\nBatchExecutor / StreamingExecutor\nGPU_execution\nPerformance_metrics" as ExecutorInstance
 }
 
 ' ============================================================================
@@ -90,6 +90,38 @@ package "Analysis Layer" #E6FFE6 {
     component "==generate_report.py\n---\nHTML_generation\nembedded_figures\nexecutive_summary\nperformance_tables" as GenReport
     component "==quick_plot.py\n---\ninteractive_plotting\nrapid_visualization\ndebugging_support" as QuickPlot
   }
+}
+
+' ============================================================================
+' Reporting Layer (NEW v0.9.4+)
+' ============================================================================
+package "Interactive Reporting Layer (PRIMARY)" #E6F3FF {
+  component "==Streamlit Dashboard\n<<experiments/streamlit/app.py>>\n---\npage_general_performance\npage_ionosphere_research\npage_configuration_explorer\nreal-time_filtering\nCSV_export" as StreamlitDashboard
+
+  note right of StreamlitDashboard
+    **Three Interactive Pages:**
+    1. General Performance (6 tabs)
+       - Throughput, Latency, Accuracy
+       - Scaling, Realtime, Configuration
+    2. Ionosphere Research (7 tabs)
+       - Resolution, Temporal, RTF Analysis
+       - Parameter impact, Use cases
+    3. Configuration Explorer
+       - Side-by-side comparison
+       - Delta metrics
+  end note
+}
+
+package "Static Reporting Layer (FUTURE)" #F0F8FF {
+  component "==Quarto Reports\n<<experiments/quarto/>>\n---\ngeneral_performance.qmd\nionosphere_research.qmd\nPDF/HTML/Word_output\nLaTeX_typesetting" as QuartoReports
+  note right of QuartoReports
+    **Publication-Quality Reports:**
+    - Cross-references
+    - Bibliographies
+    - Equations
+    - Git-tracked templates
+    - Reproducible builds
+  end note
 }
 
 ' ============================================================================
@@ -147,10 +179,10 @@ HydraSweeper --> RunThroughput : launches with config
 HydraSweeper --> RunAccuracy : launches with config
 HydraSweeper --> RunRealtime : launches with config
 
-RunLatency --> EngineInstance : instantiates
-RunThroughput --> EngineInstance : instantiates
-RunAccuracy --> EngineInstance : instantiates
-RunRealtime --> EngineInstance : instantiates
+RunLatency --> ExecutorInstance : instantiates
+RunThroughput --> ExecutorInstance : instantiates
+RunAccuracy --> ExecutorInstance : instantiates
+RunRealtime --> ExecutorInstance : instantiates
 
 RunLatency --> DataDir : writes CSV
 RunThroughput --> DataDir : writes CSV
@@ -188,6 +220,18 @@ GenReport --> ReportsDir : saves HTML
 DataDir --> QuickPlot : reads for debugging
 
 ' ============================================================================
+' Relationships - Reporting Flow (PRIMARY)
+' ============================================================================
+DataDir --> StreamlitDashboard : loads all CSVs (primary path)
+GenFigures --> StreamlitDashboard : embeds
+StreamlitDashboard --> Researcher : interactive exploration
+StreamlitDashboard --> DataDir : exports filtered CSVs
+
+DataDir --> QuartoReports : loads (future)
+GenFigures --> QuartoReports : embeds (future)
+QuartoReports --> ReportsDir : generates PDF/HTML (future)
+
+' ============================================================================
 ' Relationships - Tracking
 ' ============================================================================
 MLflow --> MLRuns : stores
@@ -223,11 +267,20 @@ note bottom of MLflow
   and comparison
 end note
 
-note left of EngineInstance
-  **GPU Acceleration**
+note left of ExecutorInstance
+  **GPU Acceleration (v0.9.4+)**
+  BatchExecutor / StreamingExecutor
   C++/CUDA backend provides
   high-performance FFT processing
   for all benchmarks
+end note
+
+note bottom of StreamlitDashboard
+  **PRIMARY Analysis Tool**
+  Launch with: iono dashboard
+  Real-time filtering, comparison
+  Interactive parameter exploration
+  CSV export capability
 end note
 
 note right of ExpIono

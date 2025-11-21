@@ -6,50 +6,59 @@ skinparam classBorderColor #4169E1
 skinparam packageBackgroundColor #E6F3FF
 skinparam arrowColor #4169E1
 
-title Ionosense HPC - Memory Management Architecture
-footer IEEE Publication Quality Diagram - © 2025
+title Ionosense HPC - BatchExecutor Memory Layout (v0.9.4+)
+footer IEEE Publication Quality Diagram - © 2025 | Updated: 2025-01-19
+
+note top
+  **BatchExecutor Mode**: High-throughput, minimal overhead
+  Total Memory: ~164 KB (nfft=2048, channels=2)
+end note
 
 package "Host Memory Space" #90EE90 {
   class "Input Buffer\n(float*)" as HostInput {
-    size: nfft * batch
-    layout: interleaved
+    size: nfft * channels
+    layout: interleaved [ch0, ch1, ...]
   }
 
   class "Output Buffer\n(float*)" as HostOutput {
-    size: (nfft/2+1) * batch
+    size: (nfft/2+1) * channels * frames
     layout: magnitude spectrum
   }
 
-  class "PinnedHostBuffer[0]" as Pinned0 <<page-locked>> {
-    size: nfft * batch
+  class "PinnedHostBuffer[0]\ninput_staging" as Pinned0 <<page-locked>> {
+    size: nfft * channels
     purpose: double buffering
   }
 
-  class "PinnedHostBuffer[1]" as Pinned1 <<page-locked>> {
-    size: nfft * batch
+  class "PinnedHostBuffer[1]\noutput_staging" as Pinned1 <<page-locked>> {
+    size: (nfft/2+1) * channels
     purpose: double buffering
   }
 }
 
 package "Device Memory Space" #FFD700 {
   class "DeviceBuffer[0]\nInput" as DevInput0 {
-    size: nfft * batch * sizeof(float)
+    size: nfft * channels * sizeof(float)
     stride: nfft
+    layout: per-channel
   }
 
   class "DeviceBuffer[1]\nInput" as DevInput1 {
-    size: nfft * batch * sizeof(float)
+    size: nfft * channels * sizeof(float)
     stride: nfft
+    layout: per-channel
   }
 
   class "DeviceBuffer\nIntermediate" as DevIntermediate {
-    size: (nfft/2+1) * batch * sizeof(float2)
+    size: (nfft/2+1) * channels * sizeof(float2)
     format: complex (R2C output)
+    note: Hermitian symmetry
   }
 
   class "DeviceBuffer\nOutput" as DevOutput {
-    size: (nfft/2+1) * batch * sizeof(float)
+    size: (nfft/2+1) * channels * sizeof(float)
     format: magnitude
+    layout: [ch0_bins, ch1_bins, ...]
   }
 
   class "Window Coefficients" as WindowCoef <<cached>> {
@@ -87,12 +96,27 @@ note right of Pinned0
   **Page-locked memory**
   Enables faster PCIe
   transfers (~25 GB/s)
+  cudaHostAlloc()
 end note
 
 note bottom of DevIntermediate
   **Complex format**
   Hermitian symmetry
   Only N/2+1 bins stored
+  Saves 50% memory
+end note
+
+note bottom
+  **BatchExecutor Memory Characteristics**:
+  - Direct pipeline: H2D → Compute → D2H
+  - Minimal overhead: 164 KB (nfft=2048, channels=2)
+  - Double buffering for input/output
+  - No ring buffers (streaming-only feature)
+
+  **Terminology (v0.9.4)**:
+  - **channels** = spatial dimension (independent signal sources)
+  - **frames** = temporal dimension (FFT windows over time)
+  - **bins** = spectral dimension (frequency components)
 end note
 
 @enduml

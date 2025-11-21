@@ -1,0 +1,601 @@
+# Ionosense HPC - Experiment & Analysis Workflow Architecture
+# Layout: dagre - hierarchical workflow components from configuration through analysis to reporting
+# Render: See docs/diagrams/README.md for rendering instructions
+#
+# This diagram shows the complete experiment and analysis workflow architecture,
+# including Hydra configuration, benchmark execution, Snakemake orchestration,
+# analysis scripts, and the dual reporting layer (Streamlit PRIMARY, Quarto FUTURE).
+
+direction: down
+
+# ==============================================================================
+# Researcher (Actor)
+# ==============================================================================
+researcher: Researcher {
+  shape: person
+  style: {
+    fill: "#FFE4E1"
+    stroke: "#C00000"
+  }
+}
+
+# ==============================================================================
+# Development Interface
+# ==============================================================================
+dev_interface: Development Interface {
+  style: {
+    fill: "#FFE4E4"
+    stroke: "#C00000"
+  }
+
+  cli: {
+    shape: rectangle
+    label: |md
+      **cli.ps1**
+      - iono clean
+      - iono setup
+      - iono build
+      - iono help
+    |
+  }
+
+  direct_cmd: {
+    shape: rectangle
+    label: |md
+      **Direct Commands**
+      - python benchmarks/run_*.py
+      - snakemake --cores 4
+      - mlflow ui
+      - dvc status/repro
+    |
+  }
+}
+
+# ==============================================================================
+# Configuration Layer (Hydra)
+# ==============================================================================
+config_layer: Configuration Layer (Hydra) {
+  style: {
+    fill: "#E6F3FF"
+    stroke: "#4169E1"
+  }
+
+  hydra_sweeper: {
+    shape: rectangle
+    label: |md
+      **Hydra Sweeper**
+      - multirun_mode
+      - parameter_sweeps
+      - optuna_integration
+      - parallel_execution
+    |
+
+    note: |md
+      **Hydra Configuration**
+      Enables parameter sweeps,
+      multirun experiments, and
+      configuration composition
+    |
+  }
+
+  conf_dir: experiments/conf {
+    style: {
+      fill: "#F0F8FF"
+      stroke: "#4169E1"
+    }
+
+    main_config: {
+      shape: document
+      label: |md
+        **config.yaml**
+        - project_metadata
+        - paths_configuration
+        - mlflow_settings
+        - seed_and_reproducibility
+      |
+    }
+
+    # Engine presets
+    engine_presets: engine/ {
+      style: {
+        fill: "#E6F3FF"
+        stroke: "#4169E1"
+      }
+
+      engine_rt: realtime.yaml {shape: document}
+      engine_throughput: throughput.yaml {shape: document}
+      engine_val: validation.yaml {shape: document}
+      engine_iono: |md
+        **ionosphere_*.yaml**
+        - ionosphere_realtime
+        - ionosphere_hires
+        - ionosphere_longterm
+      |
+      engine_iono.shape: document
+      engine_iono.note: |md
+        **Ionosphere Studies**
+        Specialized configurations for
+        ionospheric scintillation analysis
+        with multi-scale parameter sweeps
+      |
+    }
+
+    # Benchmark configs
+    benchmark_configs: benchmark/ {
+      style: {
+        fill: "#E6F3FF"
+        stroke: "#4169E1"
+      }
+
+      bench_latency: latency.yaml {shape: document}
+      bench_throughput: throughput.yaml {shape: document}
+      bench_accuracy: accuracy.yaml {shape: document}
+      bench_realtime: realtime.yaml {shape: document}
+    }
+
+    # Experiment configs
+    experiment_configs: experiment/ {
+      style: {
+        fill: "#E6F3FF"
+        stroke: "#4169E1"
+      }
+
+      exp_baseline: baseline.yaml {shape: document}
+      exp_nfft: nfft_scaling.yaml {shape: document}
+      exp_channel: channel_scaling.yaml {shape: document}
+      exp_iono: |md
+        **ionosphere_*.yaml**
+        - ionosphere_resolution
+        - ionosphere_temporal
+        - ionosphere_multiscale
+        - ionosphere_test
+      |
+      exp_iono.shape: document
+    }
+  }
+}
+
+# ==============================================================================
+# Execution Layer
+# ==============================================================================
+execution_layer: Execution Layer {
+  style: {
+    fill: "#FFE6E6"
+    stroke: "#C00000"
+  }
+
+  benchmark_scripts: Benchmark Scripts {
+    style: {
+      fill: "#FFE4B5"
+      stroke: "#FF8C00"
+    }
+
+    run_latency: {
+      shape: rectangle
+      label: |md
+        **run_latency.py**
+        - @hydra.main()
+        - LatencyBenchmark
+        - MLflow_tracking
+        - CSV_output
+      |
+    }
+
+    run_throughput: {
+      shape: rectangle
+      label: |md
+        **run_throughput.py**
+        - @hydra.main()
+        - ThroughputBenchmark
+        - MLflow_tracking
+        - CSV_output
+      |
+    }
+
+    run_accuracy: {
+      shape: rectangle
+      label: |md
+        **run_accuracy.py**
+        - @hydra.main()
+        - AccuracyBenchmark
+        - MLflow_tracking
+        - CSV_output
+      |
+    }
+
+    run_realtime: {
+      shape: rectangle
+      label: |md
+        **run_realtime.py**
+        - @hydra.main()
+        - RealtimeBenchmark
+        - MLflow_tracking
+        - CSV_output
+      |
+    }
+  }
+
+  executor_instance: {
+    shape: rectangle
+    label: |md
+      **Executor Instance**
+      «C++/CUDA»
+      - BatchExecutor / StreamingExecutor
+      - GPU_execution
+      - Performance_metrics
+    |
+
+    note: |md
+      **GPU Acceleration (v0.9.4+)**
+      BatchExecutor / StreamingExecutor
+      C++/CUDA backend provides
+      high-performance FFT processing
+      for all benchmarks
+    |
+  }
+}
+
+# ==============================================================================
+# Orchestration Layer (Snakemake)
+# ==============================================================================
+orchestration_layer: Orchestration Layer (Snakemake) {
+  style: {
+    fill: "#F0FFE6"
+    stroke: "#228B22"
+  }
+
+  snakefile: {
+    shape: rectangle
+    label: |md
+      **Snakefile**
+      - rule_run_latency_sweep
+      - rule_run_throughput_sweep
+      - rule_run_accuracy_sweep
+      - rule_analyze_results
+      - rule_generate_figures
+      - rule_generate_report
+    |
+
+    note: |md
+      **Snakemake Pipeline**
+      DAG-based workflow with
+      automatic dependency
+      resolution and parallelization
+    |
+  }
+
+  dag_executor: {
+    shape: rectangle
+    label: |md
+      **DAG Executor**
+      - dependency_resolution
+      - parallel_execution
+      - incremental_builds
+      - resource_management
+    |
+  }
+}
+
+# ==============================================================================
+# Analysis Layer
+# ==============================================================================
+analysis_layer: Analysis Layer {
+  style: {
+    fill: "#E6FFE6"
+    stroke: "#228B22"
+  }
+
+  analyze: {
+    shape: rectangle
+    label: |md
+      **analyze.py**
+      - load_CSV_data
+      - aggregate_results
+      - statistical_analysis
+      - summary_statistics
+    |
+  }
+
+  gen_figures: {
+    shape: rectangle
+    label: |md
+      **generate_figures.py**
+      - throughput_scaling_plots
+      - latency_analysis_plots
+      - accuracy_heatmaps
+      - combined_visualizations
+      - PNG_and_SVG_output
+    |
+  }
+
+  gen_report: {
+    shape: rectangle
+    label: |md
+      **generate_report.py**
+      - HTML_generation
+      - embedded_figures
+      - executive_summary
+      - performance_tables
+    |
+  }
+
+  quick_plot: {
+    shape: rectangle
+    label: |md
+      **quick_plot.py**
+      - interactive_plotting
+      - rapid_visualization
+      - debugging_support
+    |
+  }
+}
+
+# ==============================================================================
+# Interactive Reporting Layer (PRIMARY)
+# ==============================================================================
+reporting_interactive: Interactive Reporting Layer (PRIMARY) {
+  style: {
+    fill: "#E6F3FF"
+    stroke: "#4169E1"
+    stroke-width: 3
+  }
+
+  streamlit_dashboard: {
+    shape: rectangle
+    label: |md
+      **Streamlit Dashboard**
+      «experiments/streamlit/app.py»
+
+      - page_general_performance
+      - page_ionosphere_research
+      - page_configuration_explorer
+      - real-time_filtering
+      - CSV_export
+    |
+
+    note: |md
+      **PRIMARY Analysis Tool**
+      Launch with: iono dashboard
+
+      **Three Interactive Pages:**
+      1. General Performance (6 tabs)
+         - Throughput, Latency, Accuracy
+         - Scaling, Realtime, Configuration
+      2. Ionosphere Research (7 tabs)
+         - Resolution, Temporal, RTF Analysis
+         - Parameter impact, Use cases
+      3. Configuration Explorer
+         - Side-by-side comparison
+         - Delta metrics
+
+      Real-time filtering, comparison
+      Interactive parameter exploration
+      CSV export capability
+    |
+  }
+}
+
+# ==============================================================================
+# Static Reporting Layer (FUTURE)
+# ==============================================================================
+reporting_static: Static Reporting Layer (FUTURE) {
+  style: {
+    fill: "#F0F8FF"
+    stroke: "#6495ED"
+    stroke-dash: 3
+  }
+
+  quarto_reports: {
+    shape: rectangle
+    label: |md
+      **Quarto Reports**
+      «experiments/quarto/»
+
+      - general_performance.qmd
+      - ionosphere_research.qmd
+      - PDF/HTML/Word_output
+      - LaTeX_typesetting
+    |
+
+    note: |md
+      **Publication-Quality Reports:**
+      - Cross-references
+      - Bibliographies
+      - Equations
+      - Git-tracked templates
+      - Reproducible builds
+    |
+  }
+}
+
+# ==============================================================================
+# Data Storage Layer
+# ==============================================================================
+data_storage: Data Storage {
+  shape: cylinder
+  style: {
+    fill: "#FFE4B5"
+    stroke: "#FF8C00"
+  }
+
+  artifacts: artifacts/ {
+    style: {
+      fill: "#FFEFD5"
+      stroke: "#FF8C00"
+    }
+
+    data_dir: |md
+      **data/**
+      - *_summary_*.csv
+      - summary_statistics.csv
+      - detailed_analysis.json
+    |
+    data_dir.shape: stored_data
+
+    figures_dir: |md
+      **figures/**
+      - throughput_scaling.png/svg
+      - latency_vs_nfft.png/svg
+      - accuracy_heatmap.png/svg
+      - combined_analysis.png/svg
+    |
+    figures_dir.shape: stored_data
+
+    reports_dir: |md
+      **reports/**
+      - final_report.html
+      - coverage/
+    |
+    reports_dir.shape: stored_data
+
+    experiments_dir: |md
+      **experiments/**
+      - {date}/{time}/
+      - sweeps/
+      - .hydra/
+    |
+    experiments_dir.shape: stored_data
+  }
+}
+
+# ==============================================================================
+# Tracking & Versioning Layer
+# ==============================================================================
+tracking: Tracking & Versioning {
+  shape: cloud
+  style: {
+    fill: "#E6FFE6"
+    stroke: "#228B22"
+  }
+
+  mlflow: {
+    shape: rectangle
+    label: |md
+      **MLflow**
+      - experiment_tracking
+      - metric_logging
+      - parameter_tracking
+      - artifact_storage
+      - UI_server
+    |
+
+    note: |md
+      **Experiment Tracking**
+      All metrics, parameters, and
+      artifacts tracked for reproducibility
+      and comparison
+    |
+  }
+
+  dvc: {
+    shape: rectangle
+    label: |md
+      **DVC**
+      - data_versioning
+      - pipeline_tracking
+      - reproducibility
+      - dvc.yaml
+      - dvc.lock
+    |
+  }
+
+  mlruns: {
+    shape: cylinder
+    label: |md
+      **mlruns/**
+      - experiments/
+      - models/
+      - metrics/
+      - params/
+    |
+  }
+}
+
+# ==============================================================================
+# Relationships - User Interface
+# ==============================================================================
+researcher -> dev_interface.cli: initiates
+researcher -> dev_interface.direct_cmd: advanced usage
+
+# ==============================================================================
+# Relationships - Configuration Flow
+# ==============================================================================
+config_layer.conf_dir.main_config -> config_layer.hydra_sweeper: configures {
+  style.stroke-dash: 3
+}
+config_layer.conf_dir.engine_presets -> config_layer.hydra_sweeper: engine params {
+  style.stroke-dash: 3
+}
+config_layer.conf_dir.benchmark_configs -> config_layer.hydra_sweeper: benchmark params {
+  style.stroke-dash: 3
+}
+config_layer.conf_dir.experiment_configs -> config_layer.hydra_sweeper: experiment params {
+  style.stroke-dash: 3
+}
+
+# ==============================================================================
+# Relationships - Execution Flow
+# ==============================================================================
+config_layer.hydra_sweeper -> execution_layer.benchmark_scripts.run_latency: launches with config
+config_layer.hydra_sweeper -> execution_layer.benchmark_scripts.run_throughput: launches with config
+config_layer.hydra_sweeper -> execution_layer.benchmark_scripts.run_accuracy: launches with config
+config_layer.hydra_sweeper -> execution_layer.benchmark_scripts.run_realtime: launches with config
+
+execution_layer.benchmark_scripts -> execution_layer.executor_instance: instantiates
+execution_layer.benchmark_scripts -> data_storage.artifacts.data_dir: writes CSV
+execution_layer.benchmark_scripts -> tracking.mlflow: logs metrics
+
+# ==============================================================================
+# Relationships - Orchestration Flow
+# ==============================================================================
+dev_interface.cli -> orchestration_layer.snakefile: invokes
+dev_interface.direct_cmd -> orchestration_layer.snakefile: invokes
+orchestration_layer.snakefile -> orchestration_layer.dag_executor: processes rules
+
+orchestration_layer.dag_executor -> execution_layer.benchmark_scripts: executes
+orchestration_layer.dag_executor -> analysis_layer.analyze: executes
+orchestration_layer.dag_executor -> analysis_layer.gen_figures: executes
+orchestration_layer.dag_executor -> analysis_layer.gen_report: executes
+
+# ==============================================================================
+# Relationships - Analysis Flow
+# ==============================================================================
+data_storage.artifacts.data_dir -> analysis_layer.analyze: reads CSVs
+analysis_layer.analyze -> data_storage.artifacts.data_dir: writes summary
+data_storage.artifacts.data_dir -> analysis_layer.gen_figures: reads summary
+analysis_layer.gen_figures -> data_storage.artifacts.figures_dir: saves plots
+data_storage.artifacts.data_dir -> analysis_layer.gen_report: reads data
+data_storage.artifacts.figures_dir -> analysis_layer.gen_report: embeds figures
+analysis_layer.gen_report -> data_storage.artifacts.reports_dir: saves HTML
+data_storage.artifacts.data_dir -> analysis_layer.quick_plot: reads for debugging
+
+# ==============================================================================
+# Relationships - Reporting Flow (PRIMARY)
+# ==============================================================================
+data_storage.artifacts.data_dir -> reporting_interactive.streamlit_dashboard: "loads all CSVs\n(primary path)"
+analysis_layer.gen_figures -> reporting_interactive.streamlit_dashboard: embeds
+reporting_interactive.streamlit_dashboard -> researcher: interactive exploration
+reporting_interactive.streamlit_dashboard -> data_storage.artifacts.data_dir: exports filtered CSVs
+
+# Reporting Flow (FUTURE)
+data_storage.artifacts.data_dir -> reporting_static.quarto_reports: "loads\n(future)" {
+  style.stroke-dash: 3
+}
+analysis_layer.gen_figures -> reporting_static.quarto_reports: "embeds\n(future)" {
+  style.stroke-dash: 3
+}
+reporting_static.quarto_reports -> data_storage.artifacts.reports_dir: "generates PDF/HTML\n(future)" {
+  style.stroke-dash: 3
+}
+
+# ==============================================================================
+# Relationships - Tracking
+# ==============================================================================
+tracking.mlflow -> tracking.mlruns: stores
+tracking.dvc -> data_storage.artifacts.data_dir: tracks
+tracking.dvc -> data_storage.artifacts.figures_dir: tracks
+tracking.dvc -> data_storage.artifacts.reports_dir: tracks
+tracking.dvc -> orchestration_layer.snakefile: orchestrates
+
+dev_interface.cli -> tracking.mlflow: "iono ui"
+dev_interface.direct_cmd -> tracking.mlflow: "mlflow ui"

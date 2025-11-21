@@ -1,0 +1,161 @@
+@startuml "Ionosense HPC - Streaming Executor Memory"
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam classBackgroundColor #E6FFE6
+skinparam classBorderColor #228B22
+skinparam packageBackgroundColor #E6FFE6
+skinparam arrowColor #228B22
+
+title Ionosense HPC - StreamingExecutor Memory Layout (v0.9.4+)
+footer IEEE Publication Quality Diagram - © 2025 | Created: 2025-01-19
+
+note top
+  **StreamingExecutor Mode**: Low-latency streaming, arbitrary chunk sizes
+  Total Memory: ~295 KB (nfft=2048, channels=2) **+80% vs BatchExecutor**
+end note
+
+package "Host Memory Space" #E6FFE6 {
+  class "Input Chunk\n(float*)" as HostInput {
+    size: variable (arbitrary)
+    layout: per-channel chunks
+  }
+
+  class "Output Buffer\n(float*)" as HostOutput {
+    size: (nfft/2+1) * channels
+    layout: magnitude (per frame)
+  }
+
+  package "Ring Buffers (Per-Channel)" #C4E6C4 {
+    class "RingBuffer[0]" as RingBuf0 <<lock-free>> {
+      capacity: 3 * nfft
+      write_pos: atomic<size_t>
+      read_pos: atomic<size_t>
+      available: atomic<size_t>
+      buffer: PinnedHostBuffer
+    }
+
+    class "RingBuffer[1]" as RingBuf1 <<lock-free>> {
+      capacity: 3 * nfft
+      write_pos: atomic<size_t>
+      read_pos: atomic<size_t>
+      available: atomic<size_t>
+      buffer: PinnedHostBuffer
+    }
+
+    note right of RingBuf0
+      **Per-channel ring buffer**
+      - Accumulates arbitrary chunks
+      - 3× NFFT capacity prevents overflow
+      - Lock-free thread-safe (SPSC)
+      - Pinned memory for fast transfers
+    end note
+  }
+
+  class "h_batch_staging" as Staging <<page-locked>> {
+    size: nfft * channels
+    purpose: frame extraction buffer
+    note: Extracted frames from ring buffers
+  }
+
+  class "PinnedHostBuffer[0]\ninput_staging" as Pinned0 <<page-locked>> {
+    size: nfft * channels
+    purpose: double buffering
+  }
+
+  class "PinnedHostBuffer[1]\noutput_staging" as Pinned1 <<page-locked>> {
+    size: (nfft/2+1) * channels
+    purpose: double buffering
+  }
+}
+
+package "Device Memory Space" #FFD700 {
+  class "DeviceBuffer[0]\nInput" as DevInput0 {
+    size: nfft * channels * sizeof(float)
+    stride: nfft
+    layout: per-channel
+  }
+
+  class "DeviceBuffer[1]\nInput" as DevInput1 {
+    size: nfft * channels * sizeof(float)
+    stride: nfft
+    layout: per-channel
+  }
+
+  class "DeviceBuffer\nIntermediate" as DevIntermediate {
+    size: (nfft/2+1) * channels * sizeof(float2)
+    format: complex (R2C output)
+    note: Hermitian symmetry
+  }
+
+  class "DeviceBuffer\nOutput" as DevOutput {
+    size: (nfft/2+1) * channels * sizeof(float)
+    format: magnitude
+    layout: [ch0_bins, ch1_bins, ...]
+  }
+
+  class "Window Coefficients" as WindowCoef <<cached>> {
+    size: nfft * sizeof(float)
+    precomputed: true
+  }
+
+  class "cuFFT Work Area" as WorkArea {
+    size: dynamic
+    managed by: CufftPlan
+  }
+}
+
+package "PCIe Transfer" <<Transport>> #FFE4E4 {
+  class "H2D Stream[0]" as H2D
+  class "D2H Stream[2]" as D2H
+}
+
+' Data flow - Streaming mode
+HostInput --> RingBuf0 : push(chunk[ch0])
+HostInput --> RingBuf1 : push(chunk[ch1])
+
+RingBuf0 --> Staging : extract_batch(nfft, 1, hop_size)
+RingBuf1 --> Staging : extract_batch(nfft, 1, hop_size)
+
+Staging --> H2D : async
+H2D --> DevInput0 : cudaMemcpyAsync
+
+DevInput0 --> DevInput0 : window (in-place)
+DevInput0 --> DevIntermediate : FFT (R2C)
+DevIntermediate --> DevOutput : magnitude
+
+DevOutput --> D2H : async
+D2H --> Pinned1 : cudaMemcpyAsync
+Pinned1 --> HostOutput : memcpy
+
+WindowCoef --> DevInput0 : element-wise mult
+
+RingBuf0 --> RingBuf0 : advance(hop_size) after frame
+RingBuf1 --> RingBuf1 : advance(hop_size) after frame
+
+note bottom
+  **StreamingExecutor Memory Breakdown**:
+  - Ring buffers: 3 × nfft × channels × sizeof(float) = **98 KB** (extra)
+  - Staging buffer: nfft × channels × sizeof(float) = **33 KB** (extra)
+  - Device buffers: same as BatchExecutor = **164 KB**
+  - **Total: ~295 KB (+80% overhead vs BatchExecutor)**
+
+  **Tradeoffs**:
+  ✅ Supports arbitrary input chunk sizes
+  ✅ Continuous streaming capability
+  ✅ Per-channel independence
+  ❌ +80% memory overhead
+  ❌ +40% latency (122.25 µs vs 86.79 µs)
+
+  **Ring Buffer Operations**:
+  1. push() - Add new samples (lock-free)
+  2. can_extract(nfft) - Check if full frame available
+  3. extract_batch() - Extract overlapping frames
+  4. advance(hop_size) - Move read pointer for overlap
+
+  **Capacity: 3× NFFT rationale**:
+  - Prevents overflow during pipeline warmup
+  - Allows safe accumulation before first extraction
+  - Handles bursty input patterns
+end note
+
+@enduml

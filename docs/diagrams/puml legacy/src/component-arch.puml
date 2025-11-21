@@ -1,0 +1,164 @@
+@startuml "Ionosense HPC - Component Architecture"
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam componentBackgroundColor #F0F8FF
+skinparam componentBorderColor #4169E1
+skinparam packageBackgroundColor #E6F3FF
+skinparam packageBorderColor #4169E1
+skinparam arrowColor #4169E1
+skinparam noteBackgroundColor #FFFACD
+
+title Ionosense HPC - Component Architecture (v0.9.4+ Executor-Based)
+footer IEEE Publication Quality Diagram - © 2025 | Updated: 2025-01-19
+
+package "Python Bindings Layer" #FFE6E6 {
+  component [PyBatchExecutor] as PyBatch
+  component [PyStreamingExecutor] as PyStreaming
+  component [pybind11 Module] as PyBind
+}
+
+package "C++ Executor API" #E6F3FF {
+  component [BatchExecutor] as BatchExec
+  component [StreamingExecutor] as StreamExec
+  component [ExecutorConfig] as ExecConfig
+  component [SignalConfig] as SigConfig
+  component [ProcessingStats] as Stats
+}
+
+package "Streaming Components" #E6FFE6 {
+  component [Ring Buffer Manager] as RingBufMgr
+  note right of RingBufMgr
+    Per-channel ring buffers
+    Capacity: 3× NFFT
+    Lock-free thread-safe
+  end note
+}
+
+package "Processing Pipeline" #E6F3FF {
+  component [Window Stage] as Window
+  component [FFT Stage] as FFT
+  component [Magnitude Stage] as Magnitude
+  component [Stage Factory] as StageFactory
+}
+
+package "CUDA Resource Management" #D4E6FF {
+  component [CudaStream] as Stream
+  component [CudaEvent] as Event
+  component [DeviceBuffer] as DevBuf
+  component [PinnedHostBuffer] as PinBuf
+  component [CufftPlan] as Plan
+}
+
+package "CUDA Kernels" <<Device>> #FFE4B5 {
+  component [Window Kernels] as WinKern
+  component [FFT Kernels\n(cuFFT)] as FFTKern
+  component [Magnitude Kernels] as MagKern
+}
+
+package "Profiling & Debug" #F0E6FF {
+  component [NVTX Profiling] as NVTX
+  component [Performance Metrics] as Metrics
+}
+
+database "GPU Memory" as GPU #FFD700
+database "Host Memory" as Host #90EE90
+
+' Python Bindings
+PyBatch --> PyBind : wraps
+PyStreaming --> PyBind : wraps
+PyBind --> BatchExec : binds
+PyBind --> StreamExec : binds
+
+' Executor Configuration
+BatchExec --> ExecConfig : configured by
+StreamExec --> ExecConfig : configured by
+ExecConfig --> SigConfig : extends
+BatchExec --> Stats : generates
+StreamExec --> Stats : generates
+
+' Executor Resource Management
+BatchExec --> Stream : manages
+StreamExec --> Stream : manages
+BatchExec --> Event : synchronizes
+StreamExec --> Event : synchronizes
+BatchExec --> DevBuf : allocates
+StreamExec --> DevBuf : allocates
+BatchExec --> PinBuf : stages (2 buffers)
+StreamExec --> PinBuf : stages (2 buffers)
+
+' Streaming-specific components
+StreamExec --> RingBufMgr : uses
+RingBufMgr --> PinBuf : owns ring buffers
+
+' Pipeline orchestration
+BatchExec ..> Window : orchestrates
+BatchExec ..> FFT : orchestrates
+BatchExec ..> Magnitude : orchestrates
+StreamExec ..> Window : orchestrates
+StreamExec ..> FFT : orchestrates
+StreamExec ..> Magnitude : orchestrates
+
+Window --> WinKern : launches
+FFT --> FFTKern : executes
+Magnitude --> MagKern : launches
+
+Window --> DevBuf : uses
+FFT --> Plan : uses
+Magnitude --> DevBuf : uses
+
+Stream --> GPU : commands
+Event --> GPU : synchronizes
+DevBuf --> GPU : allocates
+PinBuf --> Host : allocates
+
+BatchExec ..> NVTX : instruments
+StreamExec ..> NVTX : instruments
+BatchExec ..> Metrics : collects
+StreamExec ..> Metrics : collects
+
+StageFactory --> Window : creates
+StageFactory --> FFT : creates
+StageFactory --> Magnitude : creates
+
+' Notes
+note top of PyBatch
+  **Batch Mode (High-Throughput)**
+  Direct pipeline processing
+  NumPy array interface
+  Mean latency: 86.79 µs
+end note
+
+note top of PyStreaming
+  **Streaming Mode (Low-Latency)**
+  Ring buffer accumulation
+  Arbitrary chunk sizes
+  Mean latency: 122.25 µs
+end note
+
+note right of GPU
+  Device memory managed
+  via RAII wrappers
+end note
+
+note bottom of BatchExec
+  **BatchExecutor**
+  Pimpl idiom hides
+  CUDA dependencies
+  Direct H2D → Compute → D2H
+end note
+
+note bottom of StreamExec
+  **StreamingExecutor**
+  Pimpl idiom hides
+  CUDA dependencies
+  Ring buffer → Extract → Pipeline
+end note
+
+note bottom of RingBufMgr
+  **Memory Overhead: +80%**
+  3× NFFT × channels (ring buffers)
+  + nfft × channels (staging)
+  = 295 KB vs 164 KB (batch)
+end note
+
+@enduml

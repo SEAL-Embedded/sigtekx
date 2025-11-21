@@ -1,4 +1,4 @@
-@startuml "Ionosense HPC - Processing Pipeline Flow"
+@startuml "Ionosense HPC - Batch Executor Pipeline"
 !theme plain
 skinparam backgroundColor #FEFEFE
 skinparam sequenceParticipantBackgroundColor #F0F8FF
@@ -7,12 +7,12 @@ skinparam sequenceLifeLineBorderColor #4169E1
 skinparam sequenceArrowColor #4169E1
 skinparam noteBackgroundColor #FFFACD
 
-title Ionosense HPC - Asynchronous Processing Pipeline
-footer IEEE Publication Quality Diagram - © 2025
+title Ionosense HPC - BatchExecutor Pipeline (High-Throughput Mode)
+footer IEEE Publication Quality Diagram - © 2025 | Updated: 2025-01-19
 
-participant Client
-participant ResearchEngine
-participant "ResearchEngine::Impl" as Impl
+participant "Client" as Client
+participant "BatchExecutor" as Executor
+participant "BatchExecutor::Impl" as Impl
 participant "Stream[0]\nH2D" as Stream0
 participant "Stream[1]\nCompute" as Stream1
 participant "Stream[2]\nD2H" as Stream2
@@ -22,11 +22,22 @@ participant MagnitudeStage
 
 autonumber
 
-Client -> ResearchEngine: process(input, output, num_samples)
-activate ResearchEngine
+note over Client, MagnitudeStage
+  **Batch Mode**: Direct pipeline processing
+  Input shape: [channels, num_samples]
+  Output shape: [channels, num_frames, num_bins]
+end note
 
-ResearchEngine -> Impl: process(input, output, num_samples)
+Client -> Executor: submit(input, output, num_samples)
+activate Executor
+
+Executor -> Impl: submit_impl(input, output, num_samples)
 activate Impl
+
+note right of Impl
+  Process input for all **channels**
+  Extract overlapping **frames**
+end note
 
 == Host to Device Transfer ==
 Impl -> Stream0: copy_from_host(input)
@@ -42,18 +53,21 @@ note right: Stream 1 waits for\nH2D completion
 
 Stream1 -> WindowStage: process(d_input, d_input)
 activate WindowStage
+note right: Apply window function\nShape: [channels, nfft]
 WindowStage -> WindowStage: apply_window_kernel<<<>>>
 WindowStage --> Stream1:
 deactivate WindowStage
 
 Stream1 -> FFTStage: process(d_input, d_intermediate)
 activate FFTStage
+note right: FFT on all channels\nOutput: [channels, nfft/2+1]
 FFTStage -> FFTStage: cufftExecR2C()
 FFTStage --> Stream1:
 deactivate FFTStage
 
 Stream1 -> MagnitudeStage: process(d_intermediate, d_output)
 activate MagnitudeStage
+note right: Compute magnitude\nShape: [channels, frames, bins]
 MagnitudeStage -> MagnitudeStage: magnitude_kernel<<<>>>
 MagnitudeStage --> Stream1:
 deactivate MagnitudeStage
@@ -75,11 +89,18 @@ note right: Block until D2H\ncomplete
 Stream2 --> Impl:
 deactivate Stream2
 
-Impl -> Impl: update_statistics()
-Impl --> ResearchEngine:
+Impl -> Impl: update_stats(event_start, event_end)
+note right: Update latency, throughput,\nframes_processed
+Impl --> Executor:
 deactivate Impl
 
-ResearchEngine --> Client:
-deactivate ResearchEngine
+Executor --> Client: return (output ready)
+deactivate Executor
+
+note over Client
+  **Performance**: Mean latency 86.79 µs
+  Direct pipeline = minimal overhead
+  Ideal for high-throughput batch processing
+end note
 
 @enduml

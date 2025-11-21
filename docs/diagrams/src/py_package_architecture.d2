@@ -1,0 +1,706 @@
+# Ionosense HPC - Python Package Architecture
+# Layout: dagre - hierarchical package structure with clear dependency relationships
+# Render: See docs/diagrams/README.md for rendering instructions
+#
+# This diagram shows the complete Python package architecture including core API,
+# configuration system, benchmark framework, utilities, exception hierarchy, and
+# C++ extension bindings.
+
+direction: down
+
+# ==============================================================================
+# Core Package - ionosense_hpc.core
+# ==============================================================================
+core_package: ionosense_hpc.core {
+  style: {
+    fill: "#E6F3FF"
+    stroke: "#4169E1"
+  }
+
+  Engine: |md
+    **Engine**
+    «Primary API»
+
+    **Private:**
+    - _config: ExecutorConfig
+    - _cpp_executor: IPipelineExecutor
+    - _initialized: bool
+    - _validate_inputs: bool
+    - _mode: ExecutionMode
+
+    **Public Methods:**
+    + __init__(config, mode=BATCH)
+    + submit(data, output): void
+    + submit_async(data, callback): void
+    + synchronize(): void
+    + reset(): void
+    + close(): void
+
+    **Properties:**
+    + config: ExecutorConfig {readonly}
+    + is_initialized: bool {readonly}
+    + supports_streaming: bool {readonly}
+    + stats: dict {readonly}
+    + device_info: dict {readonly}
+
+    **Context Manager:**
+    + __enter__(): Engine
+    + __exit__(): void
+
+    **Advanced Research:**
+    + get_cuda_stream(index: int): int
+    + enable_experimental_feature(feature: str): void
+    + detailed_metrics: dict {readonly}
+  |
+  Engine.shape: class
+  Engine.note: |md
+    **Single Entry Point**
+    The Engine class provides a unified
+    API following the principle:
+    "Make simple things simple,
+    complex things possible"
+  |
+
+  CppEngine: |md
+    **_engine (C++)**
+    «Extension»
+
+    - BatchExecutor
+    - StreamingExecutor
+    - ExecutorConfig
+    - SignalConfig
+    - get_available_devices()
+    - select_best_device()
+  |
+  CppEngine.shape: class
+  CppEngine.style: {fill: "#FFF0F5"}
+  CppEngine.note: |md
+    **Zero-Copy Interface**
+    NumPy arrays passed directly
+    to C++ without copying via
+    pybind11 buffer protocol
+  |
+}
+
+# ==============================================================================
+# Config Package - ionosense_hpc.config
+# ==============================================================================
+config_package: ionosense_hpc.config {
+  style: {
+    fill: "#E6F3FF"
+    stroke: "#4169E1"
+  }
+
+  SignalConfig: |md
+    **SignalConfig**
+    «Pydantic»
+
+    + nfft: int = 1024
+    + channels: int = 2
+    + overlap: float = 0.5
+    + sample_rate_hz: int = 48000
+    + stream_count: int = 3
+    + pinned_buffer_count: int = 2
+    + warmup_iters: int = 1
+
+    **Computed:**
+    + hop_size: int {computed}
+    + num_output_bins: int {computed}
+    + frame_duration_ms: float {computed}
+  |
+  SignalConfig.shape: class
+
+  ExecutorConfig: |md
+    **ExecutorConfig**
+    «Pydantic»
+
+    + mode: ExecutionMode = BATCH
+    + max_inflight_batches: int = 2
+    + enable_background_thread: bool = False
+    + timeout_ms: int = 1000
+    + use_cuda_graphs: bool = False
+    + enable_profiling: bool = False
+    + experiment_id: str
+    + tags: list
+
+    **Computed:**
+    + memory_estimate_mb: float {computed}
+    + to_experiment_dict(): dict
+  |
+  ExecutorConfig.shape: class
+
+  BenchmarkConfig: |md
+    **BenchmarkConfig**
+    «Pydantic»
+
+    + iterations: int = 5000
+    + warmup_iterations: int = 10
+    + lock_gpu_clocks: bool = False
+    + use_max_clocks: bool = False
+    + gpu_index: int = 0
+    + min_run_duration_s: float = 1.0
+
+    **Computed:**
+    + total_iterations: int {computed}
+  |
+  BenchmarkConfig.shape: class
+
+  Presets: |md
+    **Presets**
+    «Factory»
+
+    {static} + realtime(): ExecutorConfig
+    {static} + throughput(): ExecutorConfig
+    {static} + validation(): ExecutorConfig
+    {static} + profiling(): ExecutorConfig
+    {static} + custom(**kwargs): ExecutorConfig
+  |
+  Presets.shape: class
+  Presets.style: {fill: "#FFE6CC"}
+
+  ResearchConfig: |md
+    **ResearchConfig**
+    «Pydantic»
+
+    + metadata: ExperimentMetadata
+    + engine_configs: dict
+    + benchmark_configs: dict
+    + parameter_sweeps: list
+    + reproducibility: dict
+
+    + to_file(path: str): void
+    {static} + from_file(path: str): ResearchConfig
+  |
+  ResearchConfig.shape: class
+
+  # Config relationships
+  ExecutorConfig -> SignalConfig: extends
+  Presets -> ExecutorConfig: creates
+  ResearchConfig -> ExecutorConfig: contains {
+    style.stroke-dash: 3
+  }
+}
+
+# ==============================================================================
+# Benchmarks Package - ionosense_hpc.benchmarks
+# ==============================================================================
+benchmarks_package: ionosense_hpc.benchmarks {
+  style: {
+    fill: "#FFF5E6"
+    stroke: "#FF8C00"
+  }
+
+  BaseBenchmark: |md
+    **BaseBenchmark**
+    «Abstract»
+
+    **Protected:**
+    # config: BenchmarkConfig
+    # context: BenchmarkContext
+    # results: list
+
+    **Public:**
+    + __init__(config: BenchmarkConfig)
+    {abstract} + setup(): void
+    {abstract} + execute_iteration(): dict
+    {abstract} + teardown(): void
+    + run(): BenchmarkResult
+    + validate_environment(): tuple
+  |
+  BaseBenchmark.shape: class
+  BaseBenchmark.style: {fill: "#F5DEB3"}
+  BaseBenchmark.note: |md
+    **RSE/RE Standards**
+    Research Software Engineering
+    compliant benchmark framework
+    with reproducibility guarantees
+  |
+
+  BenchmarkContext: |md
+    **BenchmarkContext**
+    «Dataclass»
+
+    + timestamp: str
+    + hostname: str
+    + platform_info: dict
+    + cuda_info: dict
+    + git_info: dict
+    + package_versions: dict
+    + environment_hash: str
+
+    + to_dict(): dict
+  |
+  BenchmarkContext.shape: class
+
+  BenchmarkResult: |md
+    **BenchmarkResult**
+    «Dataclass»
+
+    + name: str
+    + config: dict
+    + context: BenchmarkContext
+    + measurements: Any
+    + statistics: dict
+    + metadata: dict
+    + passed: bool
+    + errors: list
+
+    + to_dict(): dict
+  |
+  BenchmarkResult.shape: class
+
+  LatencyBenchmark: |md
+    **LatencyBenchmark**
+
+    - engine: Engine
+    - test_data: ndarray
+    - gpu_events: Any
+
+    + setup(): void
+    + execute_iteration(): dict
+    + teardown(): void
+    + analyze_results(result): dict
+  |
+  LatencyBenchmark.shape: class
+
+  ThroughputBenchmark: |md
+    **ThroughputBenchmark**
+
+    - engine: Engine
+    - test_data: ndarray
+    - resource_samples: list
+
+    + execute_iteration(): dict
+    - _calculate_memory_bandwidth(): dict
+    - _calculate_pcie_bandwidth(): dict
+  |
+  ThroughputBenchmark.shape: class
+
+  AccuracyBenchmark: |md
+    **AccuracyBenchmark**
+
+    - engine: Engine
+    - test_results: list
+    - validation_errors: list
+
+    + execute_iteration(): dict
+    - _compute_reference_fft(): ndarray
+    - _compare_spectra(): dict
+    - _test_parseval_theorem(): dict
+  |
+  AccuracyBenchmark.shape: class
+
+  RealtimeBenchmark: |md
+    **RealtimeBenchmark**
+
+    - engine: Engine
+    - frame_times: list
+    - deadline_misses: list
+
+    + execute_iteration(): dict
+    - _analyze_timing_stability(): dict
+    - _assess_system_capability(): dict
+  |
+  RealtimeBenchmark.shape: class
+
+  # Benchmark inheritance
+  LatencyBenchmark -> BaseBenchmark: extends
+  ThroughputBenchmark -> BaseBenchmark: extends
+  AccuracyBenchmark -> BaseBenchmark: extends
+  RealtimeBenchmark -> BaseBenchmark: extends
+
+  # Benchmark relationships
+  BaseBenchmark -> config_package.BenchmarkConfig: uses {
+    style.stroke-dash: 3
+  }
+  BaseBenchmark -> BenchmarkContext: creates
+  BaseBenchmark -> BenchmarkResult: produces
+}
+
+# ==============================================================================
+# Utils Package - ionosense_hpc.utils
+# ==============================================================================
+utils_package: ionosense_hpc.utils {
+  style: {
+    fill: "#F0F8FF"
+    stroke: "#4169E1"
+  }
+
+  device: device {
+    DeviceUtils: |md
+      **DeviceUtils**
+
+      {static} + gpu_count(): int
+      {static} + current_device(): int
+      {static} + device_info(id): dict
+      {static} + get_memory_usage(): tuple
+      {static} + check_cuda_available(): bool
+    |
+    DeviceUtils.shape: class
+  }
+
+  signals: signals {
+    SignalGenerator: |md
+      **SignalGenerator**
+
+      {static} + make_sine(...): ndarray
+      {static} + make_chirp(...): ndarray
+      {static} + make_multitone(...): ndarray
+      {static} + make_noise(...): ndarray
+      {static} + make_test_batch(...): ndarray
+      {static} + make_impulse(...): ndarray
+      {static} + make_pulse_train(...): ndarray
+    |
+    SignalGenerator.shape: class
+  }
+
+  profiling: profiling {
+    Profiler: |md
+      **Profiler**
+
+      {static} + nvtx_range(name, color): Context
+      {static} + nvtx_decorate(...): Decorator
+      {static} + benchmark_range(name): Context
+      {static} + compute_range(name): Context
+      + ProfilingDomain: Enum
+      + ProfileColor: Enum
+      + NVTX_AVAILABLE: bool
+    |
+    Profiler.shape: class
+  }
+
+  logging: logging {
+    LoggerSetup: |md
+      **LoggerSetup**
+
+      + logger: Logger
+      {static} + setup_logging(...): Logger
+      {static} + log_config(config): void
+      {static} + log_performance(stats): void
+      {static} + log_device_info(info): void
+    |
+    LoggerSetup.shape: class
+  }
+
+  paths: paths {
+    PathManager: |md
+      **PathManager**
+
+      {static} + get_artifacts_root(): Path
+      {static} + get_benchmarks_root(): Path
+      {static} + get_experiments_root(): Path
+      {static} + normalize_benchmark_name(name): str
+    |
+    PathManager.shape: class
+  }
+
+  DataArchiver: |md
+    **DataArchiver**
+
+    - base_dir: Path
+
+    + archive_results(...): Path
+    + load_results(...): dict
+    + compare_versions(...): dict
+  |
+  DataArchiver.shape: class
+
+  DeterministicGenerator: |md
+    **DeterministicGenerator**
+
+    - base_seed: int
+    - context: str
+    - _rng_cache: dict
+
+    + get_rng(stream_id): Generator
+    + reset(): void
+  |
+  DeterministicGenerator.shape: class
+
+  ValidationHelper: |md
+    **ValidationHelper**
+
+    {static} + validate_measurements(...): dict
+    {static} + compare_distributions(...): dict
+  |
+  ValidationHelper.shape: class
+}
+
+# ==============================================================================
+# Exceptions Package - ionosense_hpc.exceptions
+# ==============================================================================
+exceptions_package: ionosense_hpc.exceptions {
+  style: {
+    fill: "#FFE6E6"
+    stroke: "#C00000"
+  }
+
+  IonosenseError: |md
+    **IonosenseError**
+    «Base»
+
+    + message: str
+    + hint: str
+    + context: dict
+  |
+  IonosenseError.shape: class
+  IonosenseError.style: {fill: "#FFB6C1"}
+
+  ConfigError: |md
+    **ConfigError**
+
+    + field: str
+    + value: Any
+  |
+  ConfigError.shape: class
+
+  ValidationError: |md
+    **ValidationError**
+
+    + expected: str
+    + got: str
+  |
+  ValidationError.shape: class
+
+  EngineStateError: |md
+    **EngineStateError**
+
+    + current_state: str
+  |
+  EngineStateError.shape: class
+
+  DeviceNotFoundError: |md
+    **DeviceNotFoundError**
+  |
+  DeviceNotFoundError.shape: class
+
+  BenchmarkError: |md
+    **BenchmarkError**
+
+    + benchmark_name: str
+  |
+  BenchmarkError.shape: class
+
+  # Exception hierarchy
+  ConfigError -> IonosenseError: extends
+  ValidationError -> IonosenseError: extends
+  EngineStateError -> IonosenseError: extends
+  DeviceNotFoundError -> IonosenseError: extends
+  BenchmarkError -> IonosenseError: extends
+}
+
+# ==============================================================================
+# Future Stages Package - ionosense_hpc.stages (v2.0)
+# ==============================================================================
+stages_package: ionosense_hpc.stages «Future» {
+  style: {
+    fill: "#FFFFCC"
+    stroke: "#DAA520"
+    stroke-dash: 3
+  }
+
+  StageType: |md
+    **StageType**
+    «Enum»
+
+    WINDOW
+    FFT
+    MAGNITUDE
+    PHASE
+    FILTER
+    RESAMPLE
+  |
+  StageType.shape: class
+
+  StageRegistry: |md
+    **StageRegistry**
+
+    - _stages: dict
+    - _metadata: dict
+
+    + register(name, fn, metadata): void
+    + get(name): Callable
+    + list_stages(): list
+  |
+  StageRegistry.shape: class
+
+  StageRegistry -> StageType: manages {
+    style.stroke-dash: 3
+  }
+
+  note: |md
+    **v2.0 Extensibility**
+    Prepared for pluggable
+    processing stages in
+    future releases
+  |
+}
+
+# ==============================================================================
+# Testing Package - ionosense_hpc.testing
+# ==============================================================================
+testing_package: ionosense_hpc.testing {
+  style: {
+    fill: "#F0F8FF"
+    stroke: "#4169E1"
+  }
+
+  Fixtures: |md
+    **fixtures**
+    «pytest»
+
+    test_engine()
+    validation_config()
+    benchmark_runner()
+    test_signal_suite()
+    gpu_available()
+  |
+  Fixtures.shape: class
+  Fixtures.style: {fill: "#90EE90"}
+
+  Validators: |md
+    **validators**
+    «pytest»
+
+    assert_allclose()
+    assert_spectral_peak()
+    assert_parseval()
+    assert_snr()
+    compare_with_reference()
+  |
+  Validators.shape: class
+  Validators.style: {fill: "#90EE90"}
+}
+
+# ==============================================================================
+# C++ Extension
+# ==============================================================================
+cpp_extension: C++ Extension (_engine.so) {
+  shape: package
+  style: {
+    fill: "#FFE4B5"
+    stroke: "#FF8C00"
+  }
+
+  ResearchEngine: |md
+    **ResearchEngine**
+    «Native»
+
+    + initialize(config)
+    + process(input)
+    + get_stats()
+    + reset()
+  |
+  ResearchEngine.shape: class
+
+  note: |md
+    Compiled from
+    CMake build system
+  |
+}
+
+# ==============================================================================
+# External Dependencies
+# ==============================================================================
+external_deps: External Dependencies {
+  shape: cloud
+  style: {
+    fill: "#FFE4E4"
+    stroke: "#C00000"
+  }
+
+  NumPy: NumPy {shape: rectangle; style.fill: "#FFB6C1"}
+  SciPy: SciPy {shape: rectangle; style.fill: "#FFB6C1"}
+  Pydantic: Pydantic {shape: rectangle; style.fill: "#FFB6C1"}
+  NVTX: NVTX {shape: rectangle; style.fill: "#FFA07A"}
+  PyNVML: PyNVML {shape: rectangle; style.fill: "#FFA07A"}
+  Pytest: Pytest {shape: rectangle; style.fill: "#90EE90"}
+}
+
+# ==============================================================================
+# Core Relationships
+# ==============================================================================
+core_package.Engine -> core_package.CppEngine: wraps
+core_package.Engine -> config_package.ExecutorConfig: configured by
+core_package.Engine -> config_package.Presets: uses {
+  style.stroke-dash: 3
+}
+core_package.CppEngine -> cpp_extension.ResearchEngine: binds
+
+# ==============================================================================
+# Benchmark Relationships
+# ==============================================================================
+benchmarks_package.LatencyBenchmark -> core_package.Engine: uses
+benchmarks_package.ThroughputBenchmark -> core_package.Engine: uses
+benchmarks_package.AccuracyBenchmark -> core_package.Engine: uses
+benchmarks_package.RealtimeBenchmark -> core_package.Engine: uses
+
+# ==============================================================================
+# Utils Relationships
+# ==============================================================================
+core_package.Engine -> utils_package.device.DeviceUtils: queries {
+  style.stroke-dash: 3
+}
+core_package.Engine -> utils_package.logging.LoggerSetup: uses {
+  style.stroke-dash: 3
+}
+benchmarks_package.BaseBenchmark -> utils_package.signals.SignalGenerator: generates {
+  style.stroke-dash: 3
+}
+benchmarks_package.BaseBenchmark -> utils_package.profiling.Profiler: instruments {
+  style.stroke-dash: 3
+}
+benchmarks_package.BaseBenchmark -> utils_package.DataArchiver: stores {
+  style.stroke-dash: 3
+}
+benchmarks_package.AccuracyBenchmark -> utils_package.ValidationHelper: validates {
+  style.stroke-dash: 3
+}
+utils_package.signals.SignalGenerator -> utils_package.DeterministicGenerator: uses {
+  style.stroke-dash: 3
+}
+
+# ==============================================================================
+# External Dependency Relationships
+# ==============================================================================
+core_package.Engine -> external_deps.NumPy: processes {
+  style.stroke-dash: 3
+}
+utils_package.signals.SignalGenerator -> external_deps.NumPy: generates {
+  style.stroke-dash: 3
+}
+utils_package.signals.SignalGenerator -> external_deps.SciPy: filters {
+  style.stroke-dash: 3
+}
+config_package.ExecutorConfig -> external_deps.Pydantic: validates {
+  style.stroke-dash: 3
+}
+utils_package.profiling.Profiler -> external_deps.NVTX: wraps {
+  style.stroke-dash: 3
+}
+utils_package.device.DeviceUtils -> external_deps.PyNVML: queries {
+  style.stroke-dash: 3
+}
+testing_package.Fixtures -> external_deps.Pytest: extends {
+  style.stroke-dash: 3
+}
+
+# ==============================================================================
+# Testing Relationships
+# ==============================================================================
+testing_package.Fixtures -> core_package.Engine: mocks {
+  style.stroke-dash: 3
+}
+testing_package.Validators -> external_deps.NumPy: uses {
+  style.stroke-dash: 3
+}
+testing_package -> benchmarks_package: tests {
+  style.stroke-dash: 3
+}
+
+# ==============================================================================
+# Future Extensibility
+# ==============================================================================
+core_package.Engine -> stages_package.StageRegistry: "«future»" {
+  style.stroke-dash: 3
+}
