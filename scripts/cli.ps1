@@ -520,6 +520,150 @@ function Invoke-Doctor {
     }
 }
 
+function Invoke-Diagrams {
+    param(
+        [string]$Target = "all",
+        [string]$Format = "svg",
+        [bool]$Force = $false,
+        [bool]$Verbose = $false
+    )
+
+    Write-Status "Generating architecture diagrams..."
+
+    # Verify d2 is available
+    if (-not (Get-Command d2 -ErrorAction SilentlyContinue)) {
+        Write-Error "d2 not found. Install via: scoop install d2"
+        Write-Host "See: https://d2lang.com/" -ForegroundColor Yellow
+        exit 1
+    }
+
+    # Validate format
+    if ($Format -notin @("svg", "png", "pdf")) {
+        Write-Error "Invalid format: $Format. Use: svg, png, pdf"
+        exit 1
+    }
+
+    $srcDir = Join-Path $script:ProjectRoot "docs\diagrams\src"
+    $outDir = Join-Path $script:ProjectRoot "docs\diagrams\generated"
+
+    if (-not (Test-Path $srcDir)) {
+        Write-Error "Diagram source directory not found: $srcDir"
+        exit 1
+    }
+
+    # Ensure output directory exists
+    if (-not (Test-Path $outDir)) {
+        New-Item -ItemType Directory -Path $outDir -Force | Out-Null
+    }
+
+    # Diagram to layout engine mapping
+    $diagrams = @{
+        "cpp_class_hierarchy.d2" = "elk"
+        "cpp_components_pipeline.d2" = "dagre"
+        "cpp_sequence_execution.d2" = "elk"
+        "cpp_memory_layout.d2" = "elk"
+        "py_package_architecture.d2" = "dagre"
+        "py_analysis_workflow.d2" = "dagre"
+        "py_workflow_sequence.d2" = "elk"
+        "sys_architecture_overview.d2" = "elk"
+    }
+
+    # Filter by target
+    $diagramsToGenerate = @{}
+    switch ($Target.ToLower()) {
+        "cpp" {
+            $diagrams.GetEnumerator() | Where-Object { $_.Key -like "cpp_*" } | ForEach-Object {
+                $diagramsToGenerate[$_.Key] = $_.Value
+            }
+        }
+        "py" {
+            $diagrams.GetEnumerator() | Where-Object { $_.Key -like "py_*" } | ForEach-Object {
+                $diagramsToGenerate[$_.Key] = $_.Value
+            }
+        }
+        "sys" {
+            $diagrams.GetEnumerator() | Where-Object { $_.Key -like "sys_*" } | ForEach-Object {
+                $diagramsToGenerate[$_.Key] = $_.Value
+            }
+        }
+        "all" {
+            $diagramsToGenerate = $diagrams
+        }
+        default {
+            # Try to match specific diagram name
+            $fullName = if ($Target.EndsWith(".d2")) { $Target } else { "$Target.d2" }
+            if ($diagrams.ContainsKey($fullName)) {
+                $diagramsToGenerate[$fullName] = $diagrams[$fullName]
+            } else {
+                Write-Error "Unknown diagram target: $Target"
+                Write-Host "Available targets: all, cpp, py, sys, or specific diagram name" -ForegroundColor Yellow
+                Write-Host "Available diagrams:" -ForegroundColor Yellow
+                $diagrams.Keys | Sort-Object | ForEach-Object {
+                    Write-Host "  - $($_.Replace('.d2', ''))" -ForegroundColor DarkGray
+                }
+                exit 1
+            }
+        }
+    }
+
+    $successCount = 0
+    $skipCount = 0
+    $errorCount = 0
+
+    foreach ($diagram in $diagramsToGenerate.GetEnumerator()) {
+        $srcFile = Join-Path $srcDir $diagram.Key
+        $outFile = Join-Path $outDir ($diagram.Key.Replace('.d2', ".$Format"))
+        $layout = $diagram.Value
+
+        if (-not (Test-Path $srcFile)) {
+            Write-Host "  ⚠️  Skipped: $($diagram.Key) (source not found)" -ForegroundColor Yellow
+            $skipCount++
+            continue
+        }
+
+        # Check if regeneration needed (smart regeneration)
+        if (-not $Force -and (Test-Path $outFile)) {
+            $srcTime = (Get-Item $srcFile).LastWriteTime
+            $outTime = (Get-Item $outFile).LastWriteTime
+            if ($outTime -gt $srcTime) {
+                if ($Verbose) {
+                    Write-Host "  ✓ Skipped: $($diagram.Key) (up to date)" -ForegroundColor DarkGray
+                }
+                $skipCount++
+                continue
+            }
+        }
+
+        Write-Host "  🔨 Rendering: $($diagram.Key) with $layout → $Format..." -ForegroundColor Cyan
+
+        $d2Args = @("--layout", $layout, $srcFile, $outFile)
+        if ($Verbose) {
+            & d2 @d2Args
+        } else {
+            & d2 @d2Args 2>&1 | Out-Null
+        }
+
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "     ✅ $($diagram.Key.Replace('.d2', ".$Format"))" -ForegroundColor Green
+            $successCount++
+        } else {
+            Write-Host "     ❌ Failed: $($diagram.Key)" -ForegroundColor Red
+            $errorCount++
+        }
+    }
+
+    Write-Host ""
+    if ($Force) {
+        Write-Success "Diagram generation complete: $successCount generated, $skipCount skipped, $errorCount errors"
+    } else {
+        Write-Success "Diagram generation complete: $successCount generated, $skipCount skipped (use --force to regenerate all), $errorCount errors"
+    }
+
+    if ($errorCount -gt 0) {
+        exit 1
+    }
+}
+
 function Invoke-Profile {
     param(
         [string]$Tool = "",
@@ -677,6 +821,33 @@ CODE QUALITY
   format [paths] [-Check]     Format C++ code with clang-format
   lint [all|python|cpp] [-Fix] Lint code with ruff (Python) or clang-tidy (C++)
   typecheck [-Strict]         Run mypy type checking on Python code
+
+═══════════════════════════════════════════════════════════════════════════
+DOCUMENTATION & DIAGRAMS
+═══════════════════════════════════════════════════════════════════════════
+
+  diagrams [target] [options] Generate architecture diagrams from D2 sources
+      Targets: all (default), cpp, py, sys, or specific diagram name
+      --format <fmt>  Output format: svg (default), png, pdf
+      --force         Regenerate all diagrams (skip timestamp check)
+      --verbose       Show detailed d2 output
+
+  Examples:
+    iono diagrams                           # Generate all (smart regeneration)
+    iono diagrams --force                   # Force regenerate all diagrams
+    iono diagrams cpp                       # Generate only C++ diagrams
+    iono diagrams py --format png           # Generate Python diagrams as PNG
+    iono diagrams cpp_class_hierarchy       # Generate specific diagram (SVG)
+    iono diagrams sys_architecture --format pdf  # System diagram as PDF
+
+  Single diagram (direct d2 command - most robust):
+    d2 --layout elk docs/diagrams/src/cpp_class_hierarchy.d2 \\
+       docs/diagrams/generated/cpp_class_hierarchy.svg
+
+  Requirements:
+    Install d2 via 'scoop install d2' (Windows) or see https://d2lang.com/
+
+  See: docs/diagrams/README.md for diagram documentation
 
 ═══════════════════════════════════════════════════════════════════════════
 GPU PROFILING & PERFORMANCE
@@ -894,6 +1065,32 @@ try {
             if ($paths) { $params.Paths = $paths }
 
             Invoke-TypeCheck @params
+        }
+        "diagrams" {
+            $params = @{}
+
+            # Parse target (first non-flag argument)
+            $target = $CommandArgs | Where-Object { $_ -and $_ -notlike "-*" -and $_ -notlike "--*" } | Select-Object -First 1
+            if ($target) { $params.Target = $target }
+
+            # Parse --format flag
+            for ($i = 0; $i -lt $CommandArgs.Count; $i++) {
+                if ($CommandArgs[$i] -in @("-Format", "--format") -and $i+1 -lt $CommandArgs.Count) {
+                    $params.Format = $CommandArgs[$i+1]
+                }
+            }
+
+            # Parse --force flag
+            if ($normalizedArgs -contains "-force" -or $normalizedArgs -contains "--force") {
+                $params.Force = $true
+            }
+
+            # Parse --verbose flag
+            if ($commonVerbose -or $normalizedArgs -contains "-verbose" -or $normalizedArgs -contains "--verbose") {
+                $params.Verbose = $true
+            }
+
+            Invoke-Diagrams @params
         }
         "profile"  {
             $params = @{}

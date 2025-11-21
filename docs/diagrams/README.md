@@ -78,6 +78,44 @@ D2 supports multiple layout engines with different strengths. This project uses 
 
 ## Rendering Diagrams
 
+### Quick Start (CLI - Recommended)
+
+The easiest way to generate diagrams is using the `iono diagrams` command, which handles layout engine selection automatically:
+
+```bash
+# Generate all diagrams (smart regeneration - only if source changed)
+iono diagrams
+
+# Force regenerate all diagrams (ignore timestamps)
+iono diagrams --force
+
+# Generate by category
+iono diagrams cpp        # C++ diagrams only
+iono diagrams py         # Python diagrams only
+iono diagrams sys        # System diagrams only
+
+# Generate specific diagram
+iono diagrams cpp_class_hierarchy
+iono diagrams py_analysis_workflow
+
+# Change output format (default: svg)
+iono diagrams --format png       # All as PNG
+iono diagrams cpp --format pdf   # C++ diagrams as PDF
+iono diagrams sys_architecture_overview --format pdf
+
+# Shortcut (same as 'iono diagrams')
+idiag cpp --format png
+```
+
+**Features:**
+- **Smart regeneration**: Automatically skips up-to-date diagrams (checks file timestamps)
+- **Layout engine selection**: Uses the correct layout engine for each diagram (no need to remember)
+- **Format support**: SVG (default), PNG, or PDF output
+- **Batch processing**: Generate multiple diagrams at once
+- **Verbose mode**: Add `--verbose` to see detailed d2 output
+
+**Note:** The CLI is integrated with the dev environment (see `scripts/init_pwsh.ps1`). Tab completion is available for all commands, targets, and flags.
+
 ### Install D2
 
 **Windows (Scoop):**
@@ -95,64 +133,17 @@ brew install d2
 curl -fsSL https://d2lang.com/install.sh | sh
 ```
 
-### Generate SVG Files
+### Direct D2 Commands
 
-Each D2 file specifies its recommended layout engine in the header comment.
+For single diagram generation or when you need full control over d2 options, use direct d2 commands. Each D2 file specifies its recommended layout engine in the header comment.
 
-**Single diagram:**
+**Single diagram (most robust for development):**
 ```bash
 # Using dagre (for hierarchical layouts)
 d2 --layout dagre docs/diagrams/src/cpp_class_hierarchy.d2 docs/diagrams/generated/cpp_class_hierarchy.svg
 
 # Using elk (for complex graphs)
 d2 --layout elk docs/diagrams/src/sys_architecture_overview.d2 docs/diagrams/generated/sys_architecture_overview.svg
-```
-
-**All diagrams (PowerShell script - recommended):**
-```powershell
-# Create a rendering script (docs/diagrams/render_all.ps1)
-$diagrams = @{
-    "cpp_class_hierarchy.d2" = "elk"
-    "cpp_components_pipeline.d2" = "dagre"
-    "cpp_sequence_execution.d2" = "elk"
-    "cpp_memory_layout.d2" = "elk"
-    "py_package_architecture.d2" = "dagre"
-    "py_analysis_workflow.d2" = "dagre"
-    "py_workflow_sequence.d2" = "elk"
-    "sys_architecture_overview.d2" = "elk"
-}
-
-foreach ($diagram in $diagrams.GetEnumerator()) {
-    $src = "docs/diagrams/src/$($diagram.Key)"
-    $out = "docs/diagrams/generated/$($diagram.Key.Replace('.d2', '.svg'))"
-    Write-Host "Rendering $($diagram.Key) with $($diagram.Value)..."
-    d2 --layout $diagram.Value $src $out
-}
-```
-
-**All diagrams (Bash script):**
-```bash
-# Create a rendering script (docs/diagrams/render_all.sh)
-#!/bin/bash
-
-declare -A diagrams=(
-    ["cpp_class_hierarchy.d2"]="elk"
-    ["cpp_components_pipeline.d2"]="dagre"
-    ["cpp_sequence_execution.d2"]="elk"
-    ["cpp_memory_layout.d2"]="elk"
-    ["py_package_architecture.d2"]="dagre"
-    ["py_analysis_workflow.d2"]="dagre"
-    ["py_workflow_sequence.d2"]="elk"
-    ["sys_architecture_overview.d2"]="elk"
-)
-
-for diagram in "${!diagrams[@]}"; do
-    layout="${diagrams[$diagram]}"
-    src="docs/diagrams/src/$diagram"
-    out="docs/diagrams/generated/${diagram%.d2}.svg"
-    echo "Rendering $diagram with $layout..."
-    d2 --layout "$layout" "$src" "$out"
-done
 ```
 
 ### Output Formats

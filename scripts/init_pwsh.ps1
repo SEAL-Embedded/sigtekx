@@ -333,7 +333,7 @@ function global:iono {
     }
 
     # Only allow commands that actually exist in simplified CLI
-    $validCommands = @('setup','build','test','coverage','lint','format','clean','doctor','help','profile','typecheck')
+    $validCommands = @('setup','build','test','coverage','lint','format','clean','doctor','help','profile','typecheck','diagrams')
     if ($Args.Count -gt 0 -and $Args[0] -notin $validCommands) {
         Write-Warning "Command '$($Args[0])' not available. Use 'iono help' for available commands."
         Write-Host "💡 For research workflows, use direct tools:" -ForegroundColor Cyan
@@ -575,6 +575,25 @@ function global:icprof  { ionoc profile @args }   # C++ profiling
 # Help shortcuts (use CLI help instead of removed learn commands)
 function global:ihelp { iono help }
 
+# Diagram generation shortcut
+function global:idiag {
+    [CmdletBinding()]
+    param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
+
+    $common = @{}
+    foreach ($name in @('Debug','Verbose')) {
+        if ($PSBoundParameters.ContainsKey($name)) {
+            $common[$name] = $PSBoundParameters[$name]
+        }
+    }
+
+    if ($common.Count -gt 0) {
+        iono @common diagrams @Args
+    } else {
+        iono diagrams @Args
+    }
+}
+
 # Reload iono functions (useful when init_pwsh.ps1 is updated)
 function global:ireload {
     Write-Host "Reloading iono functions..." -ForegroundColor Cyan
@@ -583,14 +602,14 @@ function global:ireload {
 }
 
 # Tab-completion (only for commands that actually exist)
-$global:IonoVerbs   = @('setup','build','test','coverage','lint','format','clean','doctor','help','profile','typecheck')
-$global:IonoTargets = @('python','cpp','all','-Clean','--clean','-Verbose','--verbose','--debug','--release','-Fix','-Check','-Coverage','-Pattern','-All','nsys','ncu','latency','throughput','accuracy','realtime','custom','-Full','-NoOpen','-Mode','-Script','-Kernel','-Duration')
+$global:IonoVerbs   = @('setup','build','test','coverage','lint','format','clean','doctor','help','profile','typecheck','diagrams')
+$global:IonoTargets = @('python','cpp','all','py','sys','-Clean','--clean','-Verbose','--verbose','--debug','--release','-Fix','-Check','-Coverage','-Pattern','-All','nsys','ncu','latency','throughput','accuracy','realtime','custom','-Full','-NoOpen','-Mode','-Script','-Kernel','-Duration','--format','--force','svg','png','pdf','cpp_class_hierarchy','cpp_components_pipeline','cpp_sequence_execution','cpp_memory_layout','py_package_architecture','py_analysis_workflow','py_workflow_sequence','sys_architecture_overview')
 
 # ionoc tab-completion
 $global:IonocVerbs   = @('bench','profile','compare','clean','help')
 $global:IonocTargets = @('quick','profile','full','nsys','ncu','--mode','--output','--stats','--trace','--set','--kernel-name')
 
-Register-ArgumentCompleter -CommandName iono,ib,it,ilint,ifmt,iclean,itp,itc,ihelp,iprof -ScriptBlock {
+Register-ArgumentCompleter -CommandName iono,ib,it,ilint,ifmt,iclean,itp,itc,ihelp,iprof,idiag -ScriptBlock {
     param($commandName,$parameterName,$wordToComplete,$commandAst,$fakeBoundParameters)
     $tokens = @()
     foreach ($e in $commandAst.CommandElements) {
