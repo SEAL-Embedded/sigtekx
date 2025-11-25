@@ -6,16 +6,17 @@
 # configuration system, benchmark framework, utilities, exception hierarchy, and
 # C++ extension bindings.
 
+# Import shared styles
+common/styles
+
 direction: down
+layout-engine: dagre
 
 # ==============================================================================
 # Core Package - ionosense_hpc.core
 # ==============================================================================
 core_package: ionosense_hpc.core {
-  style: {
-    fill: "#E6F3FF"
-    stroke: "#4169E1"
-  }
+  class: core-blue
 
   Engine: |md
     **Engine**
@@ -73,7 +74,8 @@ core_package: ionosense_hpc.core {
     - select_best_device()
   |
   CppEngine.shape: class
-  CppEngine.style: {fill: "#FFF0F5"}
+  CppEngine.style.fill: "#FFF0F5"
+  CppEngine.style.stroke-width: 2
   CppEngine.note: |md
     **Zero-Copy Interface**
     NumPy arrays passed directly
@@ -86,10 +88,7 @@ core_package: ionosense_hpc.core {
 # Config Package - ionosense_hpc.config
 # ==============================================================================
 config_package: ionosense_hpc.config {
-  style: {
-    fill: "#E6F3FF"
-    stroke: "#4169E1"
-  }
+  class: core-blue
 
   SignalConfig: |md
     **SignalConfig**
@@ -156,7 +155,8 @@ config_package: ionosense_hpc.config {
     {static} + custom(**kwargs): ExecutorConfig
   |
   Presets.shape: class
-  Presets.style: {fill: "#FFE6CC"}
+  Presets.style.fill: "#FFE6CC"
+  Presets.style.stroke-width: 2
 
   ResearchConfig: |md
     **ResearchConfig**
@@ -177,7 +177,7 @@ config_package: ionosense_hpc.config {
   ExecutorConfig -> SignalConfig: extends
   Presets -> ExecutorConfig: creates
   ResearchConfig -> ExecutorConfig: contains {
-    style.stroke-dash: 3
+    class: dependency
   }
 }
 
@@ -185,10 +185,7 @@ config_package: ionosense_hpc.config {
 # Benchmarks Package - ionosense_hpc.benchmarks
 # ==============================================================================
 benchmarks_package: ionosense_hpc.benchmarks {
-  style: {
-    fill: "#FFF5E6"
-    stroke: "#FF8C00"
-  }
+  class: benchmark-orange
 
   BaseBenchmark: |md
     **BaseBenchmark**
@@ -208,7 +205,8 @@ benchmarks_package: ionosense_hpc.benchmarks {
     + validate_environment(): tuple
   |
   BaseBenchmark.shape: class
-  BaseBenchmark.style: {fill: "#F5DEB3"}
+  BaseBenchmark.style.fill: "#F5DEB3"
+  BaseBenchmark.style.stroke-width: 2
   BaseBenchmark.note: |md
     **RSE/RE Standards**
     Research Software Engineering
@@ -321,10 +319,7 @@ benchmarks_package: ionosense_hpc.benchmarks {
 # Utils Package - ionosense_hpc.utils
 # ==============================================================================
 utils_package: ionosense_hpc.utils {
-  style: {
-    fill: "#F0F8FF"
-    stroke: "#4169E1"
-  }
+  class: config-blue
 
   device: device {
     DeviceUtils: |md
@@ -430,10 +425,7 @@ utils_package: ionosense_hpc.utils {
 # Exceptions Package - ionosense_hpc.exceptions
 # ==============================================================================
 exceptions_package: ionosense_hpc.exceptions {
-  style: {
-    fill: "#FFE6E6"
-    stroke: "#C00000"
-  }
+  class: execution-red
 
   IonosenseError: |md
     **IonosenseError**
@@ -444,7 +436,7 @@ exceptions_package: ionosense_hpc.exceptions {
     + context: dict
   |
   IonosenseError.shape: class
-  IonosenseError.style: {fill: "#FFB6C1"}
+  IonosenseError.class: exception-pink
 
   ConfigError: |md
     **ConfigError**
@@ -497,6 +489,7 @@ stages_package: ionosense_hpc.stages «Future» {
     fill: "#FFFFCC"
     stroke: "#DAA520"
     stroke-dash: 3
+    stroke-width: 2
   }
 
   StageType: |md
@@ -540,10 +533,7 @@ stages_package: ionosense_hpc.stages «Future» {
 # Testing Package - ionosense_hpc.testing
 # ==============================================================================
 testing_package: ionosense_hpc.testing {
-  style: {
-    fill: "#F0F8FF"
-    stroke: "#4169E1"
-  }
+  class: config-blue
 
   Fixtures: |md
     **fixtures**
@@ -556,7 +546,7 @@ testing_package: ionosense_hpc.testing {
     gpu_available()
   |
   Fixtures.shape: class
-  Fixtures.style: {fill: "#90EE90"}
+  Fixtures.style.fill: "#90EE90"
 
   Validators: |md
     **validators**
@@ -569,7 +559,7 @@ testing_package: ionosense_hpc.testing {
     compare_with_reference()
   |
   Validators.shape: class
-  Validators.style: {fill: "#90EE90"}
+  Validators.style.fill: "#90EE90"
 }
 
 # ==============================================================================
@@ -577,10 +567,7 @@ testing_package: ionosense_hpc.testing {
 # ==============================================================================
 cpp_extension: C++ Extension (_engine.so) {
   shape: package
-  style: {
-    fill: "#FFE4B5"
-    stroke: "#FF8C00"
-  }
+  class: kernel-orange
 
   ResearchEngine: |md
     **ResearchEngine**
@@ -604,10 +591,7 @@ cpp_extension: C++ Extension (_engine.so) {
 # ==============================================================================
 external_deps: External Dependencies {
   shape: cloud
-  style: {
-    fill: "#FFE4E4"
-    stroke: "#C00000"
-  }
+  class: execution-red
 
   NumPy: NumPy {shape: rectangle; style.fill: "#FFB6C1"}
   SciPy: SciPy {shape: rectangle; style.fill: "#FFB6C1"}
@@ -623,7 +607,7 @@ external_deps: External Dependencies {
 core_package.Engine -> core_package.CppEngine: wraps
 core_package.Engine -> config_package.ExecutorConfig: configured by
 core_package.Engine -> config_package.Presets: uses {
-  style.stroke-dash: 3
+  class: dependency
 }
 core_package.CppEngine -> cpp_extension.ResearchEngine: binds
 
@@ -639,68 +623,68 @@ benchmarks_package.RealtimeBenchmark -> core_package.Engine: uses
 # Utils Relationships
 # ==============================================================================
 core_package.Engine -> utils_package.device.DeviceUtils: queries {
-  style.stroke-dash: 3
+  class: dependency
 }
 core_package.Engine -> utils_package.logging.LoggerSetup: uses {
-  style.stroke-dash: 3
+  class: dependency
 }
 benchmarks_package.BaseBenchmark -> utils_package.signals.SignalGenerator: generates {
-  style.stroke-dash: 3
+  class: dependency
 }
 benchmarks_package.BaseBenchmark -> utils_package.profiling.Profiler: instruments {
-  style.stroke-dash: 3
+  class: dependency
 }
 benchmarks_package.BaseBenchmark -> utils_package.DataArchiver: stores {
-  style.stroke-dash: 3
+  class: dependency
 }
 benchmarks_package.AccuracyBenchmark -> utils_package.ValidationHelper: validates {
-  style.stroke-dash: 3
+  class: dependency
 }
 utils_package.signals.SignalGenerator -> utils_package.DeterministicGenerator: uses {
-  style.stroke-dash: 3
+  class: dependency
 }
 
 # ==============================================================================
 # External Dependency Relationships
 # ==============================================================================
 core_package.Engine -> external_deps.NumPy: processes {
-  style.stroke-dash: 3
+  class: dependency
 }
 utils_package.signals.SignalGenerator -> external_deps.NumPy: generates {
-  style.stroke-dash: 3
+  class: dependency
 }
 utils_package.signals.SignalGenerator -> external_deps.SciPy: filters {
-  style.stroke-dash: 3
+  class: dependency
 }
 config_package.ExecutorConfig -> external_deps.Pydantic: validates {
-  style.stroke-dash: 3
+  class: dependency
 }
 utils_package.profiling.Profiler -> external_deps.NVTX: wraps {
-  style.stroke-dash: 3
+  class: dependency
 }
 utils_package.device.DeviceUtils -> external_deps.PyNVML: queries {
-  style.stroke-dash: 3
+  class: dependency
 }
 testing_package.Fixtures -> external_deps.Pytest: extends {
-  style.stroke-dash: 3
+  class: dependency
 }
 
 # ==============================================================================
 # Testing Relationships
 # ==============================================================================
 testing_package.Fixtures -> core_package.Engine: mocks {
-  style.stroke-dash: 3
+  class: dependency
 }
 testing_package.Validators -> external_deps.NumPy: uses {
-  style.stroke-dash: 3
+  class: dependency
 }
 testing_package -> benchmarks_package: tests {
-  style.stroke-dash: 3
+  class: dependency
 }
 
 # ==============================================================================
 # Future Extensibility
 # ==============================================================================
 core_package.Engine -> stages_package.StageRegistry: "«future»" {
-  style.stroke-dash: 3
+  class: dependency
 }

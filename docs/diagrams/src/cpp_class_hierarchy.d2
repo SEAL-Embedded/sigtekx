@@ -1,6 +1,9 @@
 # Ionosense HPC Library - C++ Architecture (v0.9.4+ Executor-Based)
 # D2 Diagram - © 2025 | Updated: 2025-01-19
 
+# Import shared styles
+common/styles
+
 direction: right
 layout-engine: elk
 
@@ -8,10 +11,7 @@ layout-engine: elk
 # Executor API Layer
 # ==============================================================================
 executor_layer: Executor API Layer {
-  style: {
-    fill: "#E6F3FF"
-    stroke: "#4169E1"
-  }
+  class: core-blue
 
   IPipelineExecutor: {
     shape: class
@@ -89,23 +89,19 @@ executor_layer: Executor API Layer {
 
   # Executor relationships
   BatchExecutor -> IPipelineExecutor: implements {
-    style.stroke-dash: 3
-    target-arrowhead.shape: triangle
+    class: implementation
   }
 
   StreamingExecutor -> IPipelineExecutor: implements {
-    style.stroke-dash: 3
-    target-arrowhead.shape: triangle
+    class: implementation
   }
 
   BatchExecutor -> BatchExecutor_Impl: owns (Pimpl) {
-    style.stroke: "#4169E1"
-    target-arrowhead.shape: diamond
+    class: ownership
   }
 
   StreamingExecutor -> StreamingExecutor_Impl: owns (Pimpl) {
-    style.stroke: "#4169E1"
-    target-arrowhead.shape: diamond
+    class: ownership
   }
 }
 
@@ -113,10 +109,7 @@ executor_layer: Executor API Layer {
 # Ring Buffer for Streaming
 # ==============================================================================
 ring_buffer_layer: Ring Buffer for Streaming {
-  style: {
-    fill: "#E6FFE6"
-    stroke: "#228B22"
-  }
+  class: streaming-green
 
   RingBuffer: {
     shape: class
@@ -141,10 +134,7 @@ ring_buffer_layer: Ring Buffer for Streaming {
 # Processing Stage Layer
 # ==============================================================================
 stage_layer: Processing Stage Layer {
-  style: {
-    fill: "#E6F3FF"
-    stroke: "#4169E1"
-  }
+  class: core-blue
 
   IProcessingStage: {
     shape: class
@@ -199,30 +189,27 @@ stage_layer: Processing Stage Layer {
 
   # Stage relationships
   WindowStage -> IProcessingStage: implements {
-    style.stroke-dash: 3
-    target-arrowhead.shape: triangle
+    class: implementation
   }
 
   FFTStage -> IProcessingStage: implements {
-    style.stroke-dash: 3
-    target-arrowhead.shape: triangle
+    class: implementation
   }
 
   MagnitudeStage -> IProcessingStage: implements {
-    style.stroke-dash: 3
-    target-arrowhead.shape: triangle
+    class: implementation
   }
 
   StageFactory -> WindowStage: creates {
-    style.stroke-dash: 3
+    class: dependency
   }
 
   StageFactory -> FFTStage: creates {
-    style.stroke-dash: 3
+    class: dependency
   }
 
   StageFactory -> MagnitudeStage: creates {
-    style.stroke-dash: 3
+    class: dependency
   }
 }
 
@@ -230,10 +217,7 @@ stage_layer: Processing Stage Layer {
 # CUDA Resource Management
 # ==============================================================================
 cuda_layer: CUDA Resource Management {
-  style: {
-    fill: "#D4E6FF"
-    stroke: "#4169E1"
-  }
+  class: cuda-resource
 
   CudaStream: {
     shape: class
@@ -297,7 +281,7 @@ cuda_layer: CUDA Resource Management {
   }
 
   CufftPlan -> DeviceBuffer: owns work_area {
-    target-arrowhead.shape: diamond
+    class: ownership
   }
 }
 
@@ -305,10 +289,7 @@ cuda_layer: CUDA Resource Management {
 # Configuration & Statistics
 # ==============================================================================
 config_layer: Configuration & Statistics {
-  style: {
-    fill: "#E6F3FF"
-    stroke: "#4169E1"
-  }
+  class: core-blue
 
   SignalConfig: {
     shape: class
@@ -377,7 +358,6 @@ config_layer: Configuration & Statistics {
 
   # Config hierarchy
   ExecutorConfig -> SignalConfig: extends {
-    style.stroke: "#4169E1"
     target-arrowhead.shape: triangle
   }
 }
@@ -386,10 +366,7 @@ config_layer: Configuration & Statistics {
 # CUDA Kernels
 # ==============================================================================
 kernel_layer: CUDA Kernels {
-  style: {
-    fill: "#FFE4B5"
-    stroke: "#FF8C00"
-  }
+  class: kernel-orange
 
   OpsFft: {
     shape: class
@@ -408,10 +385,7 @@ kernel_layer: CUDA Kernels {
 # Exception Handling
 # ==============================================================================
 exception_layer: Exception Handling {
-  style: {
-    fill: "#FFE6E6"
-    stroke: "#FF6B6B"
-  }
+  class: exception-light
 
   CudaException: {
     shape: class
@@ -436,60 +410,60 @@ exception_layer: Exception Handling {
 
 # Executor -> Stage relationships
 executor_layer.BatchExecutor_Impl -> stage_layer.IProcessingStage: manages {
-  style.stroke-dash: 3
+  class: dependency
 }
 
 executor_layer.StreamingExecutor_Impl -> stage_layer.IProcessingStage: manages {
-  style.stroke-dash: 3
+  class: dependency
 }
 
 executor_layer.StreamingExecutor_Impl -> ring_buffer_layer.RingBuffer: owns (per-channel) {
-  target-arrowhead.shape: diamond
+  class: ownership
 }
 
 # Executor -> CUDA resources
 executor_layer.BatchExecutor_Impl -> cuda_layer.CudaStream: owns {
-  target-arrowhead.shape: diamond
+  class: ownership
 }
 
 executor_layer.BatchExecutor_Impl -> cuda_layer.DeviceBuffer: owns {
-  target-arrowhead.shape: diamond
+  class: ownership
 }
 
 executor_layer.StreamingExecutor_Impl -> cuda_layer.PinnedHostBuffer: owns {
-  target-arrowhead.shape: diamond
+  class: ownership
 }
 
 # Executor -> Config
 executor_layer.BatchExecutor_Impl -> config_layer.ExecutorConfig: uses {
-  style.stroke-dash: 3
+  class: dependency
 }
 
 executor_layer.BatchExecutor_Impl -> config_layer.ProcessingStats: generates {
-  style.stroke-dash: 3
+  class: dependency
 }
 
 # Ring Buffer -> CUDA
 ring_buffer_layer.RingBuffer -> cuda_layer.PinnedHostBuffer: owns buffer {
-  target-arrowhead.shape: diamond
+  class: ownership
 }
 
 # Stages -> CUDA
 stage_layer.WindowStage -> cuda_layer.DeviceBuffer: uses {
-  style.stroke-dash: 3
+  class: dependency
 }
 
 stage_layer.FFTStage -> cuda_layer.CufftPlan: uses {
-  style.stroke-dash: 3
+  class: dependency
 }
 
 stage_layer.MagnitudeStage -> kernel_layer.OpsFft: calls {
-  style.stroke-dash: 3
+  class: dependency
 }
 
 # Stages -> Config
 stage_layer.WindowStage -> config_layer.StageConfig: uses {
-  style.stroke-dash: 3
+  class: dependency
 }
 
 # ==============================================================================
@@ -504,10 +478,7 @@ executor_note: |md
   - BatchExecutor (high-throughput, 86.79 µs)
   - StreamingExecutor (low-latency, 122.25 µs)
 | {
-  style: {
-    fill: "#FFFACD"
-    stroke: "#FFD700"
-  }
+  class: note-gold
 }
 
 ring_buffer_note: |md
@@ -523,10 +494,7 @@ ring_buffer_note: |md
   Single-producer/single-consumer
   Uses atomic operations
 | {
-  style: {
-    fill: "#FFFACD"
-    stroke: "#FFD700"
-  }
+  class: note-gold
 }
 
 terminology_note: |md
@@ -536,10 +504,7 @@ terminology_note: |md
   - frames = temporal dimension (FFT windows)
   - bins = spectral dimension (frequencies)
 | {
-  style: {
-    fill: "#FFFACD"
-    stroke: "#FFD700"
-  }
+  class: note-gold
 }
 
 raii_note: |md
@@ -549,8 +514,5 @@ raii_note: |md
   Move-only semantics
   Exception-safe cleanup
 | {
-  style: {
-    fill: "#FFFACD"
-    stroke: "#FFD700"
-  }
+  class: note-gold
 }

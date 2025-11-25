@@ -1,0 +1,234 @@
+# Ionosense HPC - BatchExecutor Memory Layout
+# Layout: elk - supports self-loops for ring buffer advance operations
+# Render: See docs/diagrams/README.md for rendering instructions
+#
+# This diagram shows the complete memory layout for BatchExecutor (high-throughput mode),
+# highlighting the minimal memory overhead and direct pipeline data flow.
+#
+# LAYOUT STRATEGY (prevents crossing and winding arrows):
+# 1. Invisible subgroups (input_flow, output_flow) - organize nodes into logical columns
+#    without visible container borders (style.opacity: 0)
+# 2. Ungrouped PCIe nodes - h2d/d2h float independently near their respective paths
+#    rather than being forced together in a central container
+# 3. Consistent top-to-bottom flow - ELK naturally routes connections cleanly
+
+# Import shared styles
+common/styles
+
+direction: down
+layout-engine: elk
+
+# ==============================================================================
+# BatchExecutor Memory Layout (High-Throughput Mode)
+# ==============================================================================
+batch_memory: BatchExecutor Memory Layout {
+  class: batch-blue
+
+  description: |md
+    **BatchExecutor Mode**: High-throughput, minimal overhead
+    Total Memory: ~164 KB (nfft=2048, channels=2)
+  |
+
+  # Host Memory Space (organized in logical columns)
+  batch_host: Host Memory Space {
+    class: host-memory
+
+    # Input Flow Column (left side)
+    # Note: Invisible container (opacity: 0) groups input-related nodes together
+    # This tells ELK to keep them in a logical column without crossing output flow
+    input_flow: {
+      style.opacity: 0
+
+      host_input: |md
+        **Input Buffer**
+        (float*)
+
+        - size: nfft × channels
+        - layout: interleaved [ch0, ch1, ...]
+      |
+      host_input.shape: rectangle
+
+      pinned0: |md
+        **PinnedHostBuffer[0]**
+        input_staging
+        «page-locked»
+
+        - size: nfft × channels
+        - purpose: double buffering
+      |
+      pinned0.shape: rectangle
+      pinned0.note: |md
+        **Page-locked memory**
+        Enables faster PCIe
+        transfers (~25 GB/s)
+        cudaHostAlloc()
+      |
+    }
+
+    # Output Flow Column (right side)
+    # Note: Invisible container keeps output flow separate from input flow
+    output_flow: {
+      style.opacity: 0
+
+      host_output: |md
+        **Output Buffer**
+        (float*)
+
+        - size: (nfft/2+1) × channels × frames
+        - layout: magnitude spectrum
+      |
+      host_output.shape: rectangle
+
+      pinned1: |md
+        **PinnedHostBuffer[1]**
+        output_staging
+        «page-locked»
+
+        - size: (nfft/2+1) × channels
+        - purpose: double buffering
+      |
+      pinned1.shape: rectangle
+    }
+  }
+
+  # Device Memory Space
+  batch_device: Device Memory Space {
+    class: gpu-memory
+
+    dev_input0: |md
+      **DeviceBuffer[0]**
+      Input
+
+      - size: nfft × channels × sizeof(float)
+      - stride: nfft
+      - layout: per-channel
+    |
+    dev_input0.shape: rectangle
+
+    dev_input1: |md
+      **DeviceBuffer[1]**
+      Input
+
+      - size: nfft × channels × sizeof(float)
+      - stride: nfft
+      - layout: per-channel
+    |
+    dev_input1.shape: rectangle
+
+    dev_intermediate: |md
+      **DeviceBuffer**
+      Intermediate
+
+      - size: (nfft/2+1) × channels × sizeof(float2)
+      - format: complex (R2C output)
+      - note: Hermitian symmetry
+    |
+    dev_intermediate.shape: rectangle
+    dev_intermediate.note: |md
+      **Complex format**
+      Hermitian symmetry
+      Only N/2+1 bins stored
+      Saves 50% memory
+    |
+
+    dev_output: |md
+      **DeviceBuffer**
+      Output
+
+      - size: (nfft/2+1) × channels × sizeof(float)
+      - format: magnitude
+      - layout: [ch0_bins, ch1_bins, ...]
+    |
+    dev_output.shape: rectangle
+
+    window_coef: |md
+      **Window Coefficients**
+      «cached»
+
+      - size: nfft × sizeof(float)
+      - precomputed: true
+    |
+    window_coef.shape: rectangle
+
+    work_area: |md
+      **cuFFT Work Area**
+
+      - size: dynamic
+      - managed by: CufftPlan
+    |
+    work_area.shape: rectangle
+  }
+
+  # PCIe Transfer (ungrouped to prevent crossing)
+  # Note: h2d and d2h are separate nodes (not in a container) so they can float
+  # independently near their respective input/output paths. This prevents long
+  # winding arrows that would occur if they were grouped together in the center.
+  batch_h2d: "H2D Stream[0]\n«PCIe Transfer»" {
+    shape: rectangle
+    class: pcie-transfer
+  }
+
+  batch_d2h: "D2H Stream[2]\n«PCIe Transfer»" {
+    shape: rectangle
+    class: pcie-transfer
+  }
+
+  # Data flow (subgroups prevent crossing)
+  # Input path (left column)
+  batch_host.input_flow.host_input -> batch_host.input_flow.pinned0: memcpy
+  batch_host.input_flow.pinned0 -> batch_h2d: async
+  batch_h2d -> batch_device.dev_input0: cudaMemcpyAsync
+
+  # Processing on device
+  batch_device.dev_input0 -> batch_device.dev_input0: "window\n(in-place)"
+  batch_device.window_coef -> batch_device.dev_input0: "element-wise\nmult" {
+    class: dependency
+  }
+  batch_device.dev_input0 -> batch_device.dev_intermediate: "FFT\n(R2C)"
+  batch_device.dev_intermediate -> batch_device.dev_output: magnitude
+
+  # Output path (right column)
+  batch_device.dev_output -> batch_d2h: async
+  batch_d2h -> batch_host.output_flow.pinned1: cudaMemcpyAsync
+  batch_host.output_flow.pinned1 -> batch_host.output_flow.host_output: memcpy
+
+  characteristics: |md
+    **BatchExecutor Memory Characteristics**:
+    - Direct pipeline: H2D → Compute → D2H
+    - Minimal overhead: 164 KB (nfft=2048, channels=2)
+    - Double buffering for input/output
+    - No ring buffers (streaming-only feature)
+
+    **Terminology (v0.9.4)**:
+    - **channels** = spatial dimension (independent signal sources)
+    - **frames** = temporal dimension (FFT windows over time)
+    - **bins** = spectral dimension (frequency components)
+  |
+  characteristics.class: note-gold
+}
+
+# ==============================================================================
+# Comparison Note
+# ==============================================================================
+comparison: |md
+  # Memory Layout Comparison
+
+  ## BatchExecutor (Minimal Overhead - THIS DIAGRAM)
+  - **Total Memory**: 164 KB
+  - **Host**: Input/output buffers + 2 pinned staging buffers
+  - **Device**: 2 input buffers + intermediate + output + window + work area
+  - **No ring buffers**: Direct pipeline flow
+  - **Use case**: High-throughput batch processing
+
+  ## StreamingExecutor (+80% Memory - see 09_cpp_mem_stream.d2)
+  - **Total Memory**: 295 KB (+131 KB)
+  - **Host**: Input/output buffers + 2 pinned staging buffers + **ring buffers (98 KB)** + **batch staging (33 KB)**
+  - **Device**: Same as BatchExecutor (164 KB)
+  - **Ring buffers**: Per-channel accumulation (3× NFFT capacity)
+  - **Use case**: Real-time streaming with arbitrary chunk sizes
+
+  Both modes use the same device memory layout and processing pipeline.
+  The streaming overhead is entirely in host memory for ring buffer management.
+|
+
+comparison.class: core-blue

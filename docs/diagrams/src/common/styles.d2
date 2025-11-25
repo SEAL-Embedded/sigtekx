@@ -1,0 +1,388 @@
+# Ionosense HPC - Shared D2 Diagram Styles
+# Reusable style classes for consistent visual language across all diagrams
+# Import this file in diagrams using: ...common/styles.d2
+
+# ==============================================================================
+# Container Style Classes (Primary Groupings)
+# ==============================================================================
+
+classes: {
+  # Core Platform / Executors / C++ Architecture
+  core-blue: {
+    style: {
+      fill: "#E6F3FF"
+      stroke: "#4169E1"
+      stroke-width: 2
+    }
+  }
+
+  # Core Platform (emphasized variant with thicker stroke)
+  core-blue-emphasis: {
+    style: {
+      fill: "#E6F3FF"
+      stroke: "#4169E1"
+      stroke-width: 3
+    }
+  }
+
+  # Execution Layer / Workflow / Python Bindings
+  execution-red: {
+    style: {
+      fill: "#FFE6E6"
+      stroke: "#C00000"
+      stroke-width: 2
+    }
+  }
+
+  # Streaming Components / Analysis / Workflow
+  streaming-green: {
+    style: {
+      fill: "#E6FFE6"
+      stroke: "#228B22"
+      stroke-width: 2
+    }
+  }
+
+  # Benchmarks / Artifacts
+  benchmark-orange: {
+    style: {
+      fill: "#FFF5E6"
+      stroke: "#FF8C00"
+      stroke-width: 2
+    }
+  }
+
+  # Configuration / Orchestration
+  config-blue: {
+    style: {
+      fill: "#F0F8FF"
+      stroke: "#4169E1"
+      stroke-width: 2
+    }
+  }
+
+  # Notes / Capabilities / Highlights
+  note-gold: {
+    style: {
+      fill: "#FFFACD"
+      stroke: "#FFD700"
+      stroke-width: 2
+    }
+  }
+
+  # Research Applications / Impact
+  research-green: {
+    style: {
+      fill: "#E8F5E9"
+      stroke: "#4CAF50"
+      stroke-width: 2
+    }
+  }
+
+  # Alternative batch mode styling (light blue)
+  batch-blue: {
+    style: {
+      fill: "#F0F8FF"
+      stroke: "#4169E1"
+      stroke-width: 2
+    }
+  }
+
+  # Loop containers (light green with dashed stroke)
+  loop-container: {
+    style: {
+      fill: "#F0FFF0"
+      stroke: "#228B22"
+      stroke-dash: 3
+    }
+  }
+
+  # Optional/future features (dashed)
+  optional-orange: {
+    style: {
+      fill: "#FFF5E6"
+      stroke: "#FF8C00"
+      stroke-dash: 3
+    }
+  }
+}
+
+# ==============================================================================
+# Memory Space Style Classes
+# ==============================================================================
+
+classes: {
+  # GPU Device Memory
+  gpu-memory: {
+    style: {
+      fill: "#FFD700"
+      stroke: "#B8860B"
+      stroke-width: 2
+    }
+  }
+
+  # Host Memory (pinned/pageable)
+  host-memory: {
+    style: {
+      fill: "#90EE90"
+      stroke: "#228B22"
+      stroke-width: 2
+    }
+  }
+
+  # Ring Buffer (nested host memory)
+  ring-buffer: {
+    style: {
+      fill: "#C4E6C4"
+      stroke: "#228B22"
+      stroke-width: 2
+    }
+  }
+
+  # PCIe Transfer Nodes
+  pcie-transfer: {
+    style: {
+      fill: "#FFE4E4"
+      stroke: "#C00000"
+      stroke-width: 2
+    }
+  }
+
+  # Host memory (streaming variant - same as streaming-green)
+  host-memory-streaming: {
+    style: {
+      fill: "#E6FFE6"
+      stroke: "#228B22"
+      stroke-width: 2
+    }
+  }
+}
+
+# ==============================================================================
+# CUDA / Kernel Style Classes
+# ==============================================================================
+
+classes: {
+  # CUDA Kernels / C++ Extension
+  kernel-orange: {
+    style: {
+      fill: "#FFE4B5"
+      stroke: "#FF8C00"
+      stroke-width: 2
+    }
+  }
+
+  # CUDA Resource Management (lighter blue)
+  cuda-resource: {
+    style: {
+      fill: "#D4E6FF"
+      stroke: "#4169E1"
+      stroke-width: 2
+    }
+  }
+}
+
+# ==============================================================================
+# Exception / Error Style Classes
+# ==============================================================================
+
+classes: {
+  # Exception Handling
+  exception-light: {
+    style: {
+      fill: "#FFE6E6"
+      stroke: "#FF6B6B"
+      stroke-width: 2
+    }
+  }
+
+  # Base exception (light pink)
+  exception-pink: {
+    style: {
+      fill: "#FFB6C1"
+      stroke: "#FF6B6B"
+      stroke-width: 2
+    }
+  }
+}
+
+# ==============================================================================
+# Text / Note Style Classes
+# ==============================================================================
+
+classes: {
+  # Text notes (no border)
+  text-note: {
+    style: {
+      stroke-width: 0
+      italic: true
+      font-size: 12
+    }
+  }
+
+  # Section headers (bold, no border)
+  section-header: {
+    style: {
+      stroke-width: 0
+      font-size: 14
+      bold: true
+    }
+  }
+
+  # Standard text label (no border)
+  text-label: {
+    style: {
+      stroke-width: 0
+    }
+  }
+}
+
+# ==============================================================================
+# Relationship / Connection Style Classes
+# ==============================================================================
+
+classes: {
+  # Dependency relationships (dashed)
+  dependency: {
+    style: {
+      stroke-dash: 3
+    }
+  }
+
+  # Ownership relationships (diamond arrowhead)
+  ownership: {
+    target-arrowhead: {
+      shape: diamond
+    }
+  }
+
+  # Implementation relationships (dashed + triangle)
+  implementation: {
+    style: {
+      stroke-dash: 3
+    }
+    target-arrowhead: {
+      shape: triangle
+    }
+  }
+
+  # Data flow (standard arrow, thicker)
+  data-flow: {
+    style: {
+      stroke-width: 2
+    }
+  }
+
+  # Emphasized connection (thicker stroke)
+  connection-emphasis: {
+    style: {
+      stroke-width: 3
+    }
+  }
+}
+
+# ==============================================================================
+# Shape Style Classes
+# ==============================================================================
+
+classes: {
+  # Cylinder shape (for databases/storage)
+  storage-cylinder: {
+    shape: cylinder
+  }
+
+  # Person shape (for actors)
+  actor-person: {
+    shape: person
+  }
+
+  # Class diagram shape
+  class-shape: {
+    shape: class
+  }
+
+  # Rectangle shape (default, explicit)
+  box-rectangle: {
+    shape: rectangle
+  }
+
+  # Text shape (for pure text elements)
+  text-shape: {
+    shape: text
+  }
+}
+
+# ==============================================================================
+# Color Scheme Documentation
+# ==============================================================================
+
+color_scheme_doc: |md
+  # Ionosense HPC D2 Diagram Color Scheme
+
+  ## Container Colors (Primary)
+  - **Core Blue** (#E6F3FF / #4169E1): Core platform, executors, C++ architecture
+  - **Execution Red** (#FFE6E6 / #C00000): Execution layer, workflow phases
+  - **Streaming Green** (#E6FFE6 / #228B22): Streaming components, analysis
+  - **Benchmark Orange** (#FFF5E6 / #FF8C00): Benchmarks, artifacts, results
+  - **Config Blue** (#F0F8FF / #4169E1): Configuration, orchestration
+  - **Note Gold** (#FFFACD / #FFD700): Notes, capabilities, highlights
+  - **Research Green** (#E8F5E9 / #4CAF50): Research applications, impact
+
+  ## Memory Space Colors
+  - **GPU Gold** (#FFD700 / #B8860B): Device memory, GPU resources
+  - **Host Green** (#90EE90 / #228B22): Pinned host memory
+  - **Ring Buffer** (#C4E6C4 / #228B22): Per-channel ring buffers
+  - **PCIe Red** (#FFE4E4 / #C00000): Host-device transfers
+
+  ## Special Purpose Colors
+  - **Kernel Orange** (#FFE4B5 / #FF8C00): CUDA kernels, C++ extension
+  - **CUDA Resource** (#D4E6FF / #4169E1): CUDA resource management
+  - **Exception Pink** (#FFB6C1 / #FF6B6B): Exception handling
+
+  ## Usage Guidelines
+  - Use core-blue for primary architectural components
+  - Use execution-red for workflow/execution phases
+  - Use streaming-green for continuous/streaming data flows
+  - Use benchmark-orange for performance measurement components
+  - Use note-gold for informational callouts and highlights
+  - Use gpu-memory for all device memory allocations
+  - Use host-memory for page-locked host buffers
+  - Use pcie-transfer for explicit H2D/D2H transfer nodes
+
+  ## Relationship Styles
+  - **dependency**: Dashed line (stroke-dash: 3) for loose coupling
+  - **ownership**: Diamond arrowhead for composition/ownership
+  - **implementation**: Dashed + triangle for interface implementation
+  - **data-flow**: Solid line with standard arrow for data movement
+
+  ## Text Styles
+  - **text-note**: Italic, small font, no border (metadata)
+  - **section-header**: Bold, medium font, no border (section titles)
+  - **text-label**: Standard text, no border (inline labels)
+
+  ## Example Usage
+  ```d2
+  # Import shared styles
+  ...common/styles.d2
+
+  # Apply to containers
+  my_container: {
+    class: core-blue
+  }
+
+  # Apply to connections
+  a -> b: {
+    class: dependency
+  }
+
+  # Apply to shapes
+  database: {
+    class: storage-cylinder
+  }
+  ```
+|
+
+color_scheme_doc.style: {
+  stroke-width: 0
+  italic: true
+}

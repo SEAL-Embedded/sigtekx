@@ -9,7 +9,7 @@ This directory contains D2 source files for the Ionosense HPC architecture docum
 | Section | Description |
 |---------|-------------|
 | **[CLI Usage](#quick-start-cli---recommended)** | Generate diagrams with `iono diagrams` - smart regeneration, format options, batch processing |
-| **[Available Diagrams](#available-diagrams)** | 8 technical diagrams: C++ architecture (4), Python layer (3), System overview (1) |
+| **[Available Diagrams](#available-diagrams)** | 10 technical diagrams: C++ architecture (6), Python layer (3), System overview (1) |
 | **[Direct D2 Commands](#direct-d2-commands)** | Manual single-diagram generation for development and advanced control |
 | **[Layout Engines](#layout-engines)** | dagre (hierarchical) vs elk (complex graphs) - when to use each |
 | **[Output Formats](#output-formats)** | SVG (default), PNG, PDF support |
@@ -21,38 +21,39 @@ This directory contains D2 source files for the Ionosense HPC architecture docum
 
 ## Diagram Organization
 
-Diagrams are organized by prefix to indicate their scope:
+Diagrams use a numbered naming scheme for logical ordering:
 
-- **`cpp_*`** - C++ implementation details (classes, components, memory, sequences)
-- **`py_*`** - Python layer and workflows (packages, analysis, experimental workflows)
-- **`sys_*`** - System-level overviews (platform architecture, integrations)
+- **`01-09`** - Numbered diagrams following the architecture progression (system → Python → C++)
+- **`cpp_class_hierarchy.d2`** - Reference diagram (not numbered for easy reference)
 
 ## Available Diagrams
 
-### C++ Architecture (`cpp_*`)
+### System Overview
 
 | File | Layout | Type | Description |
 |------|--------|------|-------------|
-| `cpp_class_hierarchy.d2` | dagre | Class | Complete C++ class hierarchy with executor pattern, BatchExecutor, StreamingExecutor, ring buffers, CUDA resources, and exception handling |
-| `cpp_components_pipeline.d2` | dagre | Component | High-level component relationships showing dual executor architecture and data flow |
-| `cpp_sequence_execution.d2` | elk | Sequence | Combined execution flows for BatchExecutor and StreamingExecutor pipelines |
-| `cpp_memory_layout.d2` | dagre | Memory | Memory layouts and data flow patterns for both BatchExecutor and StreamingExecutor |
+| `01_system_overview.d2` | elk | Overview | Platform overview with CLI tools (ionoc, iprof, iono dashboard), Streamlit, and system integrations |
 
-### Python Layer (`py_*`)
+### Python Layer
 
 | File | Layout | Type | Description |
 |------|--------|------|-------------|
-| `py_package_architecture.d2` | dagre | Package | Python package structure with executor bindings, benchmarks, config, utils, and GPU clock management |
-| `py_analysis_workflow.d2` | dagre | Component | Experiment and analysis architecture with Streamlit (PRIMARY) and Quarto (FUTURE) reporting layers |
-| `py_workflow_sequence.d2` | elk | Sequence | Complete experimental workflow including ionoc, iprof, Streamlit dashboard, and GPU clock locking |
+| `02_py_structure.d2` | dagre | Package | Python package structure with executor bindings, benchmarks, config, utils, and GPU clock management |
+| `04_py_analysis.d2` | dagre | Component | Experiment and analysis architecture with Streamlit (PRIMARY) and Quarto (FUTURE) reporting layers |
+| `05_workflow_full.d2` | elk | Sequence | Complete experimental workflow including ionoc, iprof, Streamlit dashboard, and GPU clock locking |
 
-### System Overview (`sys_*`)
+### C++ Architecture
 
 | File | Layout | Type | Description |
 |------|--------|------|-------------|
-| `sys_architecture_overview.d2` | elk | Overview | Platform overview with CLI tools (ionoc, iprof, iono dashboard), Streamlit, and system integrations |
+| `03_cpp_components.d2` | dagre | Component | High-level component relationships showing dual executor architecture and data flow |
+| `06_cpp_seq_batch.d2` | elk | Sequence | BatchExecutor execution flow (high-throughput, 86.79 µs) |
+| `07_cpp_seq_stream.d2` | elk | Sequence | StreamingExecutor execution flow (low-latency streaming, 122.25 µs) |
+| `08_cpp_mem_batch.d2` | elk | Memory | BatchExecutor memory layout (164 KB, direct pipeline) |
+| `09_cpp_mem_stream.d2` | elk | Memory | StreamingExecutor memory layout (295 KB, ring buffer architecture) |
+| `cpp_class_hierarchy.d2` | elk | Class | Complete C++ class hierarchy with executor pattern, BatchExecutor, StreamingExecutor, ring buffers, CUDA resources, and exception handling |
 
-**Total:** 8 technical diagrams covering C++, Python, and system architecture
+**Total:** 10 technical diagrams covering system architecture, Python layer, and C++ implementation
 
 ## Layout Engines
 
@@ -73,7 +74,7 @@ D2 supports multiple layout engines with different strengths. This project uses 
 - Top-to-bottom or left-to-right flow
 - Best for tree-like structures
 
-**Examples:** `cpp_class_hierarchy.d2`, `cpp_components_pipeline.d2`, `py_package_architecture.d2`
+**Examples:** `02_py_structure.d2`, `03_cpp_components.d2`, `04_py_analysis.d2`
 
 ### elk (Complex Graph Layouts)
 
@@ -89,7 +90,7 @@ D2 supports multiple layout engines with different strengths. This project uses 
 - Slower than dagre but produces cleaner complex graphs
 - Best for intricate relationships
 
-**Examples:** `cpp_sequence_execution.d2`, `sys_architecture_overview.d2`, `py_workflow_sequence.d2`
+**Examples:** `01_system_overview.d2`, `05_workflow_full.d2`, `06_cpp_seq_batch.d2`, `07_cpp_seq_stream.d2`, `08_cpp_mem_batch.d2`, `09_cpp_mem_stream.d2`, `cpp_class_hierarchy.d2`
 
 ## Rendering Diagrams
 
@@ -111,12 +112,13 @@ iono diagrams sys        # System diagrams only
 
 # Generate specific diagram
 iono diagrams cpp_class_hierarchy
-iono diagrams py_analysis_workflow
+iono diagrams 02_py_structure
+iono diagrams 04_py_analysis
 
 # Change output format (default: svg)
 iono diagrams --format png       # All as PNG
 iono diagrams cpp --format pdf   # C++ diagrams as PDF
-iono diagrams sys_architecture_overview --format pdf
+iono diagrams 01_system_overview --format pdf
 
 # Shortcut (same as 'iono diagrams')
 idiag cpp --format png
@@ -158,7 +160,7 @@ For single diagram generation or when you need full control over d2 options, use
 d2 --layout dagre docs/diagrams/src/cpp_class_hierarchy.d2 docs/diagrams/generated/cpp_class_hierarchy.svg
 
 # Using elk (for complex graphs)
-d2 --layout elk docs/diagrams/src/sys_architecture_overview.d2 docs/diagrams/generated/sys_architecture_overview.svg
+d2 --layout elk docs/diagrams/src/01_system_overview.d2 docs/diagrams/generated/01_system_overview.svg
 ```
 
 ### Output Formats

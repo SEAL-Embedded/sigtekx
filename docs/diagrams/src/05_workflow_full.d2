@@ -6,7 +6,11 @@
 # C++ development workflow (ionoc), production profiling (iprof), experiment execution,
 # analysis, visualization, and interactive reporting with the Streamlit dashboard.
 
+# Import shared styles
+common/styles
+
 direction: down
+layout-engine: elk
 
 # ==============================================================================
 # Actors and Participants
@@ -148,10 +152,7 @@ DVC.note: |md
 # Phase 1: Initialization
 # ==============================================================================
 init_phase: Initialization Phase {
-  style: {
-    fill: "#E8F5E9"
-    stroke: "#4CAF50"
-  }
+  class: research-green
 
   step1: "1: Researcher → CLI: iono info" {shape: rectangle}
   step2: "2: CLI → Artifacts: check experiments/" {shape: rectangle}
@@ -168,10 +169,7 @@ init_phase: Initialization Phase {
 # Phase 2: C++ Development Workflow (Pre-Python Integration)
 # ==============================================================================
 cpp_dev_phase: C++ Development Workflow {
-  style: {
-    fill: "#E6F3FF"
-    stroke: "#4169E1"
-  }
+  class: core-blue
 
   description: |md
     **Use Case**: Iterative C++ kernel/executor development
@@ -225,10 +223,7 @@ cpp_dev_phase: C++ Development Workflow {
 # Phase 3: Production Profiling Workflow (Python End-to-End)
 # ==============================================================================
 prod_prof_phase: Production Profiling Workflow {
-  style: {
-    fill: "#FFE6E6"
-    stroke: "#C00000"
-  }
+  class: execution-red
 
   description: |md
     **Use Case**: Profile complete Python → C++ pipeline
@@ -241,7 +236,7 @@ prod_prof_phase: Production Profiling Workflow {
 
   # Optional GPU lock
   gpu_lock: Optional: GPU Clock Locking {
-    style.stroke-dash: 3
+    class: dependency
     gl1: "4a: IProf → GPUMgr: lock GPU clocks" {shape: rectangle}
     gl2: "4b: GPUMgr → IProf: clocks locked" {shape: rectangle}
     gl1 -> gl2
@@ -257,7 +252,7 @@ prod_prof_phase: Production Profiling Workflow {
 
   # Optional GPU unlock
   gpu_unlock: Optional: GPU Clock Unlock {
-    style.stroke-dash: 3
+    class: dependency
     gu1: "12a: IProf → GPUMgr: restore clocks" {shape: rectangle}
     gu2: "12b: GPUMgr → IProf: clocks restored" {shape: rectangle}
     gu1 -> gu2
@@ -282,10 +277,7 @@ prod_prof_phase: Production Profiling Workflow {
 # Phase 4: Experiment Execution
 # ==============================================================================
 experiment_phase: Experiment Execution Phase {
-  style: {
-    fill: "#E6FFE6"
-    stroke: "#228B22"
-  }
+  class: streaming-green
 
   step1: "1: Researcher → CLI: iono analysis" {shape: rectangle}
   step2: "2: CLI → Snake: snakemake --cores 4" {shape: rectangle}
@@ -374,10 +366,7 @@ experiment_phase: Experiment Execution Phase {
 # Phase 5: Analysis
 # ==============================================================================
 analysis_phase: Analysis Phase {
-  style: {
-    fill: "#E6F3FF"
-    stroke: "#4169E1"
-  }
+  class: core-blue
 
   step1: "1: CLI → Snake: continue pipeline" {shape: rectangle}
   step2: "2: Snake → Analysis: analyze.py" {shape: rectangle}
@@ -394,10 +383,7 @@ analysis_phase: Analysis Phase {
 # Phase 6: Visualization
 # ==============================================================================
 visualization_phase: Visualization Phase {
-  style: {
-    fill: "#FFE6E6"
-    stroke: "#C00000"
-  }
+  class: execution-red
 
   step1: "1: Snake → Analysis: generate_figures.py" {shape: rectangle}
   step2: "2: Analysis → Artifacts: load summary_statistics.csv" {shape: rectangle}
@@ -413,10 +399,7 @@ visualization_phase: Visualization Phase {
 # Phase 7: Reporting
 # ==============================================================================
 reporting_phase: Reporting Phase {
-  style: {
-    fill: "#E6FFE6"
-    stroke: "#228B22"
-  }
+  class: streaming-green
 
   step1: "1: Snake → Report: generate_report.py" {shape: rectangle}
   step2: "2: Report → Artifacts: load summary + figures" {shape: rectangle}
@@ -433,11 +416,7 @@ reporting_phase: Reporting Phase {
 # Phase 8: Interactive Analysis (PRIMARY)
 # ==============================================================================
 interactive_phase: Interactive Analysis Phase {
-  style: {
-    fill: "#F0F8FF"
-    stroke: "#4169E1"
-    stroke-width: 3
-  }
+  class: core-blue-emphasis
 
   description: |md
     **PRIMARY Analysis Tool**: Streamlit Dashboard
@@ -476,10 +455,7 @@ interactive_phase: Interactive Analysis Phase {
 # Phase 9: Review
 # ==============================================================================
 review_phase: Review Phase {
-  style: {
-    fill: "#FFFACD"
-    stroke: "#FFD700"
-  }
+  class: note-gold
 
   step1: "1: CLI → DVC: track artifacts" {shape: rectangle}
   step2: "2: DVC → Artifacts: compute hashes" {shape: rectangle}

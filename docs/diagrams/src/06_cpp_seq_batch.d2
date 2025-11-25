@@ -1,0 +1,146 @@
+# Ionosense HPC - BatchExecutor Pipeline Sequence
+# Layout: elk - complex sequence diagram with multiple actors and parallel flows
+# Render: See docs/diagrams/README.md for rendering instructions
+#
+# This diagram shows the complete execution flow for BatchExecutor (high-throughput mode).
+# The sequence illustrates the direct pipeline processing with 3-stream asynchronous execution.
+
+# Import shared styles
+common/styles
+
+direction: down
+layout-engine: elk
+
+# ==============================================================================
+# Batch Executor Pipeline (High-Throughput Mode)
+# ==============================================================================
+batch_mode: Batch Executor Pipeline {
+  class: batch-blue
+
+  description: |md
+    **Batch Mode: Direct Pipeline Processing**
+    - Input shape: [channels, num_samples]
+    - Output shape: [channels, num_frames, num_bins]
+    - Mean latency: 86.79 µs
+    - Ideal for high-throughput batch processing
+  |
+
+  # Actor definitions
+  Client: {shape: rectangle}
+  BatchExecutor: {shape: rectangle}
+  Impl: {
+    shape: rectangle
+    label: "BatchExecutor::Impl"
+  }
+  Stream0: {
+    shape: rectangle
+    label: "Stream[0]\nH2D"
+  }
+  Stream1: {
+    shape: rectangle
+    label: "Stream[1]\nCompute"
+  }
+  Stream2: {
+    shape: rectangle
+    label: "Stream[2]\nD2H"
+  }
+  WindowStage: {shape: rectangle}
+  FFTStage: {shape: rectangle}
+  MagnitudeStage: {shape: rectangle}
+
+  # Sequence flow
+  Client -> BatchExecutor: "1: submit(input, output, num_samples)"
+  BatchExecutor -> Impl: "2: submit_impl(input, output, num_samples)"
+
+  process_note: {
+    class: text-label
+    label: |md
+      Process input for all channels
+      Extract overlapping frames
+    |
+  }
+
+  # Host to Device Transfer
+  h2d_header: {
+    label: "═══ Host to Device Transfer ═══"
+    class: section-header
+  }
+
+  Impl -> Stream0: "3: copy_from_host(input)"
+  Stream0 -> Stream0: "4: record event_h2d_done\n(Async H2D on Stream 0)"
+
+  # Compute Pipeline
+  compute_header: {
+    label: "═══ Compute Pipeline ═══"
+    class: section-header
+  }
+
+  Stream1 -> Stream0: "5: wait(event_h2d_done)\n(Stream 1 waits for H2D)"
+  Stream1 -> WindowStage: "6: process(d_input, d_input)"
+  WindowStage -> WindowStage: "7: apply_window_kernel<<<>>>\n(Shape: [channels, nfft])"
+
+  Stream1 -> FFTStage: "8: process(d_input, d_intermediate)"
+  FFTStage -> FFTStage: "9: cufftExecR2C()\n(Output: [channels, nfft/2+1])"
+
+  Stream1 -> MagnitudeStage: "10: process(d_intermediate, d_output)"
+  MagnitudeStage -> MagnitudeStage: "11: magnitude_kernel<<<>>>\n(Shape: [channels, frames, bins])"
+
+  Stream1 -> Stream1: "12: record event_compute_done"
+
+  # Device to Host Transfer
+  d2h_header: {
+    label: "═══ Device to Host Transfer ═══"
+    class: section-header
+  }
+
+  Stream2 -> Stream1: "13: wait(event_compute_done)\n(Stream 2 waits for compute)"
+  Stream2 -> Stream2: "14: copy_to_host(output)"
+
+  # Synchronization
+  sync_header: {
+    label: "═══ Synchronization ═══"
+    class: section-header
+  }
+
+  Impl -> Stream2: "15: synchronize()\n(Block until D2H complete)"
+  Stream2 -> Impl: "16: D2H complete"
+
+  Impl -> Impl: "17: update_stats(event_start, event_end)\n(Update latency, throughput, frames_processed)"
+
+  Impl -> BatchExecutor: "18: submit complete"
+  BatchExecutor -> Client: "19: return (output ready)"
+
+  performance_note: {
+    class: note-gold
+    label: |md
+      **Performance**: Mean latency 86.79 µs
+      Direct pipeline = minimal overhead
+      Ideal for high-throughput batch processing
+    |
+  }
+}
+
+# ==============================================================================
+# Comparison Note
+# ==============================================================================
+comparison: |md
+  # Batch vs Streaming Mode Comparison
+
+  ## Batch Executor (High-Throughput - THIS DIAGRAM)
+  - **Direct pipeline**: H2D → Compute → D2H
+  - **Fixed input size**: Must provide complete frames
+  - **Lower latency**: 86.79 µs
+  - **Lower memory**: 164 KB
+  - **Use case**: Offline batch processing, file analysis
+
+  ## Streaming Executor (Low-Latency Real-Time - see 07_cpp_seq_stream.d2)
+  - **Ring buffer accumulation**: Flexible chunk sizes
+  - **Frame extraction**: Overlapping frame extraction on demand
+  - **Higher latency**: 122.25 µs (+40%)
+  - **Higher memory**: 295 KB (+80%)
+  - **Use case**: Real-time streaming, continuous monitoring
+
+  Both modes use the same 3-stream asynchronous pipeline for parallel H2D/Compute/D2H.
+|
+
+comparison.class: core-blue

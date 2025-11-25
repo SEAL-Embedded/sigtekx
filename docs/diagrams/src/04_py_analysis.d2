@@ -6,7 +6,11 @@
 # including Hydra configuration, benchmark execution, Snakemake orchestration,
 # analysis scripts, and the dual reporting layer (Streamlit PRIMARY, Quarto FUTURE).
 
+# Import shared styles
+common/styles
+
 direction: down
+layout-engine: dagre
 
 # ==============================================================================
 # Researcher (Actor)
@@ -55,10 +59,7 @@ dev_interface: Development Interface {
 # Configuration Layer (Hydra)
 # ==============================================================================
 config_layer: Configuration Layer (Hydra) {
-  style: {
-    fill: "#E6F3FF"
-    stroke: "#4169E1"
-  }
+  class: core-blue
 
   hydra_sweeper: {
     shape: rectangle
@@ -159,10 +160,7 @@ config_layer: Configuration Layer (Hydra) {
 # Execution Layer
 # ==============================================================================
 execution_layer: Execution Layer {
-  style: {
-    fill: "#FFE6E6"
-    stroke: "#C00000"
-  }
+  class: execution-red
 
   benchmark_scripts: Benchmark Scripts {
     style: {
@@ -280,10 +278,7 @@ orchestration_layer: Orchestration Layer (Snakemake) {
 # Analysis Layer
 # ==============================================================================
 analysis_layer: Analysis Layer {
-  style: {
-    fill: "#E6FFE6"
-    stroke: "#228B22"
-  }
+  class: streaming-green
 
   analyze: {
     shape: rectangle
@@ -463,10 +458,7 @@ data_storage: Data Storage {
 # ==============================================================================
 tracking: Tracking & Versioning {
   shape: cloud
-  style: {
-    fill: "#E6FFE6"
-    stroke: "#228B22"
-  }
+  class: streaming-green
 
   mlflow: {
     shape: rectangle
@@ -521,16 +513,16 @@ researcher -> dev_interface.direct_cmd: advanced usage
 # Relationships - Configuration Flow
 # ==============================================================================
 config_layer.conf_dir.main_config -> config_layer.hydra_sweeper: configures {
-  style.stroke-dash: 3
+  class: dependency
 }
 config_layer.conf_dir.engine_presets -> config_layer.hydra_sweeper: engine params {
-  style.stroke-dash: 3
+  class: dependency
 }
 config_layer.conf_dir.benchmark_configs -> config_layer.hydra_sweeper: benchmark params {
-  style.stroke-dash: 3
+  class: dependency
 }
 config_layer.conf_dir.experiment_configs -> config_layer.hydra_sweeper: experiment params {
-  style.stroke-dash: 3
+  class: dependency
 }
 
 # ==============================================================================
@@ -579,13 +571,13 @@ reporting_interactive.streamlit_dashboard -> data_storage.artifacts.data_dir: ex
 
 # Reporting Flow (FUTURE)
 data_storage.artifacts.data_dir -> reporting_static.quarto_reports: "loads\n(future)" {
-  style.stroke-dash: 3
+  class: dependency
 }
 analysis_layer.gen_figures -> reporting_static.quarto_reports: "embeds\n(future)" {
-  style.stroke-dash: 3
+  class: dependency
 }
 reporting_static.quarto_reports -> data_storage.artifacts.reports_dir: "generates PDF/HTML\n(future)" {
-  style.stroke-dash: 3
+  class: dependency
 }
 
 # ==============================================================================

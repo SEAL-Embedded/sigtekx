@@ -6,16 +6,17 @@
 # focusing on the dual executor pattern (BatchExecutor and StreamingExecutor), their
 # relationships with processing stages, CUDA resources, and memory management.
 
+# Import shared styles
+common/styles
+
 direction: down
+layout-engine: dagre
 
 # ==============================================================================
 # Python Bindings Layer
 # ==============================================================================
 python_layer: Python Bindings Layer {
-  style: {
-    fill: "#FFE6E6"
-    stroke: "#C00000"
-  }
+  class: execution-red
 
   PyBatchExecutor: {
     shape: rectangle
@@ -40,10 +41,7 @@ python_layer: Python Bindings Layer {
 # C++ Executor API
 # ==============================================================================
 executor_api: C++ Executor API {
-  style: {
-    fill: "#E6F3FF"
-    stroke: "#4169E1"
-  }
+  class: core-blue
 
   BatchExecutor: {
     shape: rectangle
@@ -53,8 +51,8 @@ executor_api: C++ Executor API {
       **Batch Mode (High-Throughput)**
       - Direct pipeline processing
       - NumPy array interface
-      - Mean latency: 86.79 µs
-      - Direct H2D ’ Compute ’ D2H
+      - Mean latency: 86.79 ï¿½s
+      - Direct H2D ï¿½ Compute ï¿½ D2H
       - Pimpl idiom hides CUDA dependencies
     |
   }
@@ -67,8 +65,8 @@ executor_api: C++ Executor API {
       **Streaming Mode (Low-Latency)**
       - Ring buffer accumulation
       - Arbitrary chunk sizes
-      - Mean latency: 122.25 µs
-      - Ring buffer ’ Extract ’ Pipeline
+      - Mean latency: 122.25 ï¿½s
+      - Ring buffer ï¿½ Extract ï¿½ Pipeline
       - Pimpl idiom hides CUDA dependencies
     |
   }
@@ -100,10 +98,7 @@ executor_api: C++ Executor API {
 # Streaming Components
 # ==============================================================================
 streaming_components: Streaming Components {
-  style: {
-    fill: "#E6FFE6"
-    stroke: "#228B22"
-  }
+  class: streaming-green
 
   RingBufferManager: {
     shape: rectangle
@@ -111,12 +106,12 @@ streaming_components: Streaming Components {
 
     note: |md
       Per-channel ring buffers
-      - Capacity: 3× NFFT
+      - Capacity: 3ï¿½ NFFT
       - Lock-free thread-safe
 
       **Memory Overhead: +80%**
-      - 3× NFFT × channels (ring buffers)
-      - + nfft × channels (staging)
+      - 3ï¿½ NFFT ï¿½ channels (ring buffers)
+      - + nfft ï¿½ channels (staging)
       - = 295 KB vs 164 KB (batch)
     |
   }
@@ -126,10 +121,7 @@ streaming_components: Streaming Components {
 # Processing Pipeline
 # ==============================================================================
 processing_pipeline: Processing Pipeline {
-  style: {
-    fill: "#E6F3FF"
-    stroke: "#4169E1"
-  }
+  class: core-blue
 
   WindowStage: {
     shape: rectangle
@@ -161,10 +153,7 @@ processing_pipeline: Processing Pipeline {
 # CUDA Resource Management
 # ==============================================================================
 cuda_resources: CUDA Resource Management {
-  style: {
-    fill: "#D4E6FF"
-    stroke: "#00008B"
-  }
+  class: cuda-resource
 
   CudaStream: {
     shape: rectangle
@@ -196,10 +185,7 @@ cuda_resources: CUDA Resource Management {
 # CUDA Kernels (Device Code)
 # ==============================================================================
 cuda_kernels: CUDA Kernels {
-  style: {
-    fill: "#FFE4B5"
-    stroke: "#DAA520"
-  }
+  class: kernel-orange
 
   WindowKernels: {
     shape: rectangle
@@ -224,6 +210,7 @@ profiling_debug: Profiling & Debug {
   style: {
     fill: "#F0E6FF"
     stroke: "#800080"
+    stroke-width: 2
   }
 
   NVTX: {
@@ -242,10 +229,7 @@ profiling_debug: Profiling & Debug {
 # ==============================================================================
 gpu_memory: GPU Memory {
   shape: cylinder
-  style: {
-    fill: "#FFD700"
-    stroke: "#B8860B"
-  }
+  class: gpu-memory
 
   note: |md
     Device memory managed
@@ -255,10 +239,7 @@ gpu_memory: GPU Memory {
 
 host_memory: Host Memory {
   shape: cylinder
-  style: {
-    fill: "#90EE90"
-    stroke: "#228B22"
-  }
+  class: host-memory
 }
 
 # ==============================================================================
@@ -285,22 +266,22 @@ streaming_components.RingBufferManager -> cuda_resources.PinnedHostBuffer: "owns
 
 # Pipeline orchestration (dashed lines for orchestration)
 executor_api.BatchExecutor -> processing_pipeline.WindowStage: orchestrates {
-  style.stroke-dash: 3
+  class: dependency
 }
 executor_api.BatchExecutor -> processing_pipeline.FFTStage: orchestrates {
-  style.stroke-dash: 3
+  class: dependency
 }
 executor_api.BatchExecutor -> processing_pipeline.MagnitudeStage: orchestrates {
-  style.stroke-dash: 3
+  class: dependency
 }
 executor_api.StreamingExecutor -> processing_pipeline.WindowStage: orchestrates {
-  style.stroke-dash: 3
+  class: dependency
 }
 executor_api.StreamingExecutor -> processing_pipeline.FFTStage: orchestrates {
-  style.stroke-dash: 3
+  class: dependency
 }
 executor_api.StreamingExecutor -> processing_pipeline.MagnitudeStage: orchestrates {
-  style.stroke-dash: 3
+  class: dependency
 }
 
 # Stage to kernel relationships
