@@ -1,6 +1,6 @@
 # Ionosense HPC - Shared D2 Diagram Styles
 # Reusable style classes for consistent visual language across all diagrams
-# Import this file in diagrams using: ...common/styles.d2
+# Import this file in diagrams using: common/styles
 
 # ==============================================================================
 # Container Style Classes (Primary Groupings)
@@ -103,6 +103,67 @@ classes: {
       fill: "#FFF5E6"
       stroke: "#FF8C00"
       stroke-dash: 3
+    }
+  }
+}
+
+# ==============================================================================
+# Functional Component Style Classes
+# ==============================================================================
+
+classes: {
+  # Configuration & Schema Components (replaces #FFE6CC, #E6F3FF)
+  config-schema: {
+    style: {
+      fill: "#B3D9FF"
+      stroke: "#4169E1"
+      stroke-width: 2
+    }
+  }
+
+  # Builder Pattern / Factory Classes (replaces #E6F7FF)
+  builder-pattern: {
+    style: {
+      fill: "#B8D8F5"
+      stroke: "#4169E1"
+      stroke-width: 2
+    }
+  }
+
+  # Utility Function Modules (replaces #F0F8FF)
+  utility-module: {
+    style: {
+      fill: "#CCE5FF"
+      stroke: "#5B9BD5"
+      stroke-width: 2
+    }
+  }
+
+  # Profiling & Performance Tools (replaces #FFF8DC)
+  profiling-tool: {
+    style: {
+      fill: "#FFD699"
+      stroke: "#FF8C00"
+      stroke-width: 2
+    }
+  }
+
+  # Abstract Base Classes (replaces #F5DEB3)
+  base-class: {
+    style: {
+      fill: "#E6D7B8"
+      stroke: "#B8860B"
+      stroke-width: 2
+    }
+  }
+
+  # Future/Experimental Features (replaces #FFFFCC)
+  future-feature: {
+    style: {
+      fill: "#FFE680"
+      stroke: "#DAA520"
+      stroke-dash: 3
+      stroke-width: 2
     }
   }
 }

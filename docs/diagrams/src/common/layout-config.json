@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "description": "D2 diagram layout engine configuration for ionosense-hpc",
+  "version": "1.0",
+  "default_layout": "dagre",
+  "layouts": {
+    "01_system_overview.d2": "elk",
+    "02_py_structure.d2": "dagre",
+    "03_cpp_components.d2": "dagre",
+    "04_py_analysis.d2": "dagre",
+    "05_workflow_full.d2": "elk",
+    "06_cpp_seq_batch.d2": "elk",
+    "07_cpp_seq_stream.d2": "elk",
+    "08_cpp_mem_batch.d2": "elk",
+    "09_cpp_mem_stream.d2": "elk",
+    "cpp_class_hierarchy.d2": "elk"
+  },
+  "excluded_paths": [
+    "common/"
+  ],
+  "notes": {
+    "elk": "Hierarchical layout - best for complex system overviews and class hierarchies",
+    "dagre": "Directed graph layout - best for pipeline and package structures"
+  }
+}

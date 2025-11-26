@@ -520,10 +520,111 @@ function Invoke-Doctor {
     }
 }
 
+# ==============================================================================
+# Diagram Generation Helper Functions
+# ==============================================================================
+
+function Get-DiagramLayoutConfig {
+    <#
+    .SYNOPSIS
+    Load diagram layout configuration from JSON file
+    .DESCRIPTION
+    Loads layout-config.json with graceful fallback to defaults if missing or invalid
+    #>
+    param([string]$ConfigPath)
+
+    if (-not (Test-Path $ConfigPath)) {
+        Write-Warning "Layout config not found: $ConfigPath"
+        Write-Host "  Using default layout engine: dagre" -ForegroundColor Yellow
+        return @{
+            default_layout = "dagre"
+            layouts = @{}
+            excluded_paths = @("common/")
+        }
+    }
+
+    try {
+        $configJson = Get-Content $ConfigPath -Raw | ConvertFrom-Json
+        return @{
+            default_layout = $configJson.default_layout
+            layouts = $configJson.layouts
+            excluded_paths = $configJson.excluded_paths
+        }
+    } catch {
+        Write-Error "Failed to parse layout config: $ConfigPath"
+        Write-Error "  JSON error: $($_.Exception.Message)"
+        exit 1
+    }
+}
+
+function Test-DiagramPathExcluded {
+    <#
+    .SYNOPSIS
+    Check if a diagram path should be excluded from rendering
+    #>
+    param(
+        [string]$RelativePath,
+        [array]$ExcludedPaths
+    )
+
+    foreach ($excluded in $ExcludedPaths) {
+        $normalizedExcluded = $excluded.Replace('/', '\')
+        if ($RelativePath.StartsWith($normalizedExcluded)) {
+            return $true
+        }
+    }
+    return $false
+}
+
+function Get-DiagramLayoutEngine {
+    <#
+    .SYNOPSIS
+    Resolve layout engine for a diagram (CLI override > config > default)
+    #>
+    param(
+        [string]$Filename,
+        [hashtable]$Config,
+        [string]$Override
+    )
+
+    # CLI override takes highest precedence
+    if ($Override) {
+        return $Override
+    }
+
+    # Lookup in config layouts mapping
+    if ($Config.layouts.PSObject.Properties.Name -contains $Filename) {
+        return $Config.layouts.$Filename
+    }
+
+    # Fallback to default layout
+    return $Config.default_layout
+}
+
+function Show-AvailableDiagrams {
+    <#
+    .SYNOPSIS
+    Display list of available diagrams when target not found
+    #>
+    param([array]$Diagrams)
+
+    Write-Host "`nAvailable diagrams:" -ForegroundColor Yellow
+    $Diagrams | Sort-Object Name | ForEach-Object {
+        $displayName = $_.Name.Replace('.d2', '')
+        Write-Host "  - $displayName" -ForegroundColor DarkGray
+    }
+    Write-Host ""
+}
+
+# ==============================================================================
+# Diagram Generation Main Function
+# ==============================================================================
+
 function Invoke-Diagrams {
     param(
         [string]$Target = "all",
         [string]$Format = "svg",
+        [string]$Layout = "",
         [bool]$Force = $false,
         [bool]$Verbose = $false
     )
@@ -543,8 +644,10 @@ function Invoke-Diagrams {
         exit 1
     }
 
+    # Setup paths
     $srcDir = Join-Path $script:ProjectRoot "docs\diagrams\src"
     $outDir = Join-Path $script:ProjectRoot "docs\diagrams\generated"
+    $configPath = Join-Path $srcDir "common\layout-config.json"
 
     if (-not (Test-Path $srcDir)) {
         Write-Error "Diagram source directory not found: $srcDir"
@@ -556,87 +659,81 @@ function Invoke-Diagrams {
         New-Item -ItemType Directory -Path $outDir -Force | Out-Null
     }
 
-    # Diagram to layout engine mapping
-    $diagrams = @{
-        "cpp_class_hierarchy.d2" = "elk"
-        "cpp_components_pipeline.d2" = "dagre"
-        "cpp_sequence_execution.d2" = "elk"
-        "cpp_memory_layout.d2" = "elk"
-        "py_package_architecture.d2" = "dagre"
-        "py_analysis_workflow.d2" = "dagre"
-        "py_workflow_sequence.d2" = "elk"
-        "sys_architecture_overview.d2" = "elk"
+    # Load layout configuration
+    $layoutConfig = Get-DiagramLayoutConfig -ConfigPath $configPath
+
+    # Discover all .d2 files (excluding common/ subdirectory)
+    $allDiagrams = Get-ChildItem -Path $srcDir -Filter "*.d2" -Recurse | Where-Object {
+        $relativePath = $_.FullName.Substring($srcDir.Length + 1)
+        -not (Test-DiagramPathExcluded -RelativePath $relativePath -ExcludedPaths $layoutConfig.excluded_paths)
     }
 
-    # Filter by target
-    $diagramsToGenerate = @{}
-    switch ($Target.ToLower()) {
-        "cpp" {
-            $diagrams.GetEnumerator() | Where-Object { $_.Key -like "cpp_*" } | ForEach-Object {
-                $diagramsToGenerate[$_.Key] = $_.Value
-            }
+    if ($allDiagrams.Count -eq 0) {
+        Write-Error "No diagram files found in: $srcDir"
+        exit 1
+    }
+
+    # Filter diagrams by target
+    $selectedDiagrams = if ($Target.ToLower() -eq "all") {
+        $allDiagrams
+    } else {
+        # Support flexible matching:
+        #   "01" -> "01*.d2"
+        #   "01_system_overview" -> "01_system_overview.d2"
+        #   "01_system_overview.d2" -> exact match
+        $pattern = if ($Target.EndsWith(".d2")) {
+            $Target
+        } else {
+            "${Target}*.d2"
         }
-        "py" {
-            $diagrams.GetEnumerator() | Where-Object { $_.Key -like "py_*" } | ForEach-Object {
-                $diagramsToGenerate[$_.Key] = $_.Value
-            }
+
+        $matches = $allDiagrams | Where-Object { $_.Name -like $pattern }
+
+        if ($matches.Count -eq 0) {
+            Write-Error "No diagrams matched target: $Target"
+            Show-AvailableDiagrams -Diagrams $allDiagrams
+            exit 1
         }
-        "sys" {
-            $diagrams.GetEnumerator() | Where-Object { $_.Key -like "sys_*" } | ForEach-Object {
-                $diagramsToGenerate[$_.Key] = $_.Value
-            }
-        }
-        "all" {
-            $diagramsToGenerate = $diagrams
-        }
-        default {
-            # Try to match specific diagram name
-            $fullName = if ($Target.EndsWith(".d2")) { $Target } else { "$Target.d2" }
-            if ($diagrams.ContainsKey($fullName)) {
-                $diagramsToGenerate[$fullName] = $diagrams[$fullName]
-            } else {
-                Write-Error "Unknown diagram target: $Target"
-                Write-Host "Available targets: all, cpp, py, sys, or specific diagram name" -ForegroundColor Yellow
-                Write-Host "Available diagrams:" -ForegroundColor Yellow
-                $diagrams.Keys | Sort-Object | ForEach-Object {
-                    Write-Host "  - $($_.Replace('.d2', ''))" -ForegroundColor DarkGray
-                }
-                exit 1
-            }
-        }
+
+        $matches
+    }
+
+    if ($Verbose) {
+        Write-Host "`nProcessing $($selectedDiagrams.Count) diagram(s)..." -ForegroundColor Cyan
     }
 
     $successCount = 0
     $skipCount = 0
     $errorCount = 0
 
-    foreach ($diagram in $diagramsToGenerate.GetEnumerator()) {
-        $srcFile = Join-Path $srcDir $diagram.Key
-        $outFile = Join-Path $outDir ($diagram.Key.Replace('.d2', ".$Format"))
-        $layout = $diagram.Value
+    foreach ($diagram in $selectedDiagrams) {
+        # Resolve layout engine (override > config > default)
+        $layoutEngine = Get-DiagramLayoutEngine `
+            -Filename $diagram.Name `
+            -Config $layoutConfig `
+            -Override $Layout
 
-        if (-not (Test-Path $srcFile)) {
-            Write-Host "  ⚠️  Skipped: $($diagram.Key) (source not found)" -ForegroundColor Yellow
-            $skipCount++
-            continue
-        }
+        $srcFile = $diagram.FullName
+        $outFilename = $diagram.Name.Replace('.d2', ".$Format")
+        $outFile = Join-Path $outDir $outFilename
 
-        # Check if regeneration needed (smart regeneration)
+        # Smart regeneration: check if output is newer than source
         if (-not $Force -and (Test-Path $outFile)) {
             $srcTime = (Get-Item $srcFile).LastWriteTime
             $outTime = (Get-Item $outFile).LastWriteTime
             if ($outTime -gt $srcTime) {
                 if ($Verbose) {
-                    Write-Host "  ✓ Skipped: $($diagram.Key) (up to date)" -ForegroundColor DarkGray
+                    Write-Host "  ✓ Skipped: $($diagram.Name) (up to date)" -ForegroundColor DarkGray
                 }
                 $skipCount++
                 continue
             }
         }
 
-        Write-Host "  🔨 Rendering: $($diagram.Key) with $layout → $Format..." -ForegroundColor Cyan
+        Write-Host "  🔨 Rendering: $($diagram.Name) with $layoutEngine → $Format..." -ForegroundColor Cyan
 
-        $d2Args = @("--layout", $layout, $srcFile, $outFile)
+        # Invoke d2
+        $d2Args = @("--layout", $layoutEngine, $srcFile, $outFile)
         if ($Verbose) {
             & d2 @d2Args
         } else {
@@ -644,10 +741,10 @@ function Invoke-Diagrams {
         }
 
         if ($LASTEXITCODE -eq 0) {
-            Write-Host "     ✅ $($diagram.Key.Replace('.d2', ".$Format"))" -ForegroundColor Green
+            Write-Host "     ✅ $outFilename" -ForegroundColor Green
             $successCount++
         } else {
-            Write-Host "     ❌ Failed: $($diagram.Key)" -ForegroundColor Red
+            Write-Host "     ❌ Failed: $($diagram.Name)" -ForegroundColor Red
             $errorCount++
         }
     }
@@ -826,28 +923,41 @@ CODE QUALITY
 DOCUMENTATION & DIAGRAMS
 ═══════════════════════════════════════════════════════════════════════════
 
-  diagrams [target] [options] Generate architecture diagrams from D2 sources
-      Targets: all (default), cpp, py, sys, or specific diagram name
-      --format <fmt>  Output format: svg (default), png, pdf
-      --force         Regenerate all diagrams (skip timestamp check)
-      --verbose       Show detailed d2 output
+  diagrams [target] [options]   Generate architecture diagrams from D2 sources
+
+      Targets:
+        all (default)           Generate all diagrams with smart regeneration
+        <prefix>                Match by number/name prefix (e.g., 01, cpp_class)
+        <filename>              Specific diagram (e.g., 01_system_overview.d2)
+
+      Options:
+        --format <fmt>          Output format: svg (default), png, pdf
+        --layout <engine>       Override layout engine: elk, dagre, tala
+        --force                 Force regenerate all (skip timestamp check)
+        --verbose               Show detailed d2 output
 
   Examples:
-    iono diagrams                           # Generate all (smart regeneration)
-    iono diagrams --force                   # Force regenerate all diagrams
-    iono diagrams cpp                       # Generate only C++ diagrams
-    iono diagrams py --format png           # Generate Python diagrams as PNG
-    iono diagrams cpp_class_hierarchy       # Generate specific diagram (SVG)
-    iono diagrams sys_architecture --format pdf  # System diagram as PDF
+    iono diagrams                                    # All diagrams (smart regen)
+    iono diagrams --force                            # Force regenerate all
+    iono diagrams 01                                 # Match prefix: 01_system_overview
+    iono diagrams cpp_class                          # Match prefix: cpp_class_hierarchy
+    iono diagrams 02_py_structure                    # Specific diagram (no .d2 needed)
+    iono diagrams cpp_class_hierarchy.d2 --format png # Specific diagram as PNG
+    iono diagrams 02 --layout elk                    # Override to elk layout
+    iono diagrams all --format pdf --force           # All diagrams as PDF
 
-  Single diagram (direct d2 command - most robust):
-    d2 --layout elk docs/diagrams/src/cpp_class_hierarchy.d2 \\
-       docs/diagrams/generated/cpp_class_hierarchy.svg
+  Direct d2 invocation (bypasses CLI, most flexible):
+    d2 --layout elk docs\diagrams\src\01_system_overview.d2 ^
+       docs\diagrams\generated\01_system_overview.svg
+
+  Layout Configuration:
+    Layout engines are configured in: docs\diagrams\src\common\layout-config.json
+    Use --layout flag to override layout engine for testing
 
   Requirements:
     Install d2 via 'scoop install d2' (Windows) or see https://d2lang.com/
 
-  See: docs/diagrams/README.md for diagram documentation
+  See: docs\diagrams\README.md for diagram documentation and style guide
 
 ═══════════════════════════════════════════════════════════════════════════
 GPU PROFILING & PERFORMANCE
@@ -1073,10 +1183,13 @@ try {
             $target = $CommandArgs | Where-Object { $_ -and $_ -notlike "-*" -and $_ -notlike "--*" } | Select-Object -First 1
             if ($target) { $params.Target = $target }
 
-            # Parse --format flag
+            # Parse --format and --layout flags
             for ($i = 0; $i -lt $CommandArgs.Count; $i++) {
                 if ($CommandArgs[$i] -in @("-Format", "--format") -and $i+1 -lt $CommandArgs.Count) {
                     $params.Format = $CommandArgs[$i+1]
+                }
+                if ($CommandArgs[$i] -in @("-Layout", "--layout") -and $i+1 -lt $CommandArgs.Count) {
+                    $params.Layout = $CommandArgs[$i+1]
                 }
             }
 
