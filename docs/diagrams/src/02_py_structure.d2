@@ -23,758 +23,615 @@
 # All colors achieve 4.5:1+ contrast ratio for readability.
 # ==============================================================================
 
-direction: down
-
 # ==============================================================================
-# Core Package - ionosense_hpc.core
+# Platform Layer - Core Architecture
 # ==============================================================================
-core_package: ionosense_hpc.core {
-  class: core-blue
+platform_layer: "Core Platform Architecture" {
+  # ==============================================================================
+  # Utils Package - ionosense_hpc.utils
+  # ==============================================================================
+  utils_package: ionosense_hpc.utils {
+    class: config-blue
 
-  Engine: |md
-    **Engine**
-    «Primary API»
+    device_functions: |md
+      **device.py**
+      «Function Module»
 
-    **Private:**
-    - _config: ExecutorConfig
-    - _cpp_executor: IPipelineExecutor
-    - _initialized: bool
-    - _validate_inputs: bool
-    - _mode: ExecutionMode
+      {static} + gpu_count(): int
+      {static} + current_device(): int
+      {static} + device_info(id): dict
+      {static} + get_memory_usage(): tuple
+      {static} + check_cuda_available(): bool
+      {static} + get_compute_capability(id): tuple
+      {static} + monitor_device(id): str
+    |
+    device_functions.shape: class
+    device_functions.class: utility-module
 
-    **Public Methods:**
-    + __init__(config, mode=BATCH)
-    + submit(data, output): void
-    + submit_async(data, callback): void
-    + synchronize(): void
-    + reset(): void
-    + close(): void
+    signal_functions: |md
+      **signals.py**
+      «Function Module»
 
-    **Properties:**
-    + config: ExecutorConfig {readonly}
-    + is_initialized: bool {readonly}
-    + supports_streaming: bool {readonly}
-    + stats: dict {readonly}
-    + device_info: dict {readonly}
+      {static} + make_sine(...): ndarray
+      {static} + make_chirp(...): ndarray
+      {static} + make_multitone(...): ndarray
+      {static} + make_noise(...): ndarray
+      {static} + make_test_batch(...): ndarray
+    |
+    signal_functions.shape: class
+    signal_functions.class: utility-module
 
-    **Context Manager:**
-    + __enter__(): Engine
-    + __exit__(): void
+    profiling_module: |md
+      **profiling.py**
+      «NVTX Integration»
 
-    **Advanced Research:**
-    + get_cuda_stream(index: int): int
-    + enable_experimental_feature(feature: str): void
-    + detailed_metrics: dict {readonly}
-  |
-  Engine.shape: class
-  Engine.note: |md
-    **Single Entry Point**
-    The Engine class provides a unified
-    API following the principle:
-    "Make simple things simple,
-    complex things possible"
-  |
+      **Context Managers:**
+      {static} + nvtx_range(name, color): Context
+      {static} + benchmark_range(name, iter): Context
+      {static} + compute_range(name): Context
+      {static} + transfer_range(name, dir): Context
+      {static} + setup_range(name): Context
+      {static} + teardown_range(name): Context
+      {static} + sync_range(name): Context
+      {static} + warmup_range(name, iter): Context
 
-  CppEngine: |md
-    **_engine (C++)**
-    «Extension»
+      **Decorators:**
+      {static} + nvtx_decorate(...): Decorator
 
-    - BatchExecutor
-    - StreamingExecutor
-    - ExecutorConfig
-    - SignalConfig
-    - get_available_devices()
-    - select_best_device()
-  |
-  CppEngine.shape: class
-  CppEngine.class: kernel-orange
-  CppEngine.note: |md
-    **Zero-Copy Interface**
-    NumPy arrays passed directly
-    to C++ without copying via
-    pybind11 buffer protocol
-  |
+      **Classes:**
+      + ProfilingContext
+      + ProfilingDomain: Enum
+      + ProfileColor: Enum
+      + ProfileCategory: Enum
 
-  PipelineBuilder: |md
-    **PipelineBuilder**
-    «Fluent API»
+      **Module Constants:**
+      + NVTX_AVAILABLE: bool
+    |
+    profiling_module.shape: class
+    profiling_module.class: profiling-tool
 
-    - _stages: list
-    - _config: EngineConfig
+    logging_functions: |md
+      **logging.py**
+      «Function Module»
 
-    **Builder Methods:**
-    + add_window(type, symmetry, norm): PipelineBuilder
-    + add_fft(scale): PipelineBuilder
-    + add_magnitude(): PipelineBuilder
-    + configure(**kwargs): PipelineBuilder
-    + build(): Pipeline
+      + logger: Logger {module-level}
 
-    **Usage:**
-    Fluent interface for constructing
-    custom processing pipelines
-  |
-  PipelineBuilder.shape: class
-  PipelineBuilder.class: builder-pattern
+      {static} + setup_logging(level, file): Logger
+      {static} + log_config(config): void
+      {static} + log_performance(stats): void
+      {static} + log_device_info(info): void
+    |
+    logging_functions.shape: class
+    logging_functions.class: utility-module
 
-  Pipeline: |md
-    **Pipeline**
-    «Immutable»
+    path_functions: |md
+      **paths.py**
+      «Function Module»
 
-    - _stages: list
-    - _config: EngineConfig
+      {static} + get_artifacts_root(): Path
+      {static} + get_output_root(): Path
+      {static} + get_benchmarks_root(): Path
+      {static} + get_benchmark_run_dir(name): Path
+      {static} + get_benchmark_result_path(...): Path
+      {static} + get_experiments_root(): Path
+      {static} + get_reports_root(): Path
+      {static} + normalize_benchmark_name(name): str
+    |
+    path_functions.shape: class
+    path_functions.class: utility-module
 
-    + stages: list {readonly}
-    + config: EngineConfig {readonly}
-  |
-  Pipeline.shape: class
-  Pipeline.class: builder-pattern
+    GpuClockManager: |md
+      **GpuClockManager**
+      «gpu_clocks.py»
 
-  # Core relationships
-  PipelineBuilder -> Pipeline: builds
-  Pipeline -> config_package.EngineConfig: contains
-}
+      - gpu_index: int
+      - use_max_clocks: bool
+      - locked: bool
+      - _original_state: dict
 
-# ==============================================================================
-# Config Package - ionosense_hpc.config
-# ==============================================================================
-config_package: ionosense_hpc.config {
-  class: core-blue
+      + __init__(gpu_index, use_max_clocks): void
+      + lock(): dict
+      + unlock(): void
+      + locked_clocks(): ContextManager
 
-  # Enumerations (matching C++ enums)
-  Enums: |md
-    **Enums**
-    «config/schemas.py»
+      {static} + check_clock_locking_available(): tuple
+    |
+    GpuClockManager.shape: class
+    GpuClockManager.class: kernel-orange
+    GpuClockManager.note: |md
+      **Benchmark Stability**
+      Reduces CV by 50-75%
+      via GPU clock locking
+    |
 
-    WindowType:
-    - RECTANGULAR, HANN, BLACKMAN
+    DataArchiver: |md
+      **DataArchiver**
+      «archiving.py»
 
-    WindowSymmetry:
-    - PERIODIC, SYMMETRIC
+      - base_dir: Path
 
-    WindowNorm:
-    - UNITY, SQRT
+      + archive_results(...): Path
+      + load_results(...): dict
+      + compare_versions(...): dict
+    |
+    DataArchiver.shape: class
 
-    ScalePolicy:
-    - NONE, ONE_OVER_N, ONE_OVER_SQRT_N
+    reproducibility_functions: |md
+      **reproducibility.py**
+      «Function Module»
 
-    OutputMode:
-    - MAGNITUDE, COMPLEX
+      **Classes:**
+      + DeterministicGenerator
 
-    ExecutionMode:
-    - BATCH, STREAMING
+      DeterministicGenerator:
+      - base_seed: int
+      - context: str
+      - _rng_cache: dict
 
-    ValidationMode:
-    - STRICT, BASIC, DISABLED
-  |
-  Enums.shape: class
-  Enums.class: config-schema
+      + get_rng(stream_id): Generator
+      + reset(): void
+    |
+    reproducibility_functions.shape: class
+    reproducibility_functions.class: utility-module
 
-  EngineConfig: |md
-    **EngineConfig**
-    «Pydantic - Unified Configuration»
+    validation_functions: |md
+      **validation.py**
+      «Function Module»
 
-    **Signal Parameters:**
-    + nfft: int = 1024
-    + channels: int = 2
-    + overlap: float = 0.5
-    + sample_rate_hz: int = 48000
-
-    **Pipeline Parameters:**
-    + window: WindowType = HANN
-    + window_symmetry: WindowSymmetry = PERIODIC
-    + window_norm: WindowNorm = UNITY
-    + scale: ScalePolicy = ONE_OVER_N
-    + output: OutputMode = MAGNITUDE
-
-    **Execution Parameters:**
-    + mode: ExecutionMode = BATCH
-    + stream_count: int = 3
-    + pinned_buffer_count: int = 2
-    + device_id: int = -1
-
-    **Performance Parameters:**
-    + warmup_iters: int = 1
-    + enable_profiling: bool = False
-    + validation: ValidationMode = STRICT
-
-    **Computed Properties:**
-    + hop_size: int {computed}
-    + num_output_bins: int {computed}
-    + frame_duration_ms: float {computed}
-    + memory_estimate_mb: float {computed}
-
-    **Class Methods:**
-    {static} + from_preset(name: str, executor: str): EngineConfig
-  |
-  EngineConfig.shape: class
-  EngineConfig.note: |md
-    **Single Source of Truth**
-    Unified config covering signal,
-    pipeline, execution, and
-    performance parameters
-  |
-
-  PresetFunctions: |md
-    **Preset Functions**
-    «config/config_presets.py»
-
-    {static} + get_preset(name, executor): EngineConfig
-    {static} + list_presets(): list[str]
-    {static} + list_executors(): list[str]
-    {static} + describe_preset(name): dict
-    {static} + compare_presets(names): DataFrame
-
-    **Available Presets:**
-    - default (batch/streaming)
-    - iono (batch/streaming)
-    - ionox (batch/streaming)
-  |
-  PresetFunctions.shape: class
-  PresetFunctions.class: config-schema
-
-  ValidationFunctions: |md
-    **Validation Functions**
-    «config/validation.py»
-
-    {static} + validate_config_device_compatibility(config): void
-    {static} + validate_input_array(arr, config): void
-    {static} + validate_input_size(size, config): void
-    {static} + estimate_memory_usage_mb(config): float
-  |
-  ValidationFunctions.shape: class
-
-  # Config relationships
-  EngineConfig -> Enums: uses
-  PresetFunctions -> EngineConfig: creates
-  ValidationFunctions -> EngineConfig: validates {
-    class: dependency
+      {static} + validate_measurements(...): dict
+      {static} + compare_distributions(...): dict
+    |
+    validation_functions.shape: class
+    validation_functions.class: utility-module
   }
-}
 
-# ==============================================================================
-# Benchmarks Package - ionosense_hpc.benchmarks
-# ==============================================================================
-benchmarks_package: ionosense_hpc.benchmarks {
-  class: benchmark-orange
+  # ==============================================================================
+  # Core Package - ionosense_hpc.core
+  # ==============================================================================
+  core_package: ionosense_hpc.core {
+    class: core-blue
 
-  BenchmarkConfig: |md
-    **BenchmarkConfig**
-    «Pydantic»
+    Engine: |md
+      **Engine**
+      «Primary API»
 
-    **Core:**
-    + name: str
-    + iterations: int = 1000
-    + warmup_iterations: int = 0
-    + timeout_seconds: float = 300.0
+      **Private:**
+      - _config: ExecutorConfig
+      - _cpp_executor: IPipelineExecutor
+      - _initialized: bool
+      - _validate_inputs: bool
+      - _mode: ExecutionMode
 
-    **Statistical:**
-    + confidence_level: float = 0.95
-    + outlier_threshold: float = 3.0
-    + min_samples: int = 30
+      **Public Methods:**
+      + __init__(config, mode=BATCH)
+      + submit(data, output): void
+      + submit_async(data, callback): void
+      + synchronize(): void
+      + reset(): void
+      + close(): void
 
-    **Engine:**
-    + engine_config: dict
+      **Properties:**
+      + config: ExecutorConfig {readonly}
+      + is_initialized: bool {readonly}
+      + supports_streaming: bool {readonly}
+      + stats: dict {readonly}
+      + device_info: dict {readonly}
 
-    **Reproducibility:**
-    + seed: int = 42
-    + deterministic: bool = True
-    + require_gpu: bool = False
+      **Context Manager:**
+      + __enter__(): Engine
+      + __exit__(): void
 
-    **Output:**
-    + save_raw_data: bool = True
-    + output_format: str = "json"
-    + verbose: bool = True
+      **Advanced Research:**
+      + get_cuda_stream(index: int): int
+      + enable_experimental_feature(feature: str): void
+      + detailed_metrics: dict {readonly}
+    |
+    Engine.shape: class
+    Engine.note: |md
+      **Single Entry Point**
+      The Engine class provides a unified
+      API following the principle:
+      "Make simple things simple,
+      complex things possible"
+    |
 
-    **GPU Clock Locking:**
-    + lock_gpu_clocks: bool = False
-    + gpu_index: int = 0
-    + use_max_clocks: bool = False
+    CppEngine: |md
+      **_engine (C++)**
+      «Extension»
 
-    **Spectrograms:**
-    + save_spectrogram: bool = False
-    + spectrogram_duration_sec: float = 5.0
-    + spectrogram_output_dir: str
-  |
-  BenchmarkConfig.shape: class
-  BenchmarkConfig.class: config-schema
+      - BatchExecutor
+      - StreamingExecutor
+      - ExecutorConfig
+      - SignalConfig
+      - get_available_devices()
+      - select_best_device()
+    |
+    CppEngine.shape: class
+    CppEngine.class: kernel-orange
+    CppEngine.note: |md
+      **Zero-Copy Interface**
+      NumPy arrays passed directly
+      to C++ without copying via
+      pybind11 buffer protocol
+    |
 
-  BaseBenchmark: |md
-    **BaseBenchmark**
-    «Abstract»
+    PipelineBuilder: |md
+      **PipelineBuilder**
+      «Fluent API»
 
-    **Protected:**
-    # config: BenchmarkConfig
-    # context: BenchmarkContext
-    # results: list
-    # gpu_clock_manager: GpuClockManager
+      - _stages: list
+      - _config: EngineConfig
 
-    **Public:**
-    + __init__(config: BenchmarkConfig)
-    {abstract} + setup(): void
-    {abstract} + execute_iteration(): dict
-    {abstract} + teardown(): void
-    + run(): BenchmarkResult
-    + validate_environment(): tuple
-  |
-  BaseBenchmark.shape: class
-  BaseBenchmark.class: base-class
-  BaseBenchmark.note: |md
-    **RSE/RE Standards**
-    Research Software Engineering
-    compliant benchmark framework
-    with reproducibility guarantees
-  |
+      **Builder Methods:**
+      + add_window(type, symmetry, norm): PipelineBuilder
+      + add_fft(scale): PipelineBuilder
+      + add_magnitude(): PipelineBuilder
+      + configure(**kwargs): PipelineBuilder
+      + build(): Pipeline
 
-  BenchmarkContext: |md
-    **BenchmarkContext**
-    «Dataclass»
+      **Usage:**
+      Fluent interface for constructing
+      custom processing pipelines
+    |
+    PipelineBuilder.shape: class
+    PipelineBuilder.class: builder-pattern
 
-    + timestamp: str
-    + hostname: str
-    + platform_info: dict
-    + cuda_info: dict
-    + git_info: dict
-    + package_versions: dict
-    + environment_hash: str
+    Pipeline: |md
+      **Pipeline**
+      «Immutable»
 
-    + to_dict(): dict
-  |
-  BenchmarkContext.shape: class
+      - _stages: list
+      - _config: EngineConfig
 
-  BenchmarkResult: |md
-    **BenchmarkResult**
-    «Dataclass»
+      + stages: list {readonly}
+      + config: EngineConfig {readonly}
+    |
+    Pipeline.shape: class
+    Pipeline.class: builder-pattern
 
-    + name: str
-    + config: dict
-    + context: BenchmarkContext
-    + measurements: Any
-    + statistics: dict
-    + metadata: dict
-    + passed: bool
-    + errors: list
-
-    + to_dict(): dict
-  |
-  BenchmarkResult.shape: class
-
-  LatencyBenchmark: |md
-    **LatencyBenchmark**
-
-    - engine: Engine
-    - test_data: ndarray
-    - gpu_events: Any
-
-    + setup(): void
-    + execute_iteration(): dict
-    + teardown(): void
-    + analyze_results(result): dict
-  |
-  LatencyBenchmark.shape: class
-
-  ThroughputBenchmark: |md
-    **ThroughputBenchmark**
-
-    - engine: Engine
-    - test_data: ndarray
-    - resource_samples: list
-
-    + execute_iteration(): dict
-    - _calculate_memory_bandwidth(): dict
-    - _calculate_pcie_bandwidth(): dict
-  |
-  ThroughputBenchmark.shape: class
-
-  AccuracyBenchmark: |md
-    **AccuracyBenchmark**
-
-    - engine: Engine
-    - test_results: list
-    - validation_errors: list
-
-    + execute_iteration(): dict
-    - _compute_reference_fft(): ndarray
-    - _compare_spectra(): dict
-    - _test_parseval_theorem(): dict
-  |
-  AccuracyBenchmark.shape: class
-
-  RealtimeBenchmark: |md
-    **RealtimeBenchmark**
-
-    - engine: Engine
-    - frame_times: list
-    - deadline_misses: list
-
-    + execute_iteration(): dict
-    - _analyze_timing_stability(): dict
-    - _assess_system_capability(): dict
-  |
-  RealtimeBenchmark.shape: class
-
-  # Benchmark inheritance
-  LatencyBenchmark -> BaseBenchmark: extends
-  ThroughputBenchmark -> BaseBenchmark: extends
-  AccuracyBenchmark -> BaseBenchmark: extends
-  RealtimeBenchmark -> BaseBenchmark: extends
-
-  # Benchmark relationships
-  BaseBenchmark -> BenchmarkConfig: uses
-  BaseBenchmark -> BenchmarkContext: creates
-  BaseBenchmark -> BenchmarkResult: produces
-  BenchmarkConfig -> config_package.EngineConfig: contains engine_config {
-    style.stroke-dash: 3
+    # Core relationships
+    PipelineBuilder -> Pipeline: builds
+    Pipeline -> config_package.EngineConfig: contains
   }
-}
 
-# ==============================================================================
-# Utils Package - ionosense_hpc.utils
-# ==============================================================================
-utils_package: ionosense_hpc.utils {
-  class: config-blue
+  # ==============================================================================
+  # Config Package - ionosense_hpc.config
+  # ==============================================================================
+  config_package: ionosense_hpc.config {
+    class: core-blue
 
-  device_functions: |md
-    **device.py**
-    «Function Module»
+    # Enumerations (matching C++ enums)
+    Enums: |md
+      **Enums**
+      «config/schemas.py»
 
-    {static} + gpu_count(): int
-    {static} + current_device(): int
-    {static} + device_info(id): dict
-    {static} + get_memory_usage(): tuple
-    {static} + check_cuda_available(): bool
-    {static} + get_compute_capability(id): tuple
-    {static} + monitor_device(id): str
-  |
-  device_functions.shape: class
-  device_functions.class: utility-module
+      WindowType:
+      - RECTANGULAR, HANN, BLACKMAN
 
-  signal_functions: |md
-    **signals.py**
-    «Function Module»
+      WindowSymmetry:
+      - PERIODIC, SYMMETRIC
 
-    {static} + make_sine(...): ndarray
-    {static} + make_chirp(...): ndarray
-    {static} + make_multitone(...): ndarray
-    {static} + make_noise(...): ndarray
-    {static} + make_test_batch(...): ndarray
-  |
-  signal_functions.shape: class
-  signal_functions.class: utility-module
+      WindowNorm:
+      - UNITY, SQRT
 
-  profiling_module: |md
-    **profiling.py**
-    «NVTX Integration»
+      ScalePolicy:
+      - NONE, ONE_OVER_N, ONE_OVER_SQRT_N
 
-    **Context Managers:**
-    {static} + nvtx_range(name, color): Context
-    {static} + benchmark_range(name, iter): Context
-    {static} + compute_range(name): Context
-    {static} + transfer_range(name, dir): Context
-    {static} + setup_range(name): Context
-    {static} + teardown_range(name): Context
-    {static} + sync_range(name): Context
-    {static} + warmup_range(name, iter): Context
+      OutputMode:
+      - MAGNITUDE, COMPLEX
 
-    **Decorators:**
-    {static} + nvtx_decorate(...): Decorator
+      ExecutionMode:
+      - BATCH, STREAMING
 
-    **Classes:**
-    + ProfilingContext
-    + ProfilingDomain: Enum
-    + ProfileColor: Enum
-    + ProfileCategory: Enum
+      ValidationMode:
+      - STRICT, BASIC, DISABLED
+    |
+    Enums.shape: class
+    Enums.class: config-schema
 
-    **Module Constants:**
-    + NVTX_AVAILABLE: bool
-  |
-  profiling_module.shape: class
-  profiling_module.class: profiling-tool
+    EngineConfig: |md
+      **EngineConfig**
+      «Pydantic - Unified Configuration»
 
-  logging_functions: |md
-    **logging.py**
-    «Function Module»
+      **Signal Parameters:**
+      + nfft: int = 1024
+      + channels: int = 2
+      + overlap: float = 0.5
+      + sample_rate_hz: int = 48000
 
-    + logger: Logger {module-level}
+      **Pipeline Parameters:**
+      + window: WindowType = HANN
+      + window_symmetry: WindowSymmetry = PERIODIC
+      + window_norm: WindowNorm = UNITY
+      + scale: ScalePolicy = ONE_OVER_N
+      + output: OutputMode = MAGNITUDE
 
-    {static} + setup_logging(level, file): Logger
-    {static} + log_config(config): void
-    {static} + log_performance(stats): void
-    {static} + log_device_info(info): void
-  |
-  logging_functions.shape: class
-  logging_functions.class: utility-module
+      **Execution Parameters:**
+      + mode: ExecutionMode = BATCH
+      + stream_count: int = 3
+      + pinned_buffer_count: int = 2
+      + device_id: int = -1
 
-  path_functions: |md
-    **paths.py**
-    «Function Module»
+      **Performance Parameters:**
+      + warmup_iters: int = 1
+      + enable_profiling: bool = False
+      + validation: ValidationMode = STRICT
 
-    {static} + get_artifacts_root(): Path
-    {static} + get_output_root(): Path
-    {static} + get_benchmarks_root(): Path
-    {static} + get_benchmark_run_dir(name): Path
-    {static} + get_benchmark_result_path(...): Path
-    {static} + get_experiments_root(): Path
-    {static} + get_reports_root(): Path
-    {static} + normalize_benchmark_name(name): str
-  |
-  path_functions.shape: class
-  path_functions.class: utility-module
+      **Computed Properties:**
+      + hop_size: int {computed}
+      + num_output_bins: int {computed}
+      + frame_duration_ms: float {computed}
+      + memory_estimate_mb: float {computed}
 
-  GpuClockManager: |md
-    **GpuClockManager**
-    «gpu_clocks.py»
+      **Class Methods:**
+      {static} + from_preset(name: str, executor: str): EngineConfig
+    |
+    EngineConfig.shape: class
+    EngineConfig.note: |md
+      **Single Source of Truth**
+      Unified config covering signal,
+      pipeline, execution, and
+      performance parameters
+    |
 
-    - gpu_index: int
-    - use_max_clocks: bool
-    - locked: bool
-    - _original_state: dict
+    PresetFunctions: |md
+      **Preset Functions**
+      «config/config_presets.py»
 
-    + __init__(gpu_index, use_max_clocks): void
-    + lock(): dict
-    + unlock(): void
-    + locked_clocks(): ContextManager
+      {static} + get_preset(name, executor): EngineConfig
+      {static} + list_presets(): list[str]
+      {static} + list_executors(): list[str]
+      {static} + describe_preset(name): dict
+      {static} + compare_presets(names): DataFrame
 
-    {static} + check_clock_locking_available(): tuple
-  |
-  GpuClockManager.shape: class
-  GpuClockManager.class: kernel-orange
-  GpuClockManager.note: |md
-    **Benchmark Stability**
-    Reduces CV by 50-75%
-    via GPU clock locking
-  |
+      **Available Presets:**
+      - default (batch/streaming)
+      - iono (batch/streaming)
+      - ionox (batch/streaming)
+    |
+    PresetFunctions.shape: class
+    PresetFunctions.class: config-schema
 
-  DataArchiver: |md
-    **DataArchiver**
-    «archiving.py»
+    ValidationFunctions: |md
+      **Validation Functions**
+      «config/validation.py»
 
-    - base_dir: Path
+      {static} + validate_config_device_compatibility(config): void
+      {static} + validate_input_array(arr, config): void
+      {static} + validate_input_size(size, config): void
+      {static} + estimate_memory_usage_mb(config): float
+    |
+    ValidationFunctions.shape: class
 
-    + archive_results(...): Path
-    + load_results(...): dict
-    + compare_versions(...): dict
-  |
-  DataArchiver.shape: class
+    # Config relationships
+    EngineConfig -> Enums: uses
+    PresetFunctions -> EngineConfig: creates
+    ValidationFunctions -> EngineConfig: validates {
+      class: dependency
+    }
+  }
 
-  reproducibility_functions: |md
-    **reproducibility.py**
-    «Function Module»
+  # ==============================================================================
+  # Benchmarks Package - ionosense_hpc.benchmarks
+  # ==============================================================================
+  benchmarks_package: ionosense_hpc.benchmarks {
+    class: benchmark-orange
 
-    **Classes:**
-    + DeterministicGenerator
+    BenchmarkConfig: |md
+      **BenchmarkConfig**
+      «Pydantic»
 
-    DeterministicGenerator:
-    - base_seed: int
-    - context: str
-    - _rng_cache: dict
+      **Core:**
+      + name: str
+      + iterations: int = 1000
+      + warmup_iterations: int = 0
+      + timeout_seconds: float = 300.0
 
-    + get_rng(stream_id): Generator
-    + reset(): void
-  |
-  reproducibility_functions.shape: class
-  reproducibility_functions.class: utility-module
+      **Statistical:**
+      + confidence_level: float = 0.95
+      + outlier_threshold: float = 3.0
+      + min_samples: int = 30
 
-  validation_functions: |md
-    **validation.py**
-    «Function Module»
+      **Engine:**
+      + engine_config: dict
 
-    {static} + validate_measurements(...): dict
-    {static} + compare_distributions(...): dict
-  |
-  validation_functions.shape: class
-  validation_functions.class: utility-module
+      **Reproducibility:**
+      + seed: int = 42
+      + deterministic: bool = True
+      + require_gpu: bool = False
+
+      **Output:**
+      + save_raw_data: bool = True
+      + output_format: str = "json"
+      + verbose: bool = True
+
+      **GPU Clock Locking:**
+      + lock_gpu_clocks: bool = False
+      + gpu_index: int = 0
+      + use_max_clocks: bool = False
+
+      **Spectrograms:**
+      + save_spectrogram: bool = False
+      + spectrogram_duration_sec: float = 5.0
+      + spectrogram_output_dir: str
+    |
+    BenchmarkConfig.shape: class
+    BenchmarkConfig.class: config-schema
+
+    BaseBenchmark: |md
+      **BaseBenchmark**
+      «Abstract»
+
+      **Protected:**
+      # config: BenchmarkConfig
+      # context: BenchmarkContext
+      # results: list
+      # gpu_clock_manager: GpuClockManager
+
+      **Public:**
+      + __init__(config: BenchmarkConfig)
+      {abstract} + setup(): void
+      {abstract} + execute_iteration(): dict
+      {abstract} + teardown(): void
+      + run(): BenchmarkResult
+      + validate_environment(): tuple
+    |
+    BaseBenchmark.shape: class
+    BaseBenchmark.class: base-class
+    BaseBenchmark.note: |md
+      **RSE/RE Standards**
+      Research Software Engineering
+      compliant benchmark framework
+      with reproducibility guarantees
+    |
+
+    BenchmarkContext: |md
+      **BenchmarkContext**
+      «Dataclass»
+
+      + timestamp: str
+      + hostname: str
+      + platform_info: dict
+      + cuda_info: dict
+      + git_info: dict
+      + package_versions: dict
+      + environment_hash: str
+
+      + to_dict(): dict
+    |
+    BenchmarkContext.shape: class
+
+    BenchmarkResult: |md
+      **BenchmarkResult**
+      «Dataclass»
+
+      + name: str
+      + config: dict
+      + context: BenchmarkContext
+      + measurements: Any
+      + statistics: dict
+      + metadata: dict
+      + passed: bool
+      + errors: list
+
+      + to_dict(): dict
+    |
+    BenchmarkResult.shape: class
+
+    LatencyBenchmark: |md
+      **LatencyBenchmark**
+
+      - engine: Engine
+      - test_data: ndarray
+      - gpu_events: Any
+
+      + setup(): void
+      + execute_iteration(): dict
+      + teardown(): void
+      + analyze_results(result): dict
+    |
+    LatencyBenchmark.shape: class
+
+    ThroughputBenchmark: |md
+      **ThroughputBenchmark**
+
+      - engine: Engine
+      - test_data: ndarray
+      - resource_samples: list
+
+      + execute_iteration(): dict
+      - _calculate_memory_bandwidth(): dict
+      - _calculate_pcie_bandwidth(): dict
+    |
+    ThroughputBenchmark.shape: class
+
+    AccuracyBenchmark: |md
+      **AccuracyBenchmark**
+
+      - engine: Engine
+      - test_results: list
+      - validation_errors: list
+
+      + execute_iteration(): dict
+      - _compute_reference_fft(): ndarray
+      - _compare_spectra(): dict
+      - _test_parseval_theorem(): dict
+    |
+    AccuracyBenchmark.shape: class
+
+    RealtimeBenchmark: |md
+      **RealtimeBenchmark**
+
+      - engine: Engine
+      - frame_times: list
+      - deadline_misses: list
+
+      + execute_iteration(): dict
+      - _analyze_timing_stability(): dict
+      - _assess_system_capability(): dict
+    |
+    RealtimeBenchmark.shape: class
+
+    # Benchmark inheritance
+    LatencyBenchmark -> BaseBenchmark: extends
+    ThroughputBenchmark -> BaseBenchmark: extends
+    AccuracyBenchmark -> BaseBenchmark: extends
+    RealtimeBenchmark -> BaseBenchmark: extends
+
+    # Benchmark relationships
+    BaseBenchmark -> BenchmarkConfig: uses
+    BaseBenchmark -> BenchmarkContext: creates
+    BaseBenchmark -> BenchmarkResult: produces
+    BenchmarkConfig -> config_package.EngineConfig: contains engine_config {
+      style.stroke-dash: 3
+    }
+  }
 }
 
 # ==============================================================================
 # Exceptions Package - ionosense_hpc.exceptions
 # ==============================================================================
 exceptions_package: ionosense_hpc.exceptions {
-  class: execution-red
+  class: core-blue
 
-  IonosenseError: |md
-    **IonosenseError**
-    «Base Exception»
+  ExceptionHierarchy: |md
+    **Exception Hierarchy**
+    «exceptions.py»
 
-    + message: str
-    + hint: str
-    + context: dict
+    **Base:**
+    • IonosenseError(Exception)
+
+    **Configuration & Validation:**
+    • ConfigError
+    • ValidationError
+
+    **Hardware & Runtime:**
+    • DeviceNotFoundError
+    • DllLoadError
+    • EngineStateError
+    • EngineRuntimeError
+
+    **Benchmarking & Research:**
+    • BenchmarkError
+      ├─ BenchmarkTimeoutError
+      └─ BenchmarkValidationError
+    • ExperimentError
+    • ReproducibilityError
+      └─ EnvironmentMismatchError
+    • DataIntegrityError
+
+    **Analysis & Reporting:**
+    • AnalysisError
+      └─ InsufficientDataError
+    • ReportGenerationError
+
+    **Workflow & Orchestration:**
+    • WorkflowError
+      └─ DependencyError
+    • ResourceExhaustedError
   |
-  IonosenseError.shape: class
-  IonosenseError.class: exception-pink
-
-  # Configuration & Validation Errors
-  ConfigError: |md
-    **ConfigError**
-
-    + field: str
-    + value: Any
-  |
-  ConfigError.shape: class
-
-  ValidationError: |md
-    **ValidationError**
-
-    + expected: str
-    + got: str
-  |
-  ValidationError.shape: class
-
-  # Hardware & Runtime Errors
-  DeviceNotFoundError: |md
-    **DeviceNotFoundError**
-  |
-  DeviceNotFoundError.shape: class
-
-  DllLoadError: |md
-    **DllLoadError**
-    «NEW»
-
-    + dll_name: str
-    + original_error: Exception
-  |
-  DllLoadError.shape: class
-  DllLoadError.style.stroke-width: 2
-
-  EngineStateError: |md
-    **EngineStateError**
-
-    + current_state: str
-  |
-  EngineStateError.shape: class
-
-  EngineRuntimeError: |md
-    **EngineRuntimeError**
-    «NEW»
-
-    + cuda_error: str
-  |
-  EngineRuntimeError.shape: class
-  EngineRuntimeError.style.stroke-width: 2
-
-  # Research & Benchmarking Errors
-  BenchmarkError: |md
-    **BenchmarkError**
-
-    + benchmark_name: str
-  |
-  BenchmarkError.shape: class
-
-  BenchmarkTimeoutError: |md
-    **BenchmarkTimeoutError**
-
-    + iteration: int
-    + timeout_s: float
-  |
-  BenchmarkTimeoutError.shape: class
-
-  BenchmarkValidationError: |md
-    **BenchmarkValidationError**
-
-    + reason: str
-    + metrics: dict
-  |
-  BenchmarkValidationError.shape: class
-
-  ExperimentError: |md
-    **ExperimentError**
-
-    + experiment_id: str
-  |
-  ExperimentError.shape: class
-
-  ReproducibilityError: |md
-    **ReproducibilityError**
-
-    + missing_info: list
-  |
-  ReproducibilityError.shape: class
-
-  EnvironmentMismatchError: |md
-    **EnvironmentMismatchError**
-
-    + expected: dict
-    + actual: dict
-    + differences: list
-  |
-  EnvironmentMismatchError.shape: class
-
-  DataIntegrityError: |md
-    **DataIntegrityError**
-
-    + expected_hash: str
-    + actual_hash: str
-  |
-  DataIntegrityError.shape: class
-
-  # Analysis & Reporting Errors
-  AnalysisError: |md
-    **AnalysisError**
-
-    + analysis_type: str
-  |
-  AnalysisError.shape: class
-
-  ReportGenerationError: |md
-    **ReportGenerationError**
-
-    + report_format: str
-  |
-  ReportGenerationError.shape: class
-
-  InsufficientDataError: |md
-    **InsufficientDataError**
-
-    + required: int
-    + actual: int
-  |
-  InsufficientDataError.shape: class
-
-  # Workflow & Orchestration Errors
-  WorkflowError: |md
-    **WorkflowError**
-
-    + workflow_stage: str
-  |
-  WorkflowError.shape: class
-
-  DependencyError: |md
-    **DependencyError**
-
-    + missing_dependencies: list
-  |
-  DependencyError.shape: class
-
-  ResourceExhaustedError: |md
-    **ResourceExhaustedError**
-
-    + resource_type: str
-    + required: Any
-    + available: Any
-  |
-  ResourceExhaustedError.shape: class
-
-  # Exception hierarchy - Level 1
-  ConfigError -> IonosenseError: extends
-  ValidationError -> IonosenseError: extends
-  DeviceNotFoundError -> IonosenseError: extends
-  DllLoadError -> IonosenseError: extends
-  EngineStateError -> IonosenseError: extends
-  EngineRuntimeError -> IonosenseError: extends
-  BenchmarkError -> IonosenseError: extends
-  ExperimentError -> IonosenseError: extends
-  ReproducibilityError -> IonosenseError: extends
-  DataIntegrityError -> IonosenseError: extends
-  AnalysisError -> IonosenseError: extends
-  ReportGenerationError -> IonosenseError: extends
-  WorkflowError -> IonosenseError: extends
-  ResourceExhaustedError -> IonosenseError: extends
-
-  # Exception hierarchy - Level 2
-  BenchmarkTimeoutError -> BenchmarkError: extends
-  BenchmarkValidationError -> BenchmarkError: extends
-  EnvironmentMismatchError -> ReproducibilityError: extends
-  InsufficientDataError -> AnalysisError: extends
-  DependencyError -> WorkflowError: extends
+  ExceptionHierarchy.shape: class
+  ExceptionHierarchy.class: base-class
 }
 
 # ==============================================================================
@@ -914,81 +771,81 @@ external_deps: External Dependencies {
 # ==============================================================================
 # Core Relationships
 # ==============================================================================
-core_package.Engine -> core_package.CppEngine: wraps
-core_package.Engine -> config_package.EngineConfig: configured by
-core_package.Engine -> config_package.PresetFunctions: uses presets {
+platform_layer.core_package.Engine -> platform_layer.core_package.CppEngine: wraps
+platform_layer.core_package.Engine -> platform_layer.config_package.EngineConfig: configured by
+platform_layer.core_package.Engine -> platform_layer.config_package.PresetFunctions: uses presets {
   class: dependency
 }
-core_package.PipelineBuilder -> core_package.Engine: initializes
-core_package.CppEngine -> cpp_extension.ResearchEngine: binds
+platform_layer.core_package.PipelineBuilder -> platform_layer.core_package.Engine: initializes
+platform_layer.core_package.CppEngine -> cpp_extension.ResearchEngine: binds
 
 # ==============================================================================
 # Benchmark Relationships
 # ==============================================================================
-benchmarks_package.BaseBenchmark -> benchmarks_package.BenchmarkConfig: configured by
-benchmarks_package.LatencyBenchmark -> core_package.Engine: uses
-benchmarks_package.ThroughputBenchmark -> core_package.Engine: uses
-benchmarks_package.AccuracyBenchmark -> core_package.Engine: uses
-benchmarks_package.RealtimeBenchmark -> core_package.Engine: uses
-benchmarks_package.BaseBenchmark -> utils_package.GpuClockManager: locks clocks {
+platform_layer.benchmarks_package.BaseBenchmark -> platform_layer.benchmarks_package.BenchmarkConfig: configured by
+platform_layer.benchmarks_package.LatencyBenchmark -> platform_layer.core_package.Engine: uses
+platform_layer.benchmarks_package.ThroughputBenchmark -> platform_layer.core_package.Engine: uses
+platform_layer.benchmarks_package.AccuracyBenchmark -> platform_layer.core_package.Engine: uses
+platform_layer.benchmarks_package.RealtimeBenchmark -> platform_layer.core_package.Engine: uses
+platform_layer.benchmarks_package.BaseBenchmark -> platform_layer.utils_package.GpuClockManager: locks clocks {
   class: dependency
 }
 
 # ==============================================================================
 # Config Validation Relationships
 # ==============================================================================
-config_package.ValidationFunctions -> config_package.EngineConfig: validates
-core_package.Engine -> config_package.ValidationFunctions: uses {
+platform_layer.config_package.ValidationFunctions -> platform_layer.config_package.EngineConfig: validates
+platform_layer.core_package.Engine -> platform_layer.config_package.ValidationFunctions: uses {
   class: dependency
 }
 
 # ==============================================================================
 # Utils Relationships
 # ==============================================================================
-core_package.Engine -> utils_package.device_functions: queries device {
+platform_layer.core_package.Engine -> platform_layer.utils_package.device_functions: queries device {
   class: dependency
 }
-core_package.Engine -> utils_package.logging_functions: logs {
+platform_layer.core_package.Engine -> platform_layer.utils_package.logging_functions: logs {
   class: dependency
 }
-benchmarks_package.BaseBenchmark -> utils_package.signal_functions: generates test data {
+platform_layer.benchmarks_package.BaseBenchmark -> platform_layer.utils_package.signal_functions: generates test data {
   class: dependency
 }
-benchmarks_package.BaseBenchmark -> utils_package.profiling_module: instruments {
+platform_layer.benchmarks_package.BaseBenchmark -> platform_layer.utils_package.profiling_module: instruments {
   class: dependency
 }
-benchmarks_package.BaseBenchmark -> utils_package.DataArchiver: stores results {
+platform_layer.benchmarks_package.BaseBenchmark -> platform_layer.utils_package.DataArchiver: stores results {
   class: dependency
 }
-benchmarks_package.AccuracyBenchmark -> utils_package.validation_functions: validates results {
+platform_layer.benchmarks_package.AccuracyBenchmark -> platform_layer.utils_package.validation_functions: validates results {
   class: dependency
 }
-utils_package.signal_functions -> utils_package.reproducibility_functions: uses DeterministicGenerator {
+platform_layer.utils_package.signal_functions -> platform_layer.utils_package.reproducibility_functions: uses DeterministicGenerator {
   class: dependency
 }
-utils_package.path_functions -> utils_package.logging_functions: shares logger {
+platform_layer.utils_package.path_functions -> platform_layer.utils_package.logging_functions: shares logger {
   class: dependency
 }
 
 # ==============================================================================
 # External Dependency Relationships
 # ==============================================================================
-core_package.Engine -> external_deps.NumPy: processes arrays {
+platform_layer.core_package.Engine -> external_deps.NumPy: processes arrays {
   class: dependency
 }
-utils_package.signal_functions -> external_deps.NumPy: generates {
+platform_layer.utils_package.signal_functions -> external_deps.NumPy: generates {
   class: dependency
 }
-utils_package.signal_functions -> external_deps.SciPy: filters {
+platform_layer.utils_package.signal_functions -> external_deps.SciPy: filters {
   class: dependency
 }
-config_package.EngineConfig -> external_deps.Pydantic: validates {
+platform_layer.config_package.EngineConfig -> external_deps.Pydantic: validates {
   class: dependency
 }
-utils_package.profiling_module -> external_deps.NVTX: wraps {
+platform_layer.utils_package.profiling_module -> external_deps.NVTX: wraps {
   class: dependency
 }
-utils_package.device_functions -> external_deps.PyNVML: queries {
+platform_layer.utils_package.device_functions -> external_deps.PyNVML: queries {
   class: dependency
 }
 testing_package.pytest_fixtures -> external_deps.Pytest: extends {
@@ -998,22 +855,22 @@ testing_package.pytest_fixtures -> external_deps.Pytest: extends {
 # ==============================================================================
 # Testing Relationships
 # ==============================================================================
-testing_package.pytest_fixtures -> core_package.Engine: creates test engines {
+testing_package.pytest_fixtures -> platform_layer.core_package.Engine: creates test engines {
   class: dependency
 }
-testing_package.pytest_fixtures -> config_package.EngineConfig: creates test configs {
+testing_package.pytest_fixtures -> platform_layer.config_package.EngineConfig: creates test configs {
   class: dependency
 }
 testing_package.validator_functions -> external_deps.NumPy: uses {
   class: dependency
 }
-testing_package -> benchmarks_package: tests {
+testing_package -> platform_layer.benchmarks_package: tests {
   class: dependency
 }
 
 # ==============================================================================
 # Future Extensibility
 # ==============================================================================
-core_package.Engine -> stages_package.StageRegistry: "«future»" {
+platform_layer.core_package.Engine -> stages_package.StageRegistry: "«future»" {
   class: dependency
 }
