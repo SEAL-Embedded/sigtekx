@@ -35,6 +35,7 @@ platform_layer: "Core Platform Architecture" {
 
     device_functions: |md
       **device.py**
+      _GPU device management and CUDA runtime introspection_
       «Function Module»
 
       {static} + gpu_count(): int
@@ -50,6 +51,7 @@ platform_layer: "Core Platform Architecture" {
 
     signal_functions: |md
       **signals.py**
+      _Test signal generation for benchmarks and validation_
       «Function Module»
 
       {static} + make_sine(...): ndarray
@@ -63,6 +65,7 @@ platform_layer: "Core Platform Architecture" {
 
     profiling_module: |md
       **profiling.py**
+      _NVTX profiling integration for performance analysis_
       «NVTX Integration»
 
       **Context Managers:**
@@ -92,6 +95,7 @@ platform_layer: "Core Platform Architecture" {
 
     logging_functions: |md
       **logging.py**
+      _Centralized logging configuration and formatting_
       «Function Module»
 
       + logger: Logger {module-level}
@@ -106,6 +110,7 @@ platform_layer: "Core Platform Architecture" {
 
     path_functions: |md
       **paths.py**
+      _Project directory and artifact path resolution_
       «Function Module»
 
       {static} + get_artifacts_root(): Path
@@ -122,6 +127,7 @@ platform_layer: "Core Platform Architecture" {
 
     GpuClockManager: |md
       **GpuClockManager**
+      _GPU clock locking for benchmark stability_
       «gpu_clocks.py»
 
       - gpu_index: int
@@ -146,6 +152,7 @@ platform_layer: "Core Platform Architecture" {
 
     DataArchiver: |md
       **DataArchiver**
+      _Benchmark result archiving and version comparison_
       «archiving.py»
 
       - base_dir: Path
@@ -158,6 +165,7 @@ platform_layer: "Core Platform Architecture" {
 
     reproducibility_functions: |md
       **reproducibility.py**
+      _Deterministic random number generation for reproducible testing_
       «Function Module»
 
       **Classes:**
@@ -176,6 +184,7 @@ platform_layer: "Core Platform Architecture" {
 
     validation_functions: |md
       **validation.py**
+      _Statistical measurement validation and distribution comparison_
       «Function Module»
 
       {static} + validate_measurements(...): dict
@@ -303,6 +312,7 @@ platform_layer: "Core Platform Architecture" {
     # Enumerations (matching C++ enums)
     Enums: |md
       **Enums**
+      _Configuration enumerations matching C++ types_
       «config/schemas.py»
 
       WindowType:
@@ -376,6 +386,7 @@ platform_layer: "Core Platform Architecture" {
 
     PresetFunctions: |md
       **Preset Functions**
+      _Predefined engine configurations (default, iono, ionox)_
       «config/config_presets.py»
 
       {static} + get_preset(name, executor): EngineConfig
@@ -394,6 +405,7 @@ platform_layer: "Core Platform Architecture" {
 
     ValidationFunctions: |md
       **Validation Functions**
+      _Device compatibility checks and memory estimation_
       «config/validation.py»
 
       {static} + validate_config_device_compatibility(config): void
@@ -596,6 +608,7 @@ exceptions_package: ionosense_hpc.exceptions {
 
   ExceptionHierarchy: |md
     **Exception Hierarchy**
+    _Custom exception hierarchy for domain-specific error handling_
     «exceptions.py»
 
     **Base:**
@@ -685,6 +698,7 @@ testing_package: ionosense_hpc.testing {
 
   pytest_fixtures: |md
     **fixtures.py**
+    _Pytest fixtures for testing infrastructure_
     «pytest fixtures»
 
     **Directory Management:**
@@ -716,6 +730,7 @@ testing_package: ionosense_hpc.testing {
 
   validator_functions: |md
     **validators.py**
+    _Spectral analysis and numerical validation assertions_
     «Validation Functions»
 
     {static} + assert_allclose(actual, expected, rtol, atol): void

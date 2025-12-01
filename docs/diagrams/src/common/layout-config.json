@@ -5,7 +5,7 @@
   "default_layout": "dagre",
   "layouts": {
     "01_system_overview.d2": "elk",
-    "02_py_structure.d2": "elk",
+    "02_py_structure.d2": "dagre",
     "03_cpp_components.d2": "dagre",
     "04_py_analysis.d2": "dagre",
     "05_workflow_full.d2": "elk",
