@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -48,8 +48,8 @@ class StatisticalMetrics(BaseModel):
     p99: float  # 99th percentile
     iqr: float  # Interquartile range
     cv: float  # Coefficient of variation
-    skewness: Optional[float] = None
-    kurtosis: Optional[float] = None
+    skewness: float | None = None
+    kurtosis: float | None = None
     n_samples: int
     n_outliers: int = 0
     confidence_interval: tuple[float, float] = Field(default=(0.0, 0.0))
@@ -107,24 +107,24 @@ class StatisticalMetrics(BaseModel):
 class BenchmarkMetadata(BaseModel):
     """Metadata for benchmark results (analysis-specific, not engine configuration)."""
 
-    run_id: Optional[str] = None
+    run_id: str | None = None
     timestamp: datetime = Field(default_factory=datetime.now)
-    tags: List[str] = Field(default_factory=list)
-    environment: Dict[str, Any] = Field(default_factory=dict)
+    tags: list[str] = Field(default_factory=list)
+    environment: dict[str, Any] = Field(default_factory=dict)
 
     # Scientific metrics (calculated from EngineConfig)
-    hop_size: Optional[int] = None
-    time_resolution_ms: Optional[float] = None
-    freq_resolution_hz: Optional[float] = None
-    rtf: Optional[float] = None  # Real-Time Factor (throughput only)
+    hop_size: int | None = None
+    time_resolution_ms: float | None = None
+    freq_resolution_hz: float | None = None
+    rtf: float | None = None  # Real-Time Factor (throughput only)
 
     # Streaming-specific metrics (realtime benchmark only)
-    deadline_compliance_rate: Optional[float] = None  # Fraction of frames meeting deadline
-    mean_jitter_ms: Optional[float] = None  # Mean timing jitter
-    p99_jitter_ms: Optional[float] = None  # 99th percentile jitter
-    frames_dropped: Optional[int] = None  # Number of frames dropped
-    stream_duration_s: Optional[float] = None  # Total stream duration
-    mode: Optional[str] = None  # Execution mode: 'streaming' or 'batch'
+    deadline_compliance_rate: float | None = None  # Fraction of frames meeting deadline
+    mean_jitter_ms: float | None = None  # Mean timing jitter
+    p99_jitter_ms: float | None = None  # 99th percentile jitter
+    frames_dropped: int | None = None  # Number of frames dropped
+    stream_duration_s: float | None = None  # Total stream duration
+    mode: str | None = None  # Execution mode: 'streaming' or 'batch'
 
 
 class BenchmarkResult(BaseModel):
@@ -136,11 +136,11 @@ class BenchmarkResult(BaseModel):
 
     # Core metrics (vary by benchmark type)
     primary_metric: float  # e.g., latency_us, fps, pass_rate
-    metrics: Dict[str, float] = Field(default_factory=dict)
+    metrics: dict[str, float] = Field(default_factory=dict)
 
     # Raw measurements (if available)
-    raw_data: Optional[List[float]] = None
-    statistics: Optional[StatisticalMetrics] = None
+    raw_data: list[float] | None = None
+    statistics: StatisticalMetrics | None = None
 
     def compute_statistics(self) -> None:
         """Compute statistical metrics from raw data."""
@@ -244,8 +244,8 @@ class ScalingAnalysis(BaseModel):
     """Analysis of performance scaling patterns."""
 
     parameter: str  # e.g., "nfft", "channels"
-    values: List[float]
-    metrics: List[float]
+    values: list[float]
+    metrics: list[float]
 
     # Scaling characteristics
     correlation: float
@@ -254,13 +254,13 @@ class ScalingAnalysis(BaseModel):
 
     # Model fit
     model_type: str  # "power", "linear", "logarithmic", "exponential"
-    model_params: Dict[str, float]
+    model_params: dict[str, float]
     model_r2: float
     model_rmse: float
 
     # Efficiency metrics
-    ideal_scaling_efficiency: List[float]  # Actual vs theoretical ideal
-    saturation_point: Optional[float] = None
+    ideal_scaling_efficiency: list[float]  # Actual vs theoretical ideal
+    saturation_point: float | None = None
 
     @classmethod
     def analyze_scaling(
@@ -271,7 +271,7 @@ class ScalingAnalysis(BaseModel):
     ) -> ScalingAnalysis:
         """Analyze scaling patterns from data."""
         from scipy import stats
-        from sklearn.metrics import r2_score, mean_squared_error
+        from sklearn.metrics import mean_squared_error, r2_score
 
         # Calculate correlation
         correlation = float(np.corrcoef(values, metrics)[0, 1])
@@ -341,25 +341,25 @@ class ExperimentSummary(BaseModel):
 
     # Data overview
     total_measurements: int
-    benchmark_types: List[BenchmarkType]
-    configurations_tested: List[EngineConfig]  # Use core EngineConfig
+    benchmark_types: list[BenchmarkType]
+    configurations_tested: list[EngineConfig]  # Use core EngineConfig
 
     # Results by type
-    results: Dict[BenchmarkType, List[BenchmarkResult]]
+    results: dict[BenchmarkType, list[BenchmarkResult]]
 
     # Statistical summaries
-    statistics_by_config: Dict[str, StatisticalMetrics]
+    statistics_by_config: dict[str, StatisticalMetrics]
 
     # Comparisons (if multiple configs)
-    comparisons: List[ComparisonResult] = Field(default_factory=list)
+    comparisons: list[ComparisonResult] = Field(default_factory=list)
 
     # Scaling analyses
-    scaling_analyses: List[ScalingAnalysis] = Field(default_factory=list)
+    scaling_analyses: list[ScalingAnalysis] = Field(default_factory=list)
 
     # Key findings
-    optimal_configs: Dict[str, EngineConfig]  # Use core EngineConfig
-    key_insights: List[str]
-    warnings: List[str] = Field(default_factory=list)
+    optimal_configs: dict[str, EngineConfig]  # Use core EngineConfig
+    key_insights: list[str]
+    warnings: list[str] = Field(default_factory=list)
 
     def to_dataframe(self) -> pd.DataFrame:
         """Convert results to DataFrame for analysis."""
@@ -378,7 +378,7 @@ class ExperimentSummary(BaseModel):
 
         return pd.DataFrame(records)
 
-    def generate_insights(self) -> List[str]:
+    def generate_insights(self) -> list[str]:
         """Generate human-readable insights from analysis."""
         insights = []
 

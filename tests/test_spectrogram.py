@@ -1,24 +1,26 @@
 """Tests for spectrogram generation and visualization utilities."""
 
+import sys
+import tempfile
+from pathlib import Path
+
 import numpy as np
 import pytest
-from pathlib import Path
-import tempfile
-import sys
 
 # Add experiments to path for analysis module imports
 _experiments_path = Path(__file__).parent.parent / "experiments"
 if str(_experiments_path) not in sys.path:
     sys.path.insert(0, str(_experiments_path))
 
-from ionosense_hpc.config import EngineConfig
 from analysis.spectrogram import (
-    SpectrogramGenerator,
     SpectrogramData,
+    SpectrogramGenerator,
     generate_spectrogram,
-    save_spectrogram,
     load_spectrogram,
+    save_spectrogram,
 )
+
+from ionosense_hpc.config import EngineConfig
 
 
 class TestSpectrogramGeneration:

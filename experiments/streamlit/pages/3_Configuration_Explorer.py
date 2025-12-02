@@ -6,20 +6,19 @@ Interactive tool for exploring parameter space and comparing configurations.
 Filter by NFFT, channels, overlap, and execution mode to find optimal settings.
 """
 
-import streamlit as st
-import pandas as pd
-from pathlib import Path
 import sys
+from pathlib import Path
+
+import streamlit as st
 
 # Add parent directory to path for imports from experiments.analysis
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 # Import from our local utils (relative to experiments/streamlit/pages/)
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from utils.data_loader import load_benchmark_data, get_available_configurations
-
 # Import from experiments.analysis
 from analysis.visualization import PerformancePlotter, VisualizationConfig
+from utils.data_loader import get_available_configurations, load_benchmark_data
 
 # Page configuration
 st.set_page_config(page_title="Configuration Explorer", page_icon="⚙️", layout="wide")

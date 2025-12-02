@@ -309,12 +309,12 @@ class TestReportsRoot:
         assert paths.get_benchmarks_root() == paths.get_output_root() / "benchmark_results"
         assert paths.get_experiments_root() == paths.get_output_root() / "experiments"
         assert paths.get_reports_root() == paths.get_output_root() / "reports"
-        
+
         # Test with env vars set
         os.environ["IONO_BENCH_DIR"] = "/custom/bench"
         os.environ["IONO_EXPERIMENTS_DIR"] = "/custom/experiments"
         os.environ["IONO_REPORTS_DIR"] = "/custom/reports"
-        
+
         assert paths.get_benchmarks_root() == Path("/custom/bench")
         assert paths.get_experiments_root() == Path("/custom/experiments")
         assert paths.get_reports_root() == Path("/custom/reports")

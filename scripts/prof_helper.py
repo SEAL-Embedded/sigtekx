@@ -9,11 +9,11 @@ import platform
 import queue
 import re
 import subprocess
+import sys
 import threading
 import time
 from datetime import datetime
 from pathlib import Path
-import sys
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SRC_DIR = REPO_ROOT / "src"
@@ -185,7 +185,7 @@ class ProfileSession:
         env_hint = NSIGHT_ENV_HINTS.get(tool, {}).get("gui")
         print(f"  {Colors.RED}[DISCOVERY] Could not auto-detect {tool} GUI executable{Colors.RESET}")
         print(f"      Set {env_hint or 'IONO_NSIGHT_ROOT'} to point at your Nsight installation")
-        print(f"      or add the Nsight GUI directory to PATH before running this helper.")
+        print("      or add the Nsight GUI directory to PATH before running this helper.")
         return None
 
     def launch_nsight_gui(self, file_path: str, tool: str):

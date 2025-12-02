@@ -10,16 +10,16 @@ Launch with:
 Navigate between pages using the sidebar.
 """
 
-import streamlit as st
-from pathlib import Path
 import sys
+from pathlib import Path
+
+import streamlit as st
 
 # Add parent directory to path for imports from experiments.analysis
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import from our local utils (not streamlit package utils)
-from utils.data_loader import load_benchmark_data, get_data_freshness
-
+from utils.data_loader import get_data_freshness, load_benchmark_data
 
 # Page configuration
 st.set_page_config(

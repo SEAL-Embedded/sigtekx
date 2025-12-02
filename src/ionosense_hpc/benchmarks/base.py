@@ -278,6 +278,7 @@ class BaseBenchmark(abc.ABC):
             if str(_experiments_path) not in sys.path:
                 sys.path.insert(0, str(_experiments_path))
             from analysis.spectrogram import SpectrogramGenerator
+
             from ionosense_hpc.config import EngineConfig
 
             # Create EngineConfig from dict

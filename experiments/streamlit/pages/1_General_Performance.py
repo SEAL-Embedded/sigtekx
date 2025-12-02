@@ -7,18 +7,19 @@ throughput, latency, accuracy, and scaling characteristics.
 """
 
 import json
-import streamlit as st
-import pandas as pd
-from pathlib import Path
-from datetime import datetime
 import sys
+from datetime import datetime
+from pathlib import Path
+
+import pandas as pd
+import streamlit as st
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from utils.data_loader import load_benchmark_data
 from analysis.visualization import PerformancePlotter, VisualizationConfig
+from utils.data_loader import load_benchmark_data
 
 SPECTROGRAM_DIR = Path("artifacts/figures/spectrograms")
 

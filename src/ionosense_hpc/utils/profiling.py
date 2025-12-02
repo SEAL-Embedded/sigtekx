@@ -9,10 +9,10 @@ behaves as a no-op with minimal overhead.
 from __future__ import annotations
 
 import functools
+import inspect
 from collections.abc import Callable
 from contextlib import contextmanager
 from enum import Enum
-import inspect
 from typing import Any
 
 try:  # Optional dependency
@@ -156,7 +156,7 @@ def _format_arg_value(value: Any, max_len: int = 30) -> str:
         return f'"{value}"'
 
     if hasattr(value, "shape"):
-        shape = getattr(value, "shape")
+        shape = value.shape
         return f"{type(value).__name__}{shape}"
 
     if isinstance(value, (list, tuple)) and len(value) > 3:

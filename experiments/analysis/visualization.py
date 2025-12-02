@@ -10,7 +10,7 @@ This skeleton provides the basic structure.
 """
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -44,15 +44,15 @@ class VisualizationConfig:
 class StatisticalPlotter:
     """Statistical distribution and comparison plots."""
 
-    def __init__(self, config: Optional[VisualizationConfig] = None):
+    def __init__(self, config: VisualizationConfig | None = None):
         self.config = config or VisualizationConfig()
 
     def plot_distribution(
         self,
         data: pd.DataFrame,
         metric: str,
-        group_by: Optional[str] = None,
-        output_path: Optional[Path] = None
+        group_by: str | None = None,
+        output_path: Path | None = None
     ) -> go.Figure:
         """Plot distribution with box plots and violin plots."""
         fig = go.Figure()
@@ -90,7 +90,7 @@ class StatisticalPlotter:
         baseline: pd.Series,
         target: pd.Series,
         title: str,
-        output_path: Optional[Path] = None
+        output_path: Path | None = None
     ) -> go.Figure:
         """Plot comparison between two datasets."""
         fig = go.Figure()
@@ -113,7 +113,7 @@ class StatisticalPlotter:
 class PerformancePlotter:
     """Performance scaling and analysis plots."""
 
-    def __init__(self, config: Optional[VisualizationConfig] = None):
+    def __init__(self, config: VisualizationConfig | None = None):
         self.config = config or VisualizationConfig()
 
     def plot_scaling(
@@ -121,10 +121,10 @@ class PerformancePlotter:
         data: pd.DataFrame,
         x_col: str,
         y_col: str,
-        group_by: Optional[str] = None,
+        group_by: str | None = None,
         log_x: bool = False,
         log_y: bool = False,
-        output_path: Optional[Path] = None
+        output_path: Path | None = None
     ) -> go.Figure:
         """Plot performance scaling curves."""
         fig = go.Figure()
@@ -167,7 +167,7 @@ class PerformancePlotter:
         x_col: str,
         y_col: str,
         z_col: str,
-        output_path: Optional[Path] = None
+        output_path: Path | None = None
     ) -> go.Figure:
         """Plot 2D heatmap of performance metrics."""
         pivot = data.pivot_table(values=z_col, index=y_col, columns=x_col, aggfunc='mean')
@@ -221,7 +221,7 @@ class PerformancePlotter:
     def plot_rtf_vs_resolution(
         self,
         data: pd.DataFrame,
-        output_path: Optional[Path] = None
+        output_path: Path | None = None
     ) -> go.Figure:
         """Plot Real-Time Factor vs Frequency Resolution (key ionosphere metric)."""
         if 'rtf' not in data.columns or 'freq_resolution_hz' not in data.columns:
@@ -269,7 +269,7 @@ class PerformancePlotter:
 
 
 # Convenience functions for common plots
-def plot_latency_analysis(data: pd.DataFrame, output_dir: Path) -> List[Path]:
+def plot_latency_analysis(data: pd.DataFrame, output_dir: Path) -> list[Path]:
     """Generate standard latency analysis plots."""
     plotter = PerformancePlotter()
     paths = []
@@ -292,7 +292,7 @@ def plot_latency_analysis(data: pd.DataFrame, output_dir: Path) -> List[Path]:
     return paths
 
 
-def plot_throughput_analysis(data: pd.DataFrame, output_dir: Path) -> List[Path]:
+def plot_throughput_analysis(data: pd.DataFrame, output_dir: Path) -> list[Path]:
     """Generate standard throughput analysis plots."""
     plotter = PerformancePlotter()
     paths = []
@@ -314,7 +314,7 @@ def plot_throughput_analysis(data: pd.DataFrame, output_dir: Path) -> List[Path]
     return paths
 
 
-def plot_ionosphere_metrics(data: pd.DataFrame, output_dir: Path) -> List[Path]:
+def plot_ionosphere_metrics(data: pd.DataFrame, output_dir: Path) -> list[Path]:
     """Generate ionosphere-specific scientific metric plots."""
     plotter = PerformancePlotter()
     paths = []
@@ -338,7 +338,7 @@ def plot_ionosphere_metrics(data: pd.DataFrame, output_dir: Path) -> List[Path]:
     return paths
 
 
-def plot_deadline_compliance(data: pd.DataFrame, output_dir: Path) -> List[Path]:
+def plot_deadline_compliance(data: pd.DataFrame, output_dir: Path) -> list[Path]:
     """Generate deadline compliance visualizations for streaming benchmarks."""
     if 'deadline_compliance_rate' not in data.columns:
         return []
@@ -389,7 +389,7 @@ def plot_deadline_compliance(data: pd.DataFrame, output_dir: Path) -> List[Path]
     return paths
 
 
-def plot_jitter_analysis(data: pd.DataFrame, output_dir: Path) -> List[Path]:
+def plot_jitter_analysis(data: pd.DataFrame, output_dir: Path) -> list[Path]:
     """Generate jitter analysis visualizations."""
     paths = []
 
@@ -440,7 +440,7 @@ def plot_jitter_analysis(data: pd.DataFrame, output_dir: Path) -> List[Path]:
     return paths
 
 
-def plot_streaming_vs_batch(data: pd.DataFrame, output_dir: Path) -> List[Path]:
+def plot_streaming_vs_batch(data: pd.DataFrame, output_dir: Path) -> list[Path]:
     """Generate streaming vs batch mode comparison visualizations."""
     if 'engine_mode' not in data.columns or len(data['engine_mode'].unique()) < 2:
         return []
@@ -506,7 +506,7 @@ def plot_streaming_vs_batch(data: pd.DataFrame, output_dir: Path) -> List[Path]:
     return paths
 
 
-def plot_frame_drop_analysis(data: pd.DataFrame, output_dir: Path) -> List[Path]:
+def plot_frame_drop_analysis(data: pd.DataFrame, output_dir: Path) -> list[Path]:
     """Generate frame drop analysis visualizations."""
     if 'frames_dropped' not in data.columns:
         return []
@@ -550,7 +550,7 @@ class SpectrogramPlotter:
     - Multiple spectrograms side-by-side comparison
     """
 
-    def __init__(self, config: Optional[VisualizationConfig] = None):
+    def __init__(self, config: VisualizationConfig | None = None):
         self.config = config or VisualizationConfig()
 
     def plot_spectrogram_interactive(
@@ -560,10 +560,10 @@ class SpectrogramPlotter:
         frequencies: Any,  # np.ndarray
         title: str = "Spectrogram",
         db_scale: bool = True,
-        vmin: Optional[float] = None,
-        vmax: Optional[float] = None,
+        vmin: float | None = None,
+        vmax: float | None = None,
         colorscale: str = 'Viridis',
-        output_path: Optional[Path] = None,
+        output_path: Path | None = None,
         height: int = 600,
         width: int = 1000
     ) -> go.Figure:
@@ -628,10 +628,10 @@ class SpectrogramPlotter:
 
     def plot_spectrogram_comparison(
         self,
-        spectrograms: List[Dict[str, Any]],
+        spectrograms: list[dict[str, Any]],
         db_scale: bool = True,
         colorscale: str = 'Viridis',
-        output_path: Optional[Path] = None,
+        output_path: Path | None = None,
         height: int = 400,
         width: int = 1200
     ) -> go.Figure:
@@ -718,11 +718,11 @@ class SpectrogramPlotter:
         spectrogram: Any,  # np.ndarray
         times: Any,  # np.ndarray
         frequencies: Any,  # np.ndarray
-        time_slice_idx: Optional[int] = None,
-        freq_slice_idx: Optional[int] = None,
+        time_slice_idx: int | None = None,
+        freq_slice_idx: int | None = None,
         db_scale: bool = True,
         colorscale: str = 'Viridis',
-        output_path: Optional[Path] = None
+        output_path: Path | None = None
     ) -> go.Figure:
         """Create spectrogram with time and frequency slice views.
 
@@ -839,7 +839,7 @@ def plot_spectrogram_interactive(
     frequencies: Any,
     title: str = "Spectrogram",
     db_scale: bool = True,
-    output_path: Optional[Path] = None,
+    output_path: Path | None = None,
     **kwargs
 ) -> go.Figure:
     """Create interactive Plotly spectrogram (convenience function).

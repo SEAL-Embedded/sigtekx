@@ -20,17 +20,16 @@ import hashlib
 import pickle
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
-from scipy import stats
 
 from ionosense_hpc.config import EngineConfig  # Import from core
+
 from .models import (
     BenchmarkResult,
     BenchmarkType,
-    BenchmarkMetadata,
     ComparisonResult,
     ExperimentSummary,
     ScalingAnalysis,
@@ -42,12 +41,12 @@ class AnalyzerBase(ABC):
     """Base class for modular analyzers."""
 
     @abstractmethod
-    def analyze(self, data: pd.DataFrame) -> Dict[str, Any]:
+    def analyze(self, data: pd.DataFrame) -> dict[str, Any]:
         """Perform analysis on the data."""
         pass
 
     @abstractmethod
-    def get_metrics(self) -> List[str]:
+    def get_metrics(self) -> list[str]:
         """Return list of metrics this analyzer produces."""
         pass
 
@@ -59,7 +58,7 @@ class AnalyzerBase(ABC):
 class LatencyAnalyzer(AnalyzerBase):
     """Analyzer for latency benchmark data."""
 
-    def get_metrics(self) -> List[str]:
+    def get_metrics(self) -> list[str]:
         return [
             'mean_latency_us',
             'p95_latency_us',
@@ -68,7 +67,7 @@ class LatencyAnalyzer(AnalyzerBase):
             'stability_score'
         ]
 
-    def analyze(self, data: pd.DataFrame) -> Dict[str, Any]:
+    def analyze(self, data: pd.DataFrame) -> dict[str, Any]:
         """Analyze latency characteristics."""
         results = {}
 
@@ -111,7 +110,7 @@ class LatencyAnalyzer(AnalyzerBase):
 class ThroughputAnalyzer(AnalyzerBase):
     """Analyzer for throughput benchmark data."""
 
-    def get_metrics(self) -> List[str]:
+    def get_metrics(self) -> list[str]:
         return [
             'frames_per_second',
             'gb_per_second',
@@ -120,7 +119,7 @@ class ThroughputAnalyzer(AnalyzerBase):
             'gpu_utilization'
         ]
 
-    def analyze(self, data: pd.DataFrame) -> Dict[str, Any]:
+    def analyze(self, data: pd.DataFrame) -> dict[str, Any]:
         """Analyze throughput and efficiency."""
         results = {}
 
@@ -171,7 +170,7 @@ class ThroughputAnalyzer(AnalyzerBase):
 class AccuracyAnalyzer(AnalyzerBase):
     """Analyzer for accuracy benchmark data."""
 
-    def get_metrics(self) -> List[str]:
+    def get_metrics(self) -> list[str]:
         return [
             'pass_rate',
             'mean_snr_db',
@@ -180,7 +179,7 @@ class AccuracyAnalyzer(AnalyzerBase):
             'reliability_score'
         ]
 
-    def analyze(self, data: pd.DataFrame) -> Dict[str, Any]:
+    def analyze(self, data: pd.DataFrame) -> dict[str, Any]:
         """Analyze accuracy and numerical stability."""
         results = {}
 
@@ -216,7 +215,7 @@ class AccuracyAnalyzer(AnalyzerBase):
 class RealtimeAnalyzer(AnalyzerBase):
     """Analyzer for real-time performance data."""
 
-    def get_metrics(self) -> List[str]:
+    def get_metrics(self) -> list[str]:
         return [
             'compliance_rate',
             'frames_dropped',
@@ -225,7 +224,7 @@ class RealtimeAnalyzer(AnalyzerBase):
             'deadline_misses'
         ]
 
-    def analyze(self, data: pd.DataFrame) -> Dict[str, Any]:
+    def analyze(self, data: pd.DataFrame) -> dict[str, Any]:
         """Analyze real-time compliance and jitter."""
         results = {}
 
@@ -267,7 +266,7 @@ class RealtimeAnalyzer(AnalyzerBase):
 class ScientificMetricsAnalyzer(AnalyzerBase):
     """Analyzer for ionosphere research scientific metrics (RTF, time/frequency resolution)."""
 
-    def get_metrics(self) -> List[str]:
+    def get_metrics(self) -> list[str]:
         return [
             'rtf',  # Real-Time Factor
             'time_resolution_ms',
@@ -276,7 +275,7 @@ class ScientificMetricsAnalyzer(AnalyzerBase):
             'effective_fps'
         ]
 
-    def analyze(self, data: pd.DataFrame) -> Dict[str, Any]:
+    def analyze(self, data: pd.DataFrame) -> dict[str, Any]:
         """Analyze scientific metrics for ionosphere research."""
         results = {}
 
@@ -338,7 +337,7 @@ class ScientificMetricsAnalyzer(AnalyzerBase):
 
         return results
 
-    def _assess_phenomena_suitability(self, time_res_ms: float, freq_res_hz: float) -> Dict[str, bool]:
+    def _assess_phenomena_suitability(self, time_res_ms: float, freq_res_hz: float) -> dict[str, bool]:
         """Assess suitability for different ionosphere phenomena."""
         return {
             'lightning_sprites': time_res_ms < 10.0,  # Fast transients (<10ms time resolution)
@@ -357,8 +356,8 @@ class ScalingAnalyzer:
         data: pd.DataFrame,
         parameter: str,
         metric: str,
-        fixed_params: Optional[Dict[str, Any]] = None
-    ) -> Optional[ScalingAnalysis]:
+        fixed_params: dict[str, Any] | None = None
+    ) -> ScalingAnalysis | None:
         """Analyze how a metric scales with a parameter."""
 
         # Filter data if fixed parameters specified
@@ -387,7 +386,7 @@ class ScalingAnalyzer:
         data: pd.DataFrame,
         optimize_for: str,
         minimize: bool = True
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Find optimal configuration point."""
 
         if optimize_for not in data.columns:
@@ -421,13 +420,13 @@ class AnalysisEngine:
     Not to be confused with ionosense_hpc.Engine (GPU processing engine).
     """
 
-    def __init__(self, cache_dir: Optional[Path] = None):
+    def __init__(self, cache_dir: Path | None = None):
         """Initialize the analysis engine."""
         self.cache_dir = cache_dir or Path("artifacts/analysis_cache")
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
         # Register analyzers
-        self.analyzers: Dict[BenchmarkType, AnalyzerBase] = {
+        self.analyzers: dict[BenchmarkType, AnalyzerBase] = {
             BenchmarkType.LATENCY: LatencyAnalyzer(),
             BenchmarkType.THROUGHPUT: ThroughputAnalyzer(),
             BenchmarkType.ACCURACY: AccuracyAnalyzer(),
@@ -444,7 +443,7 @@ class AnalysisEngine:
         data_repr = f"{data.shape}_{sorted(data.columns.tolist())}_{data.iloc[0].to_dict()}"
         return hashlib.md5(data_repr.encode()).hexdigest()
 
-    def _load_from_cache(self, cache_key: str) -> Optional[Dict[str, Any]]:
+    def _load_from_cache(self, cache_key: str) -> dict[str, Any] | None:
         """Load cached analysis results."""
         cache_file = self.cache_dir / f"{cache_key}.pkl"
         if cache_file.exists():
@@ -455,7 +454,7 @@ class AnalysisEngine:
                 pass
         return None
 
-    def _save_to_cache(self, cache_key: str, results: Dict[str, Any]) -> None:
+    def _save_to_cache(self, cache_key: str, results: dict[str, Any]) -> None:
         """Save analysis results to cache."""
         cache_file = self.cache_dir / f"{cache_key}.pkl"
         try:
@@ -468,7 +467,7 @@ class AnalysisEngine:
         self,
         data: pd.DataFrame,
         benchmark_type: BenchmarkType
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Analyze data for a specific benchmark type."""
 
         if benchmark_type not in self.analyzers:
@@ -489,16 +488,16 @@ class AnalysisEngine:
 
         return results
 
-    def analyze_scientific_metrics(self, data: pd.DataFrame) -> Dict[str, Any]:
+    def analyze_scientific_metrics(self, data: pd.DataFrame) -> dict[str, Any]:
         """Analyze scientific metrics (RTF, time/frequency resolution)."""
         return self.scientific_analyzer.analyze(data)
 
     def analyze_scaling(
         self,
         data: pd.DataFrame,
-        parameters: List[str] = ['engine_nfft', 'engine_channels'],
-        metrics: Optional[List[str]] = None
-    ) -> List[ScalingAnalysis]:
+        parameters: list[str] = ['engine_nfft', 'engine_channels'],
+        metrics: list[str] | None = None
+    ) -> list[ScalingAnalysis]:
         """Analyze scaling patterns for multiple parameters and metrics."""
 
         analyses = []
@@ -545,10 +544,10 @@ class AnalysisEngine:
     def compare_configurations(
         self,
         data: pd.DataFrame,
-        config1: Dict[str, Any],
-        config2: Dict[str, Any],
+        config1: dict[str, Any],
+        config2: dict[str, Any],
         metric: str
-    ) -> Optional[ComparisonResult]:
+    ) -> ComparisonResult | None:
         """Statistically compare two configurations."""
 
         # Filter data for each configuration
@@ -640,11 +639,7 @@ class AnalysisEngine:
                 nfft, channels = map(int, config_key.split('_'))
 
                 # Find primary metric
-                if bench_type == BenchmarkType.LATENCY:
-                    primary = config_analysis['statistics']['mean']
-                elif bench_type == BenchmarkType.THROUGHPUT:
-                    primary = config_analysis['statistics']['mean']
-                elif bench_type == BenchmarkType.ACCURACY:
+                if bench_type == BenchmarkType.LATENCY or bench_type == BenchmarkType.THROUGHPUT or bench_type == BenchmarkType.ACCURACY:
                     primary = config_analysis['statistics']['mean']
                 else:
                     primary = config_analysis['statistics']['mean']

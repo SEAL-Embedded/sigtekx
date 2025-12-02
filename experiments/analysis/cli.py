@@ -14,13 +14,11 @@ Usage:
 
 import argparse
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 
 from .analyzer import AnalysisEngine
 from .models import BenchmarkType
-from .visualization import plot_latency_analysis, plot_throughput_analysis, plot_ionosphere_metrics
 
 
 def load_data(data_path: Path) -> pd.DataFrame:
@@ -95,7 +93,7 @@ def cmd_compare(args):
     config2 = {k: int(v) if k in ['engine_nfft', 'engine_channels'] else float(v)
                for k, v in config2.items()}
 
-    print(f"Comparing configurations:")
+    print("Comparing configurations:")
     print(f"  Config 1: {config1}")
     print(f"  Config 2: {config2}")
     print(f"  Metric: {metric}")
@@ -130,7 +128,7 @@ def cmd_scaling(args):
 
     if analyses:
         for analysis in analyses:
-            print(f"\nScaling Analysis:")
+            print("\nScaling Analysis:")
             print(f"  Parameter: {analysis.parameter}")
             print(f"  Scaling type: {analysis.scaling_type}")
             print(f"  Scaling exponent: {analysis.scaling_exponent:.4f}")

@@ -8,11 +8,10 @@ Policy:
 from __future__ import annotations
 
 import os
+from collections.abc import Iterable
 from datetime import datetime
-from functools import lru_cache
+from functools import cache
 from pathlib import Path
-import shutil
-from typing import Iterable
 
 
 def _repo_root() -> Path:
@@ -301,7 +300,7 @@ def _resolve_nsight_tool(
     *,
     extra_roots: Iterable[Path] | None = None,
 ) -> Path | None:
-    """Resolve Nsight binary path via env overrides, PATH, or install search."""
+    """Resolve Nsight binary path via env overrides or install search."""
     tool = tool.lower()
     if tool not in _NSIGHT_INSTALL_PATTERNS:
         raise ValueError(f"Unsupported Nsight tool '{tool}'")
@@ -311,12 +310,7 @@ def _resolve_nsight_tool(
     if env_override:
         return env_override
 
-    for cmd_name in _NSIGHT_COMMAND_NAMES[tool][kind]:
-        resolved = shutil.which(cmd_name)
-        if resolved:
-            cmd_path = _path_if_exists(resolved)
-            if cmd_path:
-                return cmd_path
+    # PATH-based discovery removed - use env vars or standard install locations
 
     candidate_roots: list[Path] = []
     if extra_roots:
@@ -335,13 +329,13 @@ def _resolve_nsight_tool(
     return None
 
 
-@lru_cache(maxsize=None)
+@cache
 def get_nsight_cli(tool: str) -> Path | None:
     """Return the absolute CLI path for the requested Nsight tool if present."""
     return _resolve_nsight_tool(tool, "cli")
 
 
-@lru_cache(maxsize=None)
+@cache
 def get_nsight_gui(tool: str) -> Path | None:
     """Return the GUI executable path for the requested Nsight tool if present."""
     cli_path = get_nsight_cli(tool)

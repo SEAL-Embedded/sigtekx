@@ -23,7 +23,7 @@ def plot_spectrogram(
     cmap: str = "viridis",
     figsize: tuple[float, float] = (12, 6),
     dpi: int = 150,
-) -> tuple["Figure", "Axes"]:
+) -> tuple[Figure, Axes]:
     import matplotlib.pyplot as plt
 
     if db_scale:

@@ -11,21 +11,21 @@ Modern analysis toolkit for GPU benchmark results with:
 """
 
 from .analyzer import (
+    AccuracyAnalyzer,
     AnalysisEngine,
     LatencyAnalyzer,
-    ThroughputAnalyzer,
-    AccuracyAnalyzer,
     RealtimeAnalyzer,
     ScientificMetricsAnalyzer,
+    ThroughputAnalyzer,
 )
 from .models import (
-    BenchmarkType,
-    StatisticalMetrics,
     BenchmarkMetadata,
     BenchmarkResult,
+    BenchmarkType,
     ComparisonResult,
-    ScalingAnalysis,
     ExperimentSummary,
+    ScalingAnalysis,
+    StatisticalMetrics,
 )
 
 __version__ = "1.0.0"

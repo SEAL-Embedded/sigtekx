@@ -7,20 +7,21 @@ Focuses on scientific metrics, phenomena detection, and real-time processing cap
 """
 
 import json
-import streamlit as st
-import pandas as pd
-from pathlib import Path
-from datetime import datetime
 import sys
+from datetime import datetime
+from pathlib import Path
+
+import pandas as pd
 import plotly.graph_objects as go
+import streamlit as st
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from utils.data_loader import load_benchmark_data
-from analysis.visualization import PerformancePlotter, VisualizationConfig
 from analysis.metrics import assess_ionosphere_suitability
+from analysis.visualization import PerformancePlotter, VisualizationConfig
+from utils.data_loader import load_benchmark_data
 
 SPECTROGRAM_DIR = Path("artifacts/figures/spectrograms")
 

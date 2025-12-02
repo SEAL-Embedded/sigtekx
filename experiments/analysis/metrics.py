@@ -13,7 +13,6 @@ These calculations are also performed in benchmark runners, but this module
 provides utilities for post-processing and analysis.
 """
 
-from typing import Optional
 
 from ionosense_hpc.config import EngineConfig
 
@@ -60,7 +59,7 @@ def calculate_all_scientific_metrics(
     channels: int,
     overlap: float,
     sample_rate_hz: int,
-    fps: Optional[float] = None
+    fps: float | None = None
 ) -> dict:
     """
     Calculate all scientific metrics for a configuration.
@@ -95,7 +94,7 @@ def calculate_all_scientific_metrics(
 
 def calculate_from_engine_config(
     config: EngineConfig,
-    fps: Optional[float] = None
+    fps: float | None = None
 ) -> dict:
     """
     Calculate all scientific metrics from an EngineConfig.

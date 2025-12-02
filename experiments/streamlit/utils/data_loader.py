@@ -1,12 +1,13 @@
 """Data loading utilities with Streamlit caching."""
 
-from pathlib import Path
-from typing import Optional
-import pandas as pd
-import streamlit as st
-
 # Import existing data loading logic from analysis module
 import sys
+from pathlib import Path
+
+import pandas as pd
+
+import streamlit as st
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from analysis.cli import load_data as _load_data_impl
 
@@ -75,7 +76,7 @@ def get_available_configurations(data: pd.DataFrame) -> dict[str, list]:
     return config_params
 
 
-def get_data_freshness(data_path: str | Path = "artifacts/data") -> Optional[str]:
+def get_data_freshness(data_path: str | Path = "artifacts/data") -> str | None:
     """
     Get timestamp of most recently modified data file.
 
