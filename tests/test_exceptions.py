@@ -1,13 +1,18 @@
 # tests/test_exceptions.py
 
 from ionosense_hpc.exceptions import (
+    AnalysisError,
+    BenchmarkError,
+    BenchmarkTimeoutError,
     ConfigError,
     DeviceNotFoundError,
     DllLoadError,
     EngineRuntimeError,
     EngineStateError,
+    ExperimentError,
     IonosenseError,
     ValidationError,
+    WorkflowError,
 )
 
 
@@ -88,4 +93,98 @@ def test_validation_error():
     # Without expected/got (no hint)
     err_plain = ValidationError("Bad input value")
     assert "Hint:" not in str(err_plain)
+
+
+def test_documented_attributes_phase1():
+    """Test that Phase 1 exceptions have all documented attributes.
+
+    Verifies IonosenseError and BenchmarkError have the attributes
+    documented in their NumPy-style docstrings.
+    """
+    # IonosenseError
+    err_base = IonosenseError("test message", hint="test hint", extra="value")
+    assert hasattr(err_base, "hint"), "IonosenseError missing 'hint' attribute"
+    assert hasattr(err_base, "context"), "IonosenseError missing 'context' attribute"
+    assert err_base.hint == "test hint"
+    assert err_base.context == {"extra": "value"}
+
+    # BenchmarkError
+    err_bench = BenchmarkError("bench failed", benchmark_name="latency_test")
+    assert hasattr(err_bench, "benchmark_name"), "BenchmarkError missing 'benchmark_name' attribute"
+    assert hasattr(err_bench, "hint"), "BenchmarkError missing inherited 'hint' attribute"
+    assert hasattr(err_bench, "context"), "BenchmarkError missing inherited 'context' attribute"
+    assert err_bench.benchmark_name == "latency_test"
+
+
+def test_documented_attributes_phase2():
+    """Test that Phase 2 (Tier 2) exceptions have all documented attributes.
+
+    Verifies the 10 simple exceptions have attributes documented in their docstrings.
+    """
+    # DeviceNotFoundError
+    err_device = DeviceNotFoundError()
+    assert hasattr(err_device, "hint")
+    assert hasattr(err_device, "context")
+
+    # ValidationError
+    err_val = ValidationError("test", expected="int", got="str")
+    assert hasattr(err_val, "expected")
+    assert hasattr(err_val, "got")
+    assert hasattr(err_val, "hint")
+    assert err_val.expected == "int"
+    assert err_val.got == "str"
+
+    # DllLoadError
+    err_dll = DllLoadError("test.dll", original_error=RuntimeError("test"))
+    assert hasattr(err_dll, "dll_name")
+    assert hasattr(err_dll, "original_error")
+    assert hasattr(err_dll, "hint")
+    assert err_dll.dll_name == "test.dll"
+
+    # EngineStateError
+    err_state = EngineStateError("test", current_state="uninitialized")
+    assert hasattr(err_state, "current_state")
+    assert hasattr(err_state, "hint")
+    assert err_state.current_state == "uninitialized"
+
+    # EngineRuntimeError
+    err_runtime = EngineRuntimeError("test", cuda_error="out of memory")
+    assert hasattr(err_runtime, "cuda_error")
+    assert hasattr(err_runtime, "hint")
+    assert err_runtime.cuda_error == "out of memory"
+
+    # ConfigError
+    err_config = ConfigError("test", field="nfft", value=1000)
+    assert hasattr(err_config, "field")
+    assert hasattr(err_config, "value")
+    assert hasattr(err_config, "hint")
+    assert err_config.field == "nfft"
+    assert err_config.value == 1000
+
+    # BenchmarkTimeoutError
+    err_timeout = BenchmarkTimeoutError("bench", 5, 10.0)
+    assert hasattr(err_timeout, "benchmark_name")
+    assert hasattr(err_timeout, "hint")
+    assert hasattr(err_timeout, "context")
+
+    # ExperimentError
+    err_exp = ExperimentError("test", experiment_id="exp123")
+    assert hasattr(err_exp, "experiment_id")
+    assert hasattr(err_exp, "hint")
+    assert hasattr(err_exp, "context")
+    assert err_exp.experiment_id == "exp123"
+
+    # AnalysisError
+    err_analysis = AnalysisError("test", analysis_type="latency")
+    assert hasattr(err_analysis, "analysis_type")
+    assert hasattr(err_analysis, "hint")
+    assert hasattr(err_analysis, "context")
+    assert err_analysis.analysis_type == "latency"
+
+    # WorkflowError
+    err_workflow = WorkflowError("test", workflow_stage="data_collection")
+    assert hasattr(err_workflow, "workflow_stage")
+    assert hasattr(err_workflow, "hint")
+    assert hasattr(err_workflow, "context")
+    assert err_workflow.workflow_stage == "data_collection"
 
