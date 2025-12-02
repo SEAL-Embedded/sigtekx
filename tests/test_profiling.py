@@ -8,6 +8,48 @@ import pytest
 import ionosense_hpc.utils.profiling as p
 
 
+class TestFormatFunctionArgs:
+    def test_basic_formatting(self):
+        result = p._format_function_args(
+            "func", ("arg1", "arg2"), {"key": "value"}, max_args=3
+        )
+        assert result == 'func("arg1", "arg2", key="value")'
+
+    def test_self_skipping(self):
+        class MockSelf:
+            pass
+
+        result = p._format_function_args(
+            "method", (MockSelf(), "arg1"), {}, skip_first_arg=True
+        )
+        assert result == 'method("arg1")'
+
+    def test_argument_limits(self):
+        result = p._format_function_args("func", (1, 2, 3, 4), {}, max_args=2)
+        assert result == "func(1, 2)"
+
+    def test_limits_cover_kwargs(self):
+        result = p._format_function_args(
+            "func", (1,), {"a": 10, "b": 20}, max_args=2
+        )
+        assert result == "func(1, a=10)"
+
+    def test_truncation_behavior(self):
+        long_str = "x" * 100
+        result = p._format_function_args("func", (long_str,), {})
+        assert result.startswith('func("')
+        assert result.endswith('...")')
+        assert len(result) < 120
+
+    def test_range_name_truncation(self):
+        long_arg = "value" * 10
+        result = p._format_function_args(
+            "func", (long_arg,), {}, max_args=1, max_length=20
+        )
+        assert result.endswith("...")
+        assert len(result) <= 20
+
+
 class TestBuildNVTXAttrs:
     @pytest.mark.parametrize(
         "color,domain,category,payload,expect",
@@ -103,3 +145,21 @@ class TestProfilingAPIs:
         with p.nvtx_range("noop"):
             pass
         p.mark_event("noop")
+
+    def test_decorator_with_args(self, monkeypatch):
+        captured: list[str] = []
+
+        @contextlib.contextmanager
+        def fake_range(name: str, **_: object):
+            captured.append(name)
+            yield
+
+        monkeypatch.setattr(p, "NVTX_AVAILABLE", True)
+        monkeypatch.setattr(p, "nvtx_range", fake_range)
+
+        @p.nvtx_decorate(include_args=True, max_args=3)
+        def add(a, b, c=None):
+            return a + b
+
+        assert add(1, 2, c=3) == 3
+        assert captured == ["add(1, 2, c=3)"]
