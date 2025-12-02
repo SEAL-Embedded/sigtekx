@@ -3,7 +3,12 @@
  * @brief Simple JSON-based baseline storage for performance tracking.
  *
  * Provides minimal baseline storage system for detecting performance regressions
- * over time. Baselines are stored in artifacts/benchmarks/baselines/ directory.
+ * over time. Baselines are stored in artifacts/cpp/baselines/ directory.
+ *
+ * NOTE: This is C++ baseline storage, separate from Python benchmark outputs:
+ *       - C++ baselines: artifacts/cpp/baselines/
+ *       - Python API: artifacts/benchmark_results/ (standalone usage)
+ *       - Python experiments: artifacts/data/ (Hydra-orchestrated)
  */
 
 #pragma once
@@ -52,7 +57,8 @@ inline std::string get_baseline_filename(const BenchmarkConfig& config) {
  */
 inline std::string get_baseline_path(const BenchmarkConfig& config) {
   namespace fs = std::filesystem;
-  fs::path baseline_dir = fs::current_path() / "artifacts" / "benchmarks" / "baselines";
+  // C++ baseline storage - separate from Python benchmark outputs
+  fs::path baseline_dir = fs::current_path() / "artifacts" / "cpp" / "baselines";
   fs::create_directories(baseline_dir);
   return (baseline_dir / get_baseline_filename(config)).string();
 }

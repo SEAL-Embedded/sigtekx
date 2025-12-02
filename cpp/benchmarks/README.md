@@ -135,7 +135,7 @@ ionoc bench --preset latency --full --save-baseline
 ```
 
 **Baseline Storage:**
-- Location: `artifacts/benchmarks/baselines/`
+- Location: `artifacts/cpp/baselines/` (C++ only - clearly separated from Python)
 - Format: `<preset>_<variant>_<mode>.json`
 - Example: `latency_ionosphere_full.json`
 

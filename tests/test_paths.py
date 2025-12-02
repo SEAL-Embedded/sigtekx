@@ -168,7 +168,7 @@ class TestBenchmarksRoot:
 
         result = paths.get_benchmarks_root()
 
-        assert result == custom_artifacts / "benchmarks"
+        assert result == custom_artifacts / "benchmark_results"
         assert result.exists()
 
     def test_env_override_benchmarks_root(self, monkeypatch, tmp_path: Path):

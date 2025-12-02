@@ -115,7 +115,10 @@ Snakemake coordinates benchmark execution, analysis, and report generation using
 
 ```
 artifacts/
-|-- data/                   # Derived benchmark outputs (CSV/Parquet) produced by Hydra runners
+|-- cpp/                    # C++ benchmark outputs (baselines for regression detection)
+|   `-- baselines/          # JSON baselines: <preset>_<variant>_<mode>.json
+|-- benchmark_results/      # Python standalone benchmark API outputs (fallback location)
+|-- data/                   # Hydra Python experiment outputs (CSV/Parquet) - PRIMARY for analysis
 |-- experiments/            # Hydra run directories for single runs and multirun sweeps
 |-- logs/                   # Research CLI JSONL logs for traceability
 |-- mlruns/                 # MLflow tracking store (local file backend)
@@ -124,6 +127,16 @@ artifacts/
 |   `-- nsys_reports/       # Nsight Systems traces (.nsys-rep)
 `-- reports/                # Generated analysis reports and summaries
 ```
+
+**Benchmark Output Locations (Three Separate Systems):**
+
+| System | Directory | Purpose | Created By |
+|--------|-----------|---------|------------|
+| **Hydra Experiments** | `artifacts/data/` | Primary experiment outputs for analysis pipeline | `run_latency.py`, `run_throughput.py`, etc. |
+| **Python Standalone API** | `artifacts/benchmark_results/` | Fallback for direct benchmark class usage | Benchmark classes when `output_dir=None` |
+| **C++ Baseline Storage** | `artifacts/cpp/baselines/` | Performance regression detection for C++ dev | `ionoc bench --save-baseline` |
+
+These are intentionally separate to keep C++ development workflows independent from Python experiment orchestration.
 
 
 ### Build Outputs (build/)
@@ -193,7 +206,10 @@ Shared objects produced by builds land in `src/ionosense_hpc/core/`. Expect `_en
 
 ## Output Artefacts
 - Generated content persists under `artifacts/` (configurable via `IONO_OUTPUT_ROOT`).
-- Benchmark CSVs/plots: `artifacts/data/`
+- Benchmark outputs: See three separate systems documented in Artifacts section above
+  - Hydra experiments: `artifacts/data/` (primary)
+  - Python standalone: `artifacts/benchmark_results/`
+  - C++ baselines: `artifacts/cpp/baselines/`
 - Experiment dumps: `artifacts/experiments/`
 - QA reports (lint, coverage, validation): `artifacts/reports/`
 - Profiling traces: `artifacts/profiling/nsys_reports/` & `artifacts/profiling/ncu_reports/`

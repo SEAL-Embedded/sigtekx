@@ -67,20 +67,29 @@ def get_output_root() -> Path:
 
 def _get_path_with_env_override(env_var: str, default_subdir: str) -> Path:
     """Get path with environment variable override report.
-    
+
     Args: Environment variable name to check
     default_subdir: Subdirectory name under output root if env var not set
-    
+
     Returns:
         Path object - either from env var or default location
     """
     env_path = os.environ.get(env_var)
     if env_path:
-        return Path(env_path)
-    return get_output_root() / default_subdir
+        return _ensure(Path(env_path))
+    return _ensure(get_output_root() / default_subdir)
 
 def get_benchmarks_root() -> Path:
-    """Root for benchmark result directories."""
+    """Root for standalone Python benchmark API outputs.
+
+    NOTE: This is separate from other benchmark output locations:
+    - This function: artifacts/benchmark_results/ (standalone Python API)
+    - C++ baselines: artifacts/cpp/baselines/ (ionoc --save-baseline)
+    - Hydra experiments: artifacts/data/ (configured in experiments/conf/config.yaml)
+
+    In practice, Hydra experiments (run_latency.py, run_throughput.py) use
+    artifacts/data/ for their outputs, making this location primarily a fallback.
+    """
     return _get_path_with_env_override("IONO_BENCH_DIR", "benchmark_results")
 
 
