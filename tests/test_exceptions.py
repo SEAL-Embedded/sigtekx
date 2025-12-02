@@ -4,13 +4,21 @@ from ionosense_hpc.exceptions import (
     AnalysisError,
     BenchmarkError,
     BenchmarkTimeoutError,
+    BenchmarkValidationError,
     ConfigError,
+    DataIntegrityError,
+    DependencyError,
     DeviceNotFoundError,
     DllLoadError,
     EngineRuntimeError,
     EngineStateError,
+    EnvironmentMismatchError,
     ExperimentError,
+    InsufficientDataError,
     IonosenseError,
+    ReportGenerationError,
+    ReproducibilityError,
+    ResourceExhaustedError,
     ValidationError,
     WorkflowError,
 )
@@ -187,4 +195,125 @@ def test_documented_attributes_phase2():
     assert hasattr(err_workflow, "hint")
     assert hasattr(err_workflow, "context")
     assert err_workflow.workflow_stage == "data_collection"
+
+
+# ============================================================================
+# Error Code Tests (Phase 2)
+# ============================================================================
+
+def test_error_codes_present():
+    """Test that all exceptions have error_code class attribute."""
+    exceptions = [
+        IonosenseError,
+        ConfigError,
+        ValidationError,
+        DeviceNotFoundError,
+        DllLoadError,
+        EngineStateError,
+        EngineRuntimeError,
+        BenchmarkError,
+        BenchmarkTimeoutError,
+        BenchmarkValidationError,
+        ExperimentError,
+        ReproducibilityError,
+        EnvironmentMismatchError,
+        DataIntegrityError,
+        AnalysisError,
+        InsufficientDataError,
+        ReportGenerationError,
+        WorkflowError,
+        DependencyError,
+        ResourceExhaustedError,
+    ]
+
+    for exc_class in exceptions:
+        assert hasattr(exc_class, 'error_code'), f"{exc_class.__name__} missing 'error_code' attribute"
+        assert exc_class.error_code.startswith('E'), f"{exc_class.__name__}.error_code should start with 'E'"
+
+
+def test_error_codes_unique():
+    """Test that all error codes are unique."""
+    exceptions = [
+        IonosenseError,
+        ConfigError,
+        ValidationError,
+        DeviceNotFoundError,
+        DllLoadError,
+        EngineStateError,
+        EngineRuntimeError,
+        BenchmarkError,
+        BenchmarkTimeoutError,
+        BenchmarkValidationError,
+        ExperimentError,
+        ReproducibilityError,
+        EnvironmentMismatchError,
+        DataIntegrityError,
+        AnalysisError,
+        InsufficientDataError,
+        ReportGenerationError,
+        WorkflowError,
+        DependencyError,
+        ResourceExhaustedError,
+    ]
+
+    codes = [exc.error_code for exc in exceptions]
+    assert len(codes) == len(set(codes)), f"Duplicate error codes found: {codes}"
+
+
+def test_error_code_in_repr():
+    """Test that error code appears in repr()."""
+    err = ConfigError("Invalid nfft", field="nfft")
+    repr_str = repr(err)
+    assert "E1010" in repr_str, f"Error code E1010 not found in repr: {repr_str}"
+    assert "ConfigError" in repr_str, f"Class name not found in repr: {repr_str}"
+
+
+def test_error_code_not_in_str():
+    """Test backward compat - error code NOT in str()."""
+    err = ConfigError("Invalid nfft", field="nfft")
+    str_repr = str(err)
+    assert "E1010" not in str_repr, f"Error code E1010 should not be in str(): {str_repr}"
+    assert "Invalid nfft" in str_repr, f"Message not found in str(): {str_repr}"
+
+
+def test_backward_compatibility():
+    """Test that existing exception catching works."""
+    import pytest
+
+    # Test exception catching
+    with pytest.raises(ConfigError):
+        raise ConfigError("test")
+
+    # Test instance attributes
+    err = ConfigError("test", field="nfft", value=1000)
+    assert err.field == "nfft"
+    assert err.value == 1000
+
+    # Test error code access
+    assert err.error_code == "E1010"
+    assert ConfigError.error_code == "E1010"
+
+
+def test_error_code_in_logging():
+    """Test that error codes appear in logged exceptions."""
+    import logging
+    from io import StringIO
+
+    log_stream = StringIO()
+    handler = logging.StreamHandler(log_stream)
+    handler.setLevel(logging.ERROR)
+    logger = logging.getLogger('test_error_codes')
+    logger.setLevel(logging.ERROR)
+    logger.addHandler(handler)
+
+    try:
+        raise ConfigError("Invalid config", field="nfft")
+    except ConfigError as e:
+        logger.error(f"Error: {repr(e)}")
+
+    log_output = log_stream.getvalue()
+    assert "E1010" in log_output, f"Error code E1010 not found in log output: {log_output}"
+
+    # Cleanup
+    logger.removeHandler(handler)
 

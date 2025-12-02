@@ -196,7 +196,7 @@ with Engine(preset='iono') as engine:
 
 #### Error Handling
 
-All validation errors are raised as `ionosense_hpc.exceptions.ValidationError`. Runtime faults in the C++ layer are surfaced as `EngineRuntimeError`.
+All exceptions inherit from `IonosenseError` and include stable error codes for programmatic handling, logging, and documentation lookup.
 
 ```python
 from ionosense_hpc import Engine
@@ -206,7 +206,38 @@ try:
     engine = Engine(preset='iono', nfft=1000)  # Not a power of 2
 except ValidationError as e:
     print(f"Configuration error: {e}")
+    print(f"Error code: {e.error_code}")  # E1020
+    print(f"Machine repr: {repr(e)}")     # Includes error code for logging
 ```
+
+**Error Codes**
+
+Each exception has a stable `error_code` class attribute (format: `E{category}{sequence}`):
+
+| Code | Exception | Description |
+|------|-----------|-------------|
+| **E000** | `IonosenseError` | Base exception for all errors |
+| **E1010** | `ConfigError` | Configuration validation error |
+| **E1020** | `ValidationError` | Input data validation error |
+| **E2010** | `DeviceNotFoundError` | No CUDA devices found |
+| **E2020** | `DllLoadError` | DLL/library loading failed |
+| **E3010** | `EngineStateError` | Invalid engine state |
+| **E3020** | `EngineRuntimeError` | Runtime processing error |
+| **E4000** | `BenchmarkError` | Base benchmark error |
+| **E4010** | `ExperimentError` | Base experiment error |
+| **E4100** | `BenchmarkTimeoutError` | Iteration timeout |
+| **E4110** | `BenchmarkValidationError` | Validation failed |
+| **E4200** | `ReproducibilityError` | Reproducibility metadata error |
+| **E4210** | `EnvironmentMismatchError` | Environment mismatch |
+| **E4220** | `DataIntegrityError` | Data corruption |
+| **E5000** | `AnalysisError` | Base analysis error |
+| **E5010** | `InsufficientDataError` | Insufficient data |
+| **E5020** | `ReportGenerationError` | Report generation failed |
+| **E6000** | `WorkflowError` | Base workflow error |
+| **E6010** | `DependencyError` | Missing dependencies |
+| **E6020** | `ResourceExhaustedError` | Resource exhausted |
+
+Error codes appear in `repr()` (for logging) but not `str()` (backward compatible). All exceptions include contextual hints and additional attributes documented in their docstrings.
 
 ## Configuration
 
