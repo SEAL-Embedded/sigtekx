@@ -13,6 +13,14 @@ import threading
 import time
 from datetime import datetime
 from pathlib import Path
+import sys
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+SRC_DIR = REPO_ROOT / "src"
+if SRC_DIR.exists() and str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+from ionosense_hpc.utils import paths as path_utils
 
 
 class Colors:
@@ -27,6 +35,12 @@ class Colors:
     GRAY = '\033[90m'
     BOLD = '\033[1m'
     RESET = '\033[0m'
+
+
+NSIGHT_ENV_HINTS = {
+    "nsys": {"cli": "IONO_NSYS_BIN", "gui": "IONO_NSYS_GUI"},
+    "ncu": {"cli": "IONO_NCU_BIN", "gui": "IONO_NCU_GUI"},
+}
 
 
 class ProfileSession:
@@ -52,6 +66,9 @@ class ProfileSession:
         self.ncu_dir = self.reports_dir / "ncu"
         self.nsys_dir.mkdir(parents=True, exist_ok=True)
         self.ncu_dir.mkdir(parents=True, exist_ok=True)
+
+        # Resolve Nsight CLI binary upfront (allows running without PATH edits)
+        self.cli_path = path_utils.get_nsight_cli(self.tool)
 
     def print_header(self):
         """Print a clean session header"""
@@ -79,6 +96,10 @@ class ProfileSession:
                 return f"{bytes:.1f}{unit}"
             bytes /= 1024.0
         return f"{bytes:.1f}TB"
+
+    def cli_binary(self) -> str:
+        """Return the resolved CLI binary path or fallback to the bare tool name."""
+        return str(self.cli_path) if self.cli_path else self.tool
 
     def monitor_ncu_progress(self, process):
         """Monitor NCU output and show progress"""
@@ -156,81 +177,16 @@ class ProfileSession:
         """Discover the actual path to the GUI tool executable"""
         print(f"  {Colors.CYAN}[DISCOVERY] Searching for {tool} GUI executable...{Colors.RESET}")
 
-        try:
-            # First, find the command-line tool to get installation directory
-            if tool == "nsys":
-                cmd_result = subprocess.run(["where", "nsys"], capture_output=True, text=True, timeout=5)
-                if cmd_result.returncode == 0:
-                    nsys_path = Path(cmd_result.stdout.strip().split('\n')[0])
-                    print(f"  {Colors.CYAN}[DISCOVERY] Found nsys at: {nsys_path}{Colors.RESET}")
+        gui_path = path_utils.get_nsight_gui(tool)
+        if gui_path:
+            print(f"  {Colors.GREEN}[DISCOVERY] Found {tool}-ui at: {gui_path}{Colors.RESET}")
+            return str(gui_path)
 
-                    # Navigate to installation root and look for GUI in host directory
-                    install_root = nsys_path.parent.parent  # Go up from target-windows-x64 to root
-                    gui_candidates = [
-                        install_root / "host-windows-x64" / "nsys-ui.exe",
-                        install_root / "host" / "windows-x64" / "nsys-ui.exe",
-                        install_root / "host" / "nsys-ui.exe"
-                    ]
-
-                    for candidate in gui_candidates:
-                        if candidate.exists():
-                            print(f"  {Colors.GREEN}[DISCOVERY] Found nsys-ui at: {candidate}{Colors.RESET}")
-                            return str(candidate)
-
-            elif tool == "ncu":
-                cmd_result = subprocess.run(["where", "ncu"], capture_output=True, text=True, timeout=5)
-                if cmd_result.returncode == 0:
-                    ncu_paths = cmd_result.stdout.strip().split('\n')
-                    # Look for the .bat file first (it's in the root directory)
-                    for ncu_path in ncu_paths:
-                        if ncu_path.endswith('.bat'):
-                            install_root = Path(ncu_path).parent
-                            print(f"  {Colors.CYAN}[DISCOVERY] Found ncu installation at: {install_root}{Colors.RESET}")
-
-                            # Check for ncu-ui.bat first (simpler)
-                            ncu_ui_bat = install_root / "ncu-ui.bat"
-                            if ncu_ui_bat.exists():
-                                print(f"  {Colors.GREEN}[DISCOVERY] Found ncu-ui.bat at: {ncu_ui_bat}{Colors.RESET}")
-                                return str(ncu_ui_bat)
-
-                            # Check for executable in host directory
-                            gui_candidates = [
-                                install_root / "host" / "windows-desktop-win7-x64" / "ncu-ui.exe",
-                                install_root / "host" / "windows-x64" / "ncu-ui.exe",
-                                install_root / "host" / "ncu-ui.exe"
-                            ]
-
-                            for candidate in gui_candidates:
-                                if candidate.exists():
-                                    print(f"  {Colors.GREEN}[DISCOVERY] Found ncu-ui at: {candidate}{Colors.RESET}")
-                                    return str(candidate)
-                            break
-
-            # Fallback: Search common NVIDIA installation directories
-            print(f"  {Colors.YELLOW}[DISCOVERY] Trying fallback search in common NVIDIA directories...{Colors.RESET}")
-            program_files = Path("C:/Program Files/NVIDIA Corporation")
-            if program_files.exists():
-                if tool == "nsys":
-                    for nsys_dir in program_files.glob("Nsight Systems*"):
-                        for gui_path in nsys_dir.rglob("nsys-ui.exe"):
-                            print(f"  {Colors.GREEN}[DISCOVERY] Found nsys-ui via fallback: {gui_path}{Colors.RESET}")
-                            return str(gui_path)
-                elif tool == "ncu":
-                    for ncu_dir in program_files.glob("Nsight Compute*"):
-                        ncu_ui_bat = ncu_dir / "ncu-ui.bat"
-                        if ncu_ui_bat.exists():
-                            print(f"  {Colors.GREEN}[DISCOVERY] Found ncu-ui.bat via fallback: {ncu_ui_bat}{Colors.RESET}")
-                            return str(ncu_ui_bat)
-                        for gui_path in ncu_dir.rglob("ncu-ui.exe"):
-                            print(f"  {Colors.GREEN}[DISCOVERY] Found ncu-ui.exe via fallback: {gui_path}{Colors.RESET}")
-                            return str(gui_path)
-
-            print(f"  {Colors.RED}[DISCOVERY] Could not find {tool} GUI tool anywhere{Colors.RESET}")
-            return None
-
-        except Exception as e:
-            print(f"  {Colors.YELLOW}[DISCOVERY] Error during discovery: {e}{Colors.RESET}")
-            return None
+        env_hint = NSIGHT_ENV_HINTS.get(tool, {}).get("gui")
+        print(f"  {Colors.RED}[DISCOVERY] Could not auto-detect {tool} GUI executable{Colors.RESET}")
+        print(f"      Set {env_hint or 'IONO_NSIGHT_ROOT'} to point at your Nsight installation")
+        print(f"      or add the Nsight GUI directory to PATH before running this helper.")
+        return None
 
     def launch_nsight_gui(self, file_path: str, tool: str):
         """Launch appropriate Nsight GUI tool"""
@@ -354,7 +310,7 @@ class ProfileSession:
         """Run Nsight Systems profiling"""
         report_path = self.nsys_dir / output_name
 
-        cmd = ["nsys", "profile", "-o", str(report_path), "-f", "true"]
+        cmd = [self.cli_binary(), "profile", "-o", str(report_path), "-f", "true"]
 
         if self.mode == "full":
             print(f"  {Colors.CYAN}🔬 Full mode:{Colors.RESET} All GPU traces + OS runtime")
@@ -403,7 +359,7 @@ class ProfileSession:
         """Run Nsight Compute profiling"""
         report_path = self.ncu_dir / output_name
 
-        cmd = ["ncu"]
+        cmd = [self.cli_binary()]
 
         # Add metric set first (must come before -o)
         if self.mode == "full":
@@ -567,17 +523,22 @@ For more info: iono help
 
     # 3. Check for profiling tool availability with detailed validation
     tool_cmd = args.tool
+    cli_exec = str(session.cli_path) if session.cli_path else tool_cmd
     try:
-        result = subprocess.run([tool_cmd, "--version"], capture_output=True, text=True, timeout=10)
+        result = subprocess.run([cli_exec, "--version"], capture_output=True, text=True, timeout=10)
         if result.returncode == 0:
             version_info = result.stdout.strip()
-            print(f"  {Colors.GREEN}[OK] {tool_cmd.upper()} available: {version_info.split()[-1] if version_info else 'version unknown'}{Colors.RESET}")
+            location_note = f" ({cli_exec})" if session.cli_path else ""
+            print(f"  {Colors.GREEN}[OK] {tool_cmd.upper()} available{location_note}: {version_info.split()[-1] if version_info else 'version unknown'}{Colors.RESET}")
         else:
             validation_errors.append(f"{tool_cmd.upper()} version check failed (exit code: {result.returncode})")
     except subprocess.TimeoutExpired:
         validation_errors.append(f"{tool_cmd.upper()} command timed out - tool may be unresponsive")
     except FileNotFoundError:
-        validation_errors.append(f"{tool_cmd.upper()} not found in PATH - please install NVIDIA Nsight tools")
+        env_hint = NSIGHT_ENV_HINTS.get(tool_cmd, {}).get("cli", "IONO_NSIGHT_ROOT")
+        validation_errors.append(
+            f"{tool_cmd.upper()} binary not found. Set {env_hint} or ensure Nsight is on PATH."
+        )
 
     # 3.5. Check GUI tool availability (informational - not critical)
     gui_path = session.discover_gui_tool_path(tool_cmd)

@@ -1,11 +1,22 @@
 """Tests for paths module."""
 
+import os
 from datetime import datetime
 from pathlib import Path
 
 import pytest
 
 from ionosense_hpc.utils import paths
+
+
+@pytest.fixture(autouse=True)
+def _reset_nsight_cache(monkeypatch):
+    """Ensure Nsight discovery caches do not leak between tests."""
+    paths.get_nsight_cli.cache_clear()
+    paths.get_nsight_gui.cache_clear()
+    yield
+    paths.get_nsight_cli.cache_clear()
+    paths.get_nsight_gui.cache_clear()
 
 
 class TestRepoRoot:
@@ -307,3 +318,57 @@ class TestReportsRoot:
         assert paths.get_benchmarks_root() == Path("/custom/bench")
         assert paths.get_experiments_root() == Path("/custom/experiments")
         assert paths.get_reports_root() == Path("/custom/reports")
+
+
+class TestNsightDiscovery:
+    """Tests covering Nsight CLI/GUI discovery helpers."""
+
+    def test_cli_env_override(self, monkeypatch, tmp_path: Path):
+        exe = tmp_path / "nsys.exe"
+        exe.write_text("")
+        monkeypatch.setenv("IONO_NSYS_BIN", str(exe))
+        monkeypatch.delenv("IONO_NSIGHT_ROOT", raising=False)
+
+        assert paths.get_nsight_cli("nsys") == exe
+
+    def test_gui_env_override(self, monkeypatch, tmp_path: Path):
+        gui = tmp_path / "nsys-ui.exe"
+        gui.write_text("")
+        monkeypatch.setenv("IONO_NSYS_GUI", str(gui))
+
+        assert paths.get_nsight_gui("nsys") == gui
+
+    def test_discovers_from_nsight_root(self, monkeypatch, tmp_path: Path):
+        install_root = tmp_path / "Nsight Systems 2025.3.2"
+        cli_dir = install_root / "target-windows-x64"
+        gui_dir = install_root / "host-windows-x64"
+        cli_dir.mkdir(parents=True)
+        gui_dir.mkdir(parents=True)
+        cli_path = cli_dir / "nsys.exe"
+        gui_path = gui_dir / "nsys-ui.exe"
+        cli_path.write_text("")
+        gui_path.write_text("")
+
+        monkeypatch.setenv("IONO_NSIGHT_ROOT", str(install_root))
+        monkeypatch.delenv("IONO_NSYS_BIN", raising=False)
+        monkeypatch.delenv("IONO_NSYS_GUI", raising=False)
+
+        assert paths.get_nsight_cli("nsys") == cli_path
+        assert paths.get_nsight_gui("nsys") == gui_path
+
+    def test_gui_infers_from_cli_install(self, monkeypatch, tmp_path: Path):
+        install_root = tmp_path / "Nsight Systems 2025.3.2"
+        cli_dir = install_root / "target-windows-x64"
+        gui_dir = install_root / "host-windows-x64"
+        cli_dir.mkdir(parents=True)
+        gui_dir.mkdir(parents=True)
+        cli_path = cli_dir / "nsys.exe"
+        gui_path = gui_dir / "nsys-ui.exe"
+        cli_path.write_text("")
+        gui_path.write_text("")
+
+        monkeypatch.setenv("IONO_NSYS_BIN", str(cli_path))
+        monkeypatch.delenv("IONO_NSYS_GUI", raising=False)
+        monkeypatch.delenv("IONO_NSIGHT_ROOT", raising=False)
+
+        assert paths.get_nsight_gui("nsys") == gui_path
