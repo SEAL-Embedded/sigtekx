@@ -48,6 +48,7 @@ dev_interface: Development Interface {
       **Direct Commands**
       - python benchmarks/run_*.py
       - snakemake --cores 4
+      - streamlit run experiments/streamlit/app.py
       - mlflow ui
       - dvc status/repro
     |
@@ -274,42 +275,95 @@ orchestration_layer: Orchestration Layer (Snakemake) {
 }
 
 # ==============================================================================
-# Analysis Layer
+# Analysis Layer (Modular Architecture)
 # ==============================================================================
 analysis_layer: Analysis Layer {
   class: streaming-green
 
-  analyze: {
+  analyzer: {
     shape: rectangle
     label: |md
-      **analyze.py**
-      - load_CSV_data
-      - aggregate_results
-      - statistical_analysis
-      - summary_statistics
+      **analyzer.py**
+      - AnalysisEngine (orchestrator)
+      - LatencyAnalyzer
+      - ThroughputAnalyzer
+      - AccuracyAnalyzer
+      - ScientificMetricsAnalyzer
+      - Caching + incremental computation
+    |
+
+    note: |md
+      **Modular Analysis Engine**
+      Class-based analyzers handle
+      specific benchmark types.
+      AnalysisEngine orchestrates.
     |
   }
 
-  gen_figures: {
+  visualization: {
     shape: rectangle
     label: |md
-      **generate_figures.py**
-      - throughput_scaling_plots
-      - latency_analysis_plots
-      - accuracy_heatmaps
-      - combined_visualizations
-      - PNG_and_SVG_output
+      **visualization.py**
+      - PerformancePlotter
+      - StatisticalPlotter
+      - Plotly (interactive)
+      - Matplotlib (publication)
+      - PNG/SVG export
     |
   }
 
-  gen_report: {
+  metrics: {
     shape: rectangle
     label: |md
-      **generate_report.py**
-      - HTML_generation
-      - embedded_figures
-      - executive_summary
-      - performance_tables
+      **metrics.py**
+      - calculate_rtf()
+      - calculate_time_resolution()
+      - calculate_freq_resolution()
+      - calculate_hop_size()
+      - Scientific metric utilities
+    |
+  }
+
+  models: {
+    shape: rectangle
+    label: |md
+      **models.py**
+      - BenchmarkResult (Pydantic)
+      - ExperimentSummary
+      - StatisticalMetrics
+      - ComparisonResult
+      - ScalingAnalysis
+    |
+  }
+
+  spectrogram_gen: {
+    shape: rectangle
+    label: |md
+      **generate_static_spectrograms.py**
+      + **spectrogram/** package
+      - SpectrogramGenerator
+      - Static PNG generation
+      - Accuracy comparison plots
+      - Dashboard artifacts
+    |
+
+    note: |md
+      **Spectrogram Subsystem**
+      Generates static PNGs for
+      dashboard display (used by
+      Snakemake rules)
+    |
+  }
+
+  cli_interface: {
+    shape: rectangle
+    label: |md
+      **cli.py**
+      - load_data()
+      - cmd_analyze()
+      - cmd_compare()
+      - cmd_scaling()
+      - Command-line interface
     |
   }
 
@@ -317,9 +371,9 @@ analysis_layer: Analysis Layer {
     shape: rectangle
     label: |md
       **quick_plot.py**
-      - interactive_plotting
-      - rapid_visualization
-      - debugging_support
+      - Rapid visualization
+      - Debugging support
+      - Latest data plotting
     |
   }
 }
@@ -349,7 +403,7 @@ reporting_interactive: Interactive Reporting Layer (PRIMARY) {
 
     note: |md
       **PRIMARY Analysis Tool**
-      Launch with: iono dashboard
+      Launch: streamlit run experiments/streamlit/app.py
 
       **Three Interactive Pages:**
       1. General Performance (6 tabs)
@@ -544,27 +598,35 @@ dev_interface.direct_cmd -> orchestration_layer.snakefile: invokes
 orchestration_layer.snakefile -> orchestration_layer.dag_executor: processes rules
 
 orchestration_layer.dag_executor -> execution_layer.benchmark_scripts: executes
-orchestration_layer.dag_executor -> analysis_layer.analyze: executes
-orchestration_layer.dag_executor -> analysis_layer.gen_figures: executes
-orchestration_layer.dag_executor -> analysis_layer.gen_report: executes
+orchestration_layer.dag_executor -> analysis_layer.spectrogram_gen: executes
 
 # ==============================================================================
-# Relationships - Analysis Flow
+# Relationships - Analysis Flow (Modular Architecture)
 # ==============================================================================
-data_storage.artifacts.data_dir -> analysis_layer.analyze: reads CSVs
-analysis_layer.analyze -> data_storage.artifacts.data_dir: writes summary
-data_storage.artifacts.data_dir -> analysis_layer.gen_figures: reads summary
-analysis_layer.gen_figures -> data_storage.artifacts.figures_dir: saves plots
-data_storage.artifacts.data_dir -> analysis_layer.gen_report: reads data
-data_storage.artifacts.figures_dir -> analysis_layer.gen_report: embeds figures
-analysis_layer.gen_report -> data_storage.artifacts.reports_dir: saves HTML
+# Data loading and analysis
+data_storage.artifacts.data_dir -> analysis_layer.cli_interface: loads via CLI
+data_storage.artifacts.data_dir -> analysis_layer.analyzer: reads CSVs
+analysis_layer.analyzer -> analysis_layer.models: uses data models
+analysis_layer.analyzer -> data_storage.artifacts.data_dir: writes summary
+
+# Visualization and plotting
+data_storage.artifacts.data_dir -> analysis_layer.visualization: reads data
+analysis_layer.visualization -> data_storage.artifacts.figures_dir: saves interactive plots
+analysis_layer.metrics -> analysis_layer.analyzer: scientific calculations
+
+# Spectrogram generation (Snakemake-driven)
+analysis_layer.spectrogram_gen -> data_storage.artifacts.figures_dir: generates static PNGs
+
+# Quick plotting for debugging
 data_storage.artifacts.data_dir -> analysis_layer.quick_plot: reads for debugging
 
 # ==============================================================================
 # Relationships - Reporting Flow (PRIMARY)
 # ==============================================================================
 data_storage.artifacts.data_dir -> reporting_interactive.streamlit_dashboard: "loads all CSVs\n(primary path)"
-analysis_layer.gen_figures -> reporting_interactive.streamlit_dashboard: embeds
+data_storage.artifacts.figures_dir -> reporting_interactive.streamlit_dashboard: "embeds spectrograms"
+analysis_layer.visualization -> reporting_interactive.streamlit_dashboard: "interactive plots"
+dev_interface.direct_cmd -> reporting_interactive.streamlit_dashboard: "streamlit run"
 reporting_interactive.streamlit_dashboard -> researcher: interactive exploration
 reporting_interactive.streamlit_dashboard -> data_storage.artifacts.data_dir: exports filtered CSVs
 
@@ -572,7 +634,7 @@ reporting_interactive.streamlit_dashboard -> data_storage.artifacts.data_dir: ex
 data_storage.artifacts.data_dir -> reporting_static.quarto_reports: "loads\n(future)" {
   class: dependency
 }
-analysis_layer.gen_figures -> reporting_static.quarto_reports: "embeds\n(future)" {
+analysis_layer.visualization -> reporting_static.quarto_reports: "embeds\n(future)" {
   class: dependency
 }
 reporting_static.quarto_reports -> data_storage.artifacts.reports_dir: "generates PDF/HTML\n(future)" {

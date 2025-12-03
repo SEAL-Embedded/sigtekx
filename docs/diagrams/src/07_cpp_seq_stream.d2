@@ -61,48 +61,20 @@ streaming_mode: Streaming Executor Pipeline {
   StreamingExecutor -> Impl: "2: submit_impl(input, output, num_samples)"
 
   # Ring Buffer Accumulation
-  accumulation_header: {
-    label: "═══ Ring Buffer Accumulation (Per-Channel) ═══"
-    class: section-header
-  }
-
   Impl -> RingBuffer: "3: for each channel:\npush(input_chunk[ch], num_samples)"
   RingBuffer -> RingBuffer: "4: Lock-free push\nAtomic write_pos update"
   RingBuffer -> Impl: "5: push complete"
 
-  # Frame Extraction Loop
-  extraction_header: {
-    label: "═══ Frame Extraction Loop ═══"
-    class: section-header
-  }
-
-  loop_note: {
-    class: loop-container
-    label: |md
-      **Loop: while can_extract_frame(nfft)**
-      Process all complete frames available in ring buffers
-    |
-  }
-
+  # Frame Extraction Loop (while can_extract_frame(nfft))
   Impl -> RingBuffer: "6: extract_batch(staging, nfft, 1, hop_size)"
   RingBuffer -> RingBuffer: "7: Extract overlapping frame\nfor all channels"
   RingBuffer -> Staging: "8: frame data in staging"
 
   # Host to Device Transfer
-  h2d_stream_header: {
-    label: "═══ Host to Device Transfer ═══"
-    class: section-header
-  }
-
   Staging -> Stream0: "9: copy_from_host(staging)\n(Shape: [channels, nfft])"
   Stream0 -> Stream0: "10: record event_h2d_done"
 
   # Compute Pipeline
-  compute_stream_header: {
-    label: "═══ Compute Pipeline ═══"
-    class: section-header
-  }
-
   Stream1 -> Stream0: "11: wait(event_h2d_done)"
   Stream1 -> WindowStage: "12: process(d_input, d_input)"
   WindowStage -> WindowStage: "13: apply_window_kernel<<<>>>\n(Shape: [channels, nfft])"
@@ -116,34 +88,14 @@ streaming_mode: Streaming Executor Pipeline {
   Stream1 -> Stream1: "18: record event_compute_done"
 
   # Device to Host Transfer
-  d2h_stream_header: {
-    label: "═══ Device to Host Transfer ═══"
-    class: section-header
-  }
-
   Stream2 -> Stream1: "19: wait(event_compute_done)"
   Stream2 -> Stream2: "20: copy_to_host(output_frame)\n(Transfer one frame result)"
 
   # Advance Ring Buffer
-  advance_header: {
-    label: "═══ Advance Ring Buffer ═══"
-    class: section-header
-  }
-
   Impl -> RingBuffer: "21: advance(hop_size)\n(Move read pointer for overlap)"
   Impl -> Impl: "22: frames_processed++"
 
-  loop_end: {
-    class: text-note
-    label: "═══ End Frame Extraction Loop ═══"
-  }
-
-  # Synchronization
-  sync_stream_header: {
-    label: "═══ Synchronization ═══"
-    class: section-header
-  }
-
+  # End Frame Extraction Loop - Synchronization
   Impl -> Stream2: "23: synchronize()\n(Wait for last frame D2H)"
   Stream2 -> Impl: "24: last frame complete"
 

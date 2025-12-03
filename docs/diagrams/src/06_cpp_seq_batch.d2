@@ -51,29 +51,11 @@ batch_mode: Batch Executor Pipeline {
   Client -> BatchExecutor: "1: submit(input, output, num_samples)"
   BatchExecutor -> Impl: "2: submit_impl(input, output, num_samples)"
 
-  process_note: {
-    class: text-label
-    label: |md
-      Process input for all channels
-      Extract overlapping frames
-    |
-  }
-
   # Host to Device Transfer
-  h2d_header: {
-    label: "═══ Host to Device Transfer ═══"
-    class: section-header
-  }
-
   Impl -> Stream0: "3: copy_from_host(input)"
   Stream0 -> Stream0: "4: record event_h2d_done\n(Async H2D on Stream 0)"
 
   # Compute Pipeline
-  compute_header: {
-    label: "═══ Compute Pipeline ═══"
-    class: section-header
-  }
-
   Stream1 -> Stream0: "5: wait(event_h2d_done)\n(Stream 1 waits for H2D)"
   Stream1 -> WindowStage: "6: process(d_input, d_input)"
   WindowStage -> WindowStage: "7: apply_window_kernel<<<>>>\n(Shape: [channels, nfft])"
@@ -87,20 +69,10 @@ batch_mode: Batch Executor Pipeline {
   Stream1 -> Stream1: "12: record event_compute_done"
 
   # Device to Host Transfer
-  d2h_header: {
-    label: "═══ Device to Host Transfer ═══"
-    class: section-header
-  }
-
   Stream2 -> Stream1: "13: wait(event_compute_done)\n(Stream 2 waits for compute)"
   Stream2 -> Stream2: "14: copy_to_host(output)"
 
   # Synchronization
-  sync_header: {
-    label: "═══ Synchronization ═══"
-    class: section-header
-  }
-
   Impl -> Stream2: "15: synchronize()\n(Block until D2H complete)"
   Stream2 -> Impl: "16: D2H complete"
 
