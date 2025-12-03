@@ -7,7 +7,7 @@
     "01_system_overview.d2": "elk",
     "02_py_structure.d2": "elk",
     "03_cpp_components.d2": "elk",
-    "04_py_analysis.d2": "dagre",
+    "04_py_analysis.d2": "elk",
     "05_workflow_full.d2": "elk",
     "06_cpp_seq_batch.d2": "elk",
     "07_cpp_seq_stream.d2": "elk",
