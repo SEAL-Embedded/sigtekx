@@ -7,10 +7,9 @@
 # relationships with processing stages, CUDA resources, and memory management.
 
 # Import shared styles
-common/styles
+...@common/styles
 
 direction: down
-layout-engine: dagre
 
 # ==============================================================================
 # Python Bindings Layer
@@ -51,8 +50,8 @@ executor_api: C++ Executor API {
       **Batch Mode (High-Throughput)**
       - Direct pipeline processing
       - NumPy array interface
-      - Mean latency: 86.79 �s
-      - Direct H2D � Compute � D2H
+      - Mean latency: 86.79 µs
+      - Direct H2D → Compute → D2H
       - Pimpl idiom hides CUDA dependencies
     |
   }
@@ -65,8 +64,8 @@ executor_api: C++ Executor API {
       **Streaming Mode (Low-Latency)**
       - Ring buffer accumulation
       - Arbitrary chunk sizes
-      - Mean latency: 122.25 �s
-      - Ring buffer � Extract � Pipeline
+      - Mean latency: 122.25 µs
+      - Ring buffer → Extract → Pipeline
       - Pimpl idiom hides CUDA dependencies
     |
   }
@@ -106,12 +105,12 @@ streaming_components: Streaming Components {
 
     note: |md
       Per-channel ring buffers
-      - Capacity: 3� NFFT
+      - Capacity: 3× NFFT
       - Lock-free thread-safe
 
       **Memory Overhead: +80%**
-      - 3� NFFT � channels (ring buffers)
-      - + nfft � channels (staging)
+      - 3× NFFT × channels (ring buffers)
+      - + nfft × channels (staging)
       - = 295 KB vs 164 KB (batch)
     |
   }

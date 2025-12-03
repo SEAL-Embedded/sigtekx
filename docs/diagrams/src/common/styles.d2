@@ -376,74 +376,8 @@ classes: {
 # ==============================================================================
 # Color Scheme Documentation
 # ==============================================================================
-
-color_scheme_doc: |md
-  # Ionosense HPC D2 Diagram Color Scheme
-
-  ## Container Colors (Primary)
-  - **Core Blue** (#E6F3FF / #4169E1): Core platform, executors, C++ architecture
-  - **Execution Red** (#FFE6E6 / #C00000): Execution layer, workflow phases
-  - **Streaming Green** (#E6FFE6 / #228B22): Streaming components, analysis
-  - **Benchmark Orange** (#FFF5E6 / #FF8C00): Benchmarks, artifacts, results
-  - **Config Blue** (#F0F8FF / #4169E1): Configuration, orchestration
-  - **Note Gold** (#FFFACD / #FFD700): Notes, capabilities, highlights
-  - **Research Green** (#E8F5E9 / #4CAF50): Research applications, impact
-
-  ## Memory Space Colors
-  - **GPU Gold** (#FFD700 / #B8860B): Device memory, GPU resources
-  - **Host Green** (#90EE90 / #228B22): Pinned host memory
-  - **Ring Buffer** (#C4E6C4 / #228B22): Per-channel ring buffers
-  - **PCIe Red** (#FFE4E4 / #C00000): Host-device transfers
-
-  ## Special Purpose Colors
-  - **Kernel Orange** (#FFE4B5 / #FF8C00): CUDA kernels, C++ extension
-  - **CUDA Resource** (#D4E6FF / #4169E1): CUDA resource management
-  - **Exception Pink** (#FFB6C1 / #FF6B6B): Exception handling
-
-  ## Usage Guidelines
-  - Use core-blue for primary architectural components
-  - Use execution-red for workflow/execution phases
-  - Use streaming-green for continuous/streaming data flows
-  - Use benchmark-orange for performance measurement components
-  - Use note-gold for informational callouts and highlights
-  - Use gpu-memory for all device memory allocations
-  - Use host-memory for page-locked host buffers
-  - Use pcie-transfer for explicit H2D/D2H transfer nodes
-
-  ## Relationship Styles
-  - **dependency**: Dashed line (stroke-dash: 3) for loose coupling
-  - **ownership**: Diamond arrowhead for composition/ownership
-  - **implementation**: Dashed + triangle for interface implementation
-  - **data-flow**: Solid line with standard arrow for data movement
-
-  ## Text Styles
-  - **text-note**: Italic, small font, no border (metadata)
-  - **section-header**: Bold, medium font, no border (section titles)
-  - **text-label**: Standard text, no border (inline labels)
-
-  ## Example Usage
-  ```d2
-  # Import shared styles
-  ...common/styles.d2
-
-  # Apply to containers
-  my_container: {
-    class: core-blue
-  }
-
-  # Apply to connections
-  a -> b: {
-    class: dependency
-  }
-
-  # Apply to shapes
-  database: {
-    class: storage-cylinder
-  }
-  ```
-|
-
-color_scheme_doc.style: {
-  stroke-width: 0
-  italic: true
-}
+# NOTE: Full color scheme documentation has been moved to:
+#       - docs/diagrams/color-scheme.md (main documentation)
+#       - 01_system_overview.d2 (visual legend in first diagram)
+#
+# This keeps individual diagram files clean and focused.

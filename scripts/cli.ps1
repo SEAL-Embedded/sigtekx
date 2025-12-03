@@ -732,12 +732,19 @@ function Invoke-Diagrams {
 
         Write-Host "  🔨 Rendering: $($diagram.Name) with $layoutEngine → $Format..." -ForegroundColor Cyan
 
-        # Invoke d2
-        $d2Args = @("--layout", $layoutEngine, $srcFile, $outFile)
-        if ($Verbose) {
-            & d2 @d2Args
-        } else {
-            & d2 @d2Args 2>&1 | Out-Null
+        # Invoke d2 (must run from source directory for import resolution)
+        $previousLocation = Get-Location
+        try {
+            Set-Location -Path $srcDir
+            $relativeSrcFile = Resolve-Path -Relative $srcFile
+            $d2Args = @("--layout", $layoutEngine, $relativeSrcFile, $outFile)
+            if ($Verbose) {
+                & d2 @d2Args
+            } else {
+                & d2 @d2Args 2>&1 | Out-Null
+            }
+        } finally {
+            Set-Location -Path $previousLocation
         }
 
         if ($LASTEXITCODE -eq 0) {
