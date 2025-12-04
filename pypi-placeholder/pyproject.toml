@@ -1,15 +1,11 @@
-# Placeholder pyproject.toml for claiming "sigtekx" on PyPI
-# This is a minimal configuration for version 0.0.0 to reserve the package name
-# The full package will be published later after the complete rename
-
 [build-system]
 requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "sigtekx"
-version = "0.0.1"
-description = "SigTekX: GPU-accelerated signal processing pipeline builder (placeholder - full release coming soon)"
+version = "0.0.0"
+description = "GPU-accelerated signal processing pipeline builder for real-time FFT analysis"
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [
@@ -20,12 +16,13 @@ keywords = [
     "signal-processing",
     "fft",
     "cuda",
-    "hpc",
+    "gpu",
     "real-time",
-    "gpu-computing",
+    "stft",
+    "spectrogram",
 ]
 classifiers = [
-    "Development Status :: 1 - Planning",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
@@ -35,14 +32,15 @@ classifiers = [
     "Topic :: Scientific/Engineering",
     "Topic :: Scientific/Engineering :: Physics",
     "Topic :: Software Development :: Libraries :: Python Modules",
-    "Operating System :: OS Independent",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
 ]
 
 [project.urls]
 Homepage = "https://github.com/SEAL-Embedded/ionosense-hpc-lib"
 Documentation = "https://github.com/SEAL-Embedded/ionosense-hpc-lib"
-"Bug Tracker" = "https://github.com/SEAL-Embedded/ionosense-hpc-lib/issues"
 Repository = "https://github.com/SEAL-Embedded/ionosense-hpc-lib"
+"Bug Tracker" = "https://github.com/SEAL-Embedded/ionosense-hpc-lib/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]

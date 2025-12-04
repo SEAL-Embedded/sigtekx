@@ -1,46 +1,53 @@
 # SigTekX
 
-**Status**: 🚧 Package name placeholder - Full release coming soon!
+**Package name reservation - Full release coming soon**
 
 ## About
 
-**SigTekX** (**Sig**nal **Tek**ton e**X**celeration) is a high-performance CUDA-accelerated signal processing library for Python. The name reflects its core purpose: building (**tekton** = builder in Greek) GPU-accelerated signal processing pipelines with exceptional performance.
+**SigTekX** (Signal + Tekton "builder" + X "acceleration") is a high-performance GPU-accelerated signal processing library for building real-time FFT analysis pipelines.
 
-This is a **placeholder release (v0.0.0)** to reserve the `sigtekx` package name on PyPI. The full-featured library is currently in development and will be released shortly.
+This placeholder reserves the `sigtekx` package name on PyPI. The library is currently in development (v0.9.4) and will be published under this name in an upcoming release.
 
-## Planned Features
+## Current Status
 
-- 🚀 **High-Performance GPU Computing**: CUDA-accelerated FFT pipeline with sub-200μs latency
-- 🐍 **Clean Python API**: Type-safe interface with Pydantic configuration
-- 📊 **Professional Benchmarking**: Comprehensive performance analysis tools
-- 🔬 **Research Infrastructure**: Integration with Hydra, MLflow, DVC, and Snakemake
-- ⚡ **Real-Time Processing**: Optimized for streaming signal analysis
-- 📈 **NVTX Profiling**: Built-in support for NVIDIA profiling tools
+The library is in **active development** (Beta) with a working implementation featuring:
+
+- **Sub-200μs latency** CUDA FFT engine
+- **Python API** with C++ backend via pybind11
+- **Multi-stream async execution** for throughput optimization
+- **Research infrastructure** (Hydra, MLflow, DVC, Snakemake)
+- **Professional benchmarking** suite with statistical analysis
+- **NVTX profiling** support for NVIDIA tools
 
 ## Coming Soon
 
-The full package will include:
-- Complete CUDA FFT processing engine
-- Python API with extensive configuration options
-- Benchmark suite and research workflow tools
-- Comprehensive documentation and examples
-- Support for ionospheric physics research and other signal processing domains
+The rebranded `sigtekx` package will include:
 
-## Current Development
+- Complete CUDA-accelerated FFT processing engine
+- Type-safe Python API with Pydantic configuration
+- Batch and streaming execution modes
+- Comprehensive benchmark and profiling tools
+- Pre-configured presets for common use cases
+- Full documentation and examples
 
-The library is being actively developed. Check back soon or watch the repository for updates:
+## Repository
 
-**Repository**: https://github.com/SEAL-Embedded/ionosense-hpc-lib *(repository will be renamed to sigtekx)*
+Development is happening at: https://github.com/SEAL-Embedded/ionosense-hpc-lib
+
+**Note**: Repository will be renamed to `sigtekx` upon package release.
+
+## Requirements (Future Release)
+
+- Python 3.11+
+- NVIDIA GPU with CUDA compute capability 6.0+ (Pascal or newer)
+- CUDA Toolkit 13.0+
+- Windows 11 or Linux
 
 ## Contact
 
-- **Author**: Kevin Rahsaz
-- **Email**: rahsaz.kevin@gmail.com
+**Author**: Kevin Rahsaz
+**Email**: rahsaz.kevin@gmail.com
 
 ## License
 
-MIT License - See LICENSE file for details
-
----
-
-**Note**: This is version 0.0.0, a placeholder release. Please check back for the full release announcement.
+MIT License
