@@ -10,16 +10,16 @@
  * now as a standalone executor component.
  */
 
-#include "ionosense/executors/batch_executor.hpp"
+#include "sigtekx/executors/batch_executor.hpp"
 
 #include <algorithm>
 #include <chrono>
 #include <stdexcept>
 
-#include "ionosense/core/cuda_wrappers.hpp"
-#include "ionosense/profiling/nvtx.hpp"
+#include "sigtekx/core/cuda_wrappers.hpp"
+#include "sigtekx/profiling/nvtx.hpp"
 
-namespace ionosense {
+namespace sigtekx {
 
 // ============================================================================
 //  BatchExecutor::Impl (Private Implementation)
@@ -485,4 +485,4 @@ size_t BatchExecutor::get_memory_usage() const {
 
 bool BatchExecutor::is_initialized() const { return pImpl->is_initialized(); }
 
-}  // namespace ionosense
+}  // namespace sigtekx

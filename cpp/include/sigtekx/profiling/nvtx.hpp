@@ -16,14 +16,14 @@
 #include <cstdio>
 #include <string>
 
-namespace ionosense {
+namespace sigtekx {
 namespace profiling {
 
 // -----------------------------------------------------------------------------
 // Runtime toggle
 // -----------------------------------------------------------------------------
 // Implemented in src/profiling_nvtx.cu when profiling is enabled.
-#ifdef IONOSENSE_ENABLE_PROFILING
+#ifdef SIGTEKX_ENABLE_PROFILING
 bool profiling_enabled();
 void set_profiling_enabled(bool enable);
 #else
@@ -66,7 +66,7 @@ class ScopedRange {
 };
 
 // Lightweight marker
-#ifdef IONOSENSE_ENABLE_PROFILING
+#ifdef SIGTEKX_ENABLE_PROFILING
 void nvtx_mark(const char* message, uint32_t color);
 #else
 inline void nvtx_mark(const char* /*message*/, uint32_t /*color*/) {}
@@ -103,19 +103,19 @@ inline std::string format_memory_range(const std::string& operation,
 // -----------------------------------------------------------------------------
 // Public Macros
 // -----------------------------------------------------------------------------
-#ifdef IONOSENSE_ENABLE_PROFILING
+#ifdef SIGTEKX_ENABLE_PROFILING
 #define IONO_NVTX_RANGE(name, color_argb)                          \
-  ionosense::profiling::ScopedRange IONO_UNIQUE_ID(_nvtx_range_) { \
+  sigtekx::profiling::ScopedRange IONO_UNIQUE_ID(_nvtx_range_) { \
     (name), (color_argb)                                           \
   }
 #define IONO_NVTX_RANGE_FUNCTION(color_argb)                          \
-  ionosense::profiling::ScopedRange IONO_UNIQUE_ID(_nvtx_fn_range_) { \
+  sigtekx::profiling::ScopedRange IONO_UNIQUE_ID(_nvtx_fn_range_) { \
     __FUNCTION__, (color_argb)                                        \
   }
 #define IONO_NVTX_MARK(message, color_argb)                     \
   do {                                                          \
-    if (ionosense::profiling::profiling_enabled())              \
-      ionosense::profiling::nvtx_mark((message), (color_argb)); \
+    if (sigtekx::profiling::profiling_enabled())              \
+      sigtekx::profiling::nvtx_mark((message), (color_argb)); \
   } while (0)
 #else
 // No-op implementations when profiling is disabled at compile time
@@ -127,4 +127,4 @@ inline ScopedRange::~ScopedRange() {}
 #endif
 
 }  // namespace profiling
-}  // namespace ionosense
+}  // namespace sigtekx

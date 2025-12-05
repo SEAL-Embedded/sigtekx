@@ -20,7 +20,7 @@
 
 #include "cuda_wrappers.hpp"
 
-namespace ionosense {
+namespace sigtekx {
 
 /**
  * @class RingBuffer
@@ -307,4 +307,4 @@ class RingBuffer {
   std::atomic<size_t> available_;       ///< Number of samples available (lock-free)
 };
 
-}  // namespace ionosense
+}  // namespace sigtekx

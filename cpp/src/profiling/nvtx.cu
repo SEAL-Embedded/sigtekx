@@ -4,18 +4,18 @@
  * NVTX implementation - keeps all CUDA/NVTX headers isolated to .cu
  */
 
-#include "ionosense/profiling/nvtx.hpp"
+#include "sigtekx/profiling/nvtx.hpp"
 
-#ifdef IONOSENSE_ENABLE_PROFILING
+#ifdef SIGTEKX_ENABLE_PROFILING
 #define NVTX3_CPP_REQUIRE_EXPLICIT_VERSION
 #include <nvtx3/nvtx3.hpp>
 #undef NVTX3_CPP_REQUIRE_EXPLICIT_VERSION
 #endif
 
-namespace ionosense {
+namespace sigtekx {
 namespace profiling {
 
-#ifdef IONOSENSE_ENABLE_PROFILING
+#ifdef SIGTEKX_ENABLE_PROFILING
 // Single runtime toggle shared across all TUs
 static bool g_profiling_enabled = true;
 
@@ -51,7 +51,7 @@ void nvtx_mark(const char* message, uint32_t color) {
                                                 to_argb(color)});
   }
 }
-#endif  // IONOSENSE_ENABLE_PROFILING
+#endif  // SIGTEKX_ENABLE_PROFILING
 
 }  // namespace profiling
-}  // namespace ionosense
+}  // namespace sigtekx

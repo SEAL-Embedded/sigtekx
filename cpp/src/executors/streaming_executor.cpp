@@ -12,7 +12,7 @@
  * with background thread for improved throughput.
  */
 
-#include "ionosense/executors/streaming_executor.hpp"
+#include "sigtekx/executors/streaming_executor.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -24,11 +24,11 @@
 #include <stdexcept>
 #include <thread>
 
-#include "ionosense/core/cuda_wrappers.hpp"
-#include "ionosense/core/ring_buffer.hpp"
-#include "ionosense/profiling/nvtx.hpp"
+#include "sigtekx/core/cuda_wrappers.hpp"
+#include "sigtekx/core/ring_buffer.hpp"
+#include "sigtekx/profiling/nvtx.hpp"
 
-namespace ionosense {
+namespace sigtekx {
 
 // ============================================================================
 //  StreamingExecutor::Impl (Private Implementation)
@@ -847,4 +847,4 @@ bool StreamingExecutor::is_initialized() const {
   return pImpl->is_initialized();
 }
 
-}  // namespace ionosense
+}  // namespace sigtekx

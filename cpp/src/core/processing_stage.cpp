@@ -13,7 +13,7 @@
  * the header, promoting cleaner architecture and faster compile times.
  */
 
-#include "ionosense/core/processing_stage.hpp"
+#include "sigtekx/core/processing_stage.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -21,12 +21,12 @@
 #include <string>
 #include <vector>
 
-#include "ionosense/core/cuda_wrappers.hpp"
-#include "ionosense/core/window_functions.hpp"
-#include "ionosense/profiling/nvtx.hpp"
+#include "sigtekx/core/cuda_wrappers.hpp"
+#include "sigtekx/core/window_functions.hpp"
+#include "sigtekx/profiling/nvtx.hpp"
 
 // --- External Kernel Launch Function Declarations (from ops_fft.cu) ---
-namespace ionosense {
+namespace sigtekx {
 namespace kernels {
 // Declares functions defined in another translation unit (.cu file).
 extern void launch_apply_window(const float* input, float* output,
@@ -38,9 +38,9 @@ extern void launch_magnitude(const float2* input, float* output, int num_bins,
                              cudaStream_t stream);
 
 }  // namespace kernels
-}  // namespace ionosense
+}  // namespace sigtekx
 
-namespace ionosense {
+namespace sigtekx {
 
 // ============================================================================
 //  WindowStage Implementation
@@ -420,4 +420,4 @@ void normalize_window(float* window, int size, StageConfig::WindowNorm norm) {
 }
 
 }  // namespace window_utils
-}  // namespace ionosense
+}  // namespace sigtekx

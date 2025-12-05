@@ -21,9 +21,9 @@
 #include <string>
 #include <vector>
 
-#include "ionosense/core/processing_stage.hpp"
+#include "sigtekx/core/processing_stage.hpp"
 
-namespace ionosense {
+namespace sigtekx {
 
 // Forward declarations
 struct ExecutorConfig;
@@ -138,4 +138,4 @@ class IPipelineExecutor {
   virtual bool is_initialized() const = 0;
 };
 
-}  // namespace ionosense
+}  // namespace sigtekx

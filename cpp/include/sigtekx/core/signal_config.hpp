@@ -20,7 +20,7 @@
 #include <string>
 #include <vector>
 
-namespace ionosense {
+namespace sigtekx {
 
 /**
  * @struct SignalConfig
@@ -68,4 +68,4 @@ bool validate_config(const SignalConfig& config, std::string& error_msg);
 size_t estimate_memory_usage(const SignalConfig& config);
 }  // namespace signal_utils
 
-}  // namespace ionosense
+}  // namespace sigtekx

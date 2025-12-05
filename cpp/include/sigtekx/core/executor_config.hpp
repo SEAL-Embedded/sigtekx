@@ -12,9 +12,9 @@
 
 #pragma once
 
-#include "ionosense/core/signal_config.hpp"  // For SignalConfig base
+#include "sigtekx/core/signal_config.hpp"  // For SignalConfig base
 
-namespace ionosense {
+namespace sigtekx {
 
 /**
  * @struct ExecutorConfig
@@ -85,4 +85,4 @@ struct ExecutorConfig : SignalConfig {
   }
 };
 
-}  // namespace ionosense
+}  // namespace sigtekx

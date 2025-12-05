@@ -26,7 +26,7 @@
 struct CUstream_st;
 using cudaStream_t = CUstream_st*;
 
-namespace ionosense {
+namespace sigtekx {
 
 /**
  * @struct StageConfig
@@ -310,4 +310,4 @@ void generate_window(float* window, int size, StageConfig::WindowType type,
 void normalize_window(float* window, int size, StageConfig::WindowNorm norm);
 }  // namespace window_utils
 
-}  // namespace ionosense
+}  // namespace sigtekx

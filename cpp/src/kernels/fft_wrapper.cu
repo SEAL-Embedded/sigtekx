@@ -26,8 +26,8 @@
 #include <algorithm>
 #include <cmath>
 
-#include "ionosense/profiling/nvtx.hpp"
-namespace ionosense {
+#include "sigtekx/profiling/nvtx.hpp"
+namespace sigtekx {
 namespace kernels {
 
 // --- Kernel Configuration Constants ---
@@ -368,4 +368,4 @@ void launch_scale_fft(float2* data, int num_elements, float scale,
 }
 
 }  // namespace kernels
-}  // namespace ionosense
+}  // namespace sigtekx

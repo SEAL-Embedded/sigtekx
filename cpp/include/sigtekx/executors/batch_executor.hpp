@@ -14,10 +14,10 @@
 
 #include <memory>
 
-#include "ionosense/core/executor_config.hpp"
-#include "ionosense/core/pipeline_executor.hpp"
+#include "sigtekx/core/executor_config.hpp"
+#include "sigtekx/core/pipeline_executor.hpp"
 
-namespace ionosense {
+namespace sigtekx {
 
 /**
  * @class BatchExecutor
@@ -84,4 +84,4 @@ class BatchExecutor : public IPipelineExecutor {
   std::unique_ptr<Impl> pImpl;
 };
 
-}  // namespace ionosense
+}  // namespace sigtekx

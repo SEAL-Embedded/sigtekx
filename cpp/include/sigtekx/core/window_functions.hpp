@@ -42,7 +42,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace ionosense::window_functions {
+namespace sigtekx::window_functions {
 
 #if defined(__CUDACC__)
 #define IONO_HD __host__ __device__
@@ -279,4 +279,4 @@ inline void fill_window(float* destination, int size, WindowKind kind,
 
 #undef IONO_HD
 
-}  // namespace ionosense::window_functions
+}  // namespace sigtekx::window_functions

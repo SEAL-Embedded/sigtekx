@@ -7,14 +7,14 @@
  * @brief Implementation of the PipelineBuilder class.
  */
 
-#include "ionosense/core/pipeline_builder.hpp"
+#include "sigtekx/core/pipeline_builder.hpp"
 
 #include <algorithm>
 #include <stdexcept>
 
-#include "ionosense/profiling/nvtx.hpp"
+#include "sigtekx/profiling/nvtx.hpp"
 
-namespace ionosense {
+namespace sigtekx {
 
 // ============================================================================
 //  PipelineBuilder::Impl (Private Implementation)
@@ -185,4 +185,4 @@ size_t PipelineBuilder::num_stages() const { return pImpl->num_stages(); }
 
 void PipelineBuilder::clear() { pImpl->clear(); }
 
-}  // namespace ionosense
+}  // namespace sigtekx

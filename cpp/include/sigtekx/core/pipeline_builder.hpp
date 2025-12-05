@@ -16,9 +16,9 @@
 #include <string>
 #include <vector>
 
-#include "ionosense/core/processing_stage.hpp"
+#include "sigtekx/core/processing_stage.hpp"
 
-namespace ionosense {
+namespace sigtekx {
 
 /**
  * @class PipelineBuilder
@@ -136,4 +136,4 @@ class PipelineBuilder {
   std::unique_ptr<Impl> pImpl;
 };
 
-}  // namespace ionosense
+}  // namespace sigtekx

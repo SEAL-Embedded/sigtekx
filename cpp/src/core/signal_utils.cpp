@@ -13,11 +13,11 @@
 #include <sstream>
 #include <stdexcept>
 
-#include "ionosense/core/cuda_wrappers.hpp"
-#include "ionosense/core/signal_config.hpp"
-#include "ionosense/profiling/nvtx.hpp"
+#include "sigtekx/core/cuda_wrappers.hpp"
+#include "sigtekx/core/signal_config.hpp"
+#include "sigtekx/profiling/nvtx.hpp"
 
-namespace ionosense {
+namespace sigtekx {
 namespace signal_utils {
 
 std::vector<std::string> get_available_devices() {
@@ -109,4 +109,4 @@ size_t estimate_memory_usage(const SignalConfig& cfg) {
 }
 
 }  // namespace signal_utils
-}  // namespace ionosense
+}  // namespace sigtekx

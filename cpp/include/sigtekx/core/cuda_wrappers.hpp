@@ -61,7 +61,7 @@
 #include <string>
 #include <utility>
 
-namespace ionosense {
+namespace sigtekx {
 
 // Forward-declare exception classes for the macros.
 class CudaException;
@@ -727,4 +727,4 @@ class CufftPlan {
   size_t work_size_;
 };
 
-}  // namespace ionosense
+}  // namespace sigtekx
