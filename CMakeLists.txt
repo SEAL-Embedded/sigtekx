@@ -269,7 +269,7 @@ if(SIGTEKX_WITH_PYTHON AND SIGTEKX_WITH_CUDA)
 
             # Optional: import validation only for dev builds
             add_custom_command(TARGET _native POST_BUILD
-                COMMAND ${Python3_EXECUTABLE} -c "import sys; sys.path.insert(0, '${CMAKE_CURRENT_SOURCE_DIR}/python'); import sigtekx; print('[sigtekx] Python extension import validated successfully.')"
+                COMMAND ${Python3_EXECUTABLE} -c "import sys; sys.path.insert(0, '${CMAKE_CURRENT_SOURCE_DIR}/src'); import sigtekx; print('[sigtekx] Python extension import validated successfully.')"
                 COMMENT "[sigtekx] Validating Python extension import"
                 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
             )
