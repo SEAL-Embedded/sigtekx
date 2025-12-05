@@ -1,4 +1,4 @@
-name: ionosense-hpc
+name: sigtekx
 channels:
   - nvidia
   - conda-forge

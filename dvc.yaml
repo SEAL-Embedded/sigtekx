@@ -9,7 +9,7 @@ stages:
       - experiments/Snakefile
       - experiments/conf/
       - experiments/scripts/
-      - src/ionosense_hpc/
+      - src/sigtekx/
     outs:
       - artifacts/data/:
           persist: true

@@ -1,4 +1,4 @@
-# Main Hydra configuration for ionosense-hpc
+# Main Hydra configuration for sigtekx
 # Simple, clean configuration following one-tool-one-job principle
 
 defaults:
@@ -9,12 +9,12 @@ defaults:
 
 # Project metadata
 project:
-  name: ionosense-hpc
+  name: sigtekx
   version: 2.0.0
 
-# Output paths - all artifacts route through artifacts_root (overridable via IONO_OUTPUT_ROOT)
+# Output paths - all artifacts route through artifacts_root (overridable via SIGX_OUTPUT_ROOT)
 paths:
-  artifacts_root: ${oc.env:IONO_OUTPUT_ROOT,artifacts}
+  artifacts_root: ${oc.env:SIGX_OUTPUT_ROOT,artifacts}
   artifacts: ${paths.artifacts_root}
   experiments_dir: ${paths.artifacts_root}/experiments
   data: ${paths.artifacts_root}/data

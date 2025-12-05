@@ -7,7 +7,7 @@ stages:
     deps:
       - benchmarks/
       - scripts/
-      - src/ionosense_hpc/
+      - src/sigtekx/
       - conf/
       - Snakefile
     outs:
@@ -26,7 +26,7 @@ stages:
     cmd: python benchmarks/run_latency.py
     deps:
       - benchmarks/run_latency.py
-      - src/ionosense_hpc/benchmarks/
+      - src/sigtekx/benchmarks/
       - conf/engine/
       - conf/benchmark/latency.yaml
     params:
@@ -40,7 +40,7 @@ stages:
     cmd: python benchmarks/run_throughput.py
     deps:
       - benchmarks/run_throughput.py
-      - src/ionosense_hpc/benchmarks/
+      - src/sigtekx/benchmarks/
       - conf/engine/
       - conf/benchmark/throughput.yaml
     params:
