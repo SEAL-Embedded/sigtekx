@@ -47,14 +47,14 @@
 #include "../benchmarks/utils/signal_generator.hpp"
 
 // Executor and core functionality
-#include "ionosense/core/cuda_wrappers.hpp"
-#include "ionosense/core/processing_stage.hpp"
-#include "ionosense/profiling/nvtx.hpp"
-#include "ionosense/executors/batch_executor.hpp"
-#include "ionosense/executors/streaming_executor.hpp"
+#include "sigtekx/core/cuda_wrappers.hpp"
+#include "sigtekx/core/processing_stage.hpp"
+#include "sigtekx/profiling/nvtx.hpp"
+#include "sigtekx/executors/batch_executor.hpp"
+#include "sigtekx/executors/streaming_executor.hpp"
 
-using namespace ionosense;
-using namespace ionosense::benchmark;
+using namespace sigtekx;
+using namespace sigtekx::benchmark;
 
 // ============================================================================
 // Helper Functions

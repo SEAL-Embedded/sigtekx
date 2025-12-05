@@ -13,7 +13,7 @@
 
 #include "../benchmarks/core/config.hpp"
 
-namespace ionosense {
+namespace sigtekx {
 namespace benchmark {
 
 // ============================================================================
@@ -285,4 +285,4 @@ IONOSPHERE PARAMETER REFERENCE:
 }
 
 }  // namespace benchmark
-}  // namespace ionosense
+}  // namespace sigtekx

@@ -17,9 +17,9 @@
 #include "../benchmarks/core/config.hpp"
 #include "../benchmarks/core/results.hpp"
 #include "../benchmarks/utils/signal_generator.hpp"
-#include "ionosense/profiling/nvtx.hpp"
+#include "sigtekx/profiling/nvtx.hpp"
 
-namespace ionosense {
+namespace sigtekx {
 namespace benchmark {
 
 /**
@@ -129,4 +129,4 @@ inline RealtimeResults run_realtime_benchmark(ExecutorT& executor,
 }
 
 }  // namespace benchmark
-}  // namespace ionosense
+}  // namespace sigtekx

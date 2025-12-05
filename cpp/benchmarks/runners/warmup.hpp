@@ -11,9 +11,9 @@
 #include <vector>
 
 #include "../benchmarks/core/config.hpp"
-#include "ionosense/profiling/nvtx.hpp"
+#include "sigtekx/profiling/nvtx.hpp"
 
-namespace ionosense {
+namespace sigtekx {
 namespace benchmark {
 
 /**
@@ -49,4 +49,4 @@ inline void run_warmup(ExecutorT& executor, const BenchmarkConfig& config) {
 }
 
 }  // namespace benchmark
-}  // namespace ionosense
+}  // namespace sigtekx

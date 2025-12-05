@@ -21,10 +21,10 @@
 #include <cuda_runtime.h>
 #include <cufft.h>
 
-#include "ionosense/profiling/nvtx.hpp"
-#include "ionosense/core/window_functions.hpp"
+#include "sigtekx/profiling/nvtx.hpp"
+#include "sigtekx/core/window_functions.hpp"
 
-namespace ionosense {
+namespace sigtekx {
 namespace benchmark {
 
 /**
@@ -190,4 +190,4 @@ inline float compute_relative_error(const std::vector<float>& output,
 }
 
 }  // namespace benchmark
-}  // namespace ionosense
+}  // namespace sigtekx

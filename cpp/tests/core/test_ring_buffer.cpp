@@ -15,13 +15,13 @@
 #include <cmath>
 #include <vector>
 
-#include "ionosense/core/ring_buffer.hpp"
+#include "sigtekx/core/ring_buffer.hpp"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
 
-using namespace ionosense;
+using namespace sigtekx;
 
 /**
  * @class RingBufferTest

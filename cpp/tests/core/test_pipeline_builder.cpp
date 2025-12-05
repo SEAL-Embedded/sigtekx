@@ -12,11 +12,11 @@
 
 #include <gtest/gtest.h>
 
-#include "ionosense/core/cuda_wrappers.hpp"
-#include "ionosense/core/pipeline_builder.hpp"
-#include "ionosense/core/processing_stage.hpp"
+#include "sigtekx/core/cuda_wrappers.hpp"
+#include "sigtekx/core/pipeline_builder.hpp"
+#include "sigtekx/core/processing_stage.hpp"
 
-using namespace ionosense;
+using namespace sigtekx;
 
 /**
  * @class PipelineBuilderTest

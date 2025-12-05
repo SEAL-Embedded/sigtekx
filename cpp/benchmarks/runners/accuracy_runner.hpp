@@ -15,9 +15,9 @@
 #include "../benchmarks/core/results.hpp"
 #include "../benchmarks/utils/reference_compute.hpp"
 #include "../benchmarks/utils/signal_generator.hpp"
-#include "ionosense/profiling/nvtx.hpp"
+#include "sigtekx/profiling/nvtx.hpp"
 
-namespace ionosense {
+namespace sigtekx {
 namespace benchmark {
 
 /**
@@ -107,4 +107,4 @@ inline AccuracyResults run_accuracy_benchmark(ExecutorT& executor,
 }
 
 }  // namespace benchmark
-}  // namespace ionosense
+}  // namespace sigtekx

@@ -12,11 +12,11 @@
 
 #include <gtest/gtest.h>
 
-#include "ionosense/core/cuda_wrappers.hpp"
-#include "ionosense/core/signal_config.hpp"
+#include "sigtekx/core/cuda_wrappers.hpp"
+#include "sigtekx/core/signal_config.hpp"
 
-using namespace ionosense;
-using namespace ionosense::signal_utils;
+using namespace sigtekx;
+using namespace sigtekx::signal_utils;
 
 /**
  * @class SignalUtilsTest

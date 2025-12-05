@@ -15,15 +15,15 @@
 #include <cmath>
 #include <vector>
 
-#include "ionosense/core/cuda_wrappers.hpp"
-#include "ionosense/core/pipeline_builder.hpp"
-#include "ionosense/executors/batch_executor.hpp"
+#include "sigtekx/core/cuda_wrappers.hpp"
+#include "sigtekx/core/pipeline_builder.hpp"
+#include "sigtekx/executors/batch_executor.hpp"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
 
-using namespace ionosense;
+using namespace sigtekx;
 
 /**
  * @class BatchExecutorTest

@@ -12,7 +12,7 @@
 #include <cmath>
 #include <vector>
 
-namespace ionosense {
+namespace sigtekx {
 namespace benchmark {
 
 // ============================================================================
@@ -162,4 +162,4 @@ inline ErrorMetrics compute_error_metrics(const std::vector<float>& output,
 }
 
 }  // namespace benchmark
-}  // namespace ionosense
+}  // namespace sigtekx

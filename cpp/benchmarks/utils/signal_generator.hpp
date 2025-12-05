@@ -12,13 +12,13 @@
 #include <random>
 #include <vector>
 
-#include "ionosense/profiling/nvtx.hpp"
+#include "sigtekx/profiling/nvtx.hpp"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
 
-namespace ionosense {
+namespace sigtekx {
 namespace benchmark {
 
 // ============================================================================
@@ -116,4 +116,4 @@ inline std::vector<float> generate_test_signal(
 }
 
 }  // namespace benchmark
-}  // namespace ionosense
+}  // namespace sigtekx

@@ -19,8 +19,8 @@
 #include "../benchmarks/core/results.hpp"
 #include "../benchmarks/utils/reference_compute.hpp"
 #include "../benchmarks/utils/signal_generator.hpp"
-#include "ionosense/profiling/nvtx.hpp"
-#include "ionosense/executors/batch_executor.hpp"
+#include "sigtekx/profiling/nvtx.hpp"
+#include "sigtekx/executors/batch_executor.hpp"
 
 namespace ionosense {
 namespace benchmark {

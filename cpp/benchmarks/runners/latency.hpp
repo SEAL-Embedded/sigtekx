@@ -8,11 +8,11 @@
 #include "../benchmarks/core/config.hpp"
 #include "../benchmarks/core/results.hpp"
 #include "../benchmarks/utils/signal_generator.hpp"
-#include "ionosense/profiling/nvtx.hpp"
-#include "ionosense/executors/batch_executor.hpp"
+#include "sigtekx/profiling/nvtx.hpp"
+#include "sigtekx/executors/batch_executor.hpp"
 #include <cuda_runtime.h>
 
-namespace ionosense {
+namespace sigtekx {
 namespace benchmark {
 
 // ============================================================================
@@ -157,4 +157,4 @@ inline LatencyResults run_latency_benchmark(BatchExecutor& executor,
 }
 
 }  // namespace benchmark
-}  // namespace ionosense
+}  // namespace sigtekx

@@ -16,16 +16,16 @@
 #include <cmath>
 #include <vector>
 
-#include "ionosense/core/cuda_wrappers.hpp"
+#include "sigtekx/core/cuda_wrappers.hpp"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
 
-using namespace ionosense;
+using namespace sigtekx;
 
 // Forward declarations of kernel launch functions from fft_wrapper.cu
-namespace ionosense {
+namespace sigtekx {
 namespace kernels {
 
 extern void launch_real_to_complex(const float* input, float2* output, int nfft,

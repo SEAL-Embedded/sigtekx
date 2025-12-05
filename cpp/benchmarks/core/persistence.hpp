@@ -21,7 +21,7 @@
 #include "../benchmarks/core/config.hpp"
 #include "../benchmarks/core/results.hpp"
 
-namespace ionosense {
+namespace sigtekx {
 namespace benchmark {
 
 // ============================================================================
@@ -396,4 +396,4 @@ inline bool baseline_exists(const BenchmarkConfig& config) {
 }
 
 }  // namespace benchmark
-}  // namespace ionosense
+}  // namespace sigtekx

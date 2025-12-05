@@ -20,16 +20,16 @@
 #include <numeric>
 #include <vector>
 
-#include "ionosense/core/cuda_wrappers.hpp"
-#include "ionosense/core/processing_stage.hpp"
-#include "ionosense/core/window_functions.hpp"
+#include "sigtekx/core/cuda_wrappers.hpp"
+#include "sigtekx/core/processing_stage.hpp"
+#include "sigtekx/core/window_functions.hpp"
 
 // IEEE Std 1003.1-2001 compliance for mathematical constants
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
 
-using namespace ionosense;
+using namespace sigtekx;
 
 namespace {
 
@@ -70,8 +70,8 @@ void ExpectWindowParity(StageConfig::WindowType type, bool sqrt_norm, int size,
   std::vector<float> reference(size);
 
   if (size > 0) {
-    ionosense::window_utils::generate_window(generated.data(), size, type,
-                                             sqrt_norm, symmetry);
+    sigtekx::window_utils::generate_window(generated.data(), size, type,
+                                           sqrt_norm, symmetry);
     window_functions::fill_window(reference.data(), size, ToWindowKind(type),
                                   sqrt_norm, ToWindowSymmetry(symmetry));
   }

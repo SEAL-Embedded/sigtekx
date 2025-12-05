@@ -12,9 +12,9 @@
 #include <string>
 #include <vector>
 
-#include "ionosense/core/executor_config.hpp"
+#include "sigtekx/core/executor_config.hpp"
 
-namespace ionosense {
+namespace sigtekx {
 namespace benchmark {
 
 // ============================================================================
@@ -407,4 +407,4 @@ inline ExecutorConfig::ExecutionMode string_to_exec_mode(const std::string& str)
 }
 
 }  // namespace benchmark
-}  // namespace ionosense
+}  // namespace sigtekx

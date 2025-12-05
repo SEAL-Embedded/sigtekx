@@ -6,7 +6,7 @@
 #include <gtest/gtest.h>
 
 // Enable NVTX macros in this TU (definitions live in profiling_nvtx.cu)
-#define IONOSENSE_ENABLE_PROFILING 1
+#define SIGTEKX_ENABLE_PROFILING 1
 
 #include <algorithm>
 #include <chrono>
@@ -16,12 +16,12 @@
 #include <string>
 #include <vector>
 
-#include "ionosense/core/cuda_wrappers.hpp"
-#include "ionosense/core/processing_stage.hpp"  // for ProcessingStats definition
-#include "ionosense/executors/batch_executor.hpp"
-#include "ionosense/profiling/nvtx.hpp"
+#include "sigtekx/core/cuda_wrappers.hpp"
+#include "sigtekx/core/processing_stage.hpp"  // for ProcessingStats definition
+#include "sigtekx/executors/batch_executor.hpp"
+#include "sigtekx/profiling/nvtx.hpp"
 
-using namespace ionosense;
+using namespace sigtekx;
 
 static std::vector<float> generate_test_signal(int nfft, int batch) {
   IONO_NVTX_RANGE("Generate Test Signal", profiling::colors::CYAN);

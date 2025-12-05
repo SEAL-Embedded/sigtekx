@@ -16,9 +16,9 @@
 #include <numeric>
 #include <vector>
 
-#include "ionosense/core/cuda_wrappers.hpp"
+#include "sigtekx/core/cuda_wrappers.hpp"
 
-using namespace ionosense;
+using namespace sigtekx;
 
 /**
  * @class CudaWrappersTest

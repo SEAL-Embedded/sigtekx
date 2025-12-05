@@ -15,9 +15,9 @@
 #include "../benchmarks/core/config.hpp"
 #include "../benchmarks/core/persistence.hpp"
 #include "../benchmarks/core/results.hpp"
-#include "ionosense/executors/batch_executor.hpp"
+#include "sigtekx/executors/batch_executor.hpp"
 
-namespace ionosense {
+namespace sigtekx {
 namespace benchmark {
 
 // ============================================================================
@@ -581,4 +581,4 @@ inline void print_accuracy_results(const BenchmarkConfig& config,
 }
 
 }  // namespace benchmark
-}  // namespace ionosense
+}  // namespace sigtekx

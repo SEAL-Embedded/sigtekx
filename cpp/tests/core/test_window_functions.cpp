@@ -25,14 +25,14 @@
 #include <limits>
 #include <vector>
 
-#include "ionosense/core/window_functions.hpp"
+#include "sigtekx/core/window_functions.hpp"
 
 // IEEE Std 1003.1-2001 compliance for mathematical constants
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
 
-using namespace ionosense::window_functions;
+using namespace sigtekx::window_functions;
 
 // ============================================================================
 // Bounds Validation Tests
