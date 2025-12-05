@@ -8,9 +8,9 @@ requires = [
 build-backend = "scikit_build_core.build"
 # --- Project Metadata (PEP 621) ---
 [project]
-name = "ionosense-hpc"
+name = "sigtekx"
 version = "0.9.4"
-description = "High-performance CUDA FFT engine with modern ML research tooling integration"
+description = "SigTekX: GPU-accelerated signal processing pipeline builder with modern ML research tooling integration"
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [{ name = "Kevin Rahsaz", email = "rahsaz.kevin@gmail.com" }]
@@ -76,7 +76,7 @@ workflow = [
   "optuna>=3.5.0",
 ]
 research = [
-  "ionosense-hpc[benchmark,visualization,reporting,workflow]",
+  "sigtekx[benchmark,visualization,reporting,workflow]",
   "jupyterlab>=4.1",
   "ipykernel>=6.29",
   "ipywidgets>=8.1",
@@ -85,7 +85,7 @@ research = [
 ]
 export = [
   "h5py>=3.10",
-  "ionosense-hpc[benchmark,reporting]",
+  "sigtekx[benchmark,reporting]",
 ]
 color = [
   "rich>=13.7",
@@ -93,23 +93,23 @@ color = [
   "types-colorama",
 ]
 full = [
-  "ionosense-hpc[dev,research]",
+  "sigtekx[dev,research]",
 ]
 [project.urls]
-Homepage = "https://github.com/SEAL-Embedded/ionosense-hpc-lib"
-Documentation = "https://github.com/SEAL-Embedded/ionosense-hpc-lib/tree/main/docs"
-"Bug Tracker" = "https://github.com/SEAL-Embedded/ionosense-hpc-lib/issues"
+Homepage = "https://github.com/SEAL-Embedded/sigtekx"
+Documentation = "https://github.com/SEAL-Embedded/sigtekx/tree/main/docs"
+"Bug Tracker" = "https://github.com/SEAL-Embedded/sigtekx/issues"
 # --- Build System & Packaging Configuration ---
 [tool.scikit-build]
 cmake.version = ">=3.26"
 build-dir = "build/skbuild"
 cmake.args = [
-  "-DIONO_WITH_PYTHON=ON",
-  "-DIONO_WITH_TESTS=OFF",
-  "-DIONO_WITH_CUDA=OFF",
+  "-DSIGTEKX_WITH_PYTHON=ON",
+  "-DSIGTEKX_WITH_TESTS=OFF",
+  "-DSIGTEKX_WITH_CUDA=OFF",
 ]
 [tool.scikit-build.wheel]
-packages = ["src/ionosense_hpc"]
+packages = ["src/sigtekx"]
 [tool.scikit-build.sdist]
 include = [
   "CMakeLists.txt",
@@ -134,7 +134,7 @@ src = ["src", "tests", "benchmarks", "experiments/scripts"]
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "UP", "B", "C4", "SIM", "TID", "ARG"]
 ignore = ["E501", "B008"]
-isort.known-first-party = ["ionosense_hpc"]
+isort.known-first-party = ["sigtekx"]
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401", "E402", "ARG002"]
 "tests/*" = ["B", "SIM", "ARG001", "ARG002"]
@@ -181,7 +181,7 @@ addopts = [
   "-ra",
   "--strict-markers",
   "--tb=short",
-  "--cov=ionosense_hpc",
+  "--cov=sigtekx",
   "--cov-report=term-missing",
   "--cov-report=html:artifacts/reports/coverage",
 ]
@@ -208,7 +208,7 @@ log_cli = true
 log_cli_level = "INFO"
 # --- Test Coverage Configuration ---
 [tool.coverage.run]
-source = ["ionosense_hpc"]
+source = ["sigtekx"]
 omit = [
   "*/__init__.py",
   "*/benchmarks/*",

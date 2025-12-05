@@ -1,14 +1,14 @@
 cmake_minimum_required(VERSION 3.25)
-project(ionosense_hpc LANGUAGES CXX)
+project(sigtekx LANGUAGES CXX)
 
 # ============================================================================
 # Global setup
 # ============================================================================
 set(CMAKE_CXX_STANDARD 17)
-## CUDA settings are configured conditionally later when IONO_WITH_CUDA is ON
+## CUDA settings are configured conditionally later when SIGTEKX_WITH_CUDA is ON
 
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)     # (PIC) For ion_engine static lib to be used in _engine shared lib - Important for Linux!
-set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF) # (IPO) Interferes with nvcc's own LTO; Can damage _engine bindings; Do not enable/remove!
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)     # (PIC) For ion_engine static lib to be used in _native shared lib - Important for Linux!
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF) # (IPO) Interferes with nvcc's own LTO; Can damage _native bindings; Do not enable/remove!
 # Use the static C-Runtime on MSVC to match CUDA::cudart_static and avoid DLL dependencies
 if(MSVC)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -16,18 +16,18 @@ if(MSVC)
     add_compile_definitions(WIN32_LEAN_AND_MEAN NOMINMAX)
 endif()
 
-option(IONO_WITH_TESTS      "Build tests"            ON)
-option(IONO_WITH_GRAPHS     "Enable CUDA Graphs"     ON)
-option(IONO_WITH_PYTHON     "Build Python bindings"  ON)
-option(IONO_WITH_CUDA       "Enable CUDA components" ON)
-option(IONO_WITH_NVTX       "Enable NVTX profiling"  ON)
-option(IONO_ENABLE_COVERAGE "Enable code coverage"   OFF)
+option(SIGTEKX_WITH_TESTS      "Build tests"            ON)
+option(SIGTEKX_WITH_GRAPHS     "Enable CUDA Graphs"     ON)
+option(SIGTEKX_WITH_PYTHON     "Build Python bindings"  ON)
+option(SIGTEKX_WITH_CUDA       "Enable CUDA components" ON)
+option(SIGTEKX_WITH_NVTX       "Enable NVTX profiling"  ON)
+option(SIGTEKX_ENABLE_COVERAGE "Enable code coverage"   OFF)
 
 
 # ============================================================================
 # Compiler Flags for Release and Debug Builds
 # ============================================================================
-if(IONO_WITH_CUDA)
+if(SIGTEKX_WITH_CUDA)
   enable_language(CUDA)
   set(CMAKE_CUDA_STANDARD 17)
   set(CMAKE_CUDA_ARCHITECTURES 75 86 89) # NVIDIA Turing, Ampere, Ada Lovelace
@@ -51,8 +51,8 @@ if(MSVC)
   set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2 /DNDEBUG")
 
   # Code coverage flags for MSVC (use with windows-coverage preset)
-  if(IONO_ENABLE_COVERAGE)
-    message(STATUS "[ionosense] Enabling code coverage instrumentation (MSVC)")
+  if(SIGTEKX_ENABLE_COVERAGE)
+    message(STATUS "[sigtekx] Enabling code coverage instrumentation (MSVC)")
     # MSVC: gcovr uses PDB debug symbols for coverage analysis
     # /Zi and /Od are already set in CMAKE_CXX_FLAGS_DEBUG, just ensure full debug info
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /DEBUG:FULL")
@@ -64,8 +64,8 @@ else()
   set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -DNDEBUG")
 
   # Code coverage flags for GCC/Clang (gcov/llvm-cov)
-  if(IONO_ENABLE_COVERAGE)
-    message(STATUS "[ionosense] Enabling code coverage instrumentation (GCC/Clang)")
+  if(SIGTEKX_ENABLE_COVERAGE)
+    message(STATUS "[sigtekx] Enabling code coverage instrumentation (GCC/Clang)")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} --coverage -fprofile-arcs -ftest-coverage")
     set(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} --coverage")
   endif()
@@ -79,16 +79,16 @@ find_program(CLANG_FORMAT clang-format)
 if(CLANG_FORMAT)
     file(GLOB_RECURSE ALL_CXX_FILES
         "cpp/src/*.cpp" "src/*.cu"
-        "cpp/include/ionosense/*.hpp"
+        "cpp/include/sigtekx/*.hpp"
         "cpp/tests/*.cpp"
         "cpp/bindings/*.cpp"
     )
     add_custom_target(format COMMAND ${CLANG_FORMAT} -i ${ALL_CXX_FILES})
 endif()
 
-option(IONO_WITH_TIDY "Run clang-tidy static analysis" OFF)
+option(SIGTEKX_WITH_TIDY "Run clang-tidy static analysis" OFF)
 find_program(CLANG_TIDY clang-tidy)
-if(IONO_WITH_TIDY AND CLANG_TIDY)
+if(SIGTEKX_WITH_TIDY AND CLANG_TIDY)
     # Keep checks focused and exclude noisy modernize ones by default
     set(CMAKE_CXX_CLANG_TIDY
         ${CLANG_TIDY}
@@ -107,7 +107,7 @@ set(Python3_FIND_VIRTUALENV FIRST)      # Prefer venv/conda over system Python;
 find_package(Python3 3.11 REQUIRED      # provides [ Python3_EXECUTABLE, Python3_INCLUDE_DIRS, Python3_LIBRARIES ]
     COMPONENTS Interpreter Development)
 
-if(IONO_WITH_CUDA)
+if(SIGTEKX_WITH_CUDA)
   # Modern CUDA discovery (NVTX3 is header-only and ships with toolkit)
   find_package(CUDAToolkit 13.0 REQUIRED)
 endif()
@@ -148,7 +148,7 @@ FetchContent_Declare(
 # ============================================================================
 # Core static lib with CUDA kernels
 # ============================================================================
-if(IONO_WITH_CUDA)
+if(SIGTEKX_WITH_CUDA)
 add_library(ion_engine OBJECT
     # CUDA kernels (STFT pipeline operations)
     cpp/src/kernels/fft_wrapper.cu
@@ -171,9 +171,9 @@ target_include_directories(ion_engine PUBLIC
 )
 set_target_properties(ion_engine PROPERTIES CUDA_SEPARABLE_COMPILATION ON) # Enables device code linking between .cu files - Important!
 target_link_libraries(ion_engine PUBLIC CUDA::cufft)
-if(IONO_WITH_NVTX)
+if(SIGTEKX_WITH_NVTX)
   # Always compile profiling code; runtime will dynamically load NVTX if present
-  target_compile_definitions(ion_engine PUBLIC IONOSENSE_ENABLE_PROFILING)
+  target_compile_definitions(ion_engine PUBLIC SIGTEKX_ENABLE_PROFILING)
 endif()
 endif()
 
@@ -181,43 +181,43 @@ endif()
 # ============================================================================
 # Python module (pybind11)
 # ============================================================================
-if(IONO_WITH_PYTHON AND IONO_WITH_CUDA)
-    pybind11_add_module(_engine SHARED cpp/bindings/bindings.cpp) # produces [ _engine.pyd (Win) / _engine.so (linux) ]
+if(SIGTEKX_WITH_PYTHON AND SIGTEKX_WITH_CUDA)
+    pybind11_add_module(_native SHARED cpp/bindings/bindings.cpp) # produces [ _native.pyd (Win) / _native.so (linux) ]
 
-    target_include_directories(_engine PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/cpp/include)
-    target_link_libraries(_engine PRIVATE
+    target_include_directories(_native PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/cpp/include)
+    target_link_libraries(_native PRIVATE
         "$<TARGET_OBJECTS:ion_engine>"
         pybind11::module
         CUDA::cudart_static
         CUDA::cufft
     )
-    if(IONO_WITH_NVTX)
-        # _engine compiles only bindings.cpp; profiling is handled in ion_engine object TUs.
-        target_compile_definitions(_engine PRIVATE IONOSENSE_ENABLE_PROFILING)
+    if(SIGTEKX_WITH_NVTX)
+        # _native compiles only bindings.cpp; profiling is handled in ion_engine object TUs.
+        target_compile_definitions(_native PRIVATE SIGTEKX_ENABLE_PROFILING)
     endif()
 
     # If building via scikit-build-core, install into the package path
     if(DEFINED SKBUILD)
         # scikit-build-core provides ${SKBUILD_PLATLIB_DIR}
-        install(TARGETS _engine
-            LIBRARY DESTINATION ${SKBUILD_PLATLIB_DIR}/ionosense_hpc/core
-            RUNTIME DESTINATION ${SKBUILD_PLATLIB_DIR}/ionosense_hpc/core
-            ARCHIVE DESTINATION ${SKBUILD_PLATLIB_DIR}/ionosense_hpc/core
+        install(TARGETS _native
+            LIBRARY DESTINATION ${SKBUILD_PLATLIB_DIR}/sigtekx/core
+            RUNTIME DESTINATION ${SKBUILD_PLATLIB_DIR}/sigtekx/core
+            ARCHIVE DESTINATION ${SKBUILD_PLATLIB_DIR}/sigtekx/core
         )
 
         # If pre-staged runtime libs exist, include them in the wheel (optional)
-        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/ionosense_hpc/.libs/windows")
-            install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/ionosense_hpc/.libs/windows/
-                    DESTINATION ${SKBUILD_PLATLIB_DIR}/ionosense_hpc/.libs/windows)
+        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/sigtekx/.libs/windows")
+            install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/sigtekx/.libs/windows/
+                    DESTINATION ${SKBUILD_PLATLIB_DIR}/sigtekx/.libs/windows)
         endif()
-        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/ionosense_hpc/.libs/linux")
-            install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/ionosense_hpc/.libs/linux/
-                    DESTINATION ${SKBUILD_PLATLIB_DIR}/ionosense_hpc/.libs/linux)
+        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/sigtekx/.libs/linux")
+            install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/sigtekx/.libs/linux/
+                    DESTINATION ${SKBUILD_PLATLIB_DIR}/sigtekx/.libs/linux)
         endif()
     else()
         # Developer builds: drop beside the python package tree
-        set(_ION_PY_OUT "${CMAKE_CURRENT_SOURCE_DIR}/src/ionosense_hpc/core")
-        set_target_properties(_engine PROPERTIES
+        set(_ION_PY_OUT "${CMAKE_CURRENT_SOURCE_DIR}/src/sigtekx/core")
+        set_target_properties(_native PROPERTIES
             LIBRARY_OUTPUT_DIRECTORY  "${_ION_PY_OUT}"
             RUNTIME_OUTPUT_DIRECTORY  "${_ION_PY_OUT}"
             CUDA_SEPARABLE_COMPILATION ON
@@ -226,7 +226,7 @@ if(IONO_WITH_PYTHON AND IONO_WITH_CUDA)
 
         # ---------------- Windows: optionally stage NVIDIA runtime DLLs beside the .pyd ----------------
         if(WIN32)
-            set(_LIBS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/ionosense_hpc/.libs/windows")
+            set(_LIBS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/sigtekx/.libs/windows")
             file(MAKE_DIRECTORY ${_LIBS_DIR})
 
             # Prefer Conda bin, else CUDA_PATH, else skip
@@ -248,29 +248,29 @@ if(IONO_WITH_PYTHON AND IONO_WITH_CUDA)
             endforeach()
 
             if(_FOUND_DIR)
-                message(STATUS "[ionosense] Staging CUDA DLLs from: ${_FOUND_DIR}")
+                message(STATUS "[sigtekx] Staging CUDA DLLs from: ${_FOUND_DIR}")
                 file(GLOB CUFFT_DLLS "${_FOUND_DIR}/cufft*.dll")
                 file(GLOB CUDART_DLLS "${_FOUND_DIR}/cudart*.dll")
 
                 if(CUFFT_DLLS OR CUDART_DLLS)
-                    add_custom_command(TARGET _engine POST_BUILD
+                    add_custom_command(TARGET _native POST_BUILD
                         COMMAND ${CMAKE_COMMAND} -E copy_if_different
                             ${CUFFT_DLLS}
                             ${CUDART_DLLS}
                             ${_LIBS_DIR}
-                        COMMENT "[ionosense] Staging CUDA runtime DLLs to ${_LIBS_DIR}"
+                        COMMENT "[sigtekx] Staging CUDA runtime DLLs to ${_LIBS_DIR}"
                     )
                 else()
-                    message(WARNING "[ionosense] CUDA runtime DLLs not found in ${_FOUND_DIR}. Runtime may rely on system PATH.")
+                    message(WARNING "[sigtekx] CUDA runtime DLLs not found in ${_FOUND_DIR}. Runtime may rely on system PATH.")
                 endif()
             else()
-                message(STATUS "[ionosense] No CUDA bin directory found for DLL staging; skipping.")
+                message(STATUS "[sigtekx] No CUDA bin directory found for DLL staging; skipping.")
             endif()
 
             # Optional: import validation only for dev builds
-            add_custom_command(TARGET _engine POST_BUILD
-                COMMAND ${Python3_EXECUTABLE} -c "import sys; sys.path.insert(0, '${CMAKE_CURRENT_SOURCE_DIR}/python'); import ionosense_hpc; print('[ionosense] Python extension import validated successfully.')"
-                COMMENT "[ionosense] Validating Python extension import"
+            add_custom_command(TARGET _native POST_BUILD
+                COMMAND ${Python3_EXECUTABLE} -c "import sys; sys.path.insert(0, '${CMAKE_CURRENT_SOURCE_DIR}/python'); import sigtekx; print('[sigtekx] Python extension import validated successfully.')"
+                COMMENT "[sigtekx] Validating Python extension import"
                 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
             )
         endif()
@@ -281,7 +281,7 @@ endif()
 # ============================================================================
 # Unit Tests (CTest, GTest)
 # ============================================================================
-if(IONO_WITH_TESTS AND IONO_WITH_CUDA)
+if(SIGTEKX_WITH_TESTS AND SIGTEKX_WITH_CUDA)
     enable_testing()
 
     FetchContent_MakeAvailable(googletest)
@@ -328,7 +328,7 @@ if(IONO_WITH_TESTS AND IONO_WITH_CUDA)
         CUDA::cufft
     )
 
-    if(IONO_WITH_NVTX)
-        target_compile_definitions(benchmark_engine PRIVATE IONOSENSE_ENABLE_PROFILING)
+    if(SIGTEKX_WITH_NVTX)
+        target_compile_definitions(benchmark_engine PRIVATE SIGTEKX_ENABLE_PROFILING)
     endif()
 endif()
