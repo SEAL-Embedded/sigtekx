@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Robust GPU Profiling Helper for ionosense-hpc
+Robust GPU Profiling Helper for sigtekx
 Provides clean progress tracking and smart profiling modes
 """
 
@@ -20,7 +20,7 @@ SRC_DIR = REPO_ROOT / "src"
 if SRC_DIR.exists() and str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from ionosense_hpc.utils import paths as path_utils
+from sigtekx.utils import paths as path_utils
 
 
 class Colors:

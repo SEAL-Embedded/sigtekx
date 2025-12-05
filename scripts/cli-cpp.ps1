@@ -1,6 +1,6 @@
 #!/usr/bin/env pwsh
 # ============================================================================
-# ionosense-hpc • C++ Benchmarking & Profiling CLI
+# sigtekx • C++ Benchmarking & Profiling CLI
 # Dedicated tool for C++ kernel development and profiling iteration
 # ============================================================================
 
@@ -44,7 +44,7 @@ function Invoke-Bench {
 
     if (-not (Test-Path $script:BenchmarkExe)) {
         Write-Error "C++ benchmark not found at: $script:BenchmarkExe"
-        Write-Host "Run 'iono build' to build the benchmark executable." -ForegroundColor Yellow
+        Write-Host "Run 'sigx build' to build the benchmark executable." -ForegroundColor Yellow
         exit 1
     }
 
@@ -168,7 +168,7 @@ function Invoke-ProfileNsys {
 
     if (-not (Test-Path $script:BenchmarkExe)) {
         Write-Error "C++ benchmark not found at: $script:BenchmarkExe"
-        Write-Host "Run 'iono build' to build the benchmark executable." -ForegroundColor Yellow
+        Write-Host "Run 'sigx build' to build the benchmark executable." -ForegroundColor Yellow
         exit 1
     }
 
@@ -240,7 +240,7 @@ function Invoke-ProfileNcu {
 
     if (-not (Test-Path $script:BenchmarkExe)) {
         Write-Error "C++ benchmark not found at: $script:BenchmarkExe"
-        Write-Host "Run 'iono build' to build the benchmark executable." -ForegroundColor Yellow
+        Write-Host "Run 'sigx build' to build the benchmark executable." -ForegroundColor Yellow
         exit 1
     }
 

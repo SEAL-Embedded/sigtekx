@@ -1,6 +1,6 @@
 #!/usr/bin/env pwsh
 # ============================================================================
-# ionosense-hpc • Simplified Development CLI
+# sigtekx • Simplified Development CLI
 # Essential development tasks only - research tools use native CLIs directly
 # ============================================================================
 
@@ -18,7 +18,7 @@ param(
 $script:ProjectRoot = (Get-Item -Path (Join-Path $PSScriptRoot "..")).FullName
 $script:BuildDir = Join-Path $ProjectRoot "build"
 $script:BuildPreset = if ($env:BUILD_PRESET) { $env:BUILD_PRESET } else { "windows-rel" }
-$script:CondaEnvName = "ionosense-hpc"
+$script:CondaEnvName = "sigtekx"
 
 # --- Utility Functions -------------------------------------------------------
 function Write-Status {

@@ -8,7 +8,7 @@
 #>
 
 param(
-    [string]$EnvName = 'ionosense-hpc',
+    [string]$EnvName = 'sigtekx',
     [ValidateSet('x64')][string]$VSArch = 'x64',   # lock to x64 for CUDA
     [string]$Repo = (Resolve-Path "$PSScriptRoot\.."),  # default: repo root (parent of /scripts)
     [switch]$NoConda,
@@ -243,7 +243,7 @@ function Invoke-InteractiveEnvironmentSetup {
                 return $false
             }
         } else {
-            Info "Skipping environment setup. Use 'iono setup' manually when ready."
+            Info "Skipping environment setup. Use 'sigx setup' manually when ready."
             return $false
         }
     }
@@ -268,9 +268,9 @@ if (-not $Quiet) {
 
 # Set a default for colored logging in the Python backend.
 # This allows the user to override it for the session if needed.
-if (-not $env:IONO_LOG_COLOR) {
-    $env:IONO_LOG_COLOR = "1"
-    Info "Defaulted IONO_LOG_COLOR=1 for rich Python logging."
+if (-not $env:SIGX_LOG_COLOR) {
+    $env:SIGX_LOG_COLOR = "1"
+    Info "Defaulted SIGX_LOG_COLOR=1 for rich Python logging."
 }
 
 Enter-VSDev
@@ -320,35 +320,35 @@ try {
 }
 
 # Persist paths for this pwsh session
-$global:IONO_ROOT  = "$repoRoot"
-$global:IONO_CLI   = Join-Path $global:IONO_ROOT 'scripts\cli.ps1'
-$global:IONOC_CLI  = Join-Path $global:IONO_ROOT 'scripts\cli-cpp.ps1'
+$global:SIGX_ROOT  = "$repoRoot"
+$global:SIGX_CLI   = Join-Path $global:SIGX_ROOT 'scripts\cli.ps1'
+$global:SIGXC_CLI  = Join-Path $global:SIGX_ROOT 'scripts\cli-cpp.ps1'
 
-function global:iono {
+function global:sigx {
     [CmdletBinding()]
     param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
-    if (-not (Test-Path $global:IONO_CLI)) {
-        Write-Error "cli.ps1 not found at $global:IONO_CLI"
+    if (-not (Test-Path $global:SIGX_CLI)) {
+        Write-Error "cli.ps1 not found at $global:SIGX_CLI"
         return
     }
 
     # Only allow commands that actually exist in simplified CLI
     $validCommands = @('setup','build','test','coverage','lint','format','clean','doctor','help','profile','typecheck','diagrams')
     if ($Args.Count -gt 0 -and $Args[0] -notin $validCommands) {
-        Write-Warning "Command '$($Args[0])' not available. Use 'iono help' for available commands."
+        Write-Warning "Command '$($Args[0])' not available. Use 'sigx help' for available commands."
         Write-Host "💡 For research workflows, use direct tools:" -ForegroundColor Cyan
         Write-Host "   python benchmarks/run_latency.py experiment=baseline +benchmark=latency" -ForegroundColor Gray
         Write-Host "   python benchmarks/run_throughput.py --multirun experiment=ionosphere_resolution +benchmark=throughput" -ForegroundColor Gray
         Write-Host "   snakemake --cores 4 --snakefile experiments/Snakefile" -ForegroundColor Gray
         Write-Host "   mlflow ui --backend-store-uri artifacts/mlruns" -ForegroundColor Gray
         Write-Host "💡 For C++ benchmarking/profiling:" -ForegroundColor Cyan
-        Write-Host "   ionoc bench quick" -ForegroundColor Gray
-        Write-Host "   ionoc profile nsys --stats" -ForegroundColor Gray
+        Write-Host "   sigxc bench quick" -ForegroundColor Gray
+        Write-Host "   sigxc profile nsys --stats" -ForegroundColor Gray
         return
     }
 
     if ($Args.Count -eq 0) {
-        & $global:IONO_CLI
+        & $global:SIGX_CLI
         return
     }
 
@@ -376,24 +376,24 @@ function global:iono {
     }
 
     # Use splatting (safe now - pattern detection handles Hydra args, no "--" to consume)
-    & $global:IONO_CLI @processedArgs
+    & $global:SIGX_CLI @processedArgs
 }
 
-function global:ionoc {
+function global:sigxc {
     [CmdletBinding()]
     param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
 
-    if (-not (Test-Path $global:IONOC_CLI)) {
-        Write-Error "cli-cpp.ps1 not found at $global:IONOC_CLI"
+    if (-not (Test-Path $global:SIGXC_CLI)) {
+        Write-Error "cli-cpp.ps1 not found at $global:SIGXC_CLI"
         return
     }
 
     if ($Args.Count -eq 0) {
-        & $global:IONOC_CLI help
+        & $global:SIGXC_CLI help
         return
     }
 
-    & $global:IONOC_CLI @Args
+    & $global:SIGXC_CLI @Args
 }
 
 
@@ -410,9 +410,9 @@ function global:ib {
     }
 
     if ($common.Count -gt 0) {
-        iono @common build @Args
+        sigx @common build @Args
     } else {
-        iono build @Args
+        sigx build @Args
     }
 }
 function global:it {
@@ -427,9 +427,9 @@ function global:it {
     }
 
     if ($common.Count -gt 0) {
-        iono @common test @Args
+        sigx @common test @Args
     } else {
-        iono test @Args
+        sigx test @Args
     }
 }
 function global:ilint {
@@ -444,9 +444,9 @@ function global:ilint {
     }
 
     if ($common.Count -gt 0) {
-        iono @common lint @Args
+        sigx @common lint @Args
     } else {
-        iono lint @Args
+        sigx lint @Args
     }
 }
 function global:ifmt {
@@ -461,9 +461,9 @@ function global:ifmt {
     }
 
     if ($common.Count -gt 0) {
-        iono @common format @Args
+        sigx @common format @Args
     } else {
-        iono format @Args
+        sigx format @Args
     }
 }
 function global:iclean {
@@ -478,18 +478,18 @@ function global:iclean {
     }
 
     if ($common.Count -gt 0) {
-        iono @common clean @Args
+        sigx @common clean @Args
     } else {
-        iono clean @Args
+        sigx clean @Args
     }
 }
-function global:iprof {
+function global:sxp {
     [CmdletBinding()]
     param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
 
     if ($Args.Count -eq 0) {
-        Write-Host "Usage: iprof <tool> <target> [--flags] [hydra=configs]" -ForegroundColor Yellow
-        Write-Host "Example: iprof nsys latency --mode full engine.nfft=8192" -ForegroundColor Cyan
+        Write-Host "Usage: sxp <tool> <target> [--flags] [hydra=configs]" -ForegroundColor Yellow
+        Write-Host "Example: sxp nsys latency --mode full engine.nfft=8192" -ForegroundColor Cyan
         return
     }
 
@@ -526,10 +526,10 @@ function global:iprof {
         $i++
     }
 
-    # Build command: pass to iono with "profile" command
-    $ionoArgs = @("profile") + $toolArgs
+    # Build command: pass to sigx with "profile" command
+    $sigxArgs = @("profile") + $toolArgs
     if ($hydraArgs.Count -gt 0) {
-        $ionoArgs += $hydraArgs
+        $sigxArgs += $hydraArgs
     }
 
     # Handle common parameters (Debug, Verbose)
@@ -540,11 +540,11 @@ function global:iprof {
         }
     }
 
-    # Call iono with splatting (safe now - no "--" to consume)
+    # Call sigx with splatting (safe now - no "--" to consume)
     if ($common.Count -gt 0) {
-        iono @common @ionoArgs
+        sigx @common @sigxArgs
     } else {
-        iono @ionoArgs
+        sigx @sigxArgs
     }
 }
 
@@ -560,9 +560,8 @@ function global:iprof {
 function global:itp { it python }         # python tests
 function global:itc { it cpp }            # c++ tests
 
-# C++ benchmarking shortcuts
-function global:icbench { ionoc bench @args }     # C++ benchmark
-function global:icprof  { ionoc profile @args }   # C++ profiling
+# C++ benchmarking shortcuts (icbench removed - no replacement per naming decisions)
+function global:sxpc  { sigxc profile @args }   # C++ profiling shortcut
 
 # Recommended native research workflow:
 # python benchmarks/run_latency.py experiment=baseline +benchmark=latency
@@ -573,7 +572,7 @@ function global:icprof  { ionoc profile @args }   # C++ profiling
 # dvc status && dvc repro
 
 # Help shortcuts (use CLI help instead of removed learn commands)
-function global:ihelp { iono help }
+function global:ihelp { sigx help }
 
 # Diagram generation shortcut
 function global:idiag {
@@ -588,17 +587,17 @@ function global:idiag {
     }
 
     if ($common.Count -gt 0) {
-        iono @common diagrams @Args
+        sigx @common diagrams @Args
     } else {
-        iono diagrams @Args
+        sigx diagrams @Args
     }
 }
 
-# Reload iono functions (useful when init_pwsh.ps1 is updated)
+# Reload sigx functions (useful when init_pwsh.ps1 is updated)
 function global:ireload {
-    Write-Host "Reloading iono functions..." -ForegroundColor Cyan
-    . (Join-Path $global:IONO_ROOT 'scripts\init_pwsh.ps1') -Quiet
-    Write-Host "Functions reloaded. Try: iono profile nsys latency" -ForegroundColor Green
+    Write-Host "Reloading sigx functions..." -ForegroundColor Cyan
+    . (Join-Path $global:SIGX_ROOT 'scripts\init_pwsh.ps1') -Quiet
+    Write-Host "Functions reloaded. Try: sxp nsys latency" -ForegroundColor Green
 }
 
 # Tab-completion (only for commands that actually exist)
@@ -609,13 +608,13 @@ $global:IonoTargets = @('python','cpp','all','py','sys','-Clean','--clean','-Ver
 $global:IonocVerbs   = @('bench','profile','compare','clean','help')
 $global:IonocTargets = @('quick','profile','full','nsys','ncu','--mode','--output','--stats','--trace','--set','--kernel-name')
 
-Register-ArgumentCompleter -CommandName iono,ib,it,ilint,ifmt,iclean,itp,itc,ihelp,iprof,idiag -ScriptBlock {
+Register-ArgumentCompleter -CommandName sigx,ib,it,ilint,ifmt,iclean,itp,itc,ihelp,sxp,idiag -ScriptBlock {
     param($commandName,$parameterName,$wordToComplete,$commandAst,$fakeBoundParameters)
     $tokens = @()
     foreach ($e in $commandAst.CommandElements) {
         if ($e.Extent.Text -ne $commandName) { $tokens += $e.Extent.Text }
     }
-    if ($commandName -eq 'iono' -and $tokens.Count -eq 0) {
+    if ($commandName -eq 'sigx' -and $tokens.Count -eq 0) {
         $list = $global:IonoVerbs
     } else {
         $list = $global:IonoTargets + $global:IonoVerbs
@@ -627,13 +626,13 @@ Register-ArgumentCompleter -CommandName iono,ib,it,ilint,ifmt,iclean,itp,itc,ihe
     }
 }
 
-Register-ArgumentCompleter -CommandName ionoc,icbench,icprof -ScriptBlock {
+Register-ArgumentCompleter -CommandName sigxc,sxpc -ScriptBlock {
     param($commandName,$parameterName,$wordToComplete,$commandAst,$fakeBoundParameters)
     $tokens = @()
     foreach ($e in $commandAst.CommandElements) {
         if ($e.Extent.Text -ne $commandName) { $tokens += $e.Extent.Text }
     }
-    if ($commandName -eq 'ionoc' -and $tokens.Count -eq 0) {
+    if ($commandName -eq 'sigxc' -and $tokens.Count -eq 0) {
         $list = $global:IonocVerbs
     } else {
         $list = $global:IonocTargets + $global:IonocVerbs
