@@ -4,8 +4,8 @@ import numpy as np
 import pytest
 from pydantic import ValidationError
 
-from ionosense_hpc.config import EngineConfig, get_preset, list_presets, validate_input_array
-from ionosense_hpc.exceptions import ValidationError as IonoValidationError
+from sigtekx.config import EngineConfig, get_preset, list_presets, validate_input_array
+from sigtekx.exceptions import ValidationError as SigTekXValidationError
 
 
 class TestEngineConfig:
@@ -155,12 +155,12 @@ class TestValidation:
     def test_validate_input_array_errors(self):
         """Test input array validation errors."""
         # Not a numpy array
-        with pytest.raises(IonoValidationError):
+        with pytest.raises(SigTekXValidationError):
             validate_input_array([1, 2, 3])
 
         # Shape mismatch
         data = np.array([1, 2, 3])
-        with pytest.raises(IonoValidationError):
+        with pytest.raises(SigTekXValidationError):
             validate_input_array(data, expected_shape=(4,))
 
     def test_nan_warning(self):

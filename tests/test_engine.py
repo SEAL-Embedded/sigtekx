@@ -11,13 +11,13 @@ from collections.abc import Generator
 import numpy as np
 import pytest
 
-from ionosense_hpc import (
+from sigtekx import (
     Engine,
     EngineConfig,
     benchmark_latency,
     process_signal,
 )
-from ionosense_hpc.exceptions import (
+from sigtekx.exceptions import (
     EngineStateError,
     ValidationError,
 )

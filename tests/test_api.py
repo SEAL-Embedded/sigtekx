@@ -11,7 +11,7 @@ This module tests the new unified API with:
 import numpy as np
 import pytest
 
-from ionosense_hpc import (
+from sigtekx import (
     Engine,
     EngineConfig,
     ExecutionMode,

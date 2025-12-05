@@ -5,7 +5,7 @@ import types
 
 import pytest
 
-import ionosense_hpc.utils.profiling as p
+import sigtekx.utils.profiling as p
 
 
 class TestFormatFunctionArgs:

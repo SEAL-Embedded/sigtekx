@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from ionosense_hpc.testing.validators import (
+from sigtekx.testing.validators import (
     assert_allclose,
     assert_parseval,
     assert_snr,

@@ -14,7 +14,7 @@ provides utilities for post-processing and analysis.
 """
 
 
-from ionosense_hpc.config import EngineConfig
+from sigtekx.config import EngineConfig
 
 
 def calculate_hop_size(nfft: int, overlap: float) -> int:

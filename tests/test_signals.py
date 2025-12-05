@@ -5,8 +5,8 @@ import pytest
 from scipy import signal as sp_signal
 from scipy import stats
 
-from ionosense_hpc.config import EngineConfig
-from ionosense_hpc.utils.signals import (
+from sigtekx.config import EngineConfig
+from sigtekx.utils.signals import (
     make_chirp,
     make_multitone,
     make_noise,

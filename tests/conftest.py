@@ -24,7 +24,7 @@ if str(_src_dir) not in sys.path:
 
 # Make the fixtures from the testing module available to all tests
 pytest_plugins = [
-    "ionosense_hpc.testing.fixtures",
+    "sigtekx.testing.fixtures",
 ]
 
 def pytest_addoption(parser):

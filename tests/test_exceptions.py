@@ -1,6 +1,6 @@
 # tests/test_exceptions.py
 
-from ionosense_hpc.exceptions import (
+from sigtekx.exceptions import (
     AnalysisError,
     BenchmarkError,
     BenchmarkTimeoutError,
@@ -15,7 +15,7 @@ from ionosense_hpc.exceptions import (
     EnvironmentMismatchError,
     ExperimentError,
     InsufficientDataError,
-    IonosenseError,
+    SigTekXError,
     ReportGenerationError,
     ReproducibilityError,
     ResourceExhaustedError,
@@ -24,14 +24,14 @@ from ionosense_hpc.exceptions import (
 )
 
 
-def test_ionosense_error_str():
-    """Test the base __str__ method for IonosenseError."""
+def test_sigtekx_error_str():
+    """Test the base __str__ method for SigTekXError."""
     # Without hint
-    err = IonosenseError("A base error occurred.")
+    err = SigTekXError("A base error occurred.")
     assert str(err) == "A base error occurred."
 
     # With hint
-    err_with_hint = IonosenseError("A base error occurred.", hint="Check this.")
+    err_with_hint = SigTekXError("A base error occurred.", hint="Check this.")
     assert str(err_with_hint) == "A base error occurred.\nHint: Check this."
 
 def test_config_error():
@@ -106,13 +106,13 @@ def test_validation_error():
 def test_documented_attributes_phase1():
     """Test that Phase 1 exceptions have all documented attributes.
 
-    Verifies IonosenseError and BenchmarkError have the attributes
+    Verifies SigTekXError and BenchmarkError have the attributes
     documented in their NumPy-style docstrings.
     """
-    # IonosenseError
-    err_base = IonosenseError("test message", hint="test hint", extra="value")
-    assert hasattr(err_base, "hint"), "IonosenseError missing 'hint' attribute"
-    assert hasattr(err_base, "context"), "IonosenseError missing 'context' attribute"
+    # SigTekXError
+    err_base = SigTekXError("test message", hint="test hint", extra="value")
+    assert hasattr(err_base, "hint"), "SigTekXError missing 'hint' attribute"
+    assert hasattr(err_base, "context"), "SigTekXError missing 'context' attribute"
     assert err_base.hint == "test hint"
     assert err_base.context == {"extra": "value"}
 
@@ -204,7 +204,7 @@ def test_documented_attributes_phase2():
 def test_error_codes_present():
     """Test that all exceptions have error_code class attribute."""
     exceptions = [
-        IonosenseError,
+        SigTekXError,
         ConfigError,
         ValidationError,
         DeviceNotFoundError,
@@ -234,7 +234,7 @@ def test_error_codes_present():
 def test_error_codes_unique():
     """Test that all error codes are unique."""
     exceptions = [
-        IonosenseError,
+        SigTekXError,
         ConfigError,
         ValidationError,
         DeviceNotFoundError,

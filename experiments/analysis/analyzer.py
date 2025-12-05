@@ -25,7 +25,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from ionosense_hpc.config import EngineConfig  # Import from core
+from sigtekx.config import EngineConfig  # Import from core
 
 from .models import (
     BenchmarkResult,
@@ -417,7 +417,7 @@ class AnalysisEngine:
     (LatencyAnalyzer, ThroughputAnalyzer, etc.) and provides caching,
     scaling analysis, and statistical comparisons.
 
-    Not to be confused with ionosense_hpc.Engine (GPU processing engine).
+    Not to be confused with sigtekx.Engine (GPU processing engine).
     """
 
     def __init__(self, cache_dir: Path | None = None):

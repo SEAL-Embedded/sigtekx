@@ -19,7 +19,7 @@ import pandas as pd
 from pydantic import BaseModel, Field, field_validator
 
 # Import EngineConfig from core to avoid duplication
-from ionosense_hpc.config import EngineConfig
+from sigtekx.config import EngineConfig
 
 
 class BenchmarkType(str, Enum):

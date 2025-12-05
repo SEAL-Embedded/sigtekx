@@ -5,8 +5,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from ionosense_hpc import Engine
-from ionosense_hpc.config import EngineConfig
+from sigtekx import Engine
+from sigtekx.config import EngineConfig
 
 
 def test_temp_data_dir(temp_data_dir):

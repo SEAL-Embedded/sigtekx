@@ -18,11 +18,11 @@ import numpy as np
 # Add the package to the path
 sys.path.insert(0, str(Path(__file__).parent / "python" / "src"))
 
-from ionosense_hpc.benchmarks.latency import LatencyBenchmark, LatencyBenchmarkConfig
-from ionosense_hpc.benchmarks.realtime import RealtimeBenchmark, RealtimeBenchmarkConfig
-from ionosense_hpc.benchmarks.throughput import ThroughputBenchmark, ThroughputBenchmarkConfig
-from ionosense_hpc.config import EngineConfig
-from ionosense_hpc.utils.paths import get_artifacts_root
+from sigtekx.benchmarks.latency import LatencyBenchmark, LatencyBenchmarkConfig
+from sigtekx.benchmarks.realtime import RealtimeBenchmark, RealtimeBenchmarkConfig
+from sigtekx.benchmarks.throughput import ThroughputBenchmark, ThroughputBenchmarkConfig
+from sigtekx.config import EngineConfig
+from sigtekx.utils.paths import get_artifacts_root
 
 
 class EnhancedDemoGenerator:

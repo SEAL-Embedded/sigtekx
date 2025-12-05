@@ -4,7 +4,7 @@
 import pytest
 
 # Import the global registry instance that the application uses
-from ionosense_hpc.stages.registry import _global_registry
+from sigtekx.stages.registry import _global_registry
 
 
 # Mock some stages for testing, since the tests depend on them being registered.
@@ -60,7 +60,7 @@ class TestStageRegistry:
     def test_singleton_pattern(self, stage_registry):
         """Test that the StageRegistry uses a singleton pattern via its global instance."""
         # Importing the global registry again should yield the same object
-        from ionosense_hpc.stages.registry import _global_registry as registry2
+        from sigtekx.stages.registry import _global_registry as registry2
         assert stage_registry is registry2
 
     def test_stage_retrieval(self, stage_registry):

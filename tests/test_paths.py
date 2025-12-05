@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from ionosense_hpc.utils import paths
+from sigtekx.utils import paths
 
 
 @pytest.fixture(autouse=True)

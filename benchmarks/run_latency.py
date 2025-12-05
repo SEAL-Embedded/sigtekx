@@ -14,8 +14,8 @@ import mlflow
 import pandas as pd
 from omegaconf import DictConfig, OmegaConf
 
-from ionosense_hpc.benchmarks import LatencyBenchmark, LatencyBenchmarkConfig
-from ionosense_hpc.config import EngineConfig
+from sigtekx.benchmarks import LatencyBenchmark, LatencyBenchmarkConfig
+from sigtekx.config import EngineConfig
 
 
 @hydra.main(version_base=None, config_path="../experiments/conf", config_name="config")

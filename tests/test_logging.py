@@ -14,8 +14,8 @@ from pathlib import Path
 
 import pytest
 
-from ionosense_hpc.config.schemas import EngineConfig
-from ionosense_hpc.utils.logging import (
+from sigtekx.config.schemas import EngineConfig
+from sigtekx.utils.logging import (
     _ColorFormatter,
     _env_truthy,
     _is_running_under_profiler,

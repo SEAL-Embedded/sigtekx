@@ -11,7 +11,7 @@ import json
 import numpy as np
 import pytest
 
-from ionosense_hpc.benchmarks import (
+from sigtekx.benchmarks import (
     BaseBenchmark,
     BenchmarkConfig,
     BenchmarkContext,
