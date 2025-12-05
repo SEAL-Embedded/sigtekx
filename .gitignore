@@ -1,5 +1,5 @@
 # =============================
-# ionosense-hpc-lib .gitignore
+# sigtekx .gitignore
 # =============================
 # Guiding idea: ignore generated artifacts, caches, and IDE cruft.
 # Keep source, configs, and docs. Anchors (leading /) mean "repo root only".
@@ -65,8 +65,8 @@ htmlcov/
 mlruns/
 
 # Python extension modules in core/ (Windows + Linux)
-src/ionosense_hpc/core/*.pyd
-src/ionosense_hpc/core/*.so
+src/sigtekx/core/*.pyd
+src/sigtekx/core/*.so
 
 # --- Virtual Envs / Local Python ---
 .venv/
@@ -113,7 +113,7 @@ vgcore.*
 *.tmp
 *.swp
 *.swo
-.ionosense/
+.sigtekx/
 benchmark_results/
 results/
 
