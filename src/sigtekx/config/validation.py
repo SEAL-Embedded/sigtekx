@@ -4,8 +4,8 @@ import warnings
 
 import numpy as np
 
-from ionosense_hpc.config.schemas import EngineConfig
-from ionosense_hpc.exceptions import ConfigError, ValidationError
+from sigtekx.config.schemas import EngineConfig
+from sigtekx.exceptions import ConfigError, ValidationError
 
 
 def validate_config_device_compatibility(

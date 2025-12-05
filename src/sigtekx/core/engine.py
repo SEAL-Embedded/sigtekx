@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, Any, cast
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from ionosense_hpc.config import (
+from sigtekx.config import (
     EngineConfig,
     ExecutionMode,
     OutputMode,
@@ -34,7 +34,7 @@ from ionosense_hpc.config import (
     validate_input_array,
     validate_input_size,
 )
-from ionosense_hpc.exceptions import (
+from sigtekx.exceptions import (
     DeviceNotFoundError,
     DllLoadError,
     EngineRuntimeError,
@@ -43,7 +43,7 @@ from ionosense_hpc.exceptions import (
 )
 
 if TYPE_CHECKING:
-    from ionosense_hpc.core.builder import Pipeline
+    from sigtekx.core.builder import Pipeline
 
 # Type aliases
 FloatArray = NDArray[np.float32]
@@ -53,21 +53,21 @@ def _import_cpp_engine() -> Any:
     """Import the C++ extension with proper error handling.
 
     Returns:
-        The loaded _engine module
+        The loaded _native module
 
     Raises:
         DllLoadError: If the extension cannot be loaded
     """
     try:
-        from . import _engine  # type: ignore[attr-defined]
-        return _engine
+        from . import _native  # type: ignore[attr-defined]
+        return _native
     except ImportError as e:
         error_str = str(e)
         if "DLL load failed" in error_str or "cannot open shared object" in error_str:
-            raise DllLoadError("_engine", e) from e
+            raise DllLoadError("_native", e) from e
         elif "No module named" in error_str:
             raise DllLoadError(
-                "_engine",
+                "_native",
                 RuntimeError("Extension not found. Build with: ./scripts/cli.ps1 build")
             ) from e
         raise
@@ -94,7 +94,7 @@ class Engine:
         >>> engine = Engine(config=config)
 
         # Pipeline-based (full control)
-        >>> from ionosense_hpc import PipelineBuilder
+        >>> from sigtekx import PipelineBuilder
         >>> pipeline = (PipelineBuilder()
         ...     .add_window('blackman')
         ...     .add_fft('1/N')
@@ -204,7 +204,7 @@ class Engine:
             return pipeline.config
 
         if builder is not None:
-            from ionosense_hpc.core.builder import PipelineBuilder
+            from sigtekx.core.builder import PipelineBuilder
             b = PipelineBuilder()
             builder(b)
             self._pipeline = b.build()
@@ -223,13 +223,13 @@ class Engine:
             mode = ExecutionMode(mode)
 
         # Import here to avoid circular dependency
-        from ionosense_hpc.config.schemas import _apply_mode_overrides
+        from sigtekx.config.schemas import _apply_mode_overrides
         self._config = _apply_mode_overrides(self._config, mode)
 
     def _validate_device_requirements(self) -> None:
         """Validate CUDA device availability and compatibility."""
         try:
-            from ionosense_hpc.utils.device import device_info
+            from sigtekx.utils.device import device_info
         except Exception as exc:
             raise DeviceNotFoundError(
                 "Unable to import CUDA device utilities"
@@ -430,7 +430,7 @@ class Engine:
 
     def _prepare_input(self, data: NDArray[Any]) -> FloatArray:
         """Validate and prepare input array for processing."""
-        from ionosense_hpc.config.schemas import ValidationMode
+        from sigtekx.config.schemas import ValidationMode
 
         # Fast path: disabled validation (C++ still validates)
         if self._config.validation_mode == ValidationMode.DISABLED:
@@ -587,7 +587,7 @@ class Engine:
 
         # Use device utilities to get runtime info
         try:
-            from ionosense_hpc.utils.device import device_info as get_device_info
+            from sigtekx.utils.device import device_info as get_device_info
             info = get_device_info()
             return {
                 "device_name": str(info.get("name", "Unknown")),

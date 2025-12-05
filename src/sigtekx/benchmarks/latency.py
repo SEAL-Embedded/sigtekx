@@ -1,5 +1,5 @@
 """
-src/ionosense_hpc/benchmarks/latency.py
+src/sigtekx/benchmarks/latency.py
 --------------------------------------------------------------------------------
 Latency benchmark with IEEE-compliant statistical analysis and
 GPU-accurate timing using CUDA events.
@@ -10,12 +10,12 @@ from typing import Any
 
 import numpy as np
 
-from ionosense_hpc import Engine
-from ionosense_hpc.benchmarks.base import BaseBenchmark, BenchmarkConfig, BenchmarkResult
-from ionosense_hpc.config import EngineConfig, get_preset
-from ionosense_hpc.utils import logger, make_test_batch
-from ionosense_hpc.utils.paths import get_benchmark_run_dir, normalize_benchmark_name
-from ionosense_hpc.utils.profiling import (
+from sigtekx import Engine
+from sigtekx.benchmarks.base import BaseBenchmark, BenchmarkConfig, BenchmarkResult
+from sigtekx.config import EngineConfig, get_preset
+from sigtekx.utils import logger, make_test_batch
+from sigtekx.utils.paths import get_benchmark_run_dir, normalize_benchmark_name
+from sigtekx.utils.profiling import (
     ProfileColor,
     ProfilingDomain,
     nvtx_range,
@@ -177,7 +177,7 @@ class LatencyBenchmark(BaseBenchmark):
         Returns:
             Dictionary of analysis results
         """
-        from ionosense_hpc.utils.profiling import ProfileColor, nvtx_range
+        from sigtekx.utils.profiling import ProfileColor, nvtx_range
         with nvtx_range("AnalyzeResults", color=ProfileColor.ORANGE):
             if isinstance(result.measurements, dict):
                 latencies = result.measurements.get('latency_us', np.array([]))
@@ -333,7 +333,7 @@ class StreamingLatencyBenchmark(LatencyBenchmark):
         stream_samples = int(stream_duration_s * engine_config.sample_rate_hz)
 
         # Generate continuous stream data
-        from ionosense_hpc.utils import make_chirp
+        from sigtekx.utils import make_chirp
         self.stream_buffer = make_chirp(
             sample_rate=engine_config.sample_rate_hz,
             n_samples=stream_samples,
@@ -400,7 +400,7 @@ def run_latency_benchmark_suite(
     """
     from pathlib import Path
 
-    from ionosense_hpc.benchmarks.base import load_benchmark_config, save_benchmark_results
+    from sigtekx.benchmarks.base import load_benchmark_config, save_benchmark_results
 
     # Load configuration
     base_config = load_benchmark_config(config_path) if config_path else {}
@@ -505,7 +505,7 @@ if __name__ == '__main__':
         result = benchmark.run()
         from pathlib import Path
 
-        from ionosense_hpc.benchmarks.base import save_benchmark_results
+        from sigtekx.benchmarks.base import save_benchmark_results
         base_dir = Path(args.output) if args.output else get_benchmark_run_dir('latency')
         base_dir.mkdir(parents=True, exist_ok=True)
         safe_name = normalize_benchmark_name(result.name)

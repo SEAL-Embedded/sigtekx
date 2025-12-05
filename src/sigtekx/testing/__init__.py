@@ -1,8 +1,8 @@
-"""Testing utilities for ionosense-hpc.
+"""Testing utilities for sigtekx.
 
 This package intentionally avoids importing fixtures or validators at package
 import time to keep pytest plugin loading lightweight and robust. Tests should
-import from `ionosense_hpc.testing.fixtures` and `ionosense_hpc.testing.validators`
+import from `sigtekx.testing.fixtures` and `sigtekx.testing.validators`
 directly as needed.
 """
 

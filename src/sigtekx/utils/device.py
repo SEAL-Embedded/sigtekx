@@ -3,9 +3,9 @@
 import contextlib
 from typing import Any
 
-from ionosense_hpc.core.engine import _import_cpp_engine
-from ionosense_hpc.exceptions import DeviceNotFoundError, DllLoadError
-from ionosense_hpc.utils.logging import logger
+from sigtekx.core.engine import _import_cpp_engine
+from sigtekx.exceptions import DeviceNotFoundError, DllLoadError
+from sigtekx.utils.logging import logger
 
 try:
     import pynvml

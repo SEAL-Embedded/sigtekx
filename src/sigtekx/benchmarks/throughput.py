@@ -1,5 +1,5 @@
 """
-src/ionosense_hpc/benchmarks/throughput.py
+src/sigtekx/benchmarks/throughput.py
 --------------------------------------------------------------------------------
 Enhanced throughput benchmark with memory bandwidth analysis and
 scaling characterization following HPC benchmarking standards.
@@ -11,12 +11,12 @@ from typing import Any
 
 import numpy as np
 
-from ionosense_hpc import Engine
-from ionosense_hpc.benchmarks.base import BaseBenchmark, BenchmarkConfig
-from ionosense_hpc.config import EngineConfig, ExecutionMode, get_preset
-from ionosense_hpc.utils import get_memory_usage, logger, make_test_batch
-from ionosense_hpc.utils.paths import get_benchmark_run_dir, normalize_benchmark_name
-from ionosense_hpc.utils.profiling import (
+from sigtekx import Engine
+from sigtekx.benchmarks.base import BaseBenchmark, BenchmarkConfig
+from sigtekx.config import EngineConfig, ExecutionMode, get_preset
+from sigtekx.utils import get_memory_usage, logger, make_test_batch
+from sigtekx.utils.paths import get_benchmark_run_dir, normalize_benchmark_name
+from sigtekx.utils.profiling import (
     ProfileColor,
     ProfilingDomain,
     compute_range,
@@ -191,7 +191,7 @@ class ThroughputBenchmark(BaseBenchmark):
             return
 
         try:
-            from ionosense_hpc.utils import device_info
+            from sigtekx.utils import device_info
             info = device_info()
 
             sample: dict[str, Any] = {
@@ -530,7 +530,7 @@ if __name__ == '__main__':
         result = benchmark.run()
 
     # Save results
-    from ionosense_hpc.benchmarks.base import save_benchmark_results
+    from sigtekx.benchmarks.base import save_benchmark_results
     if args.output:
         save_benchmark_results(result, args.output)
     else:

@@ -10,7 +10,7 @@ Following API design principles:
 - Composable - build complex from simple
 
 Example:
-    >>> from ionosense_hpc import PipelineBuilder
+    >>> from sigtekx import PipelineBuilder
     >>>
     >>> pipeline = (
     ...     PipelineBuilder()
@@ -26,7 +26,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ionosense_hpc.config import EngineConfig, ScalePolicy, WindowNorm, WindowSymmetry, WindowType
+from sigtekx.config import EngineConfig, ScalePolicy, WindowNorm, WindowSymmetry, WindowType
 
 
 class PipelineBuilder:

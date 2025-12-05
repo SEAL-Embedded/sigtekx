@@ -1,4 +1,4 @@
-"""Ionosense-HPC: High-performance CUDA FFT engine and benchmarking suite.
+"""SigTekX: High-performance CUDA FFT engine and benchmarking suite.
 
 This package provides a Python interface to a high-performance CUDA-based
 signal processing engine, optimized for real-time signal analysis.
@@ -102,7 +102,7 @@ from .exceptions import (
     DllLoadError,
     EngineRuntimeError,
     EngineStateError,
-    IonosenseError,
+    SigTekXError,
     ValidationError,
 )
 
@@ -144,12 +144,12 @@ except (ImportError, DllLoadError) as e:
 
 
 """
-Benchmark and report modules live under the `ionosense_hpc.benchmarks` package.
+Benchmark and report modules live under the `sigtekx.benchmarks` package.
 To keep imports light and avoid optional heavy dependencies at import time,
 they are not re-exported at the top level. Import from submodules instead, e.g.:
 
-  from ionosense_hpc.benchmarks import BenchmarkSuite
-  from ionosense_hpc.benchmarks.throughput import ThroughputBenchmark
+  from sigtekx.benchmarks import BenchmarkSuite
+  from sigtekx.benchmarks.throughput import ThroughputBenchmark
 """
 
 # ============================================================================
@@ -192,7 +192,7 @@ __all__ = [
     "ExecutionMode",
 
     # -- Core Exceptions --
-    "IonosenseError",
+    "SigTekXError",
     "ConfigError",
     "DeviceNotFoundError",
     "DllLoadError",
@@ -216,7 +216,7 @@ __all__ = [
 # ============================================================================
 
 def show_versions(verbose: bool = True) -> dict:
-    """Show version information for ionosense-hpc and dependencies.
+    """Show version information for sigtekx and dependencies.
 
     Args:
         verbose: If True, print to console
@@ -227,7 +227,7 @@ def show_versions(verbose: bool = True) -> dict:
     import numpy as np
 
     versions = {
-        'ionosense_hpc': __version__,
+        'sigtekx': __version__,
         'python': f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
         'numpy': np.__version__,
         'platform': platform.platform(),
@@ -261,7 +261,7 @@ def show_versions(verbose: bool = True) -> dict:
         versions['pynvml'] = 'not installed'
 
     if verbose:
-        print("Ionosense-HPC Environment")
+        print("SigTekX Environment")
         print("=" * 40)
         for key, value in versions.items():
             print(f"{key:20s}: {value}")
@@ -279,7 +279,7 @@ def self_test(verbose: bool = True) -> bool:
         True if all tests pass
     """
     if verbose:
-        print("Running ionosense-hpc self-test...")
+        print("Running sigtekx self-test...")
         print("-" * 40)
 
     all_passed = True
@@ -401,6 +401,6 @@ except DeviceNotFoundError as exc:
 
 # Print brief info when imported interactively
 if hasattr(sys, 'ps1'):  # Interactive mode
-    print(f"Ionosense-HPC v{__version__} ready.")
+    print(f"SigTekX v{__version__} ready.")
     if not _ENGINE_AVAILABLE:
         print(f"Warning: C++ engine module not available ({_ENGINE_ERROR}). Run build first.")

@@ -1,5 +1,5 @@
 """
-Enhanced pytest fixtures for the ionosense-hpc testing framework.
+Enhanced pytest fixtures for the sigtekx testing framework.
 
 This module provides fixtures for managing test environments, generating
 test data, handling hardware dependencies, and supporting the new
@@ -14,21 +14,21 @@ import numpy as np
 import pytest
 import yaml  # type: ignore[import-untyped]
 
-from ionosense_hpc import Engine
-from ionosense_hpc.benchmarks.base import (
+from sigtekx import Engine
+from sigtekx.benchmarks.base import (
     BenchmarkConfig,
     BenchmarkContext,
     BenchmarkResult,
 )
-from ionosense_hpc.config import EngineConfig, get_preset
-from ionosense_hpc.utils import (
+from sigtekx.config import EngineConfig, get_preset
+from sigtekx.utils import (
     make_chirp,
     make_multitone,
     make_noise,
     make_sine,
     make_test_batch,
 )
-from ionosense_hpc.utils.signals import (
+from sigtekx.utils.signals import (
     make_brown_noise,
     make_dc_signal,
     make_impulse,
@@ -204,7 +204,7 @@ def mock_engine(monkeypatch) -> Engine:
         def reset(self):
             self.is_initialized = False
 
-    monkeypatch.setattr("ionosense_hpc.Engine", MockEngine)
+    monkeypatch.setattr("sigtekx.Engine", MockEngine)
     return cast(Engine, MockEngine())
 
 
@@ -221,7 +221,7 @@ def seeded_rng() -> np.random.Generator:
 @pytest.fixture
 def test_sine_data() -> np.ndarray:
     """Generates a standard 1 kHz sine wave for spectral validation."""
-    from ionosense_hpc.utils import make_sine
+    from sigtekx.utils import make_sine
     return cast(
         np.ndarray,
         make_sine(
@@ -341,7 +341,7 @@ def sweep_type(request) -> str:
 def gpu_available() -> bool:
     """Returns True if a CUDA-capable GPU is available, otherwise False."""
     try:
-        from ionosense_hpc.utils import gpu_count
+        from sigtekx.utils import gpu_count
         return gpu_count() > 0
     except Exception:
         return False
@@ -371,7 +371,7 @@ def require_nsight() -> None:
 def benchmark_runner(temp_benchmark_dir: Path):
     """Provides a configured benchmark runner for testing."""
     _ = temp_benchmark_dir  # trigger fixture side effects (workspace setup)
-    from ionosense_hpc.benchmarks.base import BaseBenchmark
+    from sigtekx.benchmarks.base import BaseBenchmark
 
     class TestBenchmark(BaseBenchmark):
         data: np.ndarray | None = None
@@ -413,14 +413,14 @@ def reference_fft_output() -> np.ndarray:
 @pytest.fixture
 def validation_helper():
     """Provides a ValidationHelper instance for testing."""
-    from ionosense_hpc.utils.validation import ValidationHelper
+    from sigtekx.utils.validation import ValidationHelper
     return ValidationHelper()
 
 
 @pytest.fixture
 def data_archiver(temp_benchmark_dir: Path):
     """Provides a DataArchiver instance for testing."""
-    from ionosense_hpc.utils.archiving import DataArchiver
+    from sigtekx.utils.archiving import DataArchiver
     return DataArchiver(temp_benchmark_dir / "archive")
 
 

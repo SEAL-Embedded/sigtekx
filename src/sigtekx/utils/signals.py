@@ -17,7 +17,7 @@ import numpy as np
 from numpy.typing import DTypeLike
 from scipy import signal as sp_signal
 
-from ionosense_hpc.config import EngineConfig
+from sigtekx.config import EngineConfig
 
 NoiseKind = Literal["white", "pink", "brown"]
 

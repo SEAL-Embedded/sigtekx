@@ -1,5 +1,5 @@
 """
-Unified configuration schema for the Ionosense HPC engine.
+Unified configuration schema for the SigTekX engine.
 
 This module defines a single, cohesive EngineConfig that covers all aspects
 of signal processing configuration: signal parameters, pipeline parameters,
@@ -291,7 +291,7 @@ class EngineConfig(BaseModel):
     @property
     def memory_estimate_mb(self) -> float:
         """Memory estimate in MB. Delegates to validation.estimate.memory.usage.mb()"""
-        from ionosense_hpc.config.validation import estimate_memory_usage_mb
+        from sigtekx.config.validation import estimate_memory_usage_mb
         return estimate_memory_usage_mb(self)
 
     # ========================================================================

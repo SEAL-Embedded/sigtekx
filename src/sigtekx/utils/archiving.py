@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 
-from ionosense_hpc.utils.paths import (
+from sigtekx.utils.paths import (
     get_benchmark_result_path,
     get_benchmark_run_dir,
     get_benchmarks_root,

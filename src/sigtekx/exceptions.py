@@ -1,5 +1,5 @@
 """
-Custom exception hierarchy for ionosense-hpc.
+Custom exception hierarchy for sigtekx.
 
 Enhanced with research-specific exceptions for benchmarking,
 experiments, and reproducibility following RSE/RE standards.
@@ -8,8 +8,8 @@ experiments, and reproducibility following RSE/RE standards.
 from typing import Any
 
 
-class IonosenseError(Exception):
-    """Base exception for all ionosense-hpc errors.
+class SigTekXError(Exception):
+    """Base exception for all sigtekx errors.
 
     Provides consistent error handling with contextual hints and flexible
     context storage for debugging and error tracking.
@@ -36,8 +36,8 @@ class IonosenseError(Exception):
 
     Examples
     --------
-    >>> raise IonosenseError("Operation failed", hint="Check system logs")
-    >>> raise IonosenseError("Config error", config_file="config.yaml", line=42)
+    >>> raise SigTekXError("Operation failed", hint="Check system logs")
+    >>> raise SigTekXError("Config error", config_file="config.yaml", line=42)
     """
 
     error_code = "E000"
@@ -65,7 +65,7 @@ class IonosenseError(Exception):
 # Configuration and Validation Errors
 # ============================================================================
 
-class ConfigError(IonosenseError):
+class ConfigError(SigTekXError):
     """Configuration validation or compatibility error.
 
     Raised when configuration parameters are invalid or incompatible.
@@ -93,7 +93,7 @@ class ConfigError(IonosenseError):
     hint : str or None
         Resolution hint (explicit or auto-generated).
     context : dict
-        Inherited from IonosenseError.
+        Inherited from SigTekXError.
     """
 
     error_code = "E1010"
@@ -115,7 +115,7 @@ class ConfigError(IonosenseError):
         self.value = value
 
 
-class ValidationError(IonosenseError):
+class ValidationError(SigTekXError):
     """Input data validation error.
 
     Raised when input data fails validation checks.
@@ -140,7 +140,7 @@ class ValidationError(IonosenseError):
     hint : str or None
         Auto-generated as "Expected {expected}, got {got}" if both provided.
     context : dict
-        Inherited from IonosenseError.
+        Inherited from SigTekXError.
     """
 
     error_code = "E1020"
@@ -158,7 +158,7 @@ class ValidationError(IonosenseError):
 # Hardware and Runtime Errors
 # ============================================================================
 
-class DeviceNotFoundError(IonosenseError):
+class DeviceNotFoundError(SigTekXError):
     """No CUDA-capable devices found.
 
     Raised when GPU detection fails during engine initialization.
@@ -175,7 +175,7 @@ class DeviceNotFoundError(IonosenseError):
     hint : str
         Always set to "Ensure NVIDIA drivers are installed and a GPU is present".
     context : dict
-        Inherited from IonosenseError (empty for this exception).
+        Inherited from SigTekXError (empty for this exception).
     """
 
     error_code = "E2010"
@@ -185,7 +185,7 @@ class DeviceNotFoundError(IonosenseError):
         super().__init__(message, hint)
 
 
-class DllLoadError(IonosenseError):
+class DllLoadError(SigTekXError):
     """Failed to load required DLL/shared library.
 
     Raised when CUDA or engine library loading fails.
@@ -208,7 +208,7 @@ class DllLoadError(IonosenseError):
     hint : str
         Always set to "Check that CUDA toolkit is installed and on PATH".
     context : dict
-        Inherited from IonosenseError.
+        Inherited from SigTekXError.
     """
 
     error_code = "E2020"
@@ -223,7 +223,7 @@ class DllLoadError(IonosenseError):
         self.original_error = original_error
 
 
-class EngineStateError(IonosenseError):
+class EngineStateError(SigTekXError):
     """Engine is in an invalid state for the requested operation.
 
     Raised when operations are attempted in incorrect engine states.
@@ -245,7 +245,7 @@ class EngineStateError(IonosenseError):
         Auto-generated based on state: "uninitialized" suggests calling
         initialize(), "processing" suggests waiting.
     context : dict
-        Inherited from IonosenseError.
+        Inherited from SigTekXError.
     """
 
     error_code = "E3010"
@@ -260,7 +260,7 @@ class EngineStateError(IonosenseError):
         self.current_state = current_state
 
 
-class EngineRuntimeError(IonosenseError):
+class EngineRuntimeError(SigTekXError):
     """Runtime error during engine processing.
 
     Raised when CUDA operations or engine processing fails.
@@ -282,7 +282,7 @@ class EngineRuntimeError(IonosenseError):
         Auto-generated based on error: "out of memory" suggests reducing
         parameters, "invalid configuration" suggests validation.
     context : dict
-        Inherited from IonosenseError.
+        Inherited from SigTekXError.
     """
 
     error_code = "E3020"
@@ -302,7 +302,7 @@ class EngineRuntimeError(IonosenseError):
 # Research and Benchmarking Errors (NEW)
 # ============================================================================
 
-class BenchmarkError(IonosenseError):
+class BenchmarkError(SigTekXError):
     """Base class for benchmark-related errors.
 
     Raised during benchmark execution, validation, or analysis phases.
@@ -314,7 +314,7 @@ class BenchmarkError(IonosenseError):
     benchmark_name : str, optional
         Name of the benchmark that raised this exception.
     **kwargs : dict
-        Additional context passed to IonosenseError.
+        Additional context passed to SigTekXError.
 
     Attributes
     ----------
@@ -323,9 +323,9 @@ class BenchmarkError(IonosenseError):
     benchmark_name : str or None
         Benchmark identifier for error tracking.
     hint : str or None
-        Inherited from IonosenseError.
+        Inherited from SigTekXError.
     context : dict
-        Inherited from IonosenseError.
+        Inherited from SigTekXError.
     """
 
     error_code = "E4000"
@@ -409,7 +409,7 @@ class BenchmarkValidationError(BenchmarkError):
         self.metrics = metrics
 
 
-class ExperimentError(IonosenseError):
+class ExperimentError(SigTekXError):
     """Base class for experiment-related errors.
 
     Raised during experiment setup, execution, or tracking phases.
@@ -421,7 +421,7 @@ class ExperimentError(IonosenseError):
     experiment_id : str, optional
         Unique identifier for the experiment.
     **kwargs : dict
-        Additional context passed to IonosenseError.
+        Additional context passed to SigTekXError.
 
     Attributes
     ----------
@@ -430,9 +430,9 @@ class ExperimentError(IonosenseError):
     experiment_id : str or None
         Experiment identifier for error tracking.
     hint : str or None
-        Inherited from IonosenseError.
+        Inherited from SigTekXError.
     context : dict
-        Inherited from IonosenseError.
+        Inherited from SigTekXError.
     """
 
     error_code = "E4010"
@@ -444,7 +444,7 @@ class ExperimentError(IonosenseError):
 
 
 
-class ReproducibilityError(IonosenseError):
+class ReproducibilityError(SigTekXError):
     """Error related to research reproducibility.
 
     Raised when reproducibility metadata is missing or incomplete.
@@ -456,7 +456,7 @@ class ReproducibilityError(IonosenseError):
     missing_info : list[str], optional
         List of missing metadata fields.
     **kwargs : dict
-        Additional context passed to IonosenseError.
+        Additional context passed to SigTekXError.
 
     Attributes
     ----------
@@ -467,7 +467,7 @@ class ReproducibilityError(IonosenseError):
     hint : str or None
         Auto-generated as "Missing reproducibility information: {list}".
     context : dict
-        Inherited from IonosenseError.
+        Inherited from SigTekXError.
 
     Examples
     --------
@@ -543,7 +543,7 @@ class EnvironmentMismatchError(ReproducibilityError):
         self.differences = differences
 
 
-class DataIntegrityError(IonosenseError):
+class DataIntegrityError(SigTekXError):
     """Data corruption or integrity check failure.
 
     Raised when data checksum or hash validation fails.
@@ -569,7 +569,7 @@ class DataIntegrityError(IonosenseError):
         Always starts with "Data may be corrupted or modified". If hashes
         provided, appends truncated hash comparison (first 8 chars).
     context : dict
-        Inherited from IonosenseError.
+        Inherited from SigTekXError.
 
     Examples
     --------
@@ -595,7 +595,7 @@ class DataIntegrityError(IonosenseError):
 # Analysis and Reporting Errors
 # ============================================================================
 
-class AnalysisError(IonosenseError):
+class AnalysisError(SigTekXError):
     """Error during result analysis.
 
     Raised when statistical or data analysis operations fail.
@@ -607,7 +607,7 @@ class AnalysisError(IonosenseError):
     analysis_type : str, optional
         Type of analysis (e.g., 'scaling', 'latency', 'throughput').
     **kwargs : dict
-        Additional context passed to IonosenseError.
+        Additional context passed to SigTekXError.
 
     Attributes
     ----------
@@ -616,9 +616,9 @@ class AnalysisError(IonosenseError):
     analysis_type : str or None
         Analysis type identifier.
     hint : str or None
-        Inherited from IonosenseError.
+        Inherited from SigTekXError.
     context : dict
-        Inherited from IonosenseError.
+        Inherited from SigTekXError.
     """
 
     error_code = "E5000"
@@ -628,7 +628,7 @@ class AnalysisError(IonosenseError):
         self.analysis_type = analysis_type
 
 
-class ReportGenerationError(IonosenseError):
+class ReportGenerationError(SigTekXError):
     """Error generating benchmark report.
 
     Raised when report generation fails due to missing dependencies or templates.
@@ -640,7 +640,7 @@ class ReportGenerationError(IonosenseError):
     report_format : str, optional
         Report format (e.g., 'pdf', 'html', 'markdown').
     **kwargs : dict
-        Additional context passed to IonosenseError.
+        Additional context passed to SigTekXError.
 
     Attributes
     ----------
@@ -652,7 +652,7 @@ class ReportGenerationError(IonosenseError):
         Auto-generated based on format: 'pdf' suggests checking matplotlib,
         'html' suggests checking templates.
     context : dict
-        Inherited from IonosenseError.
+        Inherited from SigTekXError.
     """
 
     error_code = "E5020"
@@ -711,7 +711,7 @@ class InsufficientDataError(AnalysisError):
 # Workflow and Orchestration Errors
 # ============================================================================
 
-class WorkflowError(IonosenseError):
+class WorkflowError(SigTekXError):
     """Error in research workflow execution.
 
     Raised when workflow orchestration or pipeline execution fails.
@@ -723,7 +723,7 @@ class WorkflowError(IonosenseError):
     workflow_stage : str, optional
         Current workflow stage (e.g., 'data_collection', 'analysis').
     **kwargs : dict
-        Additional context passed to IonosenseError.
+        Additional context passed to SigTekXError.
 
     Attributes
     ----------
@@ -732,9 +732,9 @@ class WorkflowError(IonosenseError):
     workflow_stage : str or None
         Workflow stage identifier.
     hint : str or None
-        Inherited from IonosenseError.
+        Inherited from SigTekXError.
     context : dict
-        Inherited from IonosenseError.
+        Inherited from SigTekXError.
     """
 
     error_code = "E6000"
@@ -780,7 +780,7 @@ class DependencyError(WorkflowError):
         self.missing_dependencies = missing_dependencies
 
 
-class ResourceExhaustedError(IonosenseError):
+class ResourceExhaustedError(SigTekXError):
     """System resource exhausted (memory, disk, etc.).
 
     Raised when system resources are insufficient for the requested operation.
@@ -808,7 +808,7 @@ class ResourceExhaustedError(IonosenseError):
         Auto-generated based on resource_type: 'gpu memory' suggests reducing
         parameters, 'disk space' suggests cleanup.
     context : dict
-        Inherited from IonosenseError.
+        Inherited from SigTekXError.
     """
 
     error_code = "E6020"

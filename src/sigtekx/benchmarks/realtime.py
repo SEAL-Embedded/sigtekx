@@ -1,5 +1,5 @@
 """
-src/ionosense_hpc/benchmarks/realtime.py
+src/sigtekx/benchmarks/realtime.py
 --------------------------------------------------------------------------------
 Real-time streaming benchmark with deadline compliance analysis.
 Upgraded to use BaseBenchmark framework for RSE/RE standards compliance.
@@ -10,12 +10,12 @@ from typing import Any
 
 import numpy as np
 
-from ionosense_hpc import Engine
-from ionosense_hpc.benchmarks.base import BaseBenchmark, BenchmarkConfig, BenchmarkResult
-from ionosense_hpc.config import EngineConfig, ExecutionMode, get_preset
-from ionosense_hpc.utils import logger, make_test_batch
-from ionosense_hpc.utils.paths import get_benchmark_run_dir, normalize_benchmark_name
-from ionosense_hpc.utils.profiling import (
+from sigtekx import Engine
+from sigtekx.benchmarks.base import BaseBenchmark, BenchmarkConfig, BenchmarkResult
+from sigtekx.config import EngineConfig, ExecutionMode, get_preset
+from sigtekx.utils import logger, make_test_batch
+from sigtekx.utils.paths import get_benchmark_run_dir, normalize_benchmark_name
+from sigtekx.utils.profiling import (
     ProfileColor,
     compute_range,
     nvtx_range,
@@ -244,7 +244,7 @@ class RealtimeBenchmark(BaseBenchmark):
         Returns:
             Dictionary with real-time specific analysis
         """
-        from ionosense_hpc.utils.profiling import ProfileColor, nvtx_range
+        from sigtekx.utils.profiling import ProfileColor, nvtx_range
         analysis = {}
         with nvtx_range("AnalyzeResults", color=ProfileColor.ORANGE):
             # Frame timing analysis
@@ -385,7 +385,7 @@ if __name__ == '__main__':
     result.metadata['analysis'] = analysis
 
     # Output results
-    from ionosense_hpc.benchmarks.base import save_benchmark_results
+    from sigtekx.benchmarks.base import save_benchmark_results
     if args.output:
         save_benchmark_results(result, args.output)
     else:

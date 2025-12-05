@@ -1,5 +1,5 @@
 """
-src/ionosense_hpc/benchmarks/base.py
+src/sigtekx/benchmarks/base.py
 --------------------------------------------------------------------------------
 Abstract base class and utilities for research-grade benchmarking following
 RSE/RE/IEEE standards for reproducibility and statistical rigor.
@@ -19,14 +19,14 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 if TYPE_CHECKING:
-    from ionosense_hpc.utils.gpu_clocks import GpuClockManager
+    from sigtekx.utils.gpu_clocks import GpuClockManager
 
 import numpy as np
 import yaml  # type: ignore[import-untyped]
 from pydantic import BaseModel, Field
 
-from ionosense_hpc.utils import logger
-from ionosense_hpc.utils.profiling import (
+from sigtekx.utils import logger
+from sigtekx.utils.profiling import (
     ProfileColor,
     ProfilingDomain,
     benchmark_range,
@@ -69,7 +69,7 @@ class BenchmarkContext:
     def _get_cuda_info(self) -> dict:
         """Query CUDA runtime and device information."""
         try:
-            from ionosense_hpc.utils import device_info, gpu_count
+            from sigtekx.utils import device_info, gpu_count
             return {
                 'gpu_count': gpu_count(),
                 'devices': [device_info(i) for i in range(gpu_count())],
@@ -94,7 +94,7 @@ class BenchmarkContext:
     def _get_package_versions(self) -> dict:
         """Get versions of key dependencies."""
         packages = {}
-        for pkg in ['numpy', 'scipy', 'pydantic', 'ionosense_hpc']:
+        for pkg in ['numpy', 'scipy', 'pydantic', 'sigtekx']:
             try:
                 mod = __import__(pkg)
                 packages[pkg] = getattr(mod, '__version__', 'unknown')
@@ -279,7 +279,7 @@ class BaseBenchmark(abc.ABC):
                 sys.path.insert(0, str(_experiments_path))
             from analysis.spectrogram import SpectrogramGenerator
 
-            from ionosense_hpc.config import EngineConfig
+            from sigtekx.config import EngineConfig
 
             # Create EngineConfig from dict
             eng_config = EngineConfig(**engine_config)
@@ -329,8 +329,8 @@ class BaseBenchmark(abc.ABC):
 
         # Check GPU availability (only hard-require if configured)
         try:
-            from ionosense_hpc.utils import gpu_count
-            from ionosense_hpc.utils import logger as _logger
+            from sigtekx.utils import gpu_count
+            from sigtekx.utils import logger as _logger
             n_gpu = gpu_count()
             if self.config.require_gpu:
                 if n_gpu == 0:
@@ -395,7 +395,7 @@ class BaseBenchmark(abc.ABC):
             # Initialize GPU clock manager if enabled
             if self.config.lock_gpu_clocks:
                 try:
-                    from ionosense_hpc.utils import GpuClockManager, check_clock_locking_available
+                    from sigtekx.utils import GpuClockManager, check_clock_locking_available
 
                     # Check availability first
                     available, reason = check_clock_locking_available()

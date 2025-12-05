@@ -6,7 +6,7 @@
  *
  * @brief pybind11 wrappers to expose C++ executors to Python.
  *
- * This file creates the Python module `_engine` and provides bindings for
+ * This file creates the Python module `_native` and provides bindings for
  * the pipeline executor architecture. It includes Python-friendly wrapper
  * classes to handle conversions between NumPy arrays and C++ pointers,
  * enabling efficient, zero-copy data exchange where possible.
@@ -18,14 +18,14 @@
 
 #include <sstream>
 
-#include "ionosense/core/executor_config.hpp"
-#include "ionosense/core/pipeline_executor.hpp"
-#include "ionosense/core/processing_stage.hpp"
-#include "ionosense/executors/batch_executor.hpp"
-#include "ionosense/executors/streaming_executor.hpp"
+#include "sigtekx/core/executor_config.hpp"
+#include "sigtekx/core/pipeline_executor.hpp"
+#include "sigtekx/core/processing_stage.hpp"
+#include "sigtekx/executors/batch_executor.hpp"
+#include "sigtekx/executors/streaming_executor.hpp"
 
 namespace py = pybind11;
-namespace ionosense {
+namespace sigtekx {
 
 /**
  * @class PyExecutor
@@ -113,7 +113,7 @@ class PyExecutor {
 using PyBatchExecutor = PyExecutor<BatchExecutor>;
 using PyStreamingExecutor = PyExecutor<StreamingExecutor>;
 
-}  // namespace ionosense
+}  // namespace sigtekx
 
 /**
  * @brief The pybind11 module definition.
@@ -121,9 +121,9 @@ using PyStreamingExecutor = PyExecutor<StreamingExecutor>;
  * This macro defines the `_engine` Python module and binds all the C++
  * classes, methods, and enumerations to make them accessible from Python.
  */
-PYBIND11_MODULE(_engine, m) {
+PYBIND11_MODULE(_native, m) {
   m.doc() = R"pbdoc(
-        Ionosense HPC CUDA FFT Engine - C++ Core Module (v0.9.3)
+        SigTekX CUDA FFT Engine - C++ Core Module (v0.9.3)
 
         This module provides high-performance CUDA-accelerated signal processing
         with a composable pipeline/executor architecture.
@@ -141,108 +141,108 @@ PYBIND11_MODULE(_engine, m) {
         - StageConfig: Per-stage configuration
 
         Example:
-            >>> import _engine
-            >>> config = _engine.ExecutorConfig()
+            >>> import _native
+            >>> config = _native.ExecutorConfig()
             >>> config.nfft = 1024
             >>> config.channels = 4
-            >>> config.mode = _engine.ExecutionMode.BATCH
-            >>> executor = _engine.BatchExecutor()
+            >>> config.mode = _native.ExecutionMode.BATCH
+            >>> executor = _native.BatchExecutor()
             >>> executor.initialize(config)
             >>> output = executor.process(input_data)
     )pbdoc";
 
   // --- Bind Enums for StageConfig ---
-  py::enum_<ionosense::StageConfig::WindowType>(m, "WindowType")
-      .value("RECTANGULAR", ionosense::StageConfig::WindowType::RECTANGULAR)
-      .value("HANN", ionosense::StageConfig::WindowType::HANN)
-      .value("BLACKMAN", ionosense::StageConfig::WindowType::BLACKMAN)
+  py::enum_<sigtekx::StageConfig::WindowType>(m, "WindowType")
+      .value("RECTANGULAR", sigtekx::StageConfig::WindowType::RECTANGULAR)
+      .value("HANN", sigtekx::StageConfig::WindowType::HANN)
+      .value("BLACKMAN", sigtekx::StageConfig::WindowType::BLACKMAN)
       .export_values();
 
-  py::enum_<ionosense::StageConfig::WindowSymmetry>(
+  py::enum_<sigtekx::StageConfig::WindowSymmetry>(
       m, "WindowSymmetry",
       "Window symmetry mode (PERIODIC for FFT, SYMMETRIC for time-domain)")
-      .value("PERIODIC", ionosense::StageConfig::WindowSymmetry::PERIODIC,
+      .value("PERIODIC", sigtekx::StageConfig::WindowSymmetry::PERIODIC,
              "Periodic window (FFT processing, denominator N)")
-      .value("SYMMETRIC", ionosense::StageConfig::WindowSymmetry::SYMMETRIC,
+      .value("SYMMETRIC", sigtekx::StageConfig::WindowSymmetry::SYMMETRIC,
              "Symmetric window (time-domain, denominator N-1)")
       .export_values();
 
-  py::enum_<ionosense::StageConfig::WindowNorm>(m, "WindowNorm",
+  py::enum_<sigtekx::StageConfig::WindowNorm>(m, "WindowNorm",
                                                 "Window normalization scheme")
-      .value("UNITY", ionosense::StageConfig::WindowNorm::UNITY,
+      .value("UNITY", sigtekx::StageConfig::WindowNorm::UNITY,
              "Unity power/energy gain normalization")
-      .value("SQRT", ionosense::StageConfig::WindowNorm::SQRT,
+      .value("SQRT", sigtekx::StageConfig::WindowNorm::SQRT,
              "Square root normalization")
       .export_values();
 
-  py::enum_<ionosense::StageConfig::ScalePolicy>(m, "ScalePolicy")
-      .value("NONE", ionosense::StageConfig::ScalePolicy::NONE)
-      .value("ONE_OVER_N", ionosense::StageConfig::ScalePolicy::ONE_OVER_N)
+  py::enum_<sigtekx::StageConfig::ScalePolicy>(m, "ScalePolicy")
+      .value("NONE", sigtekx::StageConfig::ScalePolicy::NONE)
+      .value("ONE_OVER_N", sigtekx::StageConfig::ScalePolicy::ONE_OVER_N)
       .value("ONE_OVER_SQRT_N",
-             ionosense::StageConfig::ScalePolicy::ONE_OVER_SQRT_N)
+             sigtekx::StageConfig::ScalePolicy::ONE_OVER_SQRT_N)
       .export_values();
 
-  py::enum_<ionosense::StageConfig::OutputMode>(m, "OutputMode",
+  py::enum_<sigtekx::StageConfig::OutputMode>(m, "OutputMode",
                                                 "Pipeline output format")
-      .value("MAGNITUDE", ionosense::StageConfig::OutputMode::MAGNITUDE,
+      .value("MAGNITUDE", sigtekx::StageConfig::OutputMode::MAGNITUDE,
              "Real magnitude spectrum")
       .value("COMPLEX_PASSTHROUGH",
-             ionosense::StageConfig::OutputMode::COMPLEX_PASSTHROUGH,
+             sigtekx::StageConfig::OutputMode::COMPLEX_PASSTHROUGH,
              "Complex FFT output")
       .export_values();
 
   // --- Bind ExecutorConfig Enums (v0.9.3 architecture) ---
-  py::enum_<ionosense::ExecutorConfig::ExecutionMode>(m, "ExecutionMode",
+  py::enum_<sigtekx::ExecutorConfig::ExecutionMode>(m, "ExecutionMode",
                                                       "Execution strategy for "
                                                       "pipeline executors")
-      .value("BATCH", ionosense::ExecutorConfig::ExecutionMode::BATCH,
+      .value("BATCH", sigtekx::ExecutorConfig::ExecutionMode::BATCH,
              "Process complete batches with maximum throughput")
-      .value("STREAMING", ionosense::ExecutorConfig::ExecutionMode::STREAMING,
+      .value("STREAMING", sigtekx::ExecutorConfig::ExecutionMode::STREAMING,
              "Continuous processing with low-latency via ring buffer (v0.9.4+)")
       .export_values();
 
   // --- Bind Configuration Structs ---
-  py::class_<ionosense::SignalConfig>(m, "SignalConfig")
+  py::class_<sigtekx::SignalConfig>(m, "SignalConfig")
       .def(py::init<>())
-      .def_readwrite("nfft", &ionosense::SignalConfig::nfft)
-      .def_readwrite("channels", &ionosense::SignalConfig::channels)
-      .def_readwrite("overlap", &ionosense::SignalConfig::overlap)
-      .def_readwrite("sample_rate_hz", &ionosense::SignalConfig::sample_rate_hz)
-      .def_readwrite("window_type", &ionosense::SignalConfig::window_type)
+      .def_readwrite("nfft", &sigtekx::SignalConfig::nfft)
+      .def_readwrite("channels", &sigtekx::SignalConfig::channels)
+      .def_readwrite("overlap", &sigtekx::SignalConfig::overlap)
+      .def_readwrite("sample_rate_hz", &sigtekx::SignalConfig::sample_rate_hz)
+      .def_readwrite("window_type", &sigtekx::SignalConfig::window_type)
       .def_readwrite("window_symmetry",
-                     &ionosense::SignalConfig::window_symmetry)
-      .def_readwrite("window_norm", &ionosense::SignalConfig::window_norm)
-      .def_readwrite("scale_policy", &ionosense::SignalConfig::scale_policy)
-      .def_readwrite("output_mode", &ionosense::SignalConfig::output_mode)
-      .def_readwrite("stream_count", &ionosense::SignalConfig::stream_count)
+                     &sigtekx::SignalConfig::window_symmetry)
+      .def_readwrite("window_norm", &sigtekx::SignalConfig::window_norm)
+      .def_readwrite("scale_policy", &sigtekx::SignalConfig::scale_policy)
+      .def_readwrite("output_mode", &sigtekx::SignalConfig::output_mode)
+      .def_readwrite("stream_count", &sigtekx::SignalConfig::stream_count)
       .def_readwrite("pinned_buffer_count",
-                     &ionosense::SignalConfig::pinned_buffer_count)
-      .def_readwrite("warmup_iters", &ionosense::SignalConfig::warmup_iters)
-      .def("num_output_bins", &ionosense::SignalConfig::num_output_bins)
-      .def("__repr__", [](const ionosense::SignalConfig& c) {
+                     &sigtekx::SignalConfig::pinned_buffer_count)
+      .def_readwrite("warmup_iters", &sigtekx::SignalConfig::warmup_iters)
+      .def("num_output_bins", &sigtekx::SignalConfig::num_output_bins)
+      .def("__repr__", [](const sigtekx::SignalConfig& c) {
         return "<SignalConfig nfft=" + std::to_string(c.nfft) +
                ", channels=" + std::to_string(c.channels) + ">";
       });
 
   // --- Bind ExecutorConfig (v0.9.3 architecture) ---
-  py::class_<ionosense::ExecutorConfig, ionosense::SignalConfig>(
+  py::class_<sigtekx::ExecutorConfig, sigtekx::SignalConfig>(
       m, "ExecutorConfig",
       "Configuration for pipeline executors (extends SignalConfig)")
       .def(py::init<>())
-      .def_readwrite("mode", &ionosense::ExecutorConfig::mode,
+      .def_readwrite("mode", &sigtekx::ExecutorConfig::mode,
                      "Execution strategy (BATCH/STREAMING)")
       .def_readwrite("max_inflight_batches",
-                     &ionosense::ExecutorConfig::max_inflight_batches,
+                     &sigtekx::ExecutorConfig::max_inflight_batches,
                      "Maximum concurrent batches (streaming mode, v0.9.4+)")
-      .def_readwrite("device_id", &ionosense::ExecutorConfig::device_id,
+      .def_readwrite("device_id", &sigtekx::ExecutorConfig::device_id,
                      "CUDA device ID (-1 for auto-select)")
-      .def("__repr__", [](const ionosense::ExecutorConfig& c) {
+      .def("__repr__", [](const sigtekx::ExecutorConfig& c) {
         std::string mode_str;
         switch (c.mode) {
-          case ionosense::ExecutorConfig::ExecutionMode::BATCH:
+          case sigtekx::ExecutorConfig::ExecutionMode::BATCH:
             mode_str = "BATCH";
             break;
-          case ionosense::ExecutorConfig::ExecutionMode::STREAMING:
+          case sigtekx::ExecutorConfig::ExecutionMode::STREAMING:
             mode_str = "STREAMING";
             break;
         }
@@ -251,64 +251,64 @@ PYBIND11_MODULE(_engine, m) {
                ", channels=" + std::to_string(c.channels) + ">";
       });
 
-  py::class_<ionosense::StageConfig>(m, "StageConfig")
+  py::class_<sigtekx::StageConfig>(m, "StageConfig")
       .def(py::init<>())
-      .def_readwrite("nfft", &ionosense::StageConfig::nfft)
-      .def_readwrite("window_type", &ionosense::StageConfig::window_type)
+      .def_readwrite("nfft", &sigtekx::StageConfig::nfft)
+      .def_readwrite("window_type", &sigtekx::StageConfig::window_type)
       // ... Bind other StageConfig members
-      .def("__repr__", [](const ionosense::StageConfig& c) {
+      .def("__repr__", [](const sigtekx::StageConfig& c) {
         return "<StageConfig nfft=" + std::to_string(c.nfft) + ">";
       });
 
   // --- Bind Statistics and Info Structs ---
-  py::class_<ionosense::ProcessingStats>(m, "ProcessingStats")
-      .def_readonly("latency_us", &ionosense::ProcessingStats::latency_us)
+  py::class_<sigtekx::ProcessingStats>(m, "ProcessingStats")
+      .def_readonly("latency_us", &sigtekx::ProcessingStats::latency_us)
       .def_readonly("throughput_gbps",
-                    &ionosense::ProcessingStats::throughput_gbps)
+                    &sigtekx::ProcessingStats::throughput_gbps)
       .def_readonly("frames_processed",
-                    &ionosense::ProcessingStats::frames_processed);
+                    &sigtekx::ProcessingStats::frames_processed);
 
   // --- Bind Executor Classes ---
-  py::class_<ionosense::PyBatchExecutor>(
+  py::class_<sigtekx::PyBatchExecutor>(
       m, "BatchExecutor",
       "High-throughput batch executor for processing complete batches")
       .def(py::init<>())
-      .def("initialize", &ionosense::PyBatchExecutor::initialize,
+      .def("initialize", &sigtekx::PyBatchExecutor::initialize,
            py::arg("config"), "Initializes the executor with configuration.")
-      .def("process", &ionosense::PyBatchExecutor::process, py::arg("input"),
+      .def("process", &sigtekx::PyBatchExecutor::process, py::arg("input"),
            "Processes a batch of input data.")
-      .def("reset", &ionosense::PyBatchExecutor::reset,
+      .def("reset", &sigtekx::PyBatchExecutor::reset,
            "Resets the executor to uninitialized state.")
-      .def("synchronize", &ionosense::PyBatchExecutor::synchronize,
+      .def("synchronize", &sigtekx::PyBatchExecutor::synchronize,
            "Synchronizes all CUDA streams.")
-      .def("get_stats", &ionosense::PyBatchExecutor::get_stats,
+      .def("get_stats", &sigtekx::PyBatchExecutor::get_stats,
            "Gets performance statistics from last operation.")
       .def_property_readonly("is_initialized",
-                             &ionosense::PyBatchExecutor::is_initialized,
+                             &sigtekx::PyBatchExecutor::is_initialized,
                              "Check if executor is initialized.");
 
-  py::class_<ionosense::PyStreamingExecutor>(
+  py::class_<sigtekx::PyStreamingExecutor>(
       m, "StreamingExecutor", "Low-latency streaming executor (stub in v0.9.3)")
       .def(py::init<>())
-      .def("initialize", &ionosense::PyStreamingExecutor::initialize,
+      .def("initialize", &sigtekx::PyStreamingExecutor::initialize,
            py::arg("config"), "Initializes the executor with configuration.")
-      .def("process", &ionosense::PyStreamingExecutor::process,
+      .def("process", &sigtekx::PyStreamingExecutor::process,
            py::arg("input"), "Processes a batch of input data.")
-      .def("reset", &ionosense::PyStreamingExecutor::reset,
+      .def("reset", &sigtekx::PyStreamingExecutor::reset,
            "Resets the executor to uninitialized state.")
-      .def("synchronize", &ionosense::PyStreamingExecutor::synchronize,
+      .def("synchronize", &sigtekx::PyStreamingExecutor::synchronize,
            "Synchronizes all CUDA streams.")
-      .def("get_stats", &ionosense::PyStreamingExecutor::get_stats,
+      .def("get_stats", &sigtekx::PyStreamingExecutor::get_stats,
            "Gets performance statistics from last operation.")
       .def_property_readonly("is_initialized",
-                             &ionosense::PyStreamingExecutor::is_initialized,
+                             &sigtekx::PyStreamingExecutor::is_initialized,
                              "Check if executor is initialized.");
 
   // --- Bind Utility Functions ---
   m.def("get_available_devices",
-        &ionosense::signal_utils::get_available_devices,
+        &sigtekx::signal_utils::get_available_devices,
         "Gets a list of available CUDA devices.");
-  m.def("select_best_device", &ionosense::signal_utils::select_best_device,
+  m.def("select_best_device", &sigtekx::signal_utils::select_best_device,
         "Selects the best available CUDA device.");
 
   m.attr("__version__") = "0.9.4";

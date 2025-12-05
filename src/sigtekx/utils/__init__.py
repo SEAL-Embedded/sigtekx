@@ -106,5 +106,5 @@ __all__ = [
     'ProfileCategory',
     'initialize_profiling',
     'NVTX_AVAILABLE',
-    # Reporting utilities (see ionosense_hpc.utils.reporting)
+    # Reporting utilities (see sigtekx.utils.reporting)
 ]

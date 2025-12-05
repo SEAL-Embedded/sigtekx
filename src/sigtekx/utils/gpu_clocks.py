@@ -1,5 +1,5 @@
 """
-src/ionosense_hpc/utils/gpu_clocks.py
+src/sigtekx/utils/gpu_clocks.py
 --------------------------------------------------------------------------------
 GPU clock management for stable benchmarking.
 
@@ -7,7 +7,7 @@ Provides Python interface to lock/unlock GPU clocks using nvidia-smi via
 PowerShell script integration. Reduces benchmark variability (CV) by 50-75%.
 
 Example:
-    >>> from ionosense_hpc.utils import GpuClockManager
+    >>> from sigtekx.utils import GpuClockManager
     >>>
     >>> # Context manager (recommended)
     >>> with GpuClockManager().locked_clocks():
@@ -29,7 +29,7 @@ from contextlib import contextmanager, suppress
 from pathlib import Path
 from typing import Any
 
-from ionosense_hpc.utils.logging import logger
+from sigtekx.utils.logging import logger
 
 
 class GpuClockManager:
@@ -67,9 +67,9 @@ class GpuClockManager:
         # Use the elevation wrapper which handles UAC automatically
         if script_path is None:
             utils_dir = Path(__file__).parent  # .../utils/
-            src_dir = utils_dir.parent          # .../ionosense_hpc/
+            src_dir = utils_dir.parent          # .../sigtekx/
             pkg_root = src_dir.parent           # .../
-            repo_root = pkg_root.parent         # ionosense-hpc-lib/
+            repo_root = pkg_root.parent         # sigtekx/
             script_path = repo_root / "scripts" / "gpu-manager-elevated.ps1"
 
         self.script_path = Path(script_path)

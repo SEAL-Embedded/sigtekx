@@ -11,9 +11,9 @@ import sys
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ionosense_hpc.config.schemas import EngineConfig
+    from sigtekx.config.schemas import EngineConfig
 
-logger = logging.getLogger('ionosense_hpc')
+logger = logging.getLogger('sigtekx')
 
 def _env_truthy(name:str, default:bool | None = None) -> bool | None:
     v = os.environ.get(name)
@@ -95,7 +95,7 @@ def setup_logging(
         use_color = False
         # Use a temporary basic logger to inform the user
         logging.basicConfig()
-        logging.getLogger('ionosense_hpc_setup').info("Profiler detected, falling back to simple logging.")
+        logging.getLogger('sigtekx_setup').info("Profiler detected, falling back to simple logging.")
     else:
         color_env = _env_truthy("IONO_LOG_COLOR")
         use_color = color if color is not None else (color_env if color_env is not None else _should_color())

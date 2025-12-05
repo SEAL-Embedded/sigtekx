@@ -1,5 +1,5 @@
 """
-src/ionosense_hpc/benchmarks/accuracy.py
+src/sigtekx/benchmarks/accuracy.py
 --------------------------------------------------------------------------------
 Numerical accuracy validation benchmark following IEEE standards.
 Upgraded to use BaseBenchmark framework for research-grade validation.
@@ -11,19 +11,19 @@ import numpy as np
 from scipy import signal as scipy_signal
 from scipy.fft import rfft
 
-from ionosense_hpc import Engine
-from ionosense_hpc.benchmarks.base import BaseBenchmark, BenchmarkConfig, BenchmarkResult
-from ionosense_hpc.config import EngineConfig, ExecutionMode, get_preset
-from ionosense_hpc.utils import logger, make_chirp, make_multitone, make_noise, make_sine
-from ionosense_hpc.utils.paths import get_benchmark_run_dir, normalize_benchmark_name
-from ionosense_hpc.utils.profiling import (
+from sigtekx import Engine
+from sigtekx.benchmarks.base import BaseBenchmark, BenchmarkConfig, BenchmarkResult
+from sigtekx.config import EngineConfig, ExecutionMode, get_preset
+from sigtekx.utils import logger, make_chirp, make_multitone, make_noise, make_sine
+from sigtekx.utils.paths import get_benchmark_run_dir, normalize_benchmark_name
+from sigtekx.utils.profiling import (
     ProfileColor,
     nvtx_range,
     setup_range,
     teardown_range,
 )
-from ionosense_hpc.utils.reproducibility import DeterministicGenerator
-from ionosense_hpc.utils.signals import make_dc_signal, make_impulse
+from sigtekx.utils.reproducibility import DeterministicGenerator
+from sigtekx.utils.signals import make_dc_signal, make_impulse
 
 
 class AccuracyBenchmarkConfig(BenchmarkConfig):
@@ -526,7 +526,7 @@ class AccuracyBenchmark(BaseBenchmark):
         Returns:
             Dictionary with detailed accuracy analysis
         """
-        from ionosense_hpc.utils.profiling import ProfileColor, nvtx_range
+        from sigtekx.utils.profiling import ProfileColor, nvtx_range
         with nvtx_range("AnalyzeAccuracyResults", color=ProfileColor.ORANGE):
             analysis = {
                 'summary': {
@@ -612,7 +612,7 @@ if __name__ == '__main__':
     result.metadata['analysis'] = analysis
 
     # Output
-    from ionosense_hpc.benchmarks.base import save_benchmark_results
+    from sigtekx.benchmarks.base import save_benchmark_results
     if args.output:
         save_benchmark_results(result, args.output)
     else:
