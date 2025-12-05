@@ -1,6 +1,6 @@
-# Contributing to Ionosense-HPC
+# Contributing to SigTekX
 
-Thank you for your interest in contributing to ionosense-hpc! This document provides guidelines and instructions for contributing to the project.
+Thank you for your interest in contributing to sigtekx! This document provides guidelines and instructions for contributing to the project.
 
 ## Table of Contents
 
@@ -32,17 +32,17 @@ Before contributing, ensure you have the development environment set up properly
 
 ```powershell
 # Clone the repository with submodules
-git clone --recursive https://github.com/your-org/ionosense-hpc.git
-cd ionosense-hpc
+git clone --recursive https://github.com/your-org/sigtekx.git
+cd sigtekx
 
 # Start development shell (handles MSVC, conda activation, etc.)
 .\scripts\init_pwsh.ps1 -Interactive
 
 # Setup environment (creates conda env, installs dependencies)
-iono setup
+sigx setup
 
 # Verify environment
-iono doctor
+sigx doctor
 ```
 
 ### Development Shell
@@ -61,48 +61,48 @@ The project uses an enhanced PowerShell development shell (`init_pwsh.ps1`) that
 ### Verify Your Setup
 
 ```powershell
-iono doctor                     # Comprehensive environment check
-iono build                      # Verify build works
-iono test                       # Verify tests pass
+sigx doctor                     # Comprehensive environment check
+sigx build                      # Verify build works
+sigx test                       # Verify tests pass
 ```
 
 ## Development Workflow
 
 ### CLI Commands
 
-The `iono` CLI provides essential development commands:
+The `sigx` CLI provides essential development commands:
 
 ```powershell
 # Environment management
-iono setup                      # Create conda environment and install package
-iono doctor                     # Check development environment health
+sigx setup                      # Create conda environment and install package
+sigx doctor                     # Check development environment health
 
 # Build
-iono build                      # Build with default preset (windows-rel)
-iono build --debug              # Build debug configuration
-iono build --clean              # Clean rebuild
-iono build --verbose            # Verbose build output
+sigx build                      # Build with default preset (windows-rel)
+sigx build --debug              # Build debug configuration
+sigx build --clean              # Clean rebuild
+sigx build --verbose            # Verbose build output
 
 # Testing
-iono test                       # Run all tests (Python + C++)
-iono test python                # Python tests only
-iono test cpp                   # C++ tests only
-iono test --coverage            # With coverage report
-iono test --verbose             # Verbose test output
+sigx test                       # Run all tests (Python + C++)
+sigx test python                # Python tests only
+sigx test cpp                   # C++ tests only
+sigx test --coverage            # With coverage report
+sigx test --verbose             # Verbose test output
 
 # Code Quality
-iono format                     # Format C++ code with clang-format
-iono format --check             # Check formatting without changes
-iono lint                       # Lint Python code with ruff
-iono lint --fix                 # Auto-fix lint issues
+sigx format                     # Format C++ code with clang-format
+sigx format --check             # Check formatting without changes
+sigx lint                       # Lint Python code with ruff
+sigx lint --fix                 # Auto-fix lint issues
 
 # Utilities
-iono clean                      # Remove build artifacts
-iono clean --all                # Remove build + artifacts directories
-iono ui                         # Launch MLflow UI
-iono profile nsys latency       # Profile with Nsight Systems
-iono profile ncu throughput     # Profile with Nsight Compute
-iono run <script.py>            # Run Python script with proper environment
+sigx clean                      # Remove build artifacts
+sigx clean --all                # Remove build + artifacts directories
+sigx ui                         # Launch MLflow UI
+sxp nsys latency                # Profile with Nsight Systems
+sxp ncu throughput              # Profile with Nsight Compute
+sigx run <script.py>            # Run Python script with proper environment
 ```
 
 ### Convenient Aliases
@@ -205,13 +205,13 @@ See the [Project Boards](https://github.com/your-org/ionosense-hpc/projects) for
 
 ```powershell
 # Fork the repository on GitHub, then:
-git clone https://github.com/YOUR_USERNAME/ionosense-hpc.git
-cd ionosense-hpc
-git remote add upstream https://github.com/original/ionosense-hpc.git
+git clone https://github.com/YOUR_USERNAME/sigtekx.git
+cd sigtekx
+git remote add upstream https://github.com/original/sigtekx.git
 
 # Setup development environment
 .\scripts\init_pwsh.ps1 -Interactive
-iono setup
+sigx setup
 ```
 
 ### 2. Create Feature Branch
@@ -236,22 +236,22 @@ git checkout -b docs/team-X/documentation-update    # For docs
 # Make your changes...
 
 # Build and test frequently
-ib                              # Quick build
-it                              # Run all tests
+sb                              # Quick build
+st                              # Run all tests
 
 # For C++ work (Team 1):
-iono build --debug              # Debug build for development
-itc                             # C++ tests only
-iono profile nsys latency       # Profile performance
+sigx build --debug              # Debug build for development
+st cpp                          # C++ tests only
+sxp nsys latency                # Profile performance
 
 # For Python work (Team 3):
-itp                             # Python tests only
-ilint --fix                     # Fix lint issues
-iono test --coverage            # Check coverage
+st python                       # Python tests only
+slint --fix                     # Fix lint issues
+sigx test --coverage            # Check coverage
 
 # For Research work (Team 4):
 python benchmarks/run_latency.py experiment=baseline +benchmark=latency
-iono ui                         # View results in MLflow
+sigx ui                         # View results in MLflow
 ```
 
 ### 4. Code Quality Checks
@@ -260,16 +260,16 @@ Before committing, ensure code quality:
 
 ```powershell
 # Format C++ code
-iono format
+sigx format
 
 # Lint Python code
-iono lint --fix
+sigx lint --fix
 
 # Run all tests
-iono test
+sigx test
 
 # Verify build is clean
-iono build --clean
+sigx build --clean
 ```
 
 ### 5. Commit Your Changes
@@ -423,8 +423,8 @@ iono test -Pattern "test_name"  # Specific test pattern
 ```python
 import pytest
 import numpy as np
-from ionosense_hpc import Engine
-from ionosense_hpc.config import Presets
+from sigtekx import Engine
+from sigtekx.config import Presets
 
 class TestEngine:
     """Test the Engine class."""
@@ -495,14 +495,14 @@ Use Google Test framework. Tests are run automatically with `iono test cpp`.
 
 1. **Ensure Code Quality**
    ```powershell
-   iono format              # Format C++ code
-   iono lint --fix          # Fix lint issues
+   sigx format              # Format C++ code
+   sigx lint --fix          # Fix lint issues
    ```
 
 2. **Run All Tests**
    ```powershell
-   iono test                # All tests must pass
-   iono build --clean       # Must build cleanly
+   sigx test                # All tests must pass
+   sigx build --clean       # Must build cleanly
    ```
 
 3. **Update Documentation**
@@ -513,10 +513,10 @@ Use Google Test framework. Tests are run automatically with `iono test cpp`.
 
 4. **Verify on Clean Environment** (Team 2)
    ```powershell
-   iono clean --all
-   iono setup
-   iono build
-   iono test
+   sigx clean --all
+   sigx setup
+   sigx build
+   sigx test
    ```
 
 ### PR Template
@@ -540,10 +540,10 @@ Use Google Test framework. Tests are run automatically with `iono test cpp`.
 - [ ] Team 4 (Research/Data Science)
 
 ## Validation
-- [ ] `iono format` applied
-- [ ] `iono lint` passes
-- [ ] `iono test` passes
-- [ ] `iono build --clean` succeeds
+- [ ] `sigx format` applied
+- [ ] `sigx lint` passes
+- [ ] `sigx test` passes
+- [ ] `sigx build --clean` succeeds
 - [ ] Tested on GPU: [model name]
 
 ## Testing
@@ -620,7 +620,7 @@ Steps to reproduce (include exact commands):
 ## Environment
 ```powershell
 # Run these commands and paste output:
-iono doctor
+sigx doctor
 ```
 
 ## System Information
@@ -709,11 +709,11 @@ Which team(s) would this affect?
 
 ### Getting Help
 
-- **CLI Help**: `iono help`
-- **Environment Check**: `iono doctor`
+- **CLI Help**: `sigx help`
+- **Environment Check**: `sigx doctor`
 - **Documentation**: Check `docs/` directory
-- **Issues**: Search [existing issues](https://github.com/ionosense-hpc/issues)
-- **Discussions**: Join [GitHub Discussions](https://github.com/ionosense-hpc/discussions)
+- **Issues**: Search [existing issues](https://github.com/sigtekx/issues)
+- **Discussions**: Join [GitHub Discussions](https://github.com/sigtekx/discussions)
 
 ### Communication
 
@@ -737,18 +737,18 @@ Which team(s) would this affect?
 ```powershell
 # Setup and environment
 .\scripts\init_pwsh.ps1 -Interactive    # Start dev shell
-iono setup                              # Setup environment
-iono doctor                             # Check health
+sigx setup                              # Setup environment
+sigx doctor                             # Check health
 
 # Development cycle
-ib                                      # Build (iono build)
-it                                      # Test (iono test)
-ifmt                                    # Format (iono format)
-ilint                                   # Lint (iono lint)
+sb                                      # Build (sigx build)
+st                                      # Test (sigx test)
+sfmt                                    # Format (sigx format)
+slint                                   # Lint (sigx lint)
 
 # Specialized tasks
-iono profile nsys latency               # GPU profiling
-iono ui                                 # MLflow UI
+sxp nsys latency                        # GPU profiling
+sigx ui                                 # MLflow UI
 python benchmarks/run_*.py              # Run benchmarks
 ```
 
@@ -756,30 +756,30 @@ python benchmarks/run_*.py              # Run benchmarks
 
 **Team 1 (C++/CUDA):**
 ```powershell
-iono build --debug
-itc
-iono profile ncu throughput
+sigx build --debug
+st cpp
+sxp ncu throughput
 ```
 
 **Team 2 (Infrastructure):**
 ```powershell
-iono clean --all
-iono setup
-iono build --clean
-iono test
+sigx clean --all
+sigx setup
+sigx build --clean
+sigx test
 ```
 
 **Team 3 (Python):**
 ```powershell
-itp
-ilint --fix
-iono test --coverage
+st python
+slint --fix
+sigx test --coverage
 ```
 
 **Team 4 (Research):**
 ```powershell
 python benchmarks/run_latency.py experiment=my_exp +benchmark=latency
-iono ui
+sigx ui
 jupyter lab experiments/notebooks/
 ```
 
@@ -796,4 +796,4 @@ If you have questions:
 4. Open a discussion for general questions
 5. Contact maintainers for specific concerns
 
-Thank you for contributing to ionosense-hpc! 🚀
+Thank you for contributing to sigtekx!

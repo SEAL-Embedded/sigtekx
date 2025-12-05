@@ -1,4 +1,4 @@
-# Ionosense-HPC
+# SigTekX
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![CUDA 13.0+](https://img.shields.io/badge/CUDA-13.0+-green.svg)](https://developer.nvidia.com/cuda-toolkit)
@@ -7,7 +7,7 @@ High-performance CUDA FFT engine and research-grade benchmarking suite for real-
 
 ## Overview
 
-Ionosense-HPC provides a Python interface to a high-performance CUDA-based signal processing engine, optimized for real-time FFT analysis with sub-200μs latency. The project includes a comprehensive research infrastructure following Research Software Engineering (RSE) best practices for reproducible computational experiments.
+SigTekX provides a Python interface to a high-performance CUDA-based signal processing engine, optimized for real-time FFT analysis with sub-200μs latency. The project includes a comprehensive research infrastructure following Research Software Engineering (RSE) best practices for reproducible computational experiments.
 
 ### Key Features
 
@@ -28,7 +28,7 @@ Ionosense-HPC provides a Python interface to a high-performance CUDA-based signa
 │  ↓                                                       │
 │  Hydra Configuration (YAML-based experiments)           │
 │  ↓                                                       │
-│  Python API (ionosense_hpc.Engine)                      │
+│  Python API (sigtekx.Engine)                            │
 │  ├── Pydantic Config Models                             │
 │  ├── Benchmark Framework (Latency/Throughput/Accuracy)  │
 │  └── Utilities (Signals, Device, Profiling)             │
@@ -67,19 +67,19 @@ Ionosense-HPC provides a Python interface to a high-performance CUDA-based signa
 
 ```powershell
 # 1. Clone repository
-git clone --recursive https://github.com/your-org/ionosense-hpc.git
-cd ionosense-hpc
+git clone --recursive https://github.com/your-org/sigtekx.git
+cd sigtekx
 
 # 2. Start development shell (sets up MSVC, conda, aliases)
 .\scripts\init_pwsh.ps1 -Interactive
 
 # 3. Setup environment and build
-iono setup          # Creates conda env, installs dependencies
-iono build          # Builds C++ backend
+sigx setup          # Creates conda env, installs dependencies
+sigx build          # Builds C++ backend
 
 # 4. Verify installation
-iono doctor         # Check environment health
-iono test           # Run test suite
+sigx doctor         # Check environment health
+sigx test           # Run test suite
 ```
 
 ### Detailed Installation
@@ -91,7 +91,7 @@ See [INSTALL.md](docs/INSTALL.md) for platform-specific instructions, troublesho
 ### Python API
 
 ```python
-from ionosense_hpc import Engine
+from sigtekx import Engine
 import numpy as np
 
 # Create engine with default preset (1024 FFT, sub-200μs latency)
@@ -111,7 +111,7 @@ with Engine(preset='default') as engine:
 
 ### Key Terminology
 
-Ionosense-HPC uses industry-standard terminology for signal processing dimensions (v0.9.5+):
+SigTekX uses industry-standard terminology for signal processing dimensions (v0.9.5+):
 
 ```
 ┌──────────────────────────────────────────────────────┐
@@ -139,7 +139,7 @@ Ionosense-HPC uses industry-standard terminology for signal processing dimension
 ### Configuration Presets
 
 ```python
-from ionosense_hpc import Engine
+from sigtekx import Engine
 
 # Available presets for different use cases
 engine_default = Engine(preset='default')  # General-purpose (1024 FFT)
@@ -153,7 +153,7 @@ engine = Engine(preset='iono', nfft=8192, mode='streaming')
 ### Custom Configuration
 
 ```python
-from ionosense_hpc import Engine, EngineConfig
+from sigtekx import Engine, EngineConfig
 
 # Full custom configuration
 config = EngineConfig(
@@ -177,38 +177,38 @@ engine = Engine(config=config)
 
 ### Essential CLI Commands
 
-The development shell provides the `iono` command for all development tasks:
+The development shell provides the `sigx` command for all development tasks:
 
 ```powershell
 # Environment Setup
-iono setup                      # Create conda environment & install package
-iono doctor                     # Check environment health
+sigx setup                      # Create conda environment & install package
+sigx doctor                     # Check environment health
 
 # Building
-iono build                      # Build release configuration
-iono build --debug              # Build debug configuration
-iono build --clean              # Clean rebuild
-iono build --verbose            # Verbose build output
+sigx build                      # Build release configuration
+sigx build --debug              # Build debug configuration
+sigx build --clean              # Clean rebuild
+sigx build --verbose            # Verbose build output
 
 # Testing
-iono test                       # Run all tests (Python + C++)
-iono test python                # Python tests only
-iono test cpp                   # C++ tests only
-iono test --coverage            # With coverage report
-iono test --verbose             # Verbose output
+sigx test                       # Run all tests (Python + C++)
+sigx test python                # Python tests only
+sigx test cpp                   # C++ tests only
+sigx test --coverage            # With coverage report
+sigx test --verbose             # Verbose output
 
 # Code Quality
-iono format                     # Format C++ code (clang-format)
-iono format --check             # Check formatting without changes
-iono lint                       # Lint Python code (ruff)
-iono lint --fix                 # Auto-fix lint issues
+sigx format                     # Format C++ code (clang-format)
+sigx format --check             # Check formatting without changes
+sigx lint                       # Lint Python code (ruff)
+sigx lint --fix                 # Auto-fix lint issues
 
 # Utilities
-iono clean                      # Remove build artifacts
-iono clean --all                # Remove build + artifacts
-iono ui                         # Launch MLflow UI
-iono run <script.py>            # Run Python script
-iono help                       # Show CLI help
+sigx clean                      # Remove build artifacts
+sigx clean --all                # Remove build + artifacts
+sigx ui                         # Launch MLflow UI
+sigx run <script.py>            # Run Python script
+sigx help                       # Show CLI help
 ```
 
 ### Convenient Aliases
@@ -233,15 +233,15 @@ ireload     # Reload shell functions
 
 ```powershell
 # Profile with Nsight Systems (timeline analysis)
-iono profile nsys latency
-iono profile nsys throughput
+sxp nsys latency
+sxp nsys throughput
 
 # Profile with Nsight Compute (kernel analysis)
-iono profile ncu latency --mode full
-iono profile ncu throughput --kernel magnitude_kernel
+sxp ncu latency --mode full
+sxp ncu throughput --kernel magnitude_kernel
 
 # Interactive mode (guided profiling)
-iono profile
+sxp
 ```
 
 ## Research Workflow
@@ -363,12 +363,12 @@ dvc push
 # 2. Make changes to code...
 
 # 3. Build and test
-ib                          # Build (iono build)
-it                          # Test (iono test)
+sb                          # Build (sigx build)
+st                          # Test (sigx test)
 
 # 4. Check code quality
-ifmt                        # Format C++ code
-ilint --fix                 # Fix Python lint issues
+sfmt                        # Format C++ code
+slint --fix                 # Fix Python lint issues
 
 # 5. Commit changes
 git add .
@@ -385,7 +385,7 @@ git commit -m "feat(core): add new feature"
 python benchmarks/run_throughput.py experiment=my_study +benchmark=throughput
 
 # 3. View results
-iono ui                     # Open MLflow UI
+sigx ui                     # Open MLflow UI
 
 # 4. Run analysis pipeline
 snakemake --cores 4 --snakefile experiments/Snakefile
@@ -404,28 +404,28 @@ git commit -m "data: add my_study results"
 python benchmarks/run_latency.py experiment=baseline +benchmark=latency
 
 # 2. Profile with Nsight Systems
-iono profile nsys latency
+sxp nsys latency
 
 # 3. Make optimization changes...
 
 # 4. Rebuild and profile again
-ib
-iono profile nsys latency
+sb
+sxp nsys latency
 
 # 5. Compare results in MLflow
-iono ui
+sigx ui
 ```
 
 ## Project Structure
 
 ```
-ionosense-hpc/
+sigtekx/
 ├── cpp/                        # C++ backend source
 │   ├── include/                # Public headers
 │   ├── src/                    # Implementation
 │   └── tests/                  # C++ tests (Google Test)
 ├── python/                     # Python package
-│   └── src/ionosense_hpc/      # Package source
+│   └── src/sigtekx/            # Package source
 │       ├── core/               # Engine API
 │       ├── config/             # Configuration models
 │       ├── benchmarks/         # Benchmark framework
@@ -473,8 +473,8 @@ ionosense-hpc/
 ### Quick Help
 
 ```powershell
-iono help                       # CLI command reference
-iono doctor                     # Environment diagnostics
+sigx help                       # CLI command reference
+sigx doctor                     # Environment diagnostics
 ```
 
 ## Performance Targets
@@ -512,11 +512,11 @@ iono doctor                     # Environment diagnostics
 
 ```powershell
 # Check environment health
-iono doctor
+sigx doctor
 
 # Common issues:
 # 1. Conda environment not found
-iono setup                      # Recreate environment
+sigx setup                      # Recreate environment
 
 # 2. CUDA not found
 # Install CUDA Toolkit 13.0+ from NVIDIA
@@ -525,7 +525,7 @@ iono setup                      # Recreate environment
 # Install VS 2022 with C++ build tools
 
 # 4. Build failures
-iono build --clean --verbose    # Clean rebuild with output
+sigx build --clean --verbose    # Clean rebuild with output
 ```
 
 ### Performance Issues
@@ -535,7 +535,7 @@ iono build --clean --verbose    # Clean rebuild with output
 nvidia-smi
 
 # Profile to find bottlenecks
-iono profile nsys latency
+sxp nsys latency
 
 # Verify CUDA driver version
 nvidia-smi
@@ -545,16 +545,16 @@ nvidia-smi
 
 ```powershell
 # Run tests with verbose output
-iono test --verbose
+sigx test --verbose
 
 # Run specific test
-iono test -Pattern "test_name"
+sigx test -Pattern "test_name"
 
 # Check Python tests only
-itp
+st python
 
 # Check C++ tests only
-itc
+st cpp
 ```
 
 For more troubleshooting, see [INSTALL.md](docs/INSTALL.md).
@@ -572,21 +572,21 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 
 ```powershell
 # 1. Fork and clone
-git clone https://github.com/YOUR_USERNAME/ionosense-hpc.git
-cd ionosense-hpc
+git clone https://github.com/YOUR_USERNAME/sigtekx.git
+cd sigtekx
 
 # 2. Setup environment
 .\scripts\init_pwsh.ps1 -Interactive
-iono setup
+sigx setup
 
 # 3. Create branch
 git checkout -b feat/team-X/my-feature
 
 # 4. Make changes and test
-ib && it
+sb && st
 
 # 5. Ensure code quality
-ifmt && ilint
+sfmt && slint
 
 # 6. Commit and push
 git commit -m "feat(scope): description"
@@ -607,18 +607,18 @@ The project is organized into two development boards:
 - **Team 3**: Python API and testing
 - **Team 4**: Research experiments and analysis
 
-See [Project Boards](https://github.com/your-org/ionosense-hpc/projects) for active work.
+See [Project Boards](https://github.com/your-org/sigtekx/projects) for active work.
 
 ## Citations
 
-If you use Ionosense-HPC in your research, please cite:
+If you use SigTekX in your research, please cite:
 
 ```bibtex
-@software{ionosense_hpc,
-  title = {Ionosense-HPC: High-Performance CUDA FFT Engine for Signal Processing},
+@software{sigtekx,
+  title = {SigTekX: High-Performance CUDA FFT Engine for Signal Processing},
   author = {Your Organization},
   year = {2025},
-  url = {https://github.com/your-org/ionosense-hpc}
+  url = {https://github.com/your-org/sigtekx}
 }
 ```
 
@@ -633,8 +633,8 @@ If you use Ionosense-HPC in your research, please cite:
 
 ## Contact
 
-- **Issues**: [GitHub Issues](https://github.com/SEAL-Embedded/ionosense-hpc-lib/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/SEAL-Embedded/ionosense-hpc-lib/discussions)
+- **Issues**: [GitHub Issues](https://github.com/SEAL-Embedded/sigtekx/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/SEAL-Embedded/sigtekx/discussions)
 
 ## Status
 

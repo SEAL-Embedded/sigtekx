@@ -1,6 +1,6 @@
 # Quarto Reports
 
-Publication-quality static report generation for ionosense benchmarks.
+Publication-quality static report generation for sigtekx benchmarks.
 
 ## Status
 
@@ -358,7 +358,7 @@ As shown in @fig-throughput, throughput scales ...
 ## Contact
 
 For questions about Quarto integration:
-- GitHub Issues: https://github.com/SEAL-Embedded/ionosense-hpc-lib/issues
+- GitHub Issues: https://github.com/SEAL-Embedded/sigtekx-hpc-lib/issues
 - Email: rahsaz.kevin@gmail.com
 
 ---

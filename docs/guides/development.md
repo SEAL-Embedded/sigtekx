@@ -1,6 +1,6 @@
 # Development Guide
 
-This guide is for developers contributing to ionosense-hpc. It covers the CLI-based development environment, architecture, coding standards, and contribution workflow.
+This guide is for developers contributing to sigtekx. It covers the CLI-based development environment, architecture, coding standards, and contribution workflow.
 
 ## Table of Contents
 
@@ -32,8 +32,8 @@ This guide is for developers contributing to ionosense-hpc. It covers the CLI-ba
 
 ```bash
 # Clone the repository with submodules
-git clone --recursive https://github.com/your-org/ionosense-hpc.git
-cd ionosense-hpc
+git clone --recursive https://github.com/your-org/sigtekx.git
+cd sigtekx
 
 # One-command setup using CLI
 ./scripts/cli.sh setup
@@ -46,22 +46,22 @@ cd ionosense-hpc
 
 ```powershell
 # Clone the repository
-git clone --recursive https://github.com/your-org/ionosense-hpc.git
-cd ionosense-hpc
+git clone --recursive https://github.com/your-org/sigtekx.git
+cd sigtekx
 
 # Start enhanced development shell
 .\scripts\open_dev_pwsh.ps1
 
 # One-command setup using alias
-iono setup
+sigxsetup
 
 # Verify environment
-iono doctor
+sigxdoctor
 ```
 
 ## CLI Development Workflow
 
-The ionosense-hpc CLI provides a unified interface for all development tasks, with platform-specific optimizations.
+The sigtekx CLI provides a unified interface for all development tasks, with platform-specific optimizations.
 
 ### Linux/WSL2 Commands
 
@@ -87,7 +87,7 @@ The ionosense-hpc CLI provides a unified interface for all development tasks, wi
 # Testing (Direct Tools)
 pytest tests/ -v               # Run all Python tests
 ctest --preset windows-tests   # Run C++ tests (adjust preset for platform)
-pytest tests/ --cov=ionosense_hpc  # Python tests with coverage report
+pytest tests/ --cov=sigtekx  # Python tests with coverage report
 
 # Modern research workflow (🌟 Recommended - Direct Tools)
 python benchmarks/run_latency.py experiment=baseline           # Run single experiment
@@ -96,7 +96,7 @@ snakemake --cores 4 --snakefile experiments/Snakefile         # Execute analysis
 mlflow ui --backend-store-uri file://./artifacts/mlruns       # View experiment results
 python custom_script.py                                       # Run any Python script
 ./scripts/cli.sh profile nsys latency                         # Profile with Nsight Systems
-python -m ionosense_hpc.benchmarks.accuracy                   # Numerical validation suite
+python -m sigtekx.benchmarks.accuracy                   # Numerical validation suite
 ./scripts/cli.sh monitor                                      # Real-time GPU monitoring
 ```
 
@@ -105,7 +105,7 @@ python -m ionosense_hpc.benchmarks.accuracy                   # Numerical valida
 The enhanced development shell (`.\scripts\open_dev_pwsh.ps1`) provides:
 
 - **Automatic MSVC Setup**: Configures 64-bit Visual Studio tools
-- **Conda Integration**: Activates ionosense-hpc environment
+- **Conda Integration**: Activates sigtekx environment
 - **Essential CLI Aliases**: Shortcuts for essential build/development tasks
 - **Repository Awareness**: Commands work from any subdirectory
 
@@ -114,20 +114,20 @@ The enhanced development shell (`.\scripts\open_dev_pwsh.ps1`) provides:
 .\scripts\open_dev_pwsh.ps1
 
 # Available aliases for essential CLI commands:
-iono <command>        # Main CLI alias
-ib                    # Build (iono build)
-ir                    # Rebuild (iono rebuild)
+sigx<command>        # Main CLI alias
+ib                    # Build (sigxbuild)
+ir                    # Rebuild (sigxrebuild)
 
 # Code quality shortcuts
-ifmt                  # Format code (iono format)
-ilint                 # Lint code (iono lint)
+ifmt                  # Format code (sigxformat)
+ilint                 # Lint code (sigxlint)
 
 # Development utilities
 iprof nsys latency    # Profile with Nsight
-imon                  # Monitor GPU (iono monitor)
-iinfo                 # System info (iono info)
-iclean                # Clean (iono clean)
-ilearn                # Learning guides (iono learn)
+imon                  # Monitor GPU (sigxmonitor)
+iinfo                 # System info (sigxinfo)
+iclean                # Clean (sigxclean)
+ilearn                # Learning guides (sigxlearn)
 
 # For research workflows, use direct tools:
 # python benchmarks/run_latency.py experiment=baseline
@@ -140,33 +140,33 @@ ilearn                # Learning guides (iono learn)
 **Essential Development Tasks (All Platforms):**
 ```bash
 # Start development session
-cd ionosense-hpc
-iono doctor                      # Check environment health
+cd sigtekx
+sigxdoctor                      # Check environment health
 
 # Make changes to code...
 
 # Verify changes with essential CLI tools
-iono format && iono lint         # Format and lint code
-iono typecheck                   # Type check Python code
-iono build                       # Build with changes
+sigxformat && sigxlint         # Format and lint code
+sigxtypecheck                   # Type check Python code
+sigxbuild                       # Build with changes
 pytest tests/ -v                 # Run tests
 
 # Performance validation with direct tools
 python benchmarks/run_latency.py experiment=baseline  # Performance validation
-iono profile nsys latency        # Detailed profiling
+sigxprofile nsys latency        # Detailed profiling
 ```
 
 **Windows Enhanced Shell (Optional):**
 ```powershell
 # Start development session with enhanced aliases
 .\scripts\open_dev_pwsh.ps1     # Enhanced shell with aliases
-iono doctor                     # Check environment health
+sigxdoctor                     # Check environment health
 
 # Make changes to code...
 
 # Verify changes (using aliases)
 ifmt && ilint                  # Format and lint code
-iono typecheck                 # Type check Python code
+sigxtypecheck                 # Type check Python code
 ib                             # Build with changes
 pytest tests/ -v               # Run tests
 
@@ -178,7 +178,7 @@ iprof nsys latency            # Detailed profiling (alias)
 ## Project Structure
 
 ```
-ionosense-hpc-lib/
+sigtekx-lib/
 ├── bindings/                   # C++/Python binding configurations
 │   └── bindings.cpp              # pybind11 entrypoint
 ├── include/                    # C++ public headers
@@ -193,7 +193,7 @@ ionosense-hpc-lib/
 ├── tests/                      # C++ unit tests
 ├── python/                     # Python package source and tests
 │   ├── src/                    # Source code for the Python package
-│   │   └── ionosense_hpc/        # The main Python package
+│   │   └── sigtekx/        # The main Python package
 │   │       ├── benchmarks/       # Performance benchmarking tools
 │   │       ├── config/           # Configuration management
 │   │       ├── core/             # Core Python logic wrapping the C++ library
@@ -241,20 +241,20 @@ ionosense-hpc-lib/
 **All Platforms:**
 ```bash
 # Clean build
-iono clean
-iono build
+sigxclean
+sigxbuild
 
 # Debug build
-iono build -Debug
+sigxbuild -Debug
 
 # Release build (default)
-iono build -Release
+sigxbuild -Release
 
 # Verbose build with all output
-iono build -Verbose
+sigxbuild -Verbose
 
 # Build without NVTX profiling
-iono build -NoNvtx
+sigxbuild -NoNvtx
 ```
 
 **Windows Enhanced Shell (Optional Aliases):**
@@ -264,10 +264,10 @@ iono build -NoNvtx
 
 # Clean build using aliases
 iclean
-ib                    # or 'iono build'
+ib                    # or 'sigxbuild'
 
 # Debug build
-iono build -Debug
+sigxbuild -Debug
 
 # Verbose build
 ib -Verbose
@@ -388,7 +388,7 @@ Closes #123
 pytest tests/ -v
 
 # Run with coverage report
-pytest tests/ --cov=ionosense_hpc --cov-report=term-missing
+pytest tests/ --cov=sigtekx --cov-report=term-missing
 
 # Run specific test patterns
 pytest tests/ -k "test_engine" -v
@@ -430,7 +430,7 @@ pytest tests/ -v && ctest --preset windows-tests --output-on-failure
 ```python
 import pytest
 import numpy as np
-from ionosense_hpc import Engine, Presets
+from sigtekx import Engine, Presets
 
 @pytest.mark.gpu
 class TestEngine:
@@ -455,19 +455,19 @@ class TestEngine:
 **Environment Debugging:**
 ```bash
 # All platforms
-iono doctor                       # Comprehensive environment check
-$env:IONO_LOG_LEVEL="DEBUG"      # Enable debug logging (Windows)
-export IONO_LOG_LEVEL=DEBUG      # Enable debug logging (Linux/WSL)
+sigxdoctor                       # Comprehensive environment check
+$env:SIGX_LOG_LEVEL="DEBUG"      # Enable debug logging (Windows)
+export SIGX_LOG_LEVEL=DEBUG      # Enable debug logging (Linux/WSL)
 ```
 
 **Build Debugging:**
 ```bash
 # All platforms
-iono build -Debug                 # Debug build
-iono build -Verbose               # Verbose build output
+sigxbuild -Debug                 # Debug build
+sigxbuild -Verbose               # Verbose build output
 
 # Windows enhanced shell (optional aliases)
-iono build -Debug         # Debug build
+sigxbuild -Debug         # Debug build
 ib -Verbose              # Verbose build output
 ```
 
@@ -481,7 +481,7 @@ export CUDA_LAUNCH_BLOCKING=1
 cuda-memcheck python your_script.py
 
 # Profile with Nsight (both platforms)
-iono profile nsys latency                   # Essential CLI
+sigxprofile nsys latency                   # Essential CLI
 iprof nsys latency                           # Windows alias (optional)
 ```
 
@@ -492,12 +492,12 @@ iprof nsys latency                           # Windows alias (optional)
    - Windows: Use `.\scripts\open_dev_pwsh.ps1` for enhanced shell
 
 2. **Build Failures**
-   - Run `iono doctor` first
+   - Run `sigxdoctor` first
    - Check CUDA toolkit installation
    - Verify conda environment activation
 
 3. **Import Errors**
-   - Rebuild: `iono clean` then `iono build`
+   - Rebuild: `sigxclean` then `sigxbuild`
    - Check Python path in conda environment
 
 ## Contributing
@@ -507,13 +507,13 @@ iprof nsys latency                           # Windows alias (optional)
 1. **Setup Development Environment**
    ```bash
    # All platforms
-   git clone --recursive https://github.com/your-org/ionosense-hpc.git
-   cd ionosense-hpc
-   iono setup
+   git clone --recursive https://github.com/your-org/sigtekx.git
+   cd sigtekx
+   sigxsetup
 
    # Optional: Windows enhanced shell with aliases
    .\scripts\open_dev_pwsh.ps1
-   iono setup
+   sigxsetup
    ```
 
 2. **Create Feature Branch**
@@ -524,14 +524,14 @@ iprof nsys latency                           # Windows alias (optional)
 3. **Development Loop**
    ```bash
    # All platforms - Essential CLI
-   iono format && iono lint        # Format and lint code
-   iono typecheck                  # Type check Python code
-   iono build                      # Build changes
+   sigxformat && sigxlint        # Format and lint code
+   sigxtypecheck                  # Type check Python code
+   sigxbuild                      # Build changes
    pytest tests/ -v               # Run tests
 
    # Windows enhanced shell (optional aliases)
    ifmt && ilint                  # Format and lint code
-   iono typecheck                 # Type check Python code
+   sigxtypecheck                 # Type check Python code
    ib                            # Build changes
    pytest tests/ -v              # Run tests
    ```
@@ -551,14 +551,14 @@ The CLI provides aggregated checks for code quality:
 
 ```bash
 # All platforms - Essential CLI
-iono format -Check                # Verify C++ formatting
-iono lint                         # Lint Python and C++ code
-iono typecheck                    # Type check Python code
+sigxformat -Check                # Verify C++ formatting
+sigxlint                         # Lint Python and C++ code
+sigxtypecheck                    # Type check Python code
 
 # Windows enhanced shell (optional aliases)
 ifmt -Check                      # Verify C++ formatting
 ilint                            # Lint code
-iono typecheck                   # Type check
+sigxtypecheck                   # Type check
 ```
 
 This runs:
@@ -574,12 +574,12 @@ For tests, run `pytest tests/ -v` separately to have full control over test exec
 
 ```bash
 # All platforms
-# Version is managed in src/ionosense_hpc/__version__.py
+# Version is managed in src/sigtekx/__version__.py
 pytest tests/ -v                 # Full test suite
 python benchmarks/run_latency.py experiment=baseline  # Performance regression check
 
 # Windows enhanced shell (optional aliases)
-# Version is in src/ionosense_hpc/__version__.py
+# Version is in src/sigtekx/__version__.py
 pytest tests/ -v                 # Full test suite
 python benchmarks/run_latency.py experiment=baseline  # Performance regression check
 ```
@@ -588,8 +588,8 @@ python benchmarks/run_latency.py experiment=baseline  # Performance regression c
 
 ```bash
 # All platforms - Essential CLI
-iono clean -All                  # Clean everything
-iono build                       # Fresh release build
+sigxclean -All                  # Clean everything
+sigxbuild                       # Fresh release build
 pytest tests/ -v                 # Verify build
 
 # Windows enhanced shell (optional aliases)
@@ -610,16 +610,16 @@ To keep the repo clean and follow RSE/RE practices, all generated artifacts defa
 
 The CLI initializes environment variables so Python code writes to these locations:
 
-- `IONO_OUTPUT_ROOT` – root for all artifacts (defaults to `artifacts/`)
-- `IONO_BENCH_DIR`, `IONO_EXPERIMENTS_DIR`, `IONO_REPORTS_DIR` – per-area overrides
+- `SIGX_OUTPUT_ROOT` – root for all artifacts (defaults to `artifacts/`)
+- `SIGX_BENCH_DIR`, `SIGX_EXPERIMENTS_DIR`, `SIGX_REPORTS_DIR` – per-area overrides
 
 Override them in CI or custom setups if you need different paths.
 
 ## Resources
 
 ### Essential CLI Commands
-- **CLI Help**: `iono help`
-- **Environment Check**: `iono doctor`
+- **CLI Help**: `sigxhelp`
+- **Environment Check**: `sigxdoctor`
 - **C++ Benchmarking**: `ionoc help`
 - **Python Profiling**: `iprof --help`
 

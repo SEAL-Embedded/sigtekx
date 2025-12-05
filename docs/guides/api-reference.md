@@ -1,6 +1,6 @@
 # API Reference
 
-Complete API reference for the ionosense-hpc Python package unified API (v0.9.3+).
+Complete API reference for the sigtekx Python package unified API (v0.9.3+).
 
 ## Getting Started
 
@@ -16,12 +16,12 @@ Before importing the package, make sure the C++ extension has been built with th
 **Windows**
 ```powershell
 .\scripts\open_dev_pwsh.ps1    # Launch the dev shell
- iono setup                     # Install Python deps
+ sigx setup                     # Install Python deps
  ib                             # Build the CUDA extension
 it                             # Smoke test the package
 ```
 
-Once the environment is ready you can import everything directly from `ionosense_hpc`.
+Once the environment is ready you can import everything directly from `sigtekx`.
 
 ## Core API
 
@@ -34,7 +34,7 @@ Once the environment is ready you can import everything directly from `ionosense
 **Pattern 1: Preset-based (Recommended for common use cases)**
 
 ```python
-from ionosense_hpc import Engine
+from sigtekx import Engine
 
 # Use default configuration (1024 FFT, 0.5 overlap)
 engine = Engine(preset='default')
@@ -56,7 +56,7 @@ with Engine(preset='iono') as engine:
 **Pattern 2: Config-based (Full control)**
 
 ```python
-from ionosense_hpc import Engine, EngineConfig
+from sigtekx import Engine, EngineConfig
 
 # Create custom configuration
 config = EngineConfig(
@@ -80,7 +80,7 @@ engine = Engine(config=config)
 **Pattern 3: Pipeline-based (Advanced custom pipelines)**
 
 ```python
-from ionosense_hpc import Engine, PipelineBuilder
+from sigtekx import Engine, PipelineBuilder
 
 # Build custom pipeline with fluent interface
 pipeline = (
@@ -136,7 +136,7 @@ Presets adapt their parameters based on execution mode for optimal performance:
 Use preset functions for more control:
 
 ```python
-from ionosense_hpc.config import get_preset, list_presets, describe_preset, compare_presets
+from sigtekx.config import get_preset, list_presets, describe_preset, compare_presets
 
 # Get preset configuration (defaults to batch executor variant)
 config = get_preset('iono')  # 16384 NFFT, 32 batch (high throughput)
@@ -183,7 +183,7 @@ finally:
 **Example:**
 ```python
 import numpy as np
-from ionosense_hpc import Engine
+from sigtekx import Engine
 
 with Engine(preset='iono') as engine:
     signal = np.random.randn(engine.config.nfft * engine.config.channels).astype(np.float32)
@@ -196,11 +196,11 @@ with Engine(preset='iono') as engine:
 
 #### Error Handling
 
-All exceptions inherit from `IonosenseError` and include stable error codes for programmatic handling, logging, and documentation lookup.
+All exceptions inherit from `SigTekXError` and include stable error codes for programmatic handling, logging, and documentation lookup.
 
 ```python
-from ionosense_hpc import Engine
-from ionosense_hpc.exceptions import ValidationError, EngineRuntimeError
+from sigtekx import Engine
+from sigtekx.exceptions import ValidationError, EngineRuntimeError
 
 try:
     engine = Engine(preset='iono', nfft=1000)  # Not a power of 2
@@ -216,7 +216,7 @@ Each exception has a stable `error_code` class attribute (format: `E{category}{s
 
 | Code | Exception | Description |
 |------|-----------|-------------|
-| **E000** | `IonosenseError` | Base exception for all errors |
+| **E000** | `SigTekXError` | Base exception for all errors |
 | **E1010** | `ConfigError` | Configuration validation error |
 | **E1020** | `ValidationError` | Input data validation error |
 | **E2010** | `DeviceNotFoundError` | No CUDA devices found |
@@ -243,7 +243,7 @@ Error codes appear in `repr()` (for logging) but not `str()` (backward compatibl
 
 ### `EngineConfig`
 
-`EngineConfig` (defined in `ionosense_hpc.config.schemas`) is the unified configuration class that consolidates all engine parameters. Powered by Pydantic v2 with automatic validation.
+`EngineConfig` (defined in `sigtekx.config.schemas`) is the unified configuration class that consolidates all engine parameters. Powered by Pydantic v2 with automatic validation.
 
 #### Signal Parameters
 
@@ -332,7 +332,7 @@ config_copy = config.model_copy(update={'nfft': 8192})
 #### Basic Usage
 
 ```python
-from ionosense_hpc import PipelineBuilder
+from sigtekx import PipelineBuilder
 
 pipeline = (
     PipelineBuilder()
@@ -370,16 +370,16 @@ pipeline = (
     .build()
 )
 
-from ionosense_hpc import Engine
+from sigtekx import Engine
 engine = Engine(pipeline=pipeline)
 ```
 
 ## Enumerations
 
-All enums are available from `ionosense_hpc`:
+All enums are available from `sigtekx`:
 
 ```python
-from ionosense_hpc import (
+from sigtekx import (
     WindowType, WindowSymmetry, WindowNorm,
     ScalePolicy, OutputMode, ExecutionMode
 )
@@ -407,31 +407,31 @@ config = EngineConfig(
 
 ## Utilities
 
-`ionosense_hpc.utils` hosts lightweight helpers:
+`sigtekx.utils` hosts lightweight helpers:
 
-* **`ionosense_hpc.utils.device`** - GPU discovery
+* **`sigtekx.utils.device`** - GPU discovery
   - `gpu_count()` - Get number of available GPUs
   - `device_info(device_id)` - Query GPU properties
   - `check_cuda_available()` - Check CUDA availability
   - `monitor_device(device_id)` - Real-time GPU monitoring
 
-* **`ionosense_hpc.utils.signals`** - Deterministic signal generators
+* **`sigtekx.utils.signals`** - Deterministic signal generators
   - `make_sine(sample_rate, n_samples, frequency, ...)` - Sine wave
   - `make_chirp(sample_rate, n_samples, f_start, f_end, ...)` - Chirp signal
   - `make_multitone(sample_rate, n_samples, frequencies, ...)` - Multi-tone signal
   - `make_noise(n_samples, ...)` - Noise generators (white, pink, brown)
   - `make_test_batch(signal_type, config, ...)` - Test data batch
 
-* **`ionosense_hpc.utils.archiving`** - Benchmark result storage
+* **`sigtekx.utils.archiving`** - Benchmark result storage
   - `DataArchiver` - Structured result archiving
 
-* **`ionosense_hpc.utils.validation`** - Statistical validation
+* **`sigtekx.utils.validation`** - Statistical validation
   - `ValidationHelper` - Accuracy validation utilities
 
-* **`ionosense_hpc.utils.reproducibility`** - Deterministic RNG
+* **`sigtekx.utils.reproducibility`** - Deterministic RNG
   - `DeterministicGenerator` - Reproducible random streams
 
-* **`ionosense_hpc.utils.paths`** - Output path management
+* **`sigtekx.utils.paths`** - Output path management
   - `get_benchmarks_root()` - Benchmark results directory
   - `get_benchmark_result_path(name)` - Result file paths
 
@@ -442,7 +442,7 @@ These utilities are pure Python and safe to import in environments without CUDA.
 Two top-level helpers provide a quick health check:
 
 ```python
-from ionosense_hpc import show_versions, self_test
+from sigtekx import show_versions, self_test
 
 # Print package/platform summary
 info = show_versions()
@@ -467,18 +467,18 @@ The v0.9.3 unified API replaces the old `Presets` class. See `docs/migration/v0.
 
 ```python
 # OLD (v0.9.2)
-from ionosense_hpc import Engine
-from ionosense_hpc.config import Presets
+from sigtekx import Engine
+from sigtekx.config import Presets
 
 config = Presets.realtime()
 engine = Engine(config)
 
 # NEW (v0.9.3+)
-from ionosense_hpc import Engine
+from sigtekx import Engine
 
 engine = Engine(preset='default', mode='streaming')
 # or
-from ionosense_hpc.config import get_preset
+from sigtekx.config import get_preset
 config = get_preset('default')
 config.mode = 'streaming'
 engine = Engine(config=config)

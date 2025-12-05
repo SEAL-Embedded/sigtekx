@@ -37,7 +37,7 @@ python benchmarks/run_throughput.py --multirun experiment=ionosphere_test +bench
 snakemake --cores 4 --snakefile experiments/Snakefile
 
 # 2. Launch interactive dashboard to view results
-iono dashboard
+sigx dashboard
 # OR: streamlit run experiments/streamlit/app.py
 
 # 3. View experiment tracking (optional)
@@ -50,11 +50,11 @@ dvc repro
 
 ## Report Generation Architecture
 
-Ionosense uses **two complementary reporting solutions**:
+SigTekX uses **two complementary reporting solutions**:
 
 | Solution | Type | Purpose | Command |
 |----------|------|---------|---------|
-| **Streamlit** | Interactive | Daily analysis, exploration | `iono dashboard` |
+| **Streamlit** | Interactive | Daily analysis, exploration | `sigx dashboard` |
 | **Quarto** | Static | Publications, archival | `snakemake quarto_reports` |
 
 Both solutions share core analysis modules from `experiments/analysis/`.
@@ -65,7 +65,7 @@ Primary tool for daily exploration and analysis.
 
 ```bash
 # Launch dashboard (recommended)
-iono dashboard
+sigx dashboard
 
 # OR launch manually
 streamlit run experiments/streamlit/app.py
@@ -90,7 +90,7 @@ streamlit run experiments/streamlit/app.py
 snakemake --cores 4 --snakefile experiments/Snakefile
 
 # 2. Launch dashboard
-iono dashboard
+sigx dashboard
 
 # 3. Explore interactively
 #    - Navigate between pages
@@ -154,44 +154,44 @@ snakemake quarto_reports
 
 **Use Case:** Developing and validating new C++ kernels/executors BEFORE Python integration.
 
-**Important:** This workflow is for C++ development iteration only. For production profiling, always use `iprof` with Python benchmarks (see GPU Profiling section below).
+**Important:** This workflow is for C++ development iteration only. For production profiling, always use `sxp` with Python benchmarks (see GPU Profiling section below).
 
-### Quick Start with `ionoc`
+### Quick Start with `sigxc`
 
-The `ionoc` command provides a dedicated CLI for C++ benchmarking with preset configurations:
+The `sigxc` command provides a dedicated CLI for C++ benchmarking with preset configurations:
 
 ```powershell
 # Quick validation (default: dev preset, 20 iter, ~10s)
-ionoc bench
+sigxc bench
 
 # Production latency benchmark
-ionoc bench --preset latency --full
+sigxc bench --preset latency --full
 
 # Stable benchmarking with locked GPU clocks (CV reduction: 20% → 5-10%)
-ionoc bench --preset latency --full --lock-clocks
-ionoc bench --preset realtime --iono --lock-clocks
+sigxc bench --preset latency --full --lock-clocks
+sigxc bench --preset realtime --iono --lock-clocks
 
 # Standard ionosphere realtime profiling
-ionoc bench --preset realtime --iono --profile
-ionoc profile nsys --stats
+sigxc bench --preset realtime --iono --profile
+sigxc profile nsys --stats
 
 # Extreme ionosphere throughput (missile detection)
-ionoc bench --preset throughput --ionox --full
+sigxc bench --preset throughput --ionox --full
 
 # Custom experimentation
-ionoc bench --preset throughput --nfft 4096 --batch 16 --quick
+sigxc bench --preset throughput --nfft 4096 --batch 16 --quick
 
 # Save baseline for regression tracking
-ionoc bench --preset latency --full --save-baseline
+sigxc bench --preset latency --full --save-baseline
 
 # Full help
-ionoc bench --help
+sigxc bench --help
 ```
 
 ### Build C++ Benchmark Executable
 ```bash
 # Build both tests and benchmark executable
-iono build   # or: ./scripts/cli.ps1 build
+sigx build   # or: ./scripts/cli.ps1 build
 ```
 
 ### Benchmark Presets
@@ -200,27 +200,27 @@ Multiple presets matching Python configurations:
 
 ```powershell
 # dev (default): Quick validation
-ionoc bench                                    # 20 iter, ~10s
+sigxc bench                                    # 20 iter, ~10s
 
 # latency: Latency measurement
-ionoc bench --preset latency --full            # 5000 iter, ~2min
-ionoc bench --preset latency --iono            # Standard ionosphere (4096, 0.75)
-ionoc bench --preset latency --ionox           # Extreme ionosphere (8192, 0.9)
+sigxc bench --preset latency --full            # 5000 iter, ~2min
+sigxc bench --preset latency --iono            # Standard ionosphere (4096, 0.75)
+sigxc bench --preset latency --ionox           # Extreme ionosphere (8192, 0.9)
 
 # throughput: Throughput measurement
-ionoc bench --preset throughput --full         # 10s duration
-ionoc bench --preset throughput --iono         # Ionosphere ULF/VLF (16384, 0.75)
-ionoc bench --preset throughput --ionox        # Extreme missile detection (32768, 0.9375)
+sigxc bench --preset throughput --full         # 10s duration
+sigxc bench --preset throughput --iono         # Ionosphere ULF/VLF (16384, 0.75)
+sigxc bench --preset throughput --ionox        # Extreme missile detection (32768, 0.9375)
 
 # realtime: Real-time streaming
-ionoc bench --preset realtime --full           # 10s stream
-ionoc bench --preset realtime --iono           # Standard ionosphere (4096, 0.75)
-ionoc bench --preset realtime --ionox          # Extreme ionosphere (8192, 0.9)
+sigxc bench --preset realtime --full           # 10s stream
+sigxc bench --preset realtime --iono           # Standard ionosphere (4096, 0.75)
+sigxc bench --preset realtime --ionox          # Extreme ionosphere (8192, 0.9)
 
 # accuracy: Accuracy validation
-ionoc bench --preset accuracy --full           # Single reference test
-ionoc bench --preset accuracy --iono           # Iono reference (4096, 0.75)
-ionoc bench --preset accuracy --ionox          # Ionox reference (8192, 0.9)
+sigxc bench --preset accuracy --full           # Single reference test
+sigxc bench --preset accuracy --iono           # Iono reference (4096, 0.75)
+sigxc bench --preset accuracy --ionox          # Ionox reference (8192, 0.9)
 ```
 
 ### Profile C++ Directly (Development Only)
@@ -228,96 +228,89 @@ ionoc bench --preset accuracy --ionox          # Ionox reference (8192, 0.9)
 **Nsight Systems (Timeline Analysis)**
 ```powershell
 # Basic profiling (auto-creates artifacts\profiling directory)
-ionoc profile nsys
+sigxc profile nsys
 
 # With statistics
-ionoc profile nsys --stats
+sigxc profile nsys --stats
 
 # Custom mode and traces
-ionoc profile nsys --mode quick --trace cuda,nvtx
+sigxc profile nsys --mode quick --trace cuda,nvtx
 
 # Custom output path
-ionoc profile nsys --output my_profile --stats
+sigxc profile nsys --output my_profile --stats
 ```
 
 **Nsight Compute (Kernel Analysis)**
 ```powershell
 # Basic profiling (⚠️ slow - 5-15 minutes)
-ionoc profile ncu
+sigxc profile ncu
 
 # Roofline analysis
-ionoc profile ncu --set roofline
+sigxc profile ncu --set roofline
 
 # Specific kernel only (faster)
-ionoc profile ncu --kernel-name "fft_kernel"
+sigxc profile ncu --kernel-name "fft_kernel"
 
 # Full metrics (very slow)
-ionoc profile ncu --set full --mode profile
+sigxc profile ncu --set full --mode profile
 ```
 
 **Advanced Options:**
 ```powershell
-# All ionoc profile commands support:
+# All sigxc profile commands support:
 # --mode <quick|profile|full>   Benchmark mode
 # --output <path>                Custom output path
 # Plus all native nsys/ncu flags (passthrough)
 
 # Examples:
-ionoc profile nsys --mode quick --duration 5
-ionoc profile ncu --kernel-name "magnitude" --metrics sm__throughput
+sigxc profile nsys --mode quick --duration 5
+sigxc profile ncu --kernel-name "magnitude" --metrics sm__throughput
 ```
 
 ### Typical C++ Development Workflow
 ```powershell
 # 1. Save baseline before modifications (with locked clocks for stability)
-ionoc bench --preset latency --full --lock-clocks --save-baseline
+sigxc bench --preset latency --full --lock-clocks --save-baseline
 
 # 2. Modify C++ executor/kernel code
 vim cpp\src\executors\batch_executor.cpp
 
 # 3. Rebuild
-iono build
+sigx build
 
 # 4. Quick validation (~10 seconds, compares to baseline)
-ionoc bench
+sigxc bench
 
 # 5. Full validation if quick looks good (locked clocks for stable comparison)
-ionoc bench --preset latency --full --lock-clocks
+sigxc bench --preset latency --full --lock-clocks
 # Performance card shows: ✓ NO CHANGE / ⚠ SLIGHT REGRESSION / ✗ REGRESSION
 
 # 6. Profile if needed
-ionoc bench --preset latency --profile
-ionoc profile nsys --stats
+sigxc bench --preset latency --profile
+sigxc profile nsys --stats
 
 # 7. View results
 nsys-ui artifacts\profiling\cpp_dev.nsys-rep
 
 # 8. Deep kernel analysis if needed (~5-15 minutes)
-ionoc profile ncu --kernel-name "fft_kernel" --set roofline
+sigxc profile ncu --kernel-name "fft_kernel" --set roofline
 
 # 9. Iterate until satisfied, then integrate with Python
 
 # 10. Production profiling (end-to-end Python workflow)
-iprof nsys latency    # Full Python end-to-end workflow
+sxp nsys latency    # Full Python end-to-end workflow
 ```
 
 ### When to Use Each Tool
 
 | Tool | Purpose | Duration | Use When |
 |------|---------|----------|----------|
-| `ionoc bench` | Fast validation (dev preset) | 10s | Quick sanity check after code changes |
-| `ionoc bench --preset <name> --profile` | Profile-ready benchmark | 30s-1min | Before running nsys/ncu profiling |
-| `ionoc bench --preset <name> --full` | Production equivalent | 1-10min | Matching Python benchmark results |
-| `ionoc profile nsys` | Timeline, API calls, NVTX | 30-60s | Understanding execution flow, bottlenecks |
-| `ionoc profile ncu` | Kernel metrics, roofline | 5-15min | Optimizing specific kernel performance |
-| `iprof` (Python) | **Production profiling** | Varies | **Final end-to-end validation** |
-
-### Shortcuts
-
-```powershell
-icbench quick        # Alias for: ionoc bench quick
-icprof nsys --stats  # Alias for: ionoc profile nsys --stats
-```
+| `sigxc bench` | Fast validation (dev preset) | 10s | Quick sanity check after code changes |
+| `sigxc bench --preset <name> --profile` | Profile-ready benchmark | 30s-1min | Before running nsys/ncu profiling |
+| `sigxc bench --preset <name> --full` | Production equivalent | 1-10min | Matching Python benchmark results |
+| `sigxc profile nsys` | Timeline, API calls, NVTX | 30-60s | Understanding execution flow, bottlenecks |
+| `sigxc profile ncu` | Kernel metrics, roofline | 5-15min | Optimizing specific kernel performance |
+| `sxp` (Python) | **Production profiling** | Varies | **Final end-to-end validation** |
 
 ### Troubleshooting
 
@@ -436,22 +429,22 @@ dvc dag
 #### Quick Profiling (Recommended for Development)
 ```bash
 # Fast profiling with minimal iterations - auto-selects correct config
-iprof nsys latency        # Uses profiling (20 iterations)
-iprof nsys throughput     # Uses profiling_throughput (3s duration)
-iprof nsys realtime       # Uses profiling_realtime (3s duration)
-iprof nsys accuracy       # Uses profiling_accuracy (2 iterations, 3 signals)
+sxp nsys latency        # Uses profiling (20 iterations)
+sxp nsys throughput     # Uses profiling_throughput (3s duration)
+sxp nsys realtime       # Uses profiling_realtime (3s duration)
+sxp nsys accuracy       # Uses profiling_accuracy (2 iterations, 3 signals)
 
 # NCU profiling (slower but more detailed)
-iprof ncu latency
-iprof ncu throughput
+sxp ncu latency
+sxp ncu throughput
 ```
 
 #### Full Benchmark Profiling (Research/Production)
 ```bash
 # Full benchmark profiles (SLOW - use sparingly!)
-iprof nsys latency -- experiment=profiling +benchmark=latency        # 5000 iterations
-iprof nsys throughput -- experiment=profiling +benchmark=throughput  # 10s duration
-iprof nsys accuracy -- experiment=profiling +benchmark=accuracy      # 10 iterations, 8 signals
+sxp nsys latency -- experiment=profiling +benchmark=latency        # 5000 iterations
+sxp nsys throughput -- experiment=profiling +benchmark=throughput  # 10s duration
+sxp nsys accuracy -- experiment=profiling +benchmark=accuracy      # 10 iterations, 8 signals
 ```
 
 #### Configuration Overrides (Hydra Passthrough)
@@ -461,28 +454,28 @@ Customize profiling parameters using Hydra config overrides:
 **Simple Overrides (profiling config auto-loaded):**
 ```bash
 # Override engine parameters (auto-loads profiling config + applies overrides)
-iprof nsys latency engine.nfft=8192 engine.overlap=0.75
-iprof nsys throughput engine.nfft=4096 engine.channels=8 engine.mode=streaming
+sxp nsys latency engine.nfft=8192 engine.overlap=0.75
+sxp nsys throughput engine.nfft=4096 engine.channels=8 engine.mode=streaming
 
 # Override benchmark parameters (iterations, GPU clocks, etc.)
-iprof nsys latency engine.nfft=4096 benchmark.iterations=100
-iprof ncu latency engine.nfft=8192 benchmark.lock_gpu_clocks=true
+sxp nsys latency engine.nfft=4096 benchmark.iterations=100
+sxp ncu latency engine.nfft=8192 benchmark.lock_gpu_clocks=true
 
 # Combine multiple overrides
-iprof nsys latency engine.nfft=4096 engine.overlap=0.875 \
+sxp nsys latency engine.nfft=4096 engine.overlap=0.875 \
   benchmark.iterations=50 benchmark.lock_gpu_clocks=true
 ```
 
 **Custom Benchmark Configs (full control):**
 ```bash
 # Use production config instead of profiling config
-iprof nsys latency +benchmark=latency benchmark.lock_gpu_clocks=true
+sxp nsys latency +benchmark=latency benchmark.lock_gpu_clocks=true
 
 # Use custom experiment + benchmark combination
-iprof nsys latency experiment=ionosphere_hires +benchmark=profiling
+sxp nsys latency experiment=ionosphere_hires +benchmark=profiling
 
 # Production profiling with all custom settings
-iprof nsys latency +benchmark=latency \
+sxp nsys latency +benchmark=latency \
   benchmark.lock_gpu_clocks=true benchmark.use_max_clocks=true
 ```
 
@@ -503,7 +496,7 @@ iprof nsys latency +benchmark=latency \
 
 **See Also:**
 - `python scripts/prof_helper.py --help` for detailed argument documentation
-- `iono help` for quick reference
+- `sigx help` for quick reference
 
 #### Expected Profiling Times
 
@@ -524,11 +517,11 @@ iprof nsys latency +benchmark=latency \
 
 **Purpose**: Reduce benchmark variability (Coefficient of Variation) from 20-40% → 5-15%
 
-### C++ Benchmarks (ionoc)
+### C++ Benchmarks (sigxc)
 
 ```powershell
 # Lock GPU clocks for stable C++ benchmarking (requires admin - UAC prompt)
-ionoc bench --preset latency --full --lock-clocks
+sigxc bench --preset latency --full --lock-clocks
 ```
 
 ### Python Benchmarks (Hydra)
@@ -542,7 +535,7 @@ python benchmarks/run_latency.py +benchmark=latency benchmark.lock_gpu_clocks=tr
 python benchmarks/run_latency.py +benchmark=latency
 
 # Works with profiling too
-iprof nsys latency  # With lock_gpu_clocks=true in YAML
+sxp nsys latency  # With lock_gpu_clocks=true in YAML
 ```
 
 **What it does:**
@@ -559,13 +552,13 @@ iprof nsys latency  # With lock_gpu_clocks=true in YAML
 
 ```powershell
 # Use recommended clocks (default, conservative)
-ionoc bench --preset latency --full --lock-clocks
+sigxc bench --preset latency --full --lock-clocks
 
 # Use max clocks for peak performance
-ionoc bench --preset latency --full --lock-clocks --max-clocks
+sigxc bench --preset latency --full --lock-clocks --max-clocks
 
 # Multi-GPU: select GPU 1
-ionoc bench --preset latency --full --lock-clocks --gpu-index 1
+sigxc bench --preset latency --full --lock-clocks --gpu-index 1
 
 # Query GPU info (no locking)
 pwsh scripts/gpu-manager.ps1 -Action Query

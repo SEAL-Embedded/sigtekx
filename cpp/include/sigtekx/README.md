@@ -2,7 +2,7 @@
 
 ## Overview
 
-This directory contains the public C++ header files that define the core API for the Ionosense High-Performance Computing FFT engine. The headers are designed following modern C++ best practices and Research Software Engineering (RSE) principles to provide a clean, efficient, and maintainable interface for CUDA-accelerated signal processing.
+This directory contains the public C++ header files that define the core API for the SigTekX High-Performance Computing FFT engine. The headers are designed following modern C++ best practices and Research Software Engineering (RSE) principles to provide a clean, efficient, and maintainable interface for CUDA-accelerated signal processing.
 
 ## Architecture
 

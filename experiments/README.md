@@ -1,6 +1,6 @@
 # Experiments Directory
 
-Benchmark execution and reporting for ionosense-hpc-lib.
+Benchmark execution and reporting for sigtekx.
 
 ## Directory Structure
 
@@ -38,7 +38,7 @@ Ionosense uses two complementary approaches for presenting benchmark results:
 
 ```bash
 # Launch dashboard
-iono dashboard
+sigx dashboard
 
 # OR manually
 streamlit run experiments/streamlit/app.py
@@ -103,7 +103,7 @@ snakemake run_ionosphere_temporal --snakefile experiments/Snakefile
 
 ```bash
 # Launch interactive dashboard (primary method)
-iono dashboard
+sigx dashboard
 
 # Statistical analysis via CLI
 python -m experiments.analysis.cli analyze artifacts/data
@@ -126,7 +126,7 @@ python -m experiments.analysis.cli compare artifacts/data \
 snakemake --cores 4 --snakefile experiments/Snakefile
 
 # 2. Explore results interactively
-iono dashboard
+sigx dashboard
 
 # 3. (Optional) Generate publication reports (future)
 snakemake quarto_reports
@@ -277,7 +277,7 @@ python benchmarks/run_latency.py \
 
 ```bash
 # Launch dashboard
-iono dashboard
+sigx dashboard
 
 # Navigate to pages:
 # - General Performance: Overall benchmark metrics
@@ -354,7 +354,7 @@ python benchmarks/run_throughput.py
 ## Contact
 
 For questions or contributions:
-- GitHub Issues: https://github.com/SEAL-Embedded/ionosense-hpc-lib/issues
+- GitHub Issues: https://github.com/SEAL-Embedded/sigtekx/issues
 - Email: rahsaz.kevin@gmail.com
 
 ---

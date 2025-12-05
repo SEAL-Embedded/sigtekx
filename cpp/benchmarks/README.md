@@ -6,23 +6,23 @@ The `ionoc` CLI provides a comprehensive interface for C++ benchmarking and prof
 
 ```powershell
 # Build the benchmark
-iono build
+sigx build
 
 # Quick validation (~10 seconds)
-ionoc bench
+sigxc bench
 
 # Production latency benchmark
-ionoc bench --preset latency --full
+sigxc bench --preset latency --full
 
 # Ionosphere realtime profiling
-ionoc bench --preset realtime --ionosphere --profile
-ionoc profile nsys --stats
+sigxc bench --preset realtime --ionosphere --profile
+sigxc profile nsys --stats
 
 # Custom experimentation
-ionoc bench --preset throughput --nfft 4096 --batch 16 --quick
+sigxc bench --preset throughput --nfft 4096 --batch 16 --quick
 
 # View all options
-ionoc bench --help
+sigxc bench --help
 ```
 
 ## Purpose
@@ -125,13 +125,13 @@ Track performance over time and detect regressions:
 
 ```powershell
 # Save a baseline (first time)
-ionoc bench --preset latency --full --save-baseline
+sigxc bench --preset latency --full --save-baseline
 
 # Run benchmark (automatically compares to baseline)
-ionoc bench --preset latency --full
+sigxc bench --preset latency --full
 
 # Update baseline after intentional changes
-ionoc bench --preset latency --full --save-baseline
+sigxc bench --preset latency --full --save-baseline
 ```
 
 **Baseline Storage:**
@@ -164,47 +164,47 @@ vs Baseline:   +2.3%      [⚠ SLIGHT REGRESSION]
 ### Quick Development Workflow
 ```powershell
 # Default: quick dev validation
-ionoc bench
+sigxc bench
 
 # With specific preset
-ionoc bench --preset latency --quick
+sigxc bench --preset latency --quick
 
 # Profile-ready
-ionoc bench --preset realtime --profile
-ionoc profile nsys --stats
+sigxc bench --preset realtime --profile
+sigxc profile nsys --stats
 ```
 
 ### Production Benchmarks
 ```powershell
 # Full latency benchmark (matches Python)
-ionoc bench --preset latency --full
+sigxc bench --preset latency --full
 
 # Ionosphere throughput
-ionoc bench --preset throughput --ionosphere --full
+sigxc bench --preset throughput --ionosphere --full
 
 # Real-time compliance testing
-ionoc bench --preset realtime --ionosphere --full
+sigxc bench --preset realtime --ionosphere --full
 ```
 
 ### Rapid Experimentation
 ```powershell
 # Override preset parameters
-ionoc bench --preset latency --nfft 8192 --batch 16 --quick
+sigxc bench --preset latency --nfft 8192 --batch 16 --quick
 
 # Blank canvas (no preset)
-ionoc bench --nfft 4096 --overlap 0.875 --iterations 50
+sigxc bench --nfft 4096 --overlap 0.875 --iterations 50
 
 # Custom ionosphere config
-ionoc bench --ionosphere --nfft 16384 --batch 32 --profile
+sigxc bench --ionosphere --nfft 16384 --batch 32 --profile
 ```
 
 ### Accuracy Reference Test
 ```powershell
 # Single pipeline-matching reference test
-ionoc bench --preset accuracy
+sigxc bench --preset accuracy
 
 # Ionosphere reference test (higher resolution)
-ionoc bench --preset accuracy --ionosphere
+sigxc bench --preset accuracy --ionosphere
 ```
 
 **IMPORTANT:** The C++ accuracy benchmark is a **single reference-based test** that validates the entire pipeline produces correct numerical output.
@@ -230,28 +230,28 @@ All profiling is handled through the `ionoc` CLI, which automatically creates di
 ### Nsight Systems (Timeline Analysis)
 ```powershell
 # Run profile-ready benchmark first
-ionoc bench --preset latency --profile
+sigxc bench --preset latency --profile
 
 # Profile with nsys
-ionoc profile nsys --stats
+sigxc profile nsys --stats
 
 # View results
 nsys-ui artifacts\profiling\cpp_dev.nsys-rep
 
 # Custom traces
-ionoc profile nsys --trace cuda,nvtx,osrt --stats
+sigxc profile nsys --trace cuda,nvtx,osrt --stats
 ```
 
 ### Nsight Compute (Kernel Analysis)
 ```powershell
 # Run profile-ready benchmark first
-ionoc bench --preset throughput --profile
+sigxc bench --preset throughput --profile
 
 # Profile with ncu (⚠️ slow - 5-15 minutes)
-ionoc profile ncu --set roofline
+sigxc profile ncu --set roofline
 
 # Specific kernel only (faster)
-ionoc profile ncu --kernel-name "fft_kernel"
+sigxc profile ncu --kernel-name "fft_kernel"
 
 # View results
 ncu-ui artifacts\profiling\cpp_dev_ncu.ncu-rep
@@ -265,51 +265,51 @@ ncu-ui artifacts\profiling\cpp_dev_ncu.ncu-rep
 vim cpp\src\executors\batch_executor.cpp
 
 # 2. Rebuild
-iono build
+sigx build
 
 # 3. Quick validation
-ionoc bench
+sigxc bench
 
 # 4. Profile-ready run if changes look good
-ionoc bench --preset latency --profile
+sigxc bench --preset latency --profile
 
 # 5. Profile with nsys
-ionoc profile nsys --stats
+sigxc profile nsys --stats
 
 # 6. Analyze in GUI
 nsys-ui artifacts\profiling\cpp_dev.nsys-rep
 
 # 7. Deep kernel analysis if needed
-ionoc profile ncu --kernel-name "fft_kernel" --set roofline
+sigxc profile ncu --kernel-name "fft_kernel" --set roofline
 
 # 8. Iterate until satisfied
 
 # 9. Integrate with Python and do production profiling
-iprof nsys latency    # Full end-to-end Python workflow
+sxp nsys latency    # Full end-to-end Python workflow
 ```
 
 ### Comparing Configurations
 ```powershell
 # Save baseline before changes
-ionoc bench --preset latency --full --save-baseline
+sigxc bench --preset latency --full --save-baseline
 
 # Make code changes...
 
 # Run again (automatically shows comparison)
-ionoc bench --preset latency --full
+sigxc bench --preset latency --full
 ```
 
 ### Testing Executor Refactor
 ```powershell
 # 1. Save baseline with current implementation
-ionoc bench --preset latency --full --save-baseline
+sigxc bench --preset latency --full --save-baseline
 
 # 2. Modify executor code
 # (swap in new BatchExecutor or StreamingExecutor)
 
 # 3. Rebuild and test (automatically compares to baseline)
-iono build
-ionoc bench --preset latency --full
+sigx build
+sigxc bench --preset latency --full
 
 # 4. Performance card will show regression status
 # ✓ GOOD = No regression (<2%)
@@ -317,7 +317,7 @@ ionoc bench --preset latency --full
 # ✗ POOR = Regression (>5%)
 
 # 5. If satisfied, update baseline
-ionoc bench --preset latency --full --save-baseline
+sigxc bench --preset latency --full --save-baseline
 ```
 
 ## Output Formats
@@ -354,7 +354,7 @@ Latency (µs):
 
 ### CSV Output
 ```powershell
-ionoc bench --preset latency --csv
+sigxc bench --preset latency --csv
 
 # Output:
 # preset,mode,ionosphere,nfft,batch,iterations,mean_us,p50_us,p95_us,p99_us,min_us,max_us,std_us
@@ -363,7 +363,7 @@ ionoc bench --preset latency --csv
 
 ### JSON Output
 ```powershell
-ionoc bench --preset latency --json
+sigxc bench --preset latency --json
 
 # Output: (not yet implemented, reserved for future use)
 ```
@@ -382,7 +382,7 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 # Then run benchmark
-ionoc bench
+sigxc bench
 ```
 
 **Best solution:** Use `scripts/init_pwsh.ps1` to start dev sessions (handles this automatically).
@@ -397,7 +397,7 @@ If you're running benchmark_engine.exe directly (not through `ionoc`) and encoun
 
 ```powershell
 # Solution: Use ionoc instead (recommended)
-ionoc profile nsys --stats
+sigxc profile nsys --stats
 
 # Or manually create directory
 New-Item -ItemType Directory -Path artifacts\profiling -Force | Out-Null
@@ -409,7 +409,7 @@ If benchmark_engine.exe is not found:
 
 ```powershell
 # Rebuild the project
-iono build
+sigx build
 
 # Check if executable exists
 ls build\windows-rel\benchmark_engine.exe
@@ -436,6 +436,6 @@ When validating executor refactors, aim for:
 ## See Also
 
 - Full documentation: `CLAUDE.md` → "C++ Development Workflow"
-- Python profiling: `iprof nsys latency` (production workflow)
+- Python profiling: `sxp nsys latency` (production workflow)
 - Test suite: `./scripts/cli.ps1 test cpp`
 - Preset definitions: `cpp/benchmarks/benchmark_config.hpp`

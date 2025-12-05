@@ -4,12 +4,12 @@ Core analysis modules shared by **two primary reporting solutions**.
 
 ## 🎯 Reporting Solutions
 
-Ionosense uses two complementary approaches for presenting benchmark results:
+SigTekX uses two complementary approaches for presenting benchmark results:
 
 ### 1. Streamlit Dashboard (Interactive)
 **Location:** `experiments/streamlit/`
 **Purpose:** Daily exploration, parameter tuning, interactive analysis
-**Launch:** `iono dashboard`
+**Launch:** `sigx dashboard`
 
 **Features:**
 - Three interactive pages: General Performance, Ionosphere Research, Configuration Explorer
@@ -93,7 +93,7 @@ experiments/analysis/
 
 ```bash
 # Launch Streamlit dashboard
-iono dashboard
+sigx dashboard
 
 # OR manually
 streamlit run experiments/streamlit/app.py
@@ -152,7 +152,7 @@ python -m experiments.analysis.cli scaling artifacts/data \
 snakemake --cores 4 --snakefile experiments/Snakefile
 
 # View results in interactive dashboard
-iono dashboard
+sigx dashboard
 
 # Individual benchmark steps
 snakemake run_ionosphere_resolution  # High-res analysis
@@ -246,7 +246,7 @@ visualization = [
 snakemake --cores 4 --snakefile experiments/Snakefile
 
 # 2. Launch interactive dashboard
-iono dashboard
+sigx dashboard
 
 # 3. Explore results interactively
 #    - Navigate to General Performance, Ionosphere Research, or Configuration Explorer

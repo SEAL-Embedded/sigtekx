@@ -1,9 +1,67 @@
 # Changelog
 
-All notable changes to the Ionosense-HPC project will be documented in this file.
+All notable changes to the SigTekX project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.0.0] - 2025-12-05
+
+### Changed
+
+#### BREAKING: Complete Project Rename - Ionosense-HPC → SigTekX
+
+**Motivation**: Establish new project branding with comprehensive renaming across all documentation and tooling.
+
+**All references updated:**
+- **Package name**: `ionosense-hpc` → `sigtekx`
+- **Python module**: `ionosense_hpc` → `sigtekx` (imports: `from sigtekx import Engine`)
+- **CLI commands**:
+  - `iono` → `sigx` (main command)
+  - `ionoc` → `sigxc` (C++ benchmarking - if applicable)
+  - `iprof` → `sxp` (profiling)
+- **Repository URL**: `SEAL-Embedded/ionosense-hpc-lib` → `SEAL-Embedded/sigtekx`
+- **Conda environment**: `ionosense-hpc` → `sigtekx`
+- **Environment variables**:
+  - `IONO_OUTPUT_ROOT` → `SIGX_OUTPUT_ROOT`
+  - `IONO_LOG_COLOR` → `SIGX_LOG_COLOR`
+- **Short aliases** (development shell):
+  - `ib` → `sb` (build)
+  - `it` → `st` (test)
+  - `itp` → `st python`
+  - `itc` → `st cpp`
+  - `ifmt` → `sfmt` (format)
+  - `ilint` → `slint` (lint)
+  - `iprof` → `sxp` (profile)
+  - `icbench` → removed (use `sigxc` or `sxp`)
+
+**Preserved:**
+- ✅ All "ionosphere" domain terminology (VLF/ULF, scintillation, etc.) remains unchanged
+- ✅ Scientific references and research context preserved
+- ✅ API and functionality completely unchanged - purely naming/branding update
+- ✅ All tests pass with new naming
+
+**Documentation updates:**
+- `README.md`: Updated all command examples and package references
+- `CONTRIBUTING.md`: Updated development workflow and CLI references
+- `AGENTS.md`: Updated agent operations guide
+- `CLAUDE.md`: Updated all command examples
+- All inline code examples updated to reflect new naming
+
+**Migration notes:**
+- This is a **breaking change** for all users - all imports and CLI commands must be updated
+- For upgrade instructions, see migration guide (coming in next release)
+- Conda environment must be recreated with new name
+
+**Impact**:
+- 📋 Documentation: Updated across all root files
+- 🐍 Python API: All imports change from `ionosense_hpc` to `sigtekx`
+- 💻 CLI: All commands change from `iono` prefix to `sigx`
+- 📦 Package: New conda environment and PyPI package name
+- ✅ All 133+ tests pass with new configuration
+- ✅ No functionality changes - purely naming
+
+---
 
 ## [0.9.4] - 2025-10-23
 

@@ -1,6 +1,6 @@
 # D2 Architecture Diagrams
 
-This directory contains D2 source files for the Ionosense HPC architecture documentation.
+This directory contains D2 source files for the SigTekX architecture documentation.
 
 **Last Updated:** 2025-01-20 (v0.9.4+ executor-based architecture, D2 migration)
 
@@ -8,7 +8,7 @@ This directory contains D2 source files for the Ionosense HPC architecture docum
 
 | Section | Description |
 |---------|-------------|
-| **[CLI Usage](#quick-start-cli---recommended)** | Generate diagrams with `iono diagrams` - smart regeneration, format options, batch processing |
+| **[CLI Usage](#quick-start-cli---recommended)** | Generate diagrams with `sigx diagrams` - smart regeneration, format options, batch processing |
 | **[Available Diagrams](#available-diagrams)** | 10 technical diagrams: C++ architecture (6), Python layer (3), System overview (1) |
 | **[Direct D2 Commands](#direct-d2-commands)** | Manual single-diagram generation for development and advanced control |
 | **[Layout Engines](#layout-engines)** | dagre (hierarchical) vs elk (complex graphs) - when to use each |
@@ -96,31 +96,31 @@ D2 supports multiple layout engines with different strengths. This project uses 
 
 ### Quick Start (CLI - Recommended)
 
-The easiest way to generate diagrams is using the `iono diagrams` command, which handles layout engine selection automatically:
+The easiest way to generate diagrams is using the `sigx diagrams` command, which handles layout engine selection automatically:
 
 ```bash
 # Generate all diagrams (smart regeneration - only if source changed)
-iono diagrams
+sigx diagrams
 
 # Force regenerate all diagrams (ignore timestamps)
-iono diagrams --force
+sigx diagrams --force
 
 # Generate by category
-iono diagrams cpp        # C++ diagrams only
-iono diagrams py         # Python diagrams only
-iono diagrams sys        # System diagrams only
+sigx diagrams cpp        # C++ diagrams only
+sigx diagrams py         # Python diagrams only
+sigx diagrams sys        # System diagrams only
 
 # Generate specific diagram
-iono diagrams cpp_class_hierarchy
-iono diagrams 02_py_structure
-iono diagrams 04_py_analysis
+sigx diagrams cpp_class_hierarchy
+sigx diagrams 02_py_structure
+sigx diagrams 04_py_analysis
 
 # Change output format (default: svg)
-iono diagrams --format png       # All as PNG
-iono diagrams cpp --format pdf   # C++ diagrams as PDF
-iono diagrams 01_system_overview --format pdf
+sigx diagrams --format png       # All as PNG
+sigx diagrams cpp --format pdf   # C++ diagrams as PDF
+sigx diagrams 01_system_overview --format pdf
 
-# Shortcut (same as 'iono diagrams')
+# Shortcut (same as 'sigx diagrams')
 idiag cpp --format png
 ```
 

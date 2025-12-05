@@ -147,23 +147,23 @@ Python with Hydra + Nsight requires:
 
 ```bash
 # Test 1: Simple engine override
-iprof nsys latency engine.nfft=8192
+sxp nsys latency engine.nfft=8192
 # Expected: Loads +benchmark=profiling, overrides engine.nfft
 
 # Test 2: Benchmark parameter override
-iprof nsys latency benchmark.iterations=100
+sxp nsys latency benchmark.iterations=100
 # Expected: Loads +benchmark=profiling, overrides benchmark.iterations
 
 # Test 3: Multiple overrides
-iprof nsys latency engine.nfft=4096 benchmark.iterations=50
+sxp nsys latency engine.nfft=4096 benchmark.iterations=50
 # Expected: Loads +benchmark=profiling, applies both overrides
 
 # Test 4: Custom benchmark config
-iprof nsys latency +benchmark=latency benchmark.lock_gpu_clocks=true
+sxp nsys latency +benchmark=latency benchmark.lock_gpu_clocks=true
 # Expected: Loads +benchmark=latency (production), overrides lock_gpu_clocks
 
 # Test 5: Full custom config
-iprof nsys latency experiment=ionosphere_hires +benchmark=profiling
+sxp nsys latency experiment=ionosphere_hires +benchmark=profiling
 # Expected: Uses ionosphere_hires experiment + profiling benchmark
 ```
 

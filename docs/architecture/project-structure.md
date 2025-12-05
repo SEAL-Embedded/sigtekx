@@ -1,11 +1,11 @@
 # Project Structure
 
-Complete layout of the ionosense-hpc-lib codebase with documentation links tailored to the current repository state.
+Complete layout of the sigtekx codebase with documentation links tailored to the current repository state.
 
 ## Directory Tree
 
 ```
-ionosense-hpc-lib/
+sigtekx/
 |-- .github/                # CI workflows, composite actions, issue templates
 |-- .guide/                 # Reference PDFs and legacy CUDA samples for context
 |-- .ionosense/             # Tooling state (ruff reports, session logs)
@@ -22,7 +22,7 @@ ionosense-hpc-lib/
 |-- notebooks/              # Exploratory analysis (Jupyter)
 |-- scripts/                # PowerShell helpers, profiling utilities, GPU management
 |-- src/                    # Python package source tree
-|   `-- ionosense_hpc/      # User facing package (benchmarks, config, core, utils)
+|   `-- sigtekx/      # User facing package (benchmarks, config, core, utils)
 |-- tests/                  # Pytest suite (unit, integration, GPU markers)
 |-- AGENTS.md               # Agent operations guide
 |-- accuracy_debug_plan.md  # Investigation notes for current performance work
@@ -70,9 +70,9 @@ cpp/
     `-- profiling/         # Profiling tests
 ```
 
-### Python Package (src/ionosense_hpc)
+### Python Package (src/sigtekx)
 ```
-src/ionosense_hpc/
+src/sigtekx/
 |-- __init__.py             # Package exports
 |-- __version__.py          # Semantic version string (synced with CMake/Python)
 |-- exceptions.py           # Domain specific exception hierarchy
@@ -149,7 +149,7 @@ build/
 
 
 ### Python Module Artefacts
-Shared objects produced by builds land in `src/ionosense_hpc/core/`. Expect `_engine.pyd` on Windows and `_engine.so` on Linux/WSL.
+Shared objects produced by builds land in `src/sigtekx/core/`. Expect `_engine.pyd` on Windows and `_engine.so` on Linux/WSL.
 
 
 ## Documentation Index
@@ -205,7 +205,7 @@ Shared objects produced by builds land in `src/ionosense_hpc/core/`. Expect `_en
 | RMS error | < 1e-5 | Compared against double precision reference |
 
 ## Output Artefacts
-- Generated content persists under `artifacts/` (configurable via `IONO_OUTPUT_ROOT`).
+- Generated content persists under `artifacts/` (configurable via `SIGX_OUTPUT_ROOT`).
 - Benchmark outputs: See three separate systems documented in Artifacts section above
   - Hydra experiments: `artifacts/data/` (primary)
   - Python standalone: `artifacts/benchmark_results/`
@@ -220,7 +220,7 @@ Shared objects produced by builds land in `src/ionosense_hpc/core/`. Expect `_en
 - Confirm the active Conda environment with `conda info --envs`; all developer tooling resolves from `ionosense-hpc`.
 - Execute GPU-specific tests on demand via `python -m pytest -m gpu --maxfail=1`.
 - Clear analysis caches manually when stale by deleting `.mypy_cache/`, `.ruff_cache/`, and `.pytest_cache/`.
-- Nsight CLI tools (`nsys`, `ncu`) store reports under `artifacts/profiling/`; set `IONO_OUTPUT_ROOT` to redirect outputs per experiment.
+- Nsight CLI tools (`nsys`, `ncu`) store reports under `artifacts/profiling/`; set `SIGX_OUTPUT_ROOT` to redirect outputs per experiment.
 
 ## Related Standards & Practices
 - Research Software Engineering (RSE) guidelines govern documentation, testing, and reproducibility.

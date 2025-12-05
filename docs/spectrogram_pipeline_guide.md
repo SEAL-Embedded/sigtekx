@@ -2,7 +2,7 @@
 
 ## Overview
 
-A complete ground-up spectrogram pipeline has been implemented for ionosense-hpc, enabling generation, visualization, and analysis of time-frequency spectrograms for report generation.
+A complete ground-up spectrogram pipeline has been implemented for sigtekx, enabling generation, visualization, and analysis of time-frequency spectrograms for report generation.
 
 **Design Philosophy:**
 - **DRY**: Single reusable utility called by benchmarks and standalone tools
@@ -27,7 +27,7 @@ A complete ground-up spectrogram pipeline has been implemented for ionosense-hpc
    - Multiple plot types: single, comparison, with slices
    - Static matplotlib plots for publication
 
-3. **Benchmark Integration** (`src/ionosense_hpc/benchmarks/base.py`)
+3. **Benchmark Integration** (`src/sigtekx/benchmarks/base.py`)
    - Config flags: `save_spectrogram`, `spectrogram_duration_sec`, `spectrogram_output_dir`
    - Helper method: `generate_spectrogram()` callable by any benchmark
 
@@ -123,7 +123,7 @@ from pathlib import Path
 # Add experiments to path (if running from outside experiments/)
 sys.path.insert(0, str(Path(__file__).parent.parent / "experiments"))
 
-from ionosense_hpc.config import EngineConfig
+from sigtekx.config import EngineConfig
 from analysis.spectrogram import generate_spectrogram, save_spectrogram
 
 # Configure engine
@@ -255,7 +255,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path.cwd() / "experiments"))
 
 from analysis.spectrogram import SpectrogramGenerator
-from ionosense_hpc.testing import generate_test_signal
+from sigtekx.testing import generate_test_signal
 
 # Generate known signal (e.g., sine waves)
 signal = generate_test_signal(freqs=[100, 500, 1000], duration=5.0)
@@ -361,7 +361,7 @@ pytest tests/test_spectrogram.py -v
 pytest tests/test_spectrogram.py::TestSpectrogramGeneration -v
 
 # Run with coverage
-pytest tests/test_spectrogram.py --cov=ionosense_hpc.analysis --cov-report=html
+pytest tests/test_spectrogram.py --cov=sigtekx.analysis --cov-report=html
 ```
 
 ### Test Coverage
@@ -490,7 +490,7 @@ pip install -e .
 
 ```bash
 # Check CUDA availability
-python -c "from ionosense_hpc.utils import gpu_count; print(f'GPUs: {gpu_count()}')"
+python -c "from sigtekx.utils import gpu_count; print(f'GPUs: {gpu_count()}')"
 
 # Run tests with verbose output
 pytest tests/test_spectrogram.py -v -s

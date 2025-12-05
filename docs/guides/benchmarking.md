@@ -1,6 +1,6 @@
 # Benchmarking Guide
 
-Comprehensive guide to the ionosense-hpc benchmarking suite for performance evaluation, optimization, and research using the integrated CLI platform.
+Comprehensive guide to the sigtekx benchmarking suite for performance evaluation, optimization, and research using the integrated CLI platform.
 
 ## Table of Contents
 
@@ -18,7 +18,7 @@ Comprehensive guide to the ionosense-hpc benchmarking suite for performance eval
 
 ## Overview
 
-The ionosense-hpc benchmarking suite provides research-grade performance evaluation following RSE (Research Software Engineering) and IEEE standards. It ensures reproducible, statistically rigorous benchmarking with comprehensive reporting, all accessible through the unified CLI platform.
+The sigtekx benchmarking suite provides research-grade performance evaluation following RSE (Research Software Engineering) and IEEE standards. It ensures reproducible, statistically rigorous benchmarking with comprehensive reporting, all accessible through the unified CLI platform.
 
 ### Key Features
 
@@ -54,16 +54,16 @@ The ionosense-hpc benchmarking suite provides research-grade performance evaluat
 .\scripts\open_dev_pwsh.ps1
 
 # Run default benchmark suite
-ibench suite                    # or 'iono bench suite'
+ibench suite                    # or 'sigxbench suite'
 
 # Run specific benchmark
-ibench latency                  # or 'iono bench latency'
+ibench latency                  # or 'sigxbench latency'
 
 # Run with custom configuration
 ibench throughput --config high_performance.yaml
 
 # Generate report afterwards
-iono report results/
+sigxreport results/
 ```
 
 ## CLI Benchmark Commands
@@ -90,7 +90,7 @@ iono report results/
 **Windows (Development Shell):**
 ```powershell
 # Available benchmarks
-iono info benchmarks                  # List all available benchmarks
+sigxinfo benchmarks                  # List all available benchmarks
 
 # Run individual benchmarks
 ibench latency                        # Latency benchmark
@@ -202,7 +202,7 @@ ibench realtime
 
 **Programmatic Usage:**
 ```python
-from ionosense_hpc.benchmarks import RealtimeBenchmark, RealtimeBenchmarkConfig
+from sigtekx.benchmarks import RealtimeBenchmark, RealtimeBenchmarkConfig
 
 config = RealtimeBenchmarkConfig(
     name="realtime_test",
@@ -233,7 +233,7 @@ ibench scaling
 
 **Programmatic Usage:**
 ```python
-from ionosense_hpc.benchmarks import ScalingBenchmark
+from sigtekx.benchmarks import ScalingBenchmark
 
 benchmark = ScalingBenchmark()
 results = benchmark.run_scaling_analysis()
@@ -263,13 +263,13 @@ Parameter sweeps allow systematic exploration of configuration space using the C
 **Windows (Development Shell):**
 ```powershell
 # Run parameter sweep
-iono sweep experiment_config.yaml
+sigxsweep experiment_config.yaml
 
 # Run parallel sweep
-iono sweep experiment_config.yaml --parallel --workers 4
+sigxsweep experiment_config.yaml --parallel --workers 4
 
 # Specify output directory
-iono sweep experiment_config.yaml --output sweep_results/
+sigxsweep experiment_config.yaml --output sweep_results/
 ```
 
 ### Grid Search Example
@@ -277,7 +277,7 @@ iono sweep experiment_config.yaml --output sweep_results/
 Create `grid_search.yaml`:
 ```yaml
 name: grid_search_experiment
-benchmark_class: "ionosense_hpc.benchmarks.LatencyBenchmark"
+benchmark_class: "sigtekx.benchmarks.LatencyBenchmark"
 sweep_type: grid
 
 parameters:
@@ -300,7 +300,7 @@ base_config:
 ./scripts/cli.sh sweep grid_search.yaml
 
 # Windows (dev shell)
-iono sweep grid_search.yaml
+sigxsweep grid_search.yaml
 ```
 
 ### Random Search Example
@@ -366,13 +366,13 @@ snakemake --cores 4 --snakefile experiments/Snakefile
 ./scripts/cli.sh doctor --verbose >> environment_snapshot.txt
 
 # Windows (dev shell)
-iono info system > environment_snapshot.txt
-iono doctor --verbose >> environment_snapshot.txt
+sigxinfo system > environment_snapshot.txt
+sigxdoctor --verbose >> environment_snapshot.txt
 ```
 
 **Result Archiving:**
 ```python
-from ionosense_hpc.utils.archiving import DataArchiver
+from sigtekx.utils.archiving import DataArchiver
 
 archiver = DataArchiver()  # defaults to standardized benchmark_results/<name> paths
 archiver.archive_results(
@@ -412,7 +412,7 @@ The CLI provides integrated profiling with NVIDIA Nsight tools.
 **Windows (Development Shell):**
 ```powershell
 # Quick profile using aliases
-iprof nsys latency              # or 'iono profile nsys latency'
+iprof nsys latency              # or 'sigxprofile nsys latency'
 ipq                            # Quick profile alias
 
 # Full profile
@@ -443,7 +443,7 @@ iprof nsys latency --open-gui
 **Windows (Development Shell):**
 ```powershell
 # Kernel-level profiling
-iprof ncu latency              # or 'iono profile ncu latency'
+iprof ncu latency              # or 'sigxprofile ncu latency'
 
 # Full metrics set
 iprof ncu latency --full
@@ -484,16 +484,16 @@ build/nsight_reports/
 **Windows (Development Shell):**
 ```powershell
 # Basic report
-iono report results/ --format pdf
+sigxreport results/ --format pdf
 
 # Comprehensive report
-iono report results/ --format pdf --type comprehensive --title "Research Study"
+sigxreport results/ --format pdf --type comprehensive --title "Research Study"
 
 # HTML report for web viewing
-iono report results/ --format html
+sigxreport results/ --format html
 
 # Comparative analysis
-iono report results/ --type comparative
+sigxreport results/ --type comparative
 ```
 
 ### Report Types
@@ -506,7 +506,7 @@ iono report results/ --type comparative
 ### Programmatic Reporting
 
 ```python
-from ionosense_hpc.utils.reporting import BenchmarkReport, ReportConfig
+from sigtekx.utils.reporting import BenchmarkReport, ReportConfig
 
 config = ReportConfig(
     title="Performance Evaluation Report",
@@ -532,8 +532,8 @@ report.generate("report.pdf")
 ./scripts/cli.sh info system      # Verify system configuration
 
 # Windows (dev shell)
-iono doctor                       # Check all dependencies
-iono info system                  # Verify system configuration
+sigxdoctor                       # Check all dependencies
+sigxinfo system                  # Verify system configuration
 ```
 
 **GPU Preparation:**
@@ -601,9 +601,9 @@ done
 ./scripts/cli.sh report nfft_sweep/ --type sweep
 
 # Windows (dev shell)
-iono sweep nfft_study.yaml --output nfft_sweep/
-iono sweep batch_study.yaml --output batch_sweep/
-iono report nfft_sweep/ --type sweep
+sigxsweep nfft_study.yaml --output nfft_sweep/
+sigxsweep batch_study.yaml --output batch_sweep/
+sigxreport nfft_sweep/ --type sweep
 ```
 
 ## Interpreting Results
@@ -629,7 +629,7 @@ iono report nfft_sweep/ --type sweep
 
 # Windows (dev shell)
 ibench latency | grep "Mean latency"
-iono info devices                # Check GPU status
+sigxinfo devices                # Check GPU status
 ```
 
 ### Common Performance Issues
@@ -657,7 +657,7 @@ iono info devices                # Check GPU status
 # Windows (dev shell)
 ibench scaling                                    # Identify bottlenecks
 iprof nsys throughput --full                     # Detailed analysis
-iono sweep optimization_study.yaml               # Parameter optimization
+sigxsweep optimization_study.yaml               # Parameter optimization
 ```
 
 ## Advanced Features
@@ -685,8 +685,8 @@ jobs:
 
 **Add to CLI workflow:**
 ```python
-# In ionosense_hpc/benchmarks/custom_benchmark.py
-from ionosense_hpc.benchmarks import BaseBenchmark
+# In sigtekx/benchmarks/custom_benchmark.py
+from sigtekx.benchmarks import BaseBenchmark
 
 class CustomBenchmark(BaseBenchmark):
     def setup(self):
@@ -728,11 +728,11 @@ chmod +x scripts/cli.sh
 ```bash
 # Check environment
 ./scripts/cli.sh doctor         # Linux/WSL2
-iono doctor                     # Windows (dev shell)
+sigxdoctor                     # Windows (dev shell)
 
 # Check GPU access
 ./scripts/cli.sh info devices   # Linux/WSL2
-iono info devices               # Windows (dev shell)
+sigxinfo devices               # Windows (dev shell)
 ```
 
 ### Performance Issues
@@ -760,8 +760,8 @@ ibench scaling                                  # Windows (dev shell)
 
 ## References
 
-- **CLI Help**: `./scripts/cli.sh help` / `iono help`
-- **System Info**: `./scripts/cli.sh info` / `iono info`
+- **CLI Help**: `./scripts/cli.sh help` / `sigxhelp`
+- **System Info**: `./scripts/cli.sh info` / `sigxinfo`
 - [NVIDIA Nsight Systems User Guide](https://docs.nvidia.com/nsight-systems/)
 - [CUDA Best Practices Guide](https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/)
 - [IEEE Standard for Floating-Point Arithmetic](https://ieeexplore.ieee.org/document/8766229)
@@ -775,10 +775,10 @@ By default, all benchmark artifacts are written under the repository `artifacts/
 
 You can override these locations with environment variables (useful for CI or custom storage):
 
-- `IONO_OUTPUT_ROOT`: root directory for all outputs
-- `IONO_BENCH_DIR`: benchmark results root
-- `IONO_EXPERIMENTS_DIR`: experiments root
-- `IONO_REPORTS_DIR`: reports root
+- `SIGX_OUTPUT_ROOT`: root directory for all outputs
+- `SIGX_BENCH_DIR`: benchmark results root
+- `SIGX_EXPERIMENTS_DIR`: experiments root
+- `SIGX_REPORTS_DIR`: reports root
 
 The CLI initializes these variables automatically to point to `artifacts/` so Python tools and the CLI are consistent.
 
