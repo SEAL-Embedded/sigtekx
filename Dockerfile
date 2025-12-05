@@ -29,7 +29,7 @@ COPY environments/environment.build.yml .
 RUN conda env create -f environment.build.yml && conda clean -afy
 
 # Activate the Conda environment for subsequent commands
-SHELL ["conda", "run", "-n", "ionosense-hpc", "/bin/bash", "-c"]
+SHELL ["conda", "run", "-n", "sigtekx", "/bin/bash", "-c"]
 
 # Copy build configuration and all source code required for the C++ build.
 # This includes the Python package directory, which CMake uses as the install destination for shared libraries.
@@ -40,7 +40,7 @@ COPY include/ ./include/
 
 # Build the C++/CUDA components.
 # This layer is cached as long as C++ or Python source doesn't change.
-# The compiled extension will be placed inside the src/ionosense_hpc directory.
+# The compiled extension will be placed inside the src/sigtekx directory.
 ENV PYTHONPATH="/app/src"
 RUN cmake --preset ci-linux && cmake --build --preset ci-linux-build
 
@@ -55,7 +55,7 @@ COPY tests/ ./tests/
 RUN pip wheel . --wheel-dir dist/
 
 # This ensures commands run against the CI image execute inside the conda env
-ENTRYPOINT ["conda", "run", "-n", "ionosense-hpc", "--no-capture-output"]
+ENTRYPOINT ["conda", "run", "-n", "sigtekx", "--no-capture-output"]
 
 # ==================================================================================
 
@@ -93,7 +93,7 @@ COPY --chown=appuser:appuser environments/environment.runtime.yml .
 RUN conda env create -f environment.runtime.yml && conda clean -afy
 
 # Activate the Conda environment
-SHELL ["conda", "run", "-n", "ionosense-hpc", "/bin/bash", "-c"]
+SHELL ["conda", "run", "-n", "sigtekx", "/bin/bash", "-c"]
 
 # Copy the Python wheel from the builder stage
 COPY --from=builder --chown=appuser:appuser /app/dist/ .
@@ -106,7 +106,7 @@ RUN pip install *.whl
 USER appuser
 
 # Set the entrypoint for the container
-ENTRYPOINT ["conda", "run", "-n", "ionosense-hpc", "--no-capture-output"]
+ENTRYPOINT ["conda", "run", "-n", "sigtekx", "--no-capture-output"]
 
 # This runs the benchmark suite by calling its Python module directly.
 # CMD ["python", "-m", "ionosense_hpc.benchmarks.suite"]

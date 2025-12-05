@@ -200,8 +200,8 @@ IONO_CUFFT_CHECK(cufftExecR2C(plan, input, output));
 ### CMake Integration
 
 ```cmake
-find_package(ionosense_hpc REQUIRED)
-target_link_libraries(your_target ionosense_hpc::core)
+find_package(sigtekx REQUIRED)
+target_link_libraries(your_target sigtekx::core)
 ```
 
 ### Header Dependencies

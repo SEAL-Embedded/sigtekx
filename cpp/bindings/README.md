@@ -35,7 +35,7 @@ Main pybind11 module definition exposing:
 ### PyResearchEngine Class
 
 ```python
-from ionosense_hpc.core import ResearchEngine, EngineConfig
+from sigtekx.core import ResearchEngine, EngineConfig
 
 engine = ResearchEngine()
 config = EngineConfig()
@@ -92,7 +92,7 @@ config.warmup_iters = 1         # GPU warmup iterations
 Controls individual processing stages:
 
 ```python
-from ionosense_hpc.core import StageConfig, WindowType, ScalePolicy
+from sigtekx.core import StageConfig, WindowType, ScalePolicy
 
 stage_config = StageConfig()
 stage_config.nfft = 1024
