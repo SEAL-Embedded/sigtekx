@@ -142,7 +142,7 @@ The project is organized into **two primary development boards**:
 
 **Focus:** User-facing capabilities and scientific workflows
 
-See the [Project Boards](https://github.com/your-org/ionosense-hpc/projects) for active work items.
+See the [Project Boards](https://github.com/your-org/sigtekx/projects) for active work items.
 
 ## How to Contribute
 

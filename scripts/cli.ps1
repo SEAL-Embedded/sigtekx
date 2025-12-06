@@ -976,18 +976,18 @@ GPU PROFILING & PERFORMANCE
       Targets: latency, throughput, accuracy, realtime, custom
 
   Quick Examples (auto-uses fast profiling configs):
-    iprof nsys latency                  # Nsight Systems: ~20 iterations, ~30s
-    iprof nsys throughput               # Nsight Systems: ~3s duration
-    iprof ncu latency                   # Nsight Compute: ~5-10min kernel analysis
+    sxp nsys latency                  # Nsight Systems: ~20 iterations, ~30s
+    sxp nsys throughput               # Nsight Systems: ~3s duration
+    sxp ncu latency                   # Nsight Compute: ~5-10min kernel analysis
 
   Override Parameters (profiling config auto-loaded, then overrides applied):
-    iprof nsys latency engine.nfft=8192 engine.overlap=0.75
-    iprof nsys latency engine.nfft=4096 benchmark.iterations=100
-    iprof ncu throughput engine.mode=streaming benchmark.lock_gpu_clocks=true
+    sxp nsys latency engine.nfft=8192 engine.overlap=0.75
+    sxp nsys latency engine.nfft=4096 benchmark.iterations=100
+    sxp ncu throughput engine.mode=streaming benchmark.lock_gpu_clocks=true
 
   Custom Benchmark Configs (full control):
-    iprof nsys latency +benchmark=latency benchmark.lock_gpu_clocks=true
-    iprof nsys latency experiment=ionosphere_hires +benchmark=profiling
+    sxp nsys latency +benchmark=latency benchmark.lock_gpu_clocks=true
+    sxp nsys latency experiment=ionosphere_hires +benchmark=profiling
 
   Common Override Parameters:
     engine.nfft=<size>           FFT size (1024, 2048, 4096, 8192, 16384, 32768)
@@ -1013,8 +1013,8 @@ GPU CLOCK LOCKING (Benchmark Stability)
     python benchmarks/run_latency.py +benchmark=latency \\
         benchmark.lock_gpu_clocks=true
 
-  C++ benchmarks (via ionoc):
-    ionoc bench --preset latency --full --lock-clocks
+  C++ benchmarks (via sigxc):
+    sigxc bench --preset latency --full --lock-clocks
 
   See: docs/performance/gpu-clock-locking.md for full details
 
@@ -1022,11 +1022,11 @@ GPU CLOCK LOCKING (Benchmark Stability)
 C++ DEVELOPMENT WORKFLOW (Pre-Python Integration)
 ═══════════════════════════════════════════════════════════════════════════
 
-  Use 'ionoc' CLI for C++ kernel development iteration:
-    ionoc bench                         # Quick validation (~10s)
-    ionoc bench --preset latency --full # Production benchmark
-    ionoc profile nsys --stats          # Profile C++ directly
-    ionoc help                          # Full ionoc documentation
+  Use 'sigxc' CLI for C++ kernel development iteration:
+    sigxc bench                         # Quick validation (~10s)
+    sigxc bench --preset latency --full # Production benchmark
+    sigxc profile nsys --stats          # Profile C++ directly
+    sigxc help                          # Full sigxc documentation
 
   See: CLAUDE.md "C++ Development Workflow" section
 
@@ -1067,8 +1067,8 @@ ADDITIONAL RESOURCES
   docs/performance/gpu-clock-locking.md  GPU stability optimization
   docs/guides/development.md             Detailed development workflows
 
-For C++ benchmarking: ionoc help
-For Python profiling:  iprof --help
+For C++ benchmarking: sigxc help
+For Python profiling:  sxp --help
 "@
 }
 
@@ -1215,7 +1215,7 @@ try {
         "profile"  {
             $params = @{}
 
-            # Pattern-based argument classification (same as iprof)
+            # Pattern-based argument classification (same as sxp)
             # Separate tool args from Hydra configs by regex patterns
             $profileArgs = @()
             $hydraArgs = @()

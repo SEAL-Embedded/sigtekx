@@ -476,14 +476,14 @@ void process_chunk(int thread_id,
                    const std::vector<float>& data,
                    std::vector<float>& output) {
     // ✅ Each thread creates its own executor
-    ionosense::BatchExecutor executor;
+    sigtekx::BatchExecutor executor;
 
-    ionosense::ExecutorConfig config;
+    sigtekx::ExecutorConfig config;
     config.nfft = 1024;
     config.batch = 4;
     config.stream_count = 3;
 
-    auto stages = ionosense::StageFactory::create_default_pipeline();
+    auto stages = sigtekx::StageFactory::create_default_pipeline();
     executor.initialize(config, std::move(stages));
 
     executor.submit(data.data(), output.data(), data.size());
@@ -530,13 +530,13 @@ void process_on_gpu(int gpu_id, const std::vector<float>& data) {
     // ✅ Bind thread to specific GPU
     cudaSetDevice(gpu_id);
 
-    ionosense::BatchExecutor executor;
-    ionosense::ExecutorConfig config;
+    sigtekx::BatchExecutor executor;
+    sigtekx::ExecutorConfig config;
     config.nfft = 2048;
     config.batch = 8;
     config.device_id = gpu_id;  // Explicit device selection
 
-    auto stages = ionosense::StageFactory::create_default_pipeline();
+    auto stages = sigtekx::StageFactory::create_default_pipeline();
     executor.initialize(config, std::move(stages));
 
     std::vector<float> output((2048/2 + 1) * 8);

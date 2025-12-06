@@ -398,7 +398,7 @@ function global:sigxc {
 
 
 # Essential CLI shortcuts (only for commands that actually exist)
-function global:ib {
+function global:sxb {
     [CmdletBinding()]
     param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
 
@@ -415,7 +415,7 @@ function global:ib {
         sigx build @Args
     }
 }
-function global:it {
+function global:sxt {
     [CmdletBinding()]
     param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
 
@@ -432,7 +432,7 @@ function global:it {
         sigx test @Args
     }
 }
-function global:ilint {
+function global:sxl {
     [CmdletBinding()]
     param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
 
@@ -449,7 +449,7 @@ function global:ilint {
         sigx lint @Args
     }
 }
-function global:ifmt {
+function global:sxf {
     [CmdletBinding()]
     param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
 
@@ -466,7 +466,7 @@ function global:ifmt {
         sigx format @Args
     }
 }
-function global:iclean {
+function global:sxc {
     [CmdletBinding()]
     param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
 
@@ -557,8 +557,8 @@ function global:sxp {
 # dvc status
 
 # Simple test shortcuts
-function global:itp { it python }         # python tests
-function global:itc { it cpp }            # c++ tests
+function global:sxtp { sxt python }       # python tests
+function global:sxtc { sxt cpp }          # c++ tests
 
 # C++ benchmarking shortcuts (icbench removed - no replacement per naming decisions)
 function global:sxpc  { sigxc profile @args }   # C++ profiling shortcut
@@ -572,10 +572,10 @@ function global:sxpc  { sigxc profile @args }   # C++ profiling shortcut
 # dvc status && dvc repro
 
 # Help shortcuts (use CLI help instead of removed learn commands)
-function global:ihelp { sigx help }
+function global:sxh { sigx help }
 
 # Diagram generation shortcut
-function global:idiag {
+function global:sxd {
     [CmdletBinding()]
     param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
 
@@ -594,7 +594,7 @@ function global:idiag {
 }
 
 # Reload sigx functions (useful when init_pwsh.ps1 is updated)
-function global:ireload {
+function global:sxreload {
     Write-Host "Reloading sigx functions..." -ForegroundColor Cyan
     . (Join-Path $global:SIGX_ROOT 'scripts\init_pwsh.ps1') -Quiet
     Write-Host "Functions reloaded. Try: sxp nsys latency" -ForegroundColor Green
@@ -604,11 +604,11 @@ function global:ireload {
 $global:IonoVerbs   = @('setup','build','test','coverage','lint','format','clean','doctor','help','profile','typecheck','diagrams')
 $global:IonoTargets = @('python','cpp','all','py','sys','-Clean','--clean','-Verbose','--verbose','--debug','--release','-Fix','-Check','-Coverage','-Pattern','-All','nsys','ncu','latency','throughput','accuracy','realtime','custom','-Full','-NoOpen','-Mode','-Script','-Kernel','-Duration','--format','--force','svg','png','pdf','cpp_class_hierarchy','cpp_components_pipeline','cpp_sequence_execution','cpp_memory_layout','py_package_architecture','py_analysis_workflow','py_workflow_sequence','sys_architecture_overview')
 
-# ionoc tab-completion
-$global:IonocVerbs   = @('bench','profile','compare','clean','help')
-$global:IonocTargets = @('quick','profile','full','nsys','ncu','--mode','--output','--stats','--trace','--set','--kernel-name')
+# sigxc tab-completion
+$global:SigxcVerbs   = @('bench','profile','compare','clean','help')
+$global:SigxcTargets = @('quick','profile','full','nsys','ncu','--mode','--output','--stats','--trace','--set','--kernel-name')
 
-Register-ArgumentCompleter -CommandName sigx,ib,it,ilint,ifmt,iclean,itp,itc,ihelp,sxp,idiag -ScriptBlock {
+Register-ArgumentCompleter -CommandName sigx,sxb,sxt,sxl,sxf,sxc,sxtp,sxtc,sxh,sxp,sxd -ScriptBlock {
     param($commandName,$parameterName,$wordToComplete,$commandAst,$fakeBoundParameters)
     $tokens = @()
     foreach ($e in $commandAst.CommandElements) {
@@ -633,9 +633,9 @@ Register-ArgumentCompleter -CommandName sigxc,sxpc -ScriptBlock {
         if ($e.Extent.Text -ne $commandName) { $tokens += $e.Extent.Text }
     }
     if ($commandName -eq 'sigxc' -and $tokens.Count -eq 0) {
-        $list = $global:IonocVerbs
+        $list = $global:SigxcVerbs
     } else {
-        $list = $global:IonocTargets + $global:IonocVerbs
+        $list = $global:SigxcTargets + $global:SigxcVerbs
     }
     foreach ($it in $list) {
         if ($it -like "$wordToComplete*") {

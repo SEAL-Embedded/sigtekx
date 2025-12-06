@@ -8,12 +8,12 @@ Complete layout of the sigtekx codebase with documentation links tailored to the
 sigtekx/
 |-- .github/                # CI workflows, composite actions, issue templates
 |-- .guide/                 # Reference PDFs and legacy CUDA samples for context
-|-- .ionosense/             # Tooling state (ruff reports, session logs)
+|-- .sigtekx/             # Tooling state (ruff reports, session logs)
 |-- benchmarks/             # Standalone benchmarking utilities and scenarios
 |-- build/                  # Generated artefacts (benchmarks, reports, build presets)
 |-- cpp/                    # C++17/CUDA sources, bindings, and tests
 |   |-- bindings/           # pybind11 bridge exposing the research engine
-|   |-- include/ionosense/  # Public headers and CUDA resource wrappers
+|   |-- include/sigtekx/  # Public headers and CUDA resource wrappers
 |   |-- src/                # Engine implementation, CUDA kernels, helpers
 |   `-- tests/              # C++ test suite (gtest/CTest presets)
 |-- docs/                   # Project documentation (API, development, benchmarking)
@@ -46,7 +46,7 @@ cpp/
 |   `-- main.cpp           # Entry point
 |-- bindings/
 |   `-- bindings.cpp        # pybind11 BatchExecutor/StreamingExecutor bindings
-|-- include/ionosense/
+|-- include/sigtekx/
 |   |-- core/              # Core abstractions
 |   |   |-- executor_config.hpp
 |   |   |-- pipeline_executor.hpp
@@ -217,7 +217,7 @@ Shared objects produced by builds land in `src/sigtekx/core/`. Expect `_engine.p
 
 ## Tooling Notes
 - Run `cmake --list-presets` and `ctest --list-presets` to discover configured build and test targets.
-- Confirm the active Conda environment with `conda info --envs`; all developer tooling resolves from `ionosense-hpc`.
+- Confirm the active Conda environment with `conda info --envs`; all developer tooling resolves from `sigtekx`.
 - Execute GPU-specific tests on demand via `python -m pytest -m gpu --maxfail=1`.
 - Clear analysis caches manually when stale by deleting `.mypy_cache/`, `.ruff_cache/`, and `.pytest_cache/`.
 - Nsight CLI tools (`nsys`, `ncu`) store reports under `artifacts/profiling/`; set `SIGX_OUTPUT_ROOT` to redirect outputs per experiment.

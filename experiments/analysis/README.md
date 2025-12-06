@@ -1,4 +1,4 @@
-# Ionosense HPC Analysis System
+# SigTekX Analysis System
 
 Core analysis modules shared by **two primary reporting solutions**.
 
@@ -191,13 +191,13 @@ latency,8192,2,0.875,48000,...
 ## Architecture Highlights
 
 ### DRY Principle
-- Imports `EngineConfig` from `ionosense_hpc.config` (no duplication)
+- Imports `EngineConfig` from `sigtekx.config` (no duplication)
 - Single source of truth for engine configuration schema
 
 ### Modular Design
 - Individual analyzers: `LatencyAnalyzer`, `ThroughputAnalyzer`, `AccuracyAnalyzer`
 - Orchestrator: `AnalysisEngine` coordinates all analyzers
-- Clear separation: GPU processing engine (`ionosense_hpc.Engine`) vs analysis engine
+- Clear separation: GPU processing engine (`sigtekx.Engine`) vs analysis engine
 
 ### Caching
 - MD5-based result caching for expensive analyses
@@ -266,7 +266,7 @@ python -m experiments.analysis.cli compare artifacts/data \
 ## Contact
 
 For questions or contributions:
-- GitHub Issues: https://github.com/SEAL-Embedded/ionosense-hpc-lib/issues
+- GitHub Issues: https://github.com/SEAL-Embedded/sigtekx/issues
 - Email: rahsaz.kevin@gmail.com
 
 ---

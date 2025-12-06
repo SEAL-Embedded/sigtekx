@@ -543,7 +543,7 @@ For programmatic control in Python code:
 ### Using the GpuClockManager Class
 
 ```python
-from ionosense_hpc.utils import GpuClockManager, check_clock_locking_available
+from sigtekx.utils import GpuClockManager, check_clock_locking_available
 
 # Check if GPU clock locking is available
 available, reason = check_clock_locking_available()
@@ -571,7 +571,7 @@ finally:
 The `BaseBenchmark` class automatically handles GPU clock locking when configured:
 
 ```python
-from ionosense_hpc.benchmarks import LatencyBenchmark, LatencyBenchmarkConfig
+from sigtekx.benchmarks import LatencyBenchmark, LatencyBenchmarkConfig
 
 # Via config object
 config = LatencyBenchmarkConfig(
@@ -600,7 +600,7 @@ The system gracefully degrades if clock locking is unavailable:
 # - No exception raised (non-blocking)
 
 # Check availability before running:
-from ionosense_hpc.utils import check_clock_locking_available
+from sigtekx.utils import check_clock_locking_available
 
 available, reason = check_clock_locking_available()
 if available:
@@ -627,7 +627,7 @@ The GPU clock locking system has three layers:
    - Automatic UAC elevation
    - Try/finally cleanup guarantees
 
-3. **Python Integration** (`src/ionosense_hpc/utils/gpu_clocks.py`)
+3. **Python Integration** (`src/sigtekx/utils/gpu_clocks.py`)
    - `GpuClockManager` class with context manager protocol
    - Integrated into `BaseBenchmark` framework
    - Hydra config override support

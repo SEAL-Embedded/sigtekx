@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the IEEE-754 compliance measures implemented in the ionosense-hpc library to ensure deterministic, reproducible numerical accuracy in GPU-accelerated FFT processing.
+This document describes the IEEE-754 compliance measures implemented in the sigtekx library to ensure deterministic, reproducible numerical accuracy in GPU-accelerated FFT processing.
 
 ## Compliance Measures Implemented
 

@@ -120,7 +120,7 @@ The system is organized into distinct architectural layers:
 └─────────────────────────────────────────────────────────┘
                         ↕
 ┌─────────────────────────────────────────────────────────┐
-│  Python Package (ionosense_hpc)                         │
+│  Python Package (sigtekx)                         │
 │  - Engine wrapper with NumPy integration                │
 │  - Benchmarking framework                               │
 │  - Configuration management                             │
@@ -269,11 +269,11 @@ struct StageConfig {
 
 ### 4.2 Core Modules
 
-#### **ionosense_hpc.core**
+#### **sigtekx.core**
 Primary user-facing API:
 
 ```python
-from ionosense_hpc import Engine, EngineConfig
+from sigtekx import Engine, EngineConfig
 
 # Create engine
 config = EngineConfig(nfft=2048, channels=4, overlap=0.75)
@@ -294,11 +294,11 @@ Features:
 - Automatic resource cleanup
 - Type hints and validation
 
-#### **ionosense_hpc.config**
+#### **sigtekx.config**
 Configuration management using Pydantic:
 
 ```python
-from ionosense_hpc.config import EngineConfig, Presets
+from sigtekx.config import EngineConfig, Presets
 
 # Use preset
 config = Presets.realtime()  # <100μs latency
@@ -323,11 +323,11 @@ Available presets:
 - `Presets.validation()`: Reference quality processing
 - `Presets.profiling()`: Instrumented for profiling
 
-#### **ionosense_hpc.benchmarks**
+#### **sigtekx.benchmarks**
 Reproducible benchmarking framework:
 
 ```python
-from ionosense_hpc.benchmarks import (
+from sigtekx.benchmarks import (
     LatencyBenchmark,
     ThroughputBenchmark,
     AccuracyBenchmark,
@@ -354,12 +354,12 @@ All benchmarks provide:
 - System context capture
 - MLflow integration
 
-#### **ionosense_hpc.utils**
+#### **sigtekx.utils**
 Utility modules:
 
 **DeviceUtils**: GPU device management
 ```python
-from ionosense_hpc.utils import DeviceUtils
+from sigtekx.utils import DeviceUtils
 
 # Query GPU
 device_count = DeviceUtils.gpu_count()
@@ -369,7 +369,7 @@ memory_used, memory_total = DeviceUtils.get_memory_usage()
 
 **SignalGenerator**: Test signal generation
 ```python
-from ionosense_hpc.utils import SignalGenerator
+from sigtekx.utils import SignalGenerator
 
 # Generate test signals
 sine = SignalGenerator.make_sine(freq=1000, duration=1.0, fs=48000)
@@ -379,7 +379,7 @@ multitone = SignalGenerator.make_multitone([440, 880, 1320], duration=1.0, fs=48
 
 **Profiler**: NVTX instrumentation
 ```python
-from ionosense_hpc.utils import Profiler
+from sigtekx.utils import Profiler
 
 # Annotate code for profiling
 with Profiler.nvtx_range("my_function", color="blue"):
@@ -1099,14 +1099,14 @@ conda activate ionosense
 conda install cuda -c nvidia/label/cuda-13.0.0
 
 # Install package
-pip install ionosense-hpc
+pip install sigtekx
 ```
 
 #### **Build from Source**
 ```bash
 # Clone repository
-git clone https://github.com/username/ionosense-hpc.git
-cd ionosense-hpc
+git clone https://github.com/username/sigtekx.git
+cd sigtekx
 
 # Build C++ extension
 mkdir build && cd build
@@ -1123,7 +1123,7 @@ pip install -e .
 #### **Standalone Python Script**
 ```python
 import numpy as np
-from ionosense_hpc import Engine, Presets
+from sigtekx import Engine, Presets
 
 # Create engine with preset
 engine = Engine(Presets.realtime())
@@ -1139,7 +1139,7 @@ print(f"Latency: {engine.stats['latency_us']:.2f} μs")
 #### **Streaming Application**
 ```python
 import pyaudio
-from ionosense_hpc import Engine, EngineConfig
+from sigtekx import Engine, EngineConfig
 
 # Audio configuration
 RATE = 48000
@@ -1164,8 +1164,8 @@ while True:
 #### **Integration with Research Workflow**
 ```python
 import mlflow
-from ionosense_hpc import Engine, EngineConfig
-from ionosense_hpc.benchmarks import LatencyBenchmark
+from sigtekx import Engine, EngineConfig
+from sigtekx.benchmarks import LatencyBenchmark
 
 # Load experimental configuration
 config = EngineConfig.from_file("experiment_config.yaml")
@@ -1229,7 +1229,7 @@ engine.process(data)  # Use captured graph (faster)
 
 ```python
 # Future API
-from ionosense_hpc import Engine, StageRegistry
+from sigtekx import Engine, StageRegistry
 
 # Register custom stage
 @StageRegistry.register("my_filter")
@@ -1293,13 +1293,13 @@ Future plugin system will support:
 
 ```python
 # Plugin discovery
-from ionosense_hpc.plugins import discover_plugins
+from sigtekx.plugins import discover_plugins
 
 # Install plugin
 pip install ionosense-filter-plugin
 
 # Use plugin
-from ionosense_hpc import Engine
+from sigtekx import Engine
 from ionosense_filter_plugin import BandpassStage
 
 engine = Engine(config)

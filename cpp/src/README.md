@@ -1,8 +1,8 @@
-# Ionosense HPC Library - Core Implementation
+# SigTekX Library - Core Implementation
 
 ## Overview
 
-This directory contains the core C++ and CUDA implementation files for the Ionosense High-Performance Computing FFT engine. The implementation is optimized for real-time signal processing with stringent latency requirements (<200 μs target, <100 μs goal) while maintaining IEEE 754 float32 numerical accuracy.
+This directory contains the core C++ and CUDA implementation files for the SigTekX High-Performance Computing FFT engine. The implementation is optimized for real-time signal processing with stringent latency requirements (<200 μs target, <100 μs goal) while maintaining IEEE 754 float32 numerical accuracy.
 
 ## Architecture
 

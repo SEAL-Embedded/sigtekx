@@ -1,6 +1,6 @@
 # Creating Issues for Ionosense-HPC
 
-This guide helps you create high-quality, actionable GitHub issues for the ionosense-hpc project. Whether you're reporting bugs, requesting features, or proposing improvements, following these guidelines ensures your issue is clear, implementable, and properly categorized.
+This guide helps you create high-quality, actionable GitHub issues for the sigtekx project. Whether you're reporting bugs, requesting features, or proposing improvements, following these guidelines ensures your issue is clear, implementable, and properly categorized.
 
 ## Quick Reference
 
@@ -22,7 +22,7 @@ This guide helps you create high-quality, actionable GitHub issues for the ionos
 
 **Ionosense-HPC** is a high-performance CUDA FFT signal processing library with:
 - C++17/CUDA backend (`cpp/`)
-- Python interface (`python/src/ionosense_hpc/`)
+- Python interface (`python/src/sigtekx/`)
 - Research-grade benchmarking infrastructure
 - Focus on reproducible engineering and RSE standards
 
@@ -431,7 +431,7 @@ You can provide this guide to AI assistants (like Claude) to help generate well-
 
 **Prompt Template:**
 ```
-I need a GitHub issue for ionosense-hpc. Here's what I want to accomplish:
+I need a GitHub issue for sigtekx. Here's what I want to accomplish:
 
 [Describe what you want to fix/add/improve]
 
@@ -445,7 +445,7 @@ Please create an issue following the format in docs/CREATING_ISSUES.md:
 
 **Example Prompt:**
 ```
-I need a GitHub issue for ionosense-hpc. The Python test runner in cli.ps1 
+I need a GitHub issue for sigtekx. The Python test runner in cli.ps1 
 prints duplicate status messages - it prints "Running tests..." then 
 "Running Python tests..." when you run just the Python tests.
 
@@ -597,5 +597,5 @@ Don't let uncertainty stop you from creating an issue. We'd rather have a well-i
 ## Questions?
 
 - Check [CONTRIBUTING.md](../CONTRIBUTING.md) for general contribution guidelines
-- Ask in [GitHub Discussions](https://github.com/SEAL-Embedded/ionosense-hpc-lib/discussions)
+- Ask in [GitHub Discussions](https://github.com/SEAL-Embedded/sigtekx/discussions)
 - Tag `@maintainers` in your issue for help with formatting

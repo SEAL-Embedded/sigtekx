@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft-07/schema#",
-  "description": "D2 diagram layout engine configuration for ionosense-hpc",
+  "description": "D2 diagram layout engine configuration for sigtekx",
   "version": "1.0",
   "default_layout": "dagre",
   "layouts": {

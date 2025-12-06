@@ -308,7 +308,7 @@ function Invoke-Compare {
     param([string[]]$Args = @())
 
     if ($Args.Length -lt 2) {
-        Write-Error "Usage: ionoc compare <before.csv> <after.csv>"
+        Write-Error "Usage: sigxc compare <before.csv> <after.csv>"
         Write-Host "Expected CSV files with benchmark results" -ForegroundColor Yellow
         exit 1
     }
@@ -363,7 +363,7 @@ function Show-Help {
 ║  Dedicated tool for C++ kernel development and profiling iteration    ║
 ╚════════════════════════════════════════════════════════════════════════╝
 
-USAGE: ionoc <command> [options]
+USAGE: sigxc <command> [options]
 
 COMMANDS:
   bench [options]               Run C++ benchmark with presets
@@ -398,33 +398,33 @@ GPU CLOCK CONTROL:
 
 BENCHMARK EXAMPLES:
   # Quick development validation (default)
-  ionoc bench
+  sigxc bench
 
   # Production latency benchmark
-  ionoc bench --preset latency --full
+  sigxc bench --preset latency --full
 
   # Standard ionosphere realtime profiling
-  ionoc bench --preset realtime --iono --profile
+  sigxc bench --preset realtime --iono --profile
 
   # Extreme ionosphere throughput (missile detection)
-  ionoc bench --preset throughput --ionox --full
+  sigxc bench --preset throughput --ionox --full
 
   # Custom experimentation
-  ionoc bench --preset throughput --nfft 4096 --batch 16 --quick
+  sigxc bench --preset throughput --nfft 4096 --batch 16 --quick
 
   # Blank canvas (override everything)
-  ionoc bench --nfft 8192 --batch 32 --overlap 0.875 --iterations 100
+  sigxc bench --nfft 8192 --batch 32 --overlap 0.875 --iterations 100
 
   # GPU clock locking for stability (CV reduction)
-  ionoc bench --preset latency --full --lock-clocks
+  sigxc bench --preset latency --full --lock-clocks
 
   # For all options, use:
-  ionoc bench --help
+  sigxc bench --help
 
 ═══════════════════════════════════════════════════════════════════════════
 
 NSYS PROFILING:
-  ionoc profile nsys [options]
+  sigxc profile nsys [options]
 
   Options:
     --mode <quick|profile|full>  Benchmark mode (default: profile)
@@ -435,15 +435,15 @@ NSYS PROFILING:
     [nsys flags]                 Any other nsys flags
 
   Examples:
-    ionoc profile nsys                              # Basic profile
-    ionoc profile nsys --stats                      # With statistics
-    ionoc profile nsys --trace cuda,nvtx            # Specific traces
-    ionoc profile nsys --mode quick --duration 5    # Quick 5s profile
+    sigxc profile nsys                              # Basic profile
+    sigxc profile nsys --stats                      # With statistics
+    sigxc profile nsys --trace cuda,nvtx            # Specific traces
+    sigxc profile nsys --mode quick --duration 5    # Quick 5s profile
 
 ═══════════════════════════════════════════════════════════════════════════
 
 NCU PROFILING:
-  ionoc profile ncu [options]
+  sigxc profile ncu [options]
 
   Options:
     --mode <quick|profile|full>  Benchmark mode (default: profile)
@@ -454,25 +454,25 @@ NCU PROFILING:
     [ncu flags]                  Any other ncu flags
 
   Examples:
-    ionoc profile ncu                                      # Basic profile
-    ionoc profile ncu --set roofline                       # Roofline analysis
-    ionoc profile ncu --kernel-name "fft_kernel"           # Specific kernel
-    ionoc profile ncu --set full --mode profile            # Full metrics
+    sigxc profile ncu                                      # Basic profile
+    sigxc profile ncu --set roofline                       # Roofline analysis
+    sigxc profile ncu --kernel-name "fft_kernel"           # Specific kernel
+    sigxc profile ncu --set full --mode profile            # Full metrics
 
   ⚠️  NCU profiling is slow (5-15 minutes). Use nsys first!
 
 ═══════════════════════════════════════════════════════════════════════════
 
 TYPICAL WORKFLOW:
-  1. ionoc bench                                 # Quick dev validation (~10s)
-  2. ionoc bench --preset latency --profile      # Profile-ready run (~30s)
-  3. ionoc profile nsys --stats                  # Profile with nsys (~1min)
-  4. ionoc profile ncu --kernel-name "fft..."    # Analyze kernel (~10min)
-  5. ionoc clean                                 # Clean artifacts
+  1. sigxc bench                                 # Quick dev validation (~10s)
+  2. sigxc bench --preset latency --profile      # Profile-ready run (~30s)
+  3. sigxc profile nsys --stats                  # Profile with nsys (~1min)
+  4. sigxc profile ncu --kernel-name "fft..."    # Analyze kernel (~10min)
+  5. sigxc clean                                 # Clean artifacts
 
 FOR PRODUCTION PROFILING:
-  Use 'iprof nsys latency' for end-to-end Python workflow validation.
-  ionoc is for C++ development iteration only.
+  Use 'sxp nsys latency' for end-to-end Python workflow validation.
+  sigxc is for C++ development iteration only.
 
 ═══════════════════════════════════════════════════════════════════════════
 
@@ -482,7 +482,7 @@ ARTIFACTS LOCATION:
   - cpp_dev.nsys-rep         Nsight Systems reports
   - cpp_dev_ncu.ncu-rep      Nsight Compute reports
 
-  Clean with: ionoc clean
+  Clean with: sigxc clean
 
 ═══════════════════════════════════════════════════════════════════════════
 "@
@@ -498,8 +498,8 @@ try {
         }
         "profile" {
             if ($CommandArgs.Length -eq 0) {
-                Write-Error "Usage: ionoc profile <nsys|ncu> [options]"
-                Write-Host "Run 'ionoc help' for examples" -ForegroundColor Yellow
+                Write-Error "Usage: sigxc profile <nsys|ncu> [options]"
+                Write-Host "Run 'sigxc help' for examples" -ForegroundColor Yellow
                 exit 1
             }
 
@@ -531,7 +531,7 @@ try {
         }
         default {
             Write-Error "Unknown command: $Command"
-            Write-Host "Run 'ionoc help' for available commands" -ForegroundColor Yellow
+            Write-Host "Run 'sigxc help' for available commands" -ForegroundColor Yellow
             exit 1
         }
     }

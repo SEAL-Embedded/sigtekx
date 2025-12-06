@@ -1,4 +1,4 @@
-# Ionosense HPC Library - Public C++ API
+# SigTekX Library - Public C++ API
 
 ## Overview
 
@@ -229,17 +229,17 @@ The headers have minimal external dependencies:
 ### Basic Processing Pipeline
 
 ```cpp
-#include <ionosense/research_engine.hpp>
+#include <sigtekx/research_engine.hpp>
 #include <vector>
 
 // Configure engine
-ionosense::EngineConfig config{};
+sigtekx::EngineConfig config{};
 config.nfft = 1024;
 config.batch = 2;
 config.sample_rate_hz = 48000;
 
 // Create and initialize
-auto engine = ionosense::create_engine("research");
+auto engine = sigtekx::create_engine("research");
 engine->initialize(config);
 
 // Process data
@@ -257,9 +257,9 @@ std::cout << "Latency: " << stats.latency_us << " μs\n";
 ### Custom Pipeline Construction
 
 ```cpp
-#include <ionosense/processing_stage.hpp>
+#include <sigtekx/processing_stage.hpp>
 
-using namespace ionosense;
+using namespace sigtekx;
 
 // Create custom pipeline
 std::vector<std::unique_ptr<IProcessingStage>> stages;
@@ -282,9 +282,9 @@ for (auto& stage : stages) {
 ### Direct CUDA Resource Management
 
 ```cpp
-#include <ionosense/cuda_wrappers.hpp>
+#include <sigtekx/cuda_wrappers.hpp>
 
-using namespace ionosense;
+using namespace sigtekx;
 
 // Create resources
 CudaStream stream;

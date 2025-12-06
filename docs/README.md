@@ -1,6 +1,6 @@
-# Ionosense HPC - Documentation
+# SigTekX - Documentation
 
-Comprehensive documentation for the ionosense-hpc CUDA-accelerated FFT processing library.
+Comprehensive documentation for the sigtekx CUDA-accelerated FFT processing library.
 
 ---
 

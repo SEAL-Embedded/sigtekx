@@ -182,7 +182,7 @@ sigtekx-lib/
 ├── bindings/                   # C++/Python binding configurations
 │   └── bindings.cpp              # pybind11 entrypoint
 ├── include/                    # C++ public headers
-│   └── ionosense/                # Main library header directory
+│   └── sigtekx/                # Main library header directory
 │       ├── cuda_wrappers.hpp     # RAII wrappers for CUDA/cuFFT resources
 │       ├── processing_stage.hpp  # Abstract interface for processing stages
 │       └── research_engine.hpp   # Public C++ API for the research engine

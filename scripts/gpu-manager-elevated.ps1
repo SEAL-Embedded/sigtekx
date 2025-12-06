@@ -15,7 +15,7 @@
     Version: 0.9.3
 
     This script is used by the Python GpuClockManager to provide the same
-    auto-elevation behavior as the C++ ionoc bench --lock-clocks implementation.
+    auto-elevation behavior as the C++ sigxc bench --lock-clocks implementation.
 #>
 
 param(

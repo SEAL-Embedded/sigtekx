@@ -1,6 +1,6 @@
 # Installation Guide
 
-Detailed installation instructions for ionosense-hpc on various platforms using the integrated CLI platform.
+Detailed installation instructions for sigtekx on various platforms using the integrated CLI platform.
 
 ## Table of Contents
 
@@ -39,8 +39,8 @@ Detailed installation instructions for ionosense-hpc on various platforms using 
 ### Clone Repository
 
 ```bash
-git clone https://github.com/SEAL-Embedded/ionosense-hpc-lib.git
-cd ionosense-hpc-lib
+git clone https://github.com/SEAL-Embedded/sigtekx.git
+cd sigtekx
 ```
 
 ### Linux/WSL2
@@ -149,8 +149,8 @@ mamba --version
 
 ```bash
 # Clone repository
-git clone https://github.com/SEAL-Embedded/ionosense-hpc-lib.git
-cd ionosense-hpc-lib
+git clone https://github.com/SEAL-Embedded/sigtekx.git
+cd sigtekx
 
 # Use CLI for complete setup
 ./scripts/cli.sh setup    # Creates conda env, installs dependencies
@@ -243,12 +243,12 @@ conda config --add channels nvidia
 
 #### 6. Setup with Enhanced Development Shell
 
-**Important**: Before running setup, ensure you're in the ionosense-hpc environment or run setup from the enhanced development shell.
+**Important**: Before running setup, ensure you're in the sigtekx environment or run setup from the enhanced development shell.
 
 ```powershell
 # Clone repository
-git clone https://github.com/SEAL-Embedded/ionosense-hpc-lib.git
-cd ionosense-hpc-lib
+git clone https://github.com/SEAL-Embedded/sigtekx.git
+cd sigtekx
 
 # Option 1: Start enhanced development shell first (recommended)
 .\scripts\init_pwsh.ps1 -Interactive
@@ -381,7 +381,7 @@ The `cli.sh` script provides comprehensive project management:
 The enhanced development shell (`init_pwsh.ps1`) provides:
 
 - **Automatic MSVC Configuration**: Sets up 64-bit Visual Studio tools
-- **Conda Environment**: Activates ionosense-hpc environment
+- **Conda Environment**: Activates sigtekx environment
 - **Convenient Aliases**: Short commands for all operations
 - **Tab Completion**: Smart completion for all commands
 
@@ -460,11 +460,11 @@ ibench latency     # or 'iono bench latency'
 
 ```python
 # Quick validation
-python -c "import ionosense_hpc; print('✓ Import successful')"
+python -c "import sigtekx; print('✓ Import successful')"
 
 # Interactive test
 ```python
->>> from ionosense_hpc import Engine, Presets, generate_test_signal
+>>> from sigtekx import Engine, Presets, generate_test_signal
 >>> engine = Engine(Presets.throughput())
 >>> signals = generate_test_signal(sample_rate=100_000, duration=0.1)
 >>> frame = signals['ch1'][: engine.config.nfft * engine.config.channels]

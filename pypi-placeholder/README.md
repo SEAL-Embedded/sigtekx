@@ -32,7 +32,7 @@ The rebranded `sigtekx` package will include:
 
 ## Repository
 
-Development is happening at: https://github.com/SEAL-Embedded/ionosense-hpc-lib
+Development is happening at: https://github.com/SEAL-Embedded/sigtekx
 
 **Note**: Repository will be renamed to `sigtekx` upon package release.
 
