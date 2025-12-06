@@ -25,10 +25,10 @@ The implementation follows a multi-layered architecture designed for performance
 
 **Key Implementation Details:**
 
-#### Pimpl Architecture
+#### Executor Architecture
 ```cpp
-class ResearchEngine::Impl {
-    // CUDA-specific resources hidden from public interface
+class BatchExecutor {
+    // CUDA-specific resources for batch processing
     std::vector<CudaStream> streams_;
     std::vector<CudaEvent> events_;
     std::vector<DeviceBuffer<float>> d_input_buffers_;
@@ -344,9 +344,9 @@ auto stats = engine->get_stats();
 ```cpp
 // Benchmark integration in test suite
 TEST(PerformanceRegression, LatencyTarget) {
-    ResearchEngine engine;
-    EngineConfig config{1024, 2, 0.5f, 48000};
-    engine.initialize(config);
+    BatchExecutor executor;
+    ExecutorConfig config{1024, 2, 0.5f, 48000};
+    executor.initialize(config);
     
     auto stats = run_benchmark(engine, 1000);  // 1000 iterations
     EXPECT_LT(stats.mean_latency_us, 100.0f);  // Target <100 μs
@@ -424,10 +424,10 @@ Total size: (nfft/2 + 1) * batch * sizeof(float2)
 **Strong Exception Safety:** Operations either succeed completely or leave state unchanged.
 
 ```cpp
-void ResearchEngine::Impl::process(const float* input, float* output, size_t num_samples) {
+void BatchExecutor::process(const float* input, float* output, size_t num_samples) {
     // Validate inputs before any GPU operations
     if (!initialized_) {
-        throw std::runtime_error("ResearchEngine not initialized");
+        throw std::runtime_error("BatchExecutor not initialized");
     }
     if (num_samples != expected_size) {
         throw std::runtime_error("Input size mismatch");

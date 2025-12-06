@@ -33,18 +33,25 @@ public:
 };
 ```
 
-**`ResearchEngine`** - Concrete implementation optimized for flexibility and introspection:
-```cpp
-// Basic usage
-auto engine = std::make_unique<ResearchEngine>();
-EngineConfig config{};
-config.nfft = 1024;
-config.batch = 2;
-engine->initialize(config);
+**Executors** - Concrete implementations for different processing modes:
+- **`BatchExecutor`** - High-throughput batch processing
+- **`StreamingExecutor`** - Low-latency streaming (v0.9.4+)
 
-std::vector<float> input(2048);
-std::vector<float> output(1026); // (nfft/2+1) * batch
-engine->process(input.data(), output.data(), input.size());
+Exposed via pybind11 in the `_native` module:
+```python
+import sigtekx.core._native as _native
+
+# Create and configure executor
+executor = _native.BatchExecutor()
+config = _native.ExecutorConfig()
+config.nfft = 1024
+config.channels = 4
+config.mode = _native.ExecutionMode.BATCH
+executor.initialize(config)
+
+# Process data
+output = executor.process(input_data)
+stats = executor.get_stats()
 ```
 
 #### Configuration Structures

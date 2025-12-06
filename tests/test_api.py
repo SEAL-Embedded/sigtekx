@@ -517,8 +517,8 @@ class TestEndToEndIntegration:
     """End-to-end tests of complete workflows."""
 
     @pytest.mark.skipif(
-        not pytest.importorskip("sigtekx.core._engine", reason="C++ engine not available"),
-        reason="Requires C++ engine"
+        not pytest.importorskip("sigtekx.core._native", reason="C++ extension not available"),
+        reason="Requires C++ extension"
     )
     def test_iono_preset_workflow(self):
         """Test complete workflow with iono preset."""
@@ -540,8 +540,8 @@ class TestEndToEndIntegration:
         engine.close()
 
     @pytest.mark.skipif(
-        not pytest.importorskip("sigtekx.core._engine", reason="C++ engine not available"),
-        reason="Requires C++ engine"
+        not pytest.importorskip("sigtekx.core._native", reason="C++ extension not available"),
+        reason="Requires C++ extension"
     )
     def test_custom_pipeline_workflow(self):
         """Test complete workflow with custom pipeline."""

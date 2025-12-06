@@ -6,8 +6,8 @@
  *
  * @brief Implementation of BatchExecutor.
  *
- * Extracted from ResearchEngine::Impl with the same execution logic,
- * now as a standalone executor component.
+ * Batch executor implementation for high-throughput processing
+ * with pipelined CUDA streams and asynchronous memory transfers.
  */
 
 #include "sigtekx/executors/batch_executor.hpp"

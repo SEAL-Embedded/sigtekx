@@ -118,7 +118,7 @@ using PyStreamingExecutor = PyExecutor<StreamingExecutor>;
 /**
  * @brief The pybind11 module definition.
  *
- * This macro defines the `_engine` Python module and binds all the C++
+ * This macro defines the `_native` Python module and binds all the C++
  * classes, methods, and enumerations to make them accessible from Python.
  */
 PYBIND11_MODULE(_native, m) {

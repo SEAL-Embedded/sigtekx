@@ -12,7 +12,7 @@ try:
 
     NVML_AVAILABLE = True
 except ImportError:
-    # Optional dependency: gracefully fall back to the C++ engine queries.
+    # Optional dependency: gracefully fall back to the C++ backend queries.
     NVML_AVAILABLE = False
 
 
@@ -51,7 +51,7 @@ def gpu_count() -> int:
     try:
         return len(list(cpp_module.get_available_devices()))
     except Exception as exc:  # pragma: no cover - propagate enumeration errors
-        raise DeviceNotFoundError("Failed to enumerate CUDA devices via C++ engine") from exc
+        raise DeviceNotFoundError("Failed to enumerate CUDA devices via C++ backend") from exc
 
 
 def current_device() -> int:

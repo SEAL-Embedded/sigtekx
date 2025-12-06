@@ -14,8 +14,8 @@ Deliver an ordered walkthrough that links to concrete files, explains why each s
 ## 2. Package Entry Point
 - [src/ionosense_hpc/__init__.py](src/ionosense_hpc/__init__.py)  
   This file sets the foundation for the whole package:
-  - **DLL bootstrapping**: Ensures required Windows DLLs and CUDA toolkit libraries are discoverable before the C++ engine loads.
-  - **Engine handling**: Wraps the import of the C++ extension (`_engine`) in a resilient way—falling back to a proxy class with clear error messages if the build or DLLs are missing.
+  - **DLL bootstrapping**: Ensures required Windows DLLs and CUDA toolkit libraries are discoverable before the C++ extension loads.
+  - **Engine handling**: Wraps the import of the C++ extension (`_native`) in a resilient way—falling back to a proxy class with clear error messages if the build or DLLs are missing.
   - **Public API exposure**: Defines what’s accessible at the top level (`Engine`, `process_signal`, `benchmark_latency`, `gpu_count`, etc.).
   - **Diagnostics**: Includes `show_versions()` for environment reporting (Python, NumPy, CUDA, pynvml versions) and `self_test()` to verify installation, GPU availability, and numerical stability.
 

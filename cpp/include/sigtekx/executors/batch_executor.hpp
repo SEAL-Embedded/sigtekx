@@ -23,8 +23,8 @@ namespace sigtekx {
  * @class BatchExecutor
  * @brief Executor optimized for batch processing with maximum throughput.
  *
- * This executor implements the execution logic extracted from the original
- * ResearchEngine::Impl. It manages:
+ * This executor implements batch processing with maximum throughput.
+ * It manages:
  * - Multiple CUDA streams for H2D, compute, and D2H operations
  * - Round-robin buffer selection for pipelining
  * - Event-based synchronization between pipeline stages

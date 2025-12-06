@@ -6,10 +6,10 @@ This directory contains the pybind11 bindings that expose the C++ CUDA FFT engin
 
 ## Architecture
 
-The Python bindings follow a dual-layer design:
+The Python bindings follow a clean, direct design:
 
-1. **Direct C++ Bindings**: Low-level pybind11 wrappers for core C++ classes
-2. **Python-Friendly Wrapper**: `PyResearchEngine` class that handles NumPy array conversions and provides Pythonic interfaces
+1. **Direct C++ Bindings**: pybind11 wrappers expose `BatchExecutor` and `StreamingExecutor` classes
+2. **Python Wrapper**: High-level `Engine` class provides NumPy array handling and Pythonic interface
 
 ### Key Design Decisions
 
@@ -23,22 +23,23 @@ The Python bindings follow a dual-layer design:
 ### `bindings.cpp`
 Main pybind11 module definition exposing:
 
-- `ResearchEngine` - Main processing engine wrapper
-- `EngineConfig` - Engine configuration parameters  
+- `BatchExecutor` - High-throughput batch processing
+- `StreamingExecutor` - Low-latency streaming (v0.9.4+)
+- `ExecutorConfig` - Executor configuration (extends SignalConfig)
+- `SignalConfig` - Base signal configuration parameters
 - `StageConfig` - Processing stage configuration
 - `ProcessingStats` - Performance metrics
-- `RuntimeInfo` - CUDA environment information
-- Utility functions for device management
+- Utility functions for device management (`get_available_devices`, `select_best_device`)
 
 ## API Reference
 
-### PyResearchEngine Class
+### _native Module (pybind11 bindings)
 
 ```python
-from sigtekx.core import ResearchEngine, EngineConfig
+from sigtekx.core import _native
 
-engine = ResearchEngine()
-config = EngineConfig()
+executor = _native.BatchExecutor()
+config = _native.ExecutorConfig()
 config.nfft = 1024
 config.batch = 2
 engine.initialize(config)
@@ -117,17 +118,17 @@ stage_config.scale_policy = ScalePolicy.ONE_OVER_N
 ### Optimization Guidelines
 
 ```python
-# Good: Reuse engine instance
-engine = ResearchEngine()
-engine.initialize(config)
+# Good: Reuse executor instance
+executor = _native.BatchExecutor()
+executor.initialize(config)
 for data_batch in signal_stream:
-    spectrum = engine.process(data_batch)
+    spectrum = executor.process(data_batch)
 
-# Avoid: Recreating engine frequently
+# Avoid: Recreating executor frequently
 for data_batch in signal_stream:
-    engine = ResearchEngine()  # Expensive!
-    engine.initialize(config)
-    spectrum = engine.process(data_batch)
+    executor = _native.BatchExecutor()  # Expensive!
+    executor.initialize(config)
+    spectrum = executor.process(data_batch)
 ```
 
 ## Error Handling

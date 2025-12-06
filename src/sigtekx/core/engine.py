@@ -407,7 +407,7 @@ class Engine:
         input_array = self._prepare_input(input_array)
 
         try:
-            # Process through C++ engine
+            # Process through native executor
             output = self._cpp_engine.process(input_array)
 
             # Update statistics

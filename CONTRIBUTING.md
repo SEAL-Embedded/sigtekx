@@ -357,26 +357,21 @@ def process_signal(
 - **RAII**: Use smart pointers, avoid manual memory management
 - **Move semantics**: Delete copy, default move for resource-owning classes
 
-```cpp
-class ResearchEngine {
-public:
-    explicit ResearchEngine(const EngineConfig& config);
-    ~ResearchEngine();
-    
-    // Delete copy operations
-    ResearchEngine(const ResearchEngine&) = delete;
-    ResearchEngine& operator=(const ResearchEngine&) = delete;
-    
-    // Move operations
-    ResearchEngine(ResearchEngine&&) noexcept = default;
-    ResearchEngine& operator=(ResearchEngine&&) noexcept = default;
-    
-    void process(const float* input, float* output, size_t num_samples);
-    
-private:
-    class Impl;
-    std::unique_ptr<Impl> pImpl_;  // Pimpl pattern
-};
+```python
+# Python API for _native module
+import sigtekx.core._native as _native
+
+# Create executor and config
+executor = _native.BatchExecutor()
+config = _native.ExecutorConfig()
+config.nfft = 1024
+config.channels = 4
+config.mode = _native.ExecutionMode.BATCH
+
+# Initialize and process
+executor.initialize(config)
+output = executor.process(input_data)
+stats = executor.get_stats()
 ```
 
 ### Configuration Style (Team 4)

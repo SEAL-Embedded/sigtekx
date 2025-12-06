@@ -207,7 +207,7 @@ inline LatencyResults run_latency_benchmark(BatchExecutor& executor,
  * Measures frames per second, GB/s, and samples per second over a fixed
  * time duration.
  *
- * @param engine ResearchEngine instance
+ * @param executor BatchExecutor instance
  * @param config Benchmark configuration
  * @return ThroughputResults with all computed metrics
  */
@@ -268,7 +268,7 @@ inline ThroughputResults run_throughput_benchmark(BatchExecutor& executor,
  * Measures real-time performance including deadline compliance rate,
  * latency, and jitter.
  *
- * @param engine ResearchEngine instance
+ * @param executor BatchExecutor instance
  * @param config Benchmark configuration
  * @return RealtimeResults with all computed metrics
  */
@@ -387,7 +387,7 @@ inline RealtimeResults run_realtime_benchmark(BatchExecutor& executor,
  * For comprehensive cross-platform validation with scipy, use Python tests:
  *   pytest tests/test_accuracy.py
  *
- * @param engine ResearchEngine instance
+ * @param executor BatchExecutor instance
  * @param config Benchmark configuration
  * @return AccuracyResults with pass/fail based on numerical agreement
  */

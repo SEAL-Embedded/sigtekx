@@ -136,7 +136,7 @@ except (ImportError, DllLoadError) as e:
 
     Engine = _UnavailableEngineProxy
     warnings.warn(
-        f"C++ engine module could not be loaded: {_ENGINE_ERROR}",
+        f"C++ extension could not be loaded: {_ENGINE_ERROR}",
         UserWarning,
         stacklevel=2,
     )
@@ -403,4 +403,4 @@ except DeviceNotFoundError as exc:
 if hasattr(sys, 'ps1'):  # Interactive mode
     print(f"SigTekX v{__version__} ready.")
     if not _ENGINE_AVAILABLE:
-        print(f"Warning: C++ engine module not available ({_ENGINE_ERROR}). Run build first.")
+        print(f"Warning: C++ extension not available ({_ENGINE_ERROR}). Run build first.")

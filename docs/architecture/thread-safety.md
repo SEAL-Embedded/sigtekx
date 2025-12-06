@@ -196,10 +196,10 @@ std::thread t2([&]{ shared_exec.submit(data2, out2, size); });  // ❌ Race!
 | `BatchExecutor` | ❌ | ✅ | ❌ | **Not safe for concurrent `submit()`** |
 | `StreamingExecutor` | ❌ | ✅ | ❌ | Delegates to `BatchExecutor` |
 | **Engines** ||||
-| `ResearchEngine` | ❌ | ✅ | ❌ | Wraps executor |
+| `Engine` (Python) | ❌ | ✅ | ❌ | Wraps executor |
 | `AntennaEngine` | ❌ | ✅ | ❌ | Wraps executor |
 | **Python Bindings** ||||
-| `PyResearchEngine` | ❌ | ✅ | ❌ | No GIL release in v0.9.3 |
+| `BatchExecutor` (_native) | ❌ | ✅ | ❌ | No GIL release in v0.9.3 |
 
 ### 3.2 Detailed Class Analysis
 
@@ -361,9 +361,9 @@ Python's GIL serializes Python bytecode execution, but **C++ extensions can rele
 ```python
 # ❌ Python threads will serialize through GIL
 import threading
-from ionosense import ResearchEngine
+from sigtekx import Engine
 
-engine = ResearchEngine()
+engine = Engine()
 engine.initialize(config)
 
 def process_data(data):
@@ -382,11 +382,11 @@ t2.start()
 
 ```python
 import threading
-from ionosense import ResearchEngine
+from sigtekx import Engine
 
 def worker_thread(thread_id, data):
     # Create engine per thread
-    engine = ResearchEngine()
+    engine = Engine()
     engine.initialize(config)
     output = engine.process(data)
     return output
@@ -405,10 +405,10 @@ for t in threads:
 
 ```python
 from multiprocessing import Process, Queue
-from ionosense import ResearchEngine
+from sigtekx import Engine
 
 def worker_process(data_queue, result_queue):
-    engine = ResearchEngine()
+    engine = Engine()
     engine.initialize(config)
 
     while True:
@@ -446,11 +446,11 @@ py::array_t<float> process(py::array_t<float> input) {
 ### 6.1 Single-Threaded Usage (Simple)
 
 ```cpp
-#include "ionosense/engines/research_engine.hpp"
+#include "sigtekx/executors/batch_executor.hpp"
 
 int main() {
-    ionosense::ResearchEngine engine;
-    ionosense::EngineConfig config;
+    sigtekx::BatchExecutor executor;
+    sigtekx::ExecutorConfig config;
     config.nfft = 1024;
     config.batch = 2;
 
@@ -567,12 +567,12 @@ int main() {
 
 ```python
 from multiprocessing import Pool
-from ionosense import ResearchEngine
+from sigtekx import Engine
 import numpy as np
 
 def process_signal(data_chunk):
     """Process one chunk of data (runs in separate process)"""
-    engine = ResearchEngine()
+    engine = Engine()
     config = {
         'nfft': 1024,
         'batch': 4,
