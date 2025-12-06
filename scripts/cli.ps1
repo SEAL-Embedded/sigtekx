@@ -128,7 +128,7 @@ function Invoke-Test {
     Write-Status "Running tests..."
 
     $args = @()
-    if ($Coverage) { $args += "--cov=ionosense_hpc" }
+    if ($Coverage) { $args += "--cov=sigtekx" }
     if ($Verbose) { $args += "-v" }
     if ($Pattern) { $args += "-k", $Pattern }
 
@@ -412,7 +412,7 @@ function Invoke-TypeCheck {
 
     # Default paths
     if ($Paths.Count -eq 0) {
-        $Paths = @("src/ionosense_hpc")
+        $Paths = @("src/sigtekx")
     }
 
     # Verify mypy is available
@@ -898,11 +898,11 @@ function Invoke-Profile {
 function Show-Help {
     Write-Host @"
 ╔════════════════════════════════════════════════════════════════════════╗
-║  IONOSENSE-HPC DEVELOPMENT CLI                                         ║
+║  SIGTEKX DEVELOPMENT CLI                                               ║
 ║  Custom tooling for C++ builds, profiling, and development workflows   ║
 ╚════════════════════════════════════════════════════════════════════════╝
 
-USAGE: iono <command> [options]
+USAGE: sigx <command> [options]
    OR: .\scripts\cli.ps1 <command> [options]  (explicit path for automation)
 
 ═══════════════════════════════════════════════════════════════════════════
@@ -944,14 +944,14 @@ DOCUMENTATION & DIAGRAMS
         --verbose               Show detailed d2 output
 
   Examples:
-    iono diagrams                                    # All diagrams (smart regen)
-    iono diagrams --force                            # Force regenerate all
-    iono diagrams 01                                 # Match prefix: 01_system_overview
-    iono diagrams cpp_class                          # Match prefix: cpp_class_hierarchy
-    iono diagrams 02_py_structure                    # Specific diagram (no .d2 needed)
-    iono diagrams cpp_class_hierarchy.d2 --format png # Specific diagram as PNG
-    iono diagrams 02 --layout elk                    # Override to elk layout
-    iono diagrams all --format pdf --force           # All diagrams as PDF
+    sigx diagrams                                    # All diagrams (smart regen)
+    sigx diagrams --force                            # Force regenerate all
+    sigx diagrams 01                                 # Match prefix: 01_system_overview
+    sigx diagrams cpp_class                          # Match prefix: cpp_class_hierarchy
+    sigx diagrams 02_py_structure                    # Specific diagram (no .d2 needed)
+    sigx diagrams cpp_class_hierarchy.d2 --format png # Specific diagram as PNG
+    sigx diagrams 02 --layout elk                    # Override to elk layout
+    sigx diagrams all --format pdf --force           # All diagrams as PDF
 
   Direct d2 invocation (bypasses CLI, most flexible):
     d2 --layout elk docs\diagrams\src\01_system_overview.d2 ^
@@ -1035,14 +1035,14 @@ TYPICAL WORKFLOWS
 ═══════════════════════════════════════════════════════════════════════════
 
 Development Setup:
-  iono setup                  # First-time environment setup
-  iono build                  # Build C++ components
-  iono test                   # Verify everything works
+  sigx setup                  # First-time environment setup
+  sigx build                  # Build C++ components
+  sigx test                   # Verify everything works
 
 Code Quality Check:
-  iono format && iono lint    # Format and lint all code
-  iono typecheck              # Check Python types
-  iono test -Coverage         # Run tests with coverage
+  sigx format && sigx lint    # Format and lint all code
+  sigx typecheck              # Check Python types
+  sigx test -Coverage         # Run tests with coverage
 
 Research & Benchmarking:
   # Run benchmarks (native Hydra CLI)
