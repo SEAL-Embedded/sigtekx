@@ -73,7 +73,7 @@ workflow = [
   "dvc>=3.47.0",
   "dvc-data>=3.14.0",
   "snakemake>=8.0.0",
-  "optuna>=3.5.0",
+  "optuna>=2.10.0,<3.0.0",  # Compatible with hydra-optuna-sweeper
 ]
 research = [
   "sigtekx[benchmark,visualization,reporting,workflow]",
