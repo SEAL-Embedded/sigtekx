@@ -44,7 +44,7 @@ except ImportError:
 @pytest.fixture
 def clean_logger() -> Generator[logging.Logger, None, None]:
     """Provides a clean logger instance for each test, restoring state afterward."""
-    logger = logging.getLogger('ionosense_hpc')
+    logger = logging.getLogger('sigtekx')
     original_level = logger.level
     original_handlers = logger.handlers[:]
     original_propagate = logger.propagate
@@ -82,7 +82,7 @@ class TestSetupLogging:
     def test_default_setup(self, clean_logger: logging.Logger):
         """Test logger setup with default parameters."""
         logger = setup_logging()
-        assert logger.name == 'ionosense_hpc'
+        assert logger.name == 'sigtekx'
         assert logger.level == logging.INFO
         assert len(logger.handlers) == 1
         assert isinstance(logger.handlers[0], HANDLER_TYPES)

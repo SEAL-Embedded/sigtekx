@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 from numpy.typing import NDArray
 
-from ionosense_hpc.config import (
+from sigtekx.config import (
     EngineConfig,
     ScalePolicy,
     WindowNorm,

@@ -8,8 +8,8 @@ from pathlib import Path
 import numpy as np
 from numpy.typing import NDArray
 
-from ionosense_hpc.config import EngineConfig
-from ionosense_hpc.core import Engine
+from sigtekx.config import EngineConfig
+from sigtekx.core import Engine
 
 from .data import (
     FloatArray,

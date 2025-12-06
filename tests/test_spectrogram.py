@@ -20,7 +20,7 @@ from analysis.spectrogram import (
     save_spectrogram,
 )
 
-from ionosense_hpc.config import EngineConfig
+from sigtekx.config import EngineConfig
 
 
 class TestSpectrogramGeneration:

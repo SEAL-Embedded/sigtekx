@@ -177,7 +177,7 @@ class TestValidation:
 ])
 def test_memory_estimation(nfft, channels, expected_mb):
     """Test memory usage estimation."""
-    from ionosense_hpc.config import estimate_memory_usage_mb
+    from sigtekx.config import estimate_memory_usage_mb
 
     config = EngineConfig(nfft=nfft, channels=channels)
     estimated = estimate_memory_usage_mb(config)

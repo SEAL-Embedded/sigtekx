@@ -609,7 +609,7 @@ For more info: iono help
             target_cmd = ["python", args.target]
         else:
             # Module format
-            target_cmd = ["python", "-m", f"ionosense_hpc.benchmarks.{args.target}"]
+            target_cmd = ["python", "-m", f"sigtekx.benchmarks.{args.target}"]
 
         # argparse REMAINDER already stripped the '--' separator
         if args.args:
