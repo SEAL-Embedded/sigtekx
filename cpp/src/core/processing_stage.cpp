@@ -331,7 +331,7 @@ size_t MagnitudeStage::get_workspace_size() const {
 //  StageFactory Implementation
 // ============================================================================
 
-std::unique_ptr<IProcessingStage> StageFactory::create(StageType type) {
+std::unique_ptr<ProcessingStage> StageFactory::create(StageType type) {
   IONO_NVTX_RANGE("StageFactory::Create", profiling::colors::DARK_GRAY);
   switch (type) {
     case StageType::WINDOW: {
@@ -353,11 +353,11 @@ std::unique_ptr<IProcessingStage> StageFactory::create(StageType type) {
   }
 }
 
-std::vector<std::unique_ptr<IProcessingStage>>
+std::vector<std::unique_ptr<ProcessingStage>>
 StageFactory::create_default_pipeline() {
   IONO_NVTX_RANGE("StageFactory::CreateDefaultPipeline",
                   profiling::colors::DARK_GRAY);
-  std::vector<std::unique_ptr<IProcessingStage>> stages;
+  std::vector<std::unique_ptr<ProcessingStage>> stages;
   stages.push_back(create(StageType::WINDOW));
   stages.push_back(create(StageType::FFT));
   stages.push_back(create(StageType::MAGNITUDE));

@@ -66,7 +66,7 @@ class PipelineBuilder {
    * @param stage Unique pointer to the stage (ownership transferred).
    * @return Reference to this builder for chaining.
    */
-  PipelineBuilder& add_stage(std::unique_ptr<IProcessingStage> stage);
+  PipelineBuilder& add_stage(std::unique_ptr<ProcessingStage> stage);
 
   /**
    * @brief Adds a window stage with the specified window type.
@@ -118,7 +118,7 @@ class PipelineBuilder {
    * @return Vector of processing stages ready for executor initialization.
    * @throws std::runtime_error if pipeline validation fails.
    */
-  std::vector<std::unique_ptr<IProcessingStage>> build();
+  std::vector<std::unique_ptr<ProcessingStage>> build();
 
   /**
    * @brief Returns the number of stages currently in the pipeline.

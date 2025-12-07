@@ -513,13 +513,13 @@ void ResearchEngine::Impl::process(...) {
 ## Proposed Solution
 ```cpp
 // New architecture
-class IPipelineExecutor { ... };
-class BatchExecutor : public IPipelineExecutor { ... };
-class StreamingExecutor : public IPipelineExecutor { ... };
+class PipelineExecutor { ... };
+class BatchExecutor : public PipelineExecutor { ... };
+class StreamingExecutor : public PipelineExecutor { ... };
 ```
 
 ## Implementation Tasks
-- [ ] Define IPipelineExecutor interface
+- [ ] Define PipelineExecutor interface
 - [ ] Implement BatchExecutor
 - [ ] Refactor ResearchEngine to use executor
 - [ ] Update tests

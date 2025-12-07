@@ -7,7 +7,7 @@
  * @brief Defines the abstract interface and concrete implementations for stages
  * in the signal processing pipeline.
  *
- * This file specifies the IProcessingStage interface using the Strategy design
+ * This file specifies the ProcessingStage interface using the Strategy design
  * pattern, allowing for a flexible and extensible pipeline architecture. It
  * also provides the concrete stages for the v1.0 pipeline: Window, FFT, and
  * Magnitude. The design promotes modularity and testability, key tenets of
@@ -143,16 +143,16 @@ struct RuntimeInfo {
 };
 
 /**
- * @class IProcessingStage
+ * @class ProcessingStage
  * @brief Abstract base class for a stage in the processing pipeline (Strategy
  * Pattern).
  *
  * Defines the common interface that all processing stages must implement,
  * ensuring interchangeability and a consistent pipeline structure.
  */
-class IProcessingStage {
+class ProcessingStage {
  public:
-  virtual ~IProcessingStage() = default;
+  virtual ~ProcessingStage() = default;
 
   /**
    * @brief Initializes the stage with a given configuration and CUDA stream.
@@ -196,7 +196,7 @@ class IProcessingStage {
  * @class WindowStage
  * @brief Applies a window function to the input signal.
  */
-class WindowStage : public IProcessingStage {
+class WindowStage : public ProcessingStage {
  public:
   WindowStage();
   ~WindowStage();
@@ -217,7 +217,7 @@ class WindowStage : public IProcessingStage {
  * @class FFTStage
  * @brief Performs the Fast Fourier Transform using cuFFT.
  */
-class FFTStage : public IProcessingStage {
+class FFTStage : public ProcessingStage {
  public:
   FFTStage();
   ~FFTStage();
@@ -238,7 +238,7 @@ class FFTStage : public IProcessingStage {
  * @class MagnitudeStage
  * @brief Computes the magnitude from the complex FFT output.
  */
-class MagnitudeStage : public IProcessingStage {
+class MagnitudeStage : public ProcessingStage {
  public:
   MagnitudeStage();
   ~MagnitudeStage();
@@ -270,15 +270,15 @@ class StageFactory {
   /**
    * @brief Creates a single processing stage of a specified type.
    * @param type The type of stage to create.
-   * @return A unique_ptr to the created IProcessingStage.
+   * @return A unique_ptr to the created ProcessingStage.
    */
-  static std::unique_ptr<IProcessingStage> create(StageType type);
+  static std::unique_ptr<ProcessingStage> create(StageType type);
 
   /**
    * @brief Creates the default sequence of stages for the v1.0 pipeline.
    * @return A vector of unique_ptrs to the pipeline stages in order.
    */
-  static std::vector<std::unique_ptr<IProcessingStage>>
+  static std::vector<std::unique_ptr<ProcessingStage>>
   create_default_pipeline();
 };
 

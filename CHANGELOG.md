@@ -5,6 +5,17 @@ All notable changes to the SigTekX project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Breaking Changes
+
+- **C++ API Rename:** Abstract base classes renamed to remove Hungarian notation prefix
+  - `IProcessingStage` → `ProcessingStage`
+  - `IPipelineExecutor` → `PipelineExecutor`
+  - **Rationale:** Modern C++ best practices favor descriptive names. Abstract classes are clearly identified through documentation and pure virtual methods.
+  - **C++ API Impact:** BREAKING - update all references in custom C++ code
+  - **Python API Impact:** NONE - bindings use concrete executors only
+
 ## [1.0.0] - 2025-12-05
 
 ### Changed
@@ -282,8 +293,8 @@ engine = Engine(config=config)
 
 #### Architecture
 - **C++ Backend (arch/cpp-abs branch)**: v0.9.3 cpp-abs
-  - `IPipelineExecutor` interface with `BatchExecutor` and `StreamingExecutor`
-  - `IProcessingStage` interface with `WindowStage`, `FFTStage`, `MagnitudeStage`
+  - `PipelineExecutor` interface with `BatchExecutor` and `StreamingExecutor`
+  - `ProcessingStage` interface with `WindowStage`, `FFTStage`, `MagnitudeStage`
   - `PipelineBuilder` for composing stages
   - `EngineConfig` and `ExecutorConfig` separation at C++ level
 

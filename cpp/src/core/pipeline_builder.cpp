@@ -29,7 +29,7 @@ class PipelineBuilder::Impl {
     return builder_ref_;
   }
 
-  PipelineBuilder& add_stage(std::unique_ptr<IProcessingStage> stage) {
+  PipelineBuilder& add_stage(std::unique_ptr<ProcessingStage> stage) {
     if (stage) {
       stages_.push_back(std::move(stage));
     }
@@ -113,7 +113,7 @@ class PipelineBuilder::Impl {
     return total;
   }
 
-  std::vector<std::unique_ptr<IProcessingStage>> build() {
+  std::vector<std::unique_ptr<ProcessingStage>> build() {
     std::string error_msg;
     if (!validate(error_msg)) {
       throw std::runtime_error("Pipeline validation failed: " + error_msg);
@@ -135,7 +135,7 @@ class PipelineBuilder::Impl {
 
  private:
   StageConfig config_{};
-  std::vector<std::unique_ptr<IProcessingStage>> stages_;
+  std::vector<std::unique_ptr<ProcessingStage>> stages_;
   std::reference_wrapper<PipelineBuilder> builder_ref_{
       *reinterpret_cast<PipelineBuilder*>(this)};
 };
@@ -155,7 +155,7 @@ PipelineBuilder& PipelineBuilder::with_config(const StageConfig& config) {
 }
 
 PipelineBuilder& PipelineBuilder::add_stage(
-    std::unique_ptr<IProcessingStage> stage) {
+    std::unique_ptr<ProcessingStage> stage) {
   return pImpl->add_stage(std::move(stage));
 }
 
@@ -177,7 +177,7 @@ size_t PipelineBuilder::estimate_memory_usage() const {
   return pImpl->estimate_memory_usage();
 }
 
-std::vector<std::unique_ptr<IProcessingStage>> PipelineBuilder::build() {
+std::vector<std::unique_ptr<ProcessingStage>> PipelineBuilder::build() {
   return pImpl->build();
 }
 

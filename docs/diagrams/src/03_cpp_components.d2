@@ -3,7 +3,7 @@
 # Render: See docs/diagrams/README.md for rendering instructions
 # 
 # This diagram shows the complete component architecture of the Ionosense HPC library,
-# including interfaces (IPipelineExecutor, IProcessingStage), concrete implementations,
+# including interfaces (PipelineExecutor, ProcessingStage), concrete implementations,
 # the Builder pattern (PipelineBuilder), and all configuration/resource relationships.
 # 
 # AUDIT STATUS: ✓ Verified accurate against codebase (2025-12-02)
@@ -45,9 +45,9 @@ executor_api: C++ Executor API {
   class: core-blue
 
   # Abstract Interface
-  IPipelineExecutor: {
+  PipelineExecutor: {
     shape: rectangle
-    label: "IPipelineExecutor\n«interface»"
+    label: "PipelineExecutor\n«interface»"
     style: {
       stroke-dash: 3
       italic: true
@@ -125,12 +125,12 @@ executor_api: C++ Executor API {
   }
 
   # Inheritance relationships (implements interface)
-  BatchExecutor -> IPipelineExecutor: implements {
+  BatchExecutor -> PipelineExecutor: implements {
     style: {
       stroke-dash: 3
     }
   }
-  StreamingExecutor -> IPipelineExecutor: implements {
+  StreamingExecutor -> PipelineExecutor: implements {
     style: {
       stroke-dash: 3
     }
@@ -188,9 +188,9 @@ processing_pipeline: Processing Pipeline {
   class: core-blue
 
   # Abstract Stage Interface
-  IProcessingStage: {
+  ProcessingStage: {
     shape: rectangle
-    label: "IProcessingStage\n«interface»"
+    label: "ProcessingStage\n«interface»"
     style: {
       stroke-dash: 3
       italic: true
@@ -255,7 +255,7 @@ processing_pipeline: Processing Pipeline {
       - create(StageType)
       - create_default_pipeline()
 
-      Returns `unique_ptr<IProcessingStage>`
+      Returns `unique_ptr<ProcessingStage>`
     |
   }
 
@@ -270,7 +270,7 @@ processing_pipeline: Processing Pipeline {
       - add_window() / add_fft() / add_magnitude()
       - validate()
       - estimate_memory_usage()
-      - build() → `vector<unique_ptr<IProcessingStage>>`
+      - build() → `vector<unique_ptr<ProcessingStage>>`
 
       Builder pattern for stage composition
     |
@@ -292,17 +292,17 @@ processing_pipeline: Processing Pipeline {
   }
 
   # Inheritance relationships (implements interface)
-  WindowStage -> IProcessingStage: implements {
+  WindowStage -> ProcessingStage: implements {
     style: {
       stroke-dash: 3
     }
   }
-  FFTStage -> IProcessingStage: implements {
+  FFTStage -> ProcessingStage: implements {
     style: {
       stroke-dash: 3
     }
   }
-  MagnitudeStage -> IProcessingStage: implements {
+  MagnitudeStage -> ProcessingStage: implements {
     style: {
       stroke-dash: 3
     }
@@ -316,7 +316,7 @@ processing_pipeline: Processing Pipeline {
   # Builder relationships
   PipelineBuilder -> StageFactory: uses
   PipelineBuilder -> StageConfig: configured by
-  PipelineBuilder -> IProcessingStage: "builds\nvector<>"
+  PipelineBuilder -> ProcessingStage: "builds\nvector<>"
 
   # Configuration relationships
   WindowStage <- StageConfig: configured by
@@ -564,11 +564,11 @@ executor_api.StreamingExecutor -> streaming_components.RingBuffer: uses
 streaming_components.RingBuffer -> cuda_resources.PinnedHostBuffer: "owns ring\nbuffers"
 
 # Pipeline initialization flow (executors receive stages from builder/factory)
-executor_api.IPipelineExecutor <- processing_pipeline.PipelineBuilder: "provides\nstages to"
-executor_api.BatchExecutor <- processing_pipeline.IProcessingStage: "owns\nvector<>" {
+executor_api.PipelineExecutor <- processing_pipeline.PipelineBuilder: "provides\nstages to"
+executor_api.BatchExecutor <- processing_pipeline.ProcessingStage: "owns\nvector<>" {
   class: dependency
 }
-executor_api.StreamingExecutor <- processing_pipeline.IProcessingStage: "owns\nvector<>" {
+executor_api.StreamingExecutor <- processing_pipeline.ProcessingStage: "owns\nvector<>" {
   class: dependency
 }
 
@@ -649,12 +649,12 @@ executor_api.ExecutorConfig <- utilities.signal_utils: validates {
 # 
 # VERIFIED COMPONENTS (All Accurate):
 # ✓ Python Bindings: PyExecutor<BatchExecutor>, PyExecutor<StreamingExecutor>, pybind11
-# ✓ Executor Interfaces: IPipelineExecutor (pipeline_executor.hpp:57)
-# ✓ Executor Implementations: BatchExecutor, StreamingExecutor (both implement IPipelineExecutor)
+# ✓ Executor Interfaces: PipelineExecutor (pipeline_executor.hpp:57)
+# ✓ Executor Implementations: BatchExecutor, StreamingExecutor (both implement PipelineExecutor)
 # ✓ Configuration: ExecutorConfig : SignalConfig, StageConfig, ProcessingStats
 # ✓ Builder Pattern: PipelineBuilder (pipeline_builder.hpp)
-# ✓ Stage Interface: IProcessingStage (processing_stage.hpp:153)
-# ✓ Stage Implementations: WindowStage, FFTStage, MagnitudeStage (all implement IProcessingStage)
+# ✓ Stage Interface: ProcessingStage (processing_stage.hpp:153)
+# ✓ Stage Implementations: WindowStage, FFTStage, MagnitudeStage (all implement ProcessingStage)
 # ✓ Stage Factory: StageFactory with create() and create_default_pipeline()
 # ✓ Streaming: RingBuffer<T> template (ring_buffer.hpp:57) - lock-free, pinned memory
 # ✓ CUDA Resources: CudaStream, CudaEvent, DeviceBuffer<T>, PinnedHostBuffer<T>, CufftPlan
@@ -664,7 +664,7 @@ executor_api.ExecutorConfig <- utilities.signal_utils: validates {
 # ✓ Utilities: window_utils, signal_utils namespaces
 # 
 # DESIGN PATTERNS DOCUMENTED:
-# - Strategy Pattern: IPipelineExecutor, IProcessingStage interfaces
+# - Strategy Pattern: PipelineExecutor, ProcessingStage interfaces
 # - Factory Pattern: StageFactory for stage creation
 # - Builder Pattern: PipelineBuilder for pipeline composition
 # - RAII Pattern: All CUDA resource wrappers (move-only, unique ownership)
@@ -672,9 +672,9 @@ executor_api.ExecutorConfig <- utilities.signal_utils: validates {
 # 
 # FILES VERIFIED:
 # - cpp/bindings/bindings.cpp (Python bindings)
-# - cpp/include/ionosense/core/pipeline_executor.hpp (IPipelineExecutor)
+# - cpp/include/ionosense/core/pipeline_executor.hpp (PipelineExecutor)
 # - cpp/include/ionosense/executors/*.hpp (BatchExecutor, StreamingExecutor)
-# - cpp/include/ionosense/core/processing_stage.hpp (IProcessingStage, stages, StageConfig)
+# - cpp/include/ionosense/core/processing_stage.hpp (ProcessingStage, stages, StageConfig)
 # - cpp/include/ionosense/core/pipeline_builder.hpp (PipelineBuilder)
 # - cpp/include/ionosense/core/executor_config.hpp (ExecutorConfig)
 # - cpp/include/ionosense/core/signal_config.hpp (SignalConfig)

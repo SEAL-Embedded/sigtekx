@@ -6,7 +6,7 @@
  *
  * @brief Batch-oriented pipeline executor with round-robin buffer management.
  *
- * Implements the IPipelineExecutor interface for high-throughput batch
+ * Implements the PipelineExecutor interface for high-throughput batch
  * processing using multiple CUDA streams and double/triple buffering.
  */
 
@@ -36,7 +36,7 @@ namespace sigtekx {
  * - Proper buffer reuse with cross-frame synchronization
  * - NVTX profiling integration
  */
-class BatchExecutor : public IPipelineExecutor {
+class BatchExecutor : public PipelineExecutor {
  public:
   BatchExecutor();
   ~BatchExecutor() override;
@@ -47,10 +47,10 @@ class BatchExecutor : public IPipelineExecutor {
   BatchExecutor(BatchExecutor&&) noexcept;
   BatchExecutor& operator=(BatchExecutor&&) noexcept;
 
-  // IPipelineExecutor interface
+  // PipelineExecutor interface
   void initialize(
       const ExecutorConfig& config,
-      std::vector<std::unique_ptr<IProcessingStage>> stages) override;
+      std::vector<std::unique_ptr<ProcessingStage>> stages) override;
   void reset() override;
   void submit(const float* input, float* output, size_t num_samples) override;
 

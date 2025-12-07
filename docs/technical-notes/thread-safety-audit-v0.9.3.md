@@ -231,7 +231,7 @@ cudaStreamWaitEvent(streams_[compute_stream_idx].get(), e_h2d_done.get(), 0);
 ExecutorConfig config_{};                                // ✅ Read-only after init
 int device_id_ = 0;                                     // ✅ Read-only after ctor
 cudaDeviceProp device_props_{};                         // ✅ Read-only after init
-std::vector<std::unique_ptr<IProcessingStage>> stages_; // ✅ Read-only after init
+std::vector<std::unique_ptr<ProcessingStage>> stages_; // ✅ Read-only after init
 std::vector<CudaStream> streams_;                       // ✅ Read-only after init
 std::vector<CudaEvent> events_;                         // ✅ Read-only after init
 std::vector<DeviceBuffer<float>> d_input_buffers_;      // ⚠️ Modified in submit()

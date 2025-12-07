@@ -59,7 +59,7 @@ class BatchExecutor::Impl {
   ~Impl() { reset(); }
 
   void initialize(const ExecutorConfig& config,
-                  std::vector<std::unique_ptr<IProcessingStage>> stages) {
+                  std::vector<std::unique_ptr<ProcessingStage>> stages) {
     IONO_NVTX_RANGE("BatchExecutor::Initialize", profiling::colors::DARK_GRAY);
 
     if (initialized_) {
@@ -437,7 +437,7 @@ class BatchExecutor::Impl {
   ExecutorConfig config_{};
   int device_id_ = 0;
   cudaDeviceProp device_props_{};
-  std::vector<std::unique_ptr<IProcessingStage>> stages_;
+  std::vector<std::unique_ptr<ProcessingStage>> stages_;
   std::vector<CudaStream> streams_;
   std::vector<CudaEvent> events_;
   std::vector<DeviceBuffer<float>> d_input_buffers_;
@@ -459,7 +459,7 @@ BatchExecutor& BatchExecutor::operator=(BatchExecutor&&) noexcept = default;
 
 void BatchExecutor::initialize(
     const ExecutorConfig& config,
-    std::vector<std::unique_ptr<IProcessingStage>> stages) {
+    std::vector<std::unique_ptr<ProcessingStage>> stages) {
   pImpl->initialize(config, std::move(stages));
 }
 

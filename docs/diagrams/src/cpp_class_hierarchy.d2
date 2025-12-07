@@ -12,12 +12,12 @@ direction: right
 executor_layer: Executor API Layer {
   class: core-blue
 
-  IPipelineExecutor: {
+  PipelineExecutor: {
     shape: class
-    label: "«interface»\nIPipelineExecutor"
+    label: "«interface»\nPipelineExecutor"
 
     # Abstract methods
-    "+initialize(config: ExecutorConfig, stages: vector<IProcessingStage>): void": ""
+    "+initialize(config: ExecutorConfig, stages: vector<ProcessingStage>): void": ""
     "+submit(input: float*, output: float*, num_samples: size_t): void": ""
     "+submit_async(input: float*, num_samples: size_t, callback: ResultCallback): void": ""
     "+synchronize(): void": ""
@@ -33,7 +33,7 @@ executor_layer: Executor API Layer {
     "": ""
     "+BatchExecutor()": ""
     "+~BatchExecutor()": ""
-    "+initialize(config: ExecutorConfig, stages: vector<IProcessingStage>): void": ""
+    "+initialize(config: ExecutorConfig, stages: vector<ProcessingStage>): void": ""
     "+submit(input: float*, output: float*, num_samples: size_t): void": ""
     "+submit_async(input: float*, num_samples: size_t, callback: ResultCallback): void": ""
     "+synchronize(): void": ""
@@ -47,7 +47,7 @@ executor_layer: Executor API Layer {
 
     "-config_: ExecutorConfig": ""
     "-device_id_: int": ""
-    "-stages_: vector<unique_ptr<IProcessingStage>>": ""
+    "-stages_: vector<unique_ptr<ProcessingStage>>": ""
     "-streams_: vector<CudaStream>": ""
     "-events_: vector<CudaEvent>": ""
     "-d_input_buffers_: vector<DeviceBuffer<float>>": ""
@@ -66,7 +66,7 @@ executor_layer: Executor API Layer {
     "": ""
     "+StreamingExecutor()": ""
     "+~StreamingExecutor()": ""
-    "+initialize(config: ExecutorConfig, stages: vector<IProcessingStage>): void": ""
+    "+initialize(config: ExecutorConfig, stages: vector<ProcessingStage>): void": ""
     "+submit(input: float*, output: float*, num_samples: size_t): void": ""
     "+synchronize(): void": ""
     "+supports_streaming(): bool // returns true": ""
@@ -87,11 +87,11 @@ executor_layer: Executor API Layer {
   }
 
   # Executor relationships
-  BatchExecutor -> IPipelineExecutor: implements {
+  BatchExecutor -> PipelineExecutor: implements {
     class: implementation
   }
 
-  StreamingExecutor -> IPipelineExecutor: implements {
+  StreamingExecutor -> PipelineExecutor: implements {
     class: implementation
   }
 
@@ -135,9 +135,9 @@ ring_buffer_layer: Ring Buffer for Streaming {
 stage_layer: Processing Stage Layer {
   class: core-blue
 
-  IProcessingStage: {
+  ProcessingStage: {
     shape: class
-    label: "«interface»\nIProcessingStage"
+    label: "«interface»\nProcessingStage"
 
     "+initialize(config: StageConfig, stream: cudaStream_t): void": ""
     "+process(input: void*, output: void*, num_elements: size_t, stream: cudaStream_t): void": ""
@@ -174,8 +174,8 @@ stage_layer: Processing Stage Layer {
   StageFactory: {
     shape: class
     label: "«Singleton»\nStageFactory"
-    "+create(type: StageType): unique_ptr<IProcessingStage> «static»": ""
-    "+create_default_pipeline(): vector<unique_ptr<IProcessingStage>> «static»": ""
+    "+create(type: StageType): unique_ptr<ProcessingStage> «static»": ""
+    "+create_default_pipeline(): vector<unique_ptr<ProcessingStage>> «static»": ""
   }
 
   StageType: {
@@ -187,15 +187,15 @@ stage_layer: Processing Stage Layer {
   }
 
   # Stage relationships
-  WindowStage -> IProcessingStage: implements {
+  WindowStage -> ProcessingStage: implements {
     class: implementation
   }
 
-  FFTStage -> IProcessingStage: implements {
+  FFTStage -> ProcessingStage: implements {
     class: implementation
   }
 
-  MagnitudeStage -> IProcessingStage: implements {
+  MagnitudeStage -> ProcessingStage: implements {
     class: implementation
   }
 
@@ -408,11 +408,11 @@ exception_layer: Exception Handling {
 # ==============================================================================
 
 # Executor -> Stage relationships
-executor_layer.BatchExecutor_Impl -> stage_layer.IProcessingStage: manages {
+executor_layer.BatchExecutor_Impl -> stage_layer.ProcessingStage: manages {
   class: dependency
 }
 
-executor_layer.StreamingExecutor_Impl -> stage_layer.IProcessingStage: manages {
+executor_layer.StreamingExecutor_Impl -> stage_layer.ProcessingStage: manages {
   class: dependency
 }
 

@@ -59,7 +59,7 @@ class StreamingExecutor::Impl {
   ~Impl() { reset(); }
 
   void initialize(const ExecutorConfig& config,
-                  std::vector<std::unique_ptr<IProcessingStage>> stages) {
+                  std::vector<std::unique_ptr<ProcessingStage>> stages) {
     IONO_NVTX_RANGE("StreamingExecutor::Initialize",
                     profiling::colors::DARK_GRAY);
 
@@ -790,7 +790,7 @@ class StreamingExecutor::Impl {
   PinnedHostBuffer<float> h_batch_staging_;
 
   // Pipeline and resources
-  std::vector<std::unique_ptr<IProcessingStage>> stages_;
+  std::vector<std::unique_ptr<ProcessingStage>> stages_;
   std::vector<CudaStream> streams_;
   std::vector<CudaEvent> events_;
   std::vector<DeviceBuffer<float>> d_input_buffers_;
@@ -824,7 +824,7 @@ StreamingExecutor& StreamingExecutor::operator=(StreamingExecutor&&) noexcept =
 
 void StreamingExecutor::initialize(
     const ExecutorConfig& config,
-    std::vector<std::unique_ptr<IProcessingStage>> stages) {
+    std::vector<std::unique_ptr<ProcessingStage>> stages) {
   pImpl->initialize(config, std::move(stages));
 }
 

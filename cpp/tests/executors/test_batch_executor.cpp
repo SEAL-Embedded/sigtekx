@@ -85,7 +85,7 @@ TEST_F(BatchExecutorTest, InitializationWithStandardPipeline) {
 
 TEST_F(BatchExecutorTest, InitializeWithEmptyPipelineFails) {
   BatchExecutor executor;
-  std::vector<std::unique_ptr<IProcessingStage>> empty_stages;
+  std::vector<std::unique_ptr<ProcessingStage>> empty_stages;
 
   EXPECT_THROW(executor.initialize(config_, std::move(empty_stages)),
                std::runtime_error);

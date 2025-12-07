@@ -234,7 +234,7 @@ TEST_F(PipelineBuilderTest, BuildTransfersOwnership) {
   ASSERT_EQ(stages.size(), 1);
 
   // Move ownership to another vector
-  std::vector<std::unique_ptr<IProcessingStage>> moved_stages =
+  std::vector<std::unique_ptr<ProcessingStage>> moved_stages =
       std::move(stages);
   ASSERT_EQ(moved_stages.size(), 1);
   EXPECT_NE(moved_stages[0], nullptr);

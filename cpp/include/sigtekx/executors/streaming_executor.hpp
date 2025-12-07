@@ -66,7 +66,7 @@ namespace sigtekx {
  * - True async with background thread (submit_async() currently synchronous)
  * - Optional CUDA graph optimization for zero-overhead kernel launches
  */
-class StreamingExecutor : public IPipelineExecutor {
+class StreamingExecutor : public PipelineExecutor {
  public:
   StreamingExecutor();
   ~StreamingExecutor() override;
@@ -77,10 +77,10 @@ class StreamingExecutor : public IPipelineExecutor {
   StreamingExecutor(StreamingExecutor&&) noexcept;
   StreamingExecutor& operator=(StreamingExecutor&&) noexcept;
 
-  // IPipelineExecutor interface
+  // PipelineExecutor interface
   void initialize(
       const ExecutorConfig& config,
-      std::vector<std::unique_ptr<IProcessingStage>> stages) override;
+      std::vector<std::unique_ptr<ProcessingStage>> stages) override;
   void reset() override;
   void submit(const float* input, float* output, size_t num_samples) override;
   void submit_async(const float* input, size_t num_samples,

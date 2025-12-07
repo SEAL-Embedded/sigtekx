@@ -4,7 +4,7 @@
  * @date 2025-10-09
  * @author [Kevin Rahsaz]
  *
- * @brief Defines the abstract IPipelineExecutor interface for executing signal
+ * @brief Defines the abstract PipelineExecutor interface for executing signal
  * processing pipelines.
  *
  * This header introduces the core abstraction that separates pipeline
@@ -27,7 +27,7 @@ namespace sigtekx {
 
 // Forward declarations
 struct ExecutorConfig;
-class IProcessingStage;
+class ProcessingStage;
 
 /**
  * @brief Callback function type for asynchronous processing results.
@@ -41,7 +41,7 @@ using ResultCallback =
                        size_t num_frames, const ProcessingStats& stats)>;
 
 /**
- * @class IPipelineExecutor
+ * @class PipelineExecutor
  * @brief Abstract interface for executing a signal processing pipeline.
  *
  * This interface defines the contract for all executor implementations. It
@@ -54,9 +54,9 @@ using ResultCallback =
  * - Manage asynchronous execution and synchronization
  * - Provide performance introspection
  */
-class IPipelineExecutor {
+class PipelineExecutor {
  public:
-  virtual ~IPipelineExecutor() = default;
+  virtual ~PipelineExecutor() = default;
 
   /**
    * @brief Initializes the executor with configuration and pipeline stages.
@@ -72,7 +72,7 @@ class IPipelineExecutor {
    */
   virtual void initialize(
       const ExecutorConfig& config,
-      std::vector<std::unique_ptr<IProcessingStage>> stages) = 0;
+      std::vector<std::unique_ptr<ProcessingStage>> stages) = 0;
 
   /**
    * @brief Resets the executor, releasing all CUDA resources.

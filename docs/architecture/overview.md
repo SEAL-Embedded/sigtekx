@@ -203,10 +203,10 @@ Benefits:
 - Move-only semantics prevent accidental copies
 
 #### **Strategy Pattern**
-Processing stages implement the `IProcessingStage` interface:
+Processing stages implement the `ProcessingStage` interface:
 
 ```cpp
-interface IProcessingStage {
+interface ProcessingStage {
     +initialize(config, stream): void
     +process(input, output, num_elements, stream): void
     +name(): string
@@ -928,7 +928,7 @@ class ResearchEngine::Impl {
 - `CufftPlan`: Manages cuFFT plans
 
 #### **Strategy Pattern**
-**Location:** Processing stages (`IProcessingStage`)
+**Location:** Processing stages (`ProcessingStage`)
 
 **Purpose:**
 - Flexible pipeline composition
@@ -937,14 +937,14 @@ class ResearchEngine::Impl {
 
 **Implementation:**
 ```cpp
-class IProcessingStage {
+class ProcessingStage {
 public:
     virtual void process(...) = 0;
-    virtual ~IProcessingStage() = default;
+    virtual ~ProcessingStage() = default;
 };
 
-class WindowStage : public IProcessingStage { /*...*/ };
-class FFTStage : public IProcessingStage { /*...*/ };
+class WindowStage : public ProcessingStage { /*...*/ };
+class FFTStage : public ProcessingStage { /*...*/ };
 ```
 
 #### **Factory Pattern**
@@ -959,8 +959,8 @@ class FFTStage : public IProcessingStage { /*...*/ };
 ```cpp
 class StageFactory {
 public:
-    static unique_ptr<IProcessingStage> create(StageType type);
-    static vector<unique_ptr<IProcessingStage>> create_default_pipeline();
+    static unique_ptr<ProcessingStage> create(StageType type);
+    static vector<unique_ptr<ProcessingStage>> create_default_pipeline();
 };
 ```
 
@@ -977,10 +977,10 @@ public:
 | Principle | Application |
 |-----------|-------------|
 | **Single Responsibility** | Each class has one reason to change (e.g., `CudaStream` only manages streams) |
-| **Open/Closed** | Processing pipeline open for extension via `IProcessingStage`, closed for modification |
-| **Liskov Substitution** | All stage implementations are interchangeable via `IProcessingStage` interface |
-| **Interface Segregation** | Small, focused interfaces (e.g., `IProcessingStage` has minimal methods) |
-| **Dependency Inversion** | `ResearchEngine::Impl` depends on `IProcessingStage` abstraction, not concrete stages |
+| **Open/Closed** | Processing pipeline open for extension via `ProcessingStage`, closed for modification |
+| **Liskov Substitution** | All stage implementations are interchangeable via `ProcessingStage` interface |
+| **Interface Segregation** | Small, focused interfaces (e.g., `ProcessingStage` has minimal methods) |
+| **Dependency Inversion** | `ResearchEngine::Impl` depends on `ProcessingStage` abstraction, not concrete stages |
 
 ### 8.3 Performance Design Principles
 
@@ -1268,7 +1268,7 @@ results = engines.process_batch(data_streams)  # Parallel processing
 The architecture is designed for extension at multiple levels:
 
 1. **Processing Stages** (C++)
-   - Implement `IProcessingStage` interface
+   - Implement `ProcessingStage` interface
    - Register with `StageFactory`
 
 2. **Benchmarks** (Python)

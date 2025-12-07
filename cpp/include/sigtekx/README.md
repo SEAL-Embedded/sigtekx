@@ -75,9 +75,9 @@ Defines the Strategy pattern implementation for pipeline stages.
 
 #### Core Interfaces
 
-**`IProcessingStage`** - Abstract stage interface:
+**`ProcessingStage`** - Abstract stage interface:
 ```cpp
-class IProcessingStage {
+class ProcessingStage {
 public:
     virtual void initialize(const StageConfig& config, cudaStream_t stream) = 0;
     virtual void process(void* input, void* output, size_t num_elements, cudaStream_t stream) = 0;
@@ -262,7 +262,7 @@ std::cout << "Latency: " << stats.latency_us << " μs\n";
 using namespace sigtekx;
 
 // Create custom pipeline
-std::vector<std::unique_ptr<IProcessingStage>> stages;
+std::vector<std::unique_ptr<ProcessingStage>> stages;
 stages.push_back(StageFactory::create(StageType::WINDOW));
 stages.push_back(StageFactory::create(StageType::FFT));
 stages.push_back(StageFactory::create(StageType::MAGNITUDE));
