@@ -8,7 +8,8 @@
  *
  * Provides a thread-safe, single-producer/single-consumer ring buffer
  * optimized for STFT streaming applications with overlapping frame extraction.
- * Uses CUDA pinned memory for faster H2D transfers and lock-free atomic operations.
+ * Uses CUDA pinned memory for faster H2D transfers and lock-free atomic
+ * operations.
  */
 
 #pragma once
@@ -57,7 +58,8 @@ template <typename T>
 class RingBuffer {
  public:
   /**
-   * @brief Constructs a ring buffer with specified capacity using pinned memory.
+   * @brief Constructs a ring buffer with specified capacity using pinned
+   * memory.
    * @param capacity Maximum number of elements to store.
    * @throws std::invalid_argument if capacity is 0.
    *
@@ -120,7 +122,8 @@ class RingBuffer {
   }
 
   /**
-   * @brief Checks if enough samples are available to extract a frame (lock-free).
+   * @brief Checks if enough samples are available to extract a frame
+   * (lock-free).
    * @param frame_size Size of the frame to extract (e.g., nfft).
    * @return True if frame can be extracted, false otherwise.
    *
@@ -131,7 +134,8 @@ class RingBuffer {
   }
 
   /**
-   * @brief Extracts a single frame from the ring buffer (lock-free thread-safe).
+   * @brief Extracts a single frame from the ring buffer (lock-free
+   * thread-safe).
    * @param output Destination buffer (must have space for frame_size elements).
    * @param frame_size Number of samples in one frame (e.g., nfft).
    * @throws std::underflow_error if insufficient samples available.
@@ -167,7 +171,8 @@ class RingBuffer {
   }
 
   /**
-   * @brief Extracts multiple overlapping temporal frames for STFT processing (lock-free).
+   * @brief Extracts multiple overlapping temporal frames for STFT processing
+   * (lock-free).
    * @param output Destination buffer (must have space for nfft * num_frames
    * elements).
    * @param nfft Frame size (window size for FFT).
@@ -211,7 +216,8 @@ class RingBuffer {
       // Handle wraparound for this frame
       if (frame_start + nfft <= capacity_) {
         // Contiguous copy
-        std::memcpy(frame_output, buffer_.get() + frame_start, nfft * sizeof(T));
+        std::memcpy(frame_output, buffer_.get() + frame_start,
+                    nfft * sizeof(T));
       } else {
         // Split copy (wraparound)
         size_t first_part = capacity_ - frame_start;
@@ -224,7 +230,8 @@ class RingBuffer {
   }
 
   /**
-   * @brief Advances the read pointer by a specified number of samples (lock-free).
+   * @brief Advances the read pointer by a specified number of samples
+   * (lock-free).
    * @param samples Number of samples to advance (typically hop_size).
    *
    * After extracting frames, call this to move the read position forward
@@ -244,7 +251,8 @@ class RingBuffer {
     size_t current_read = read_pos_.load(std::memory_order_relaxed);
 
     // Update positions (release semantics for producer visibility)
-    read_pos_.store((current_read + samples) % capacity_, std::memory_order_release);
+    read_pos_.store((current_read + samples) % capacity_,
+                    std::memory_order_release);
     available_.fetch_sub(samples, std::memory_order_release);
   }
 
@@ -285,9 +293,7 @@ class RingBuffer {
    *
    * Uses atomic load with acquire semantics for thread safety.
    */
-  bool empty() const {
-    return available_.load(std::memory_order_acquire) == 0;
-  }
+  bool empty() const { return available_.load(std::memory_order_acquire) == 0; }
 
   /**
    * @brief Checks if the ring buffer is full (lock-free).
@@ -300,11 +306,11 @@ class RingBuffer {
   }
 
  private:
-  size_t capacity_;                     ///< Maximum number of elements
-  PinnedHostBuffer<T> buffer_;          ///< CUDA pinned memory storage
-  std::atomic<size_t> write_pos_;       ///< Current write position (lock-free)
-  std::atomic<size_t> read_pos_;        ///< Current read position (lock-free)
-  std::atomic<size_t> available_;       ///< Number of samples available (lock-free)
+  size_t capacity_;                ///< Maximum number of elements
+  PinnedHostBuffer<T> buffer_;     ///< CUDA pinned memory storage
+  std::atomic<size_t> write_pos_;  ///< Current write position (lock-free)
+  std::atomic<size_t> read_pos_;   ///< Current read position (lock-free)
+  std::atomic<size_t> available_;  ///< Number of samples available (lock-free)
 };
 
 }  // namespace sigtekx

@@ -168,7 +168,7 @@ PYBIND11_MODULE(_native, m) {
       .export_values();
 
   py::enum_<sigtekx::StageConfig::WindowNorm>(m, "WindowNorm",
-                                                "Window normalization scheme")
+                                              "Window normalization scheme")
       .value("UNITY", sigtekx::StageConfig::WindowNorm::UNITY,
              "Unity power/energy gain normalization")
       .value("SQRT", sigtekx::StageConfig::WindowNorm::SQRT,
@@ -183,7 +183,7 @@ PYBIND11_MODULE(_native, m) {
       .export_values();
 
   py::enum_<sigtekx::StageConfig::OutputMode>(m, "OutputMode",
-                                                "Pipeline output format")
+                                              "Pipeline output format")
       .value("MAGNITUDE", sigtekx::StageConfig::OutputMode::MAGNITUDE,
              "Real magnitude spectrum")
       .value("COMPLEX_PASSTHROUGH",
@@ -193,8 +193,8 @@ PYBIND11_MODULE(_native, m) {
 
   // --- Bind ExecutorConfig Enums (v0.9.3 architecture) ---
   py::enum_<sigtekx::ExecutorConfig::ExecutionMode>(m, "ExecutionMode",
-                                                      "Execution strategy for "
-                                                      "pipeline executors")
+                                                    "Execution strategy for "
+                                                    "pipeline executors")
       .value("BATCH", sigtekx::ExecutorConfig::ExecutionMode::BATCH,
              "Process complete batches with maximum throughput")
       .value("STREAMING", sigtekx::ExecutorConfig::ExecutionMode::STREAMING,
@@ -209,8 +209,7 @@ PYBIND11_MODULE(_native, m) {
       .def_readwrite("overlap", &sigtekx::SignalConfig::overlap)
       .def_readwrite("sample_rate_hz", &sigtekx::SignalConfig::sample_rate_hz)
       .def_readwrite("window_type", &sigtekx::SignalConfig::window_type)
-      .def_readwrite("window_symmetry",
-                     &sigtekx::SignalConfig::window_symmetry)
+      .def_readwrite("window_symmetry", &sigtekx::SignalConfig::window_symmetry)
       .def_readwrite("window_norm", &sigtekx::SignalConfig::window_norm)
       .def_readwrite("scale_policy", &sigtekx::SignalConfig::scale_policy)
       .def_readwrite("output_mode", &sigtekx::SignalConfig::output_mode)
@@ -292,8 +291,8 @@ PYBIND11_MODULE(_native, m) {
       .def(py::init<>())
       .def("initialize", &sigtekx::PyStreamingExecutor::initialize,
            py::arg("config"), "Initializes the executor with configuration.")
-      .def("process", &sigtekx::PyStreamingExecutor::process,
-           py::arg("input"), "Processes a batch of input data.")
+      .def("process", &sigtekx::PyStreamingExecutor::process, py::arg("input"),
+           "Processes a batch of input data.")
       .def("reset", &sigtekx::PyStreamingExecutor::reset,
            "Resets the executor to uninitialized state.")
       .def("synchronize", &sigtekx::PyStreamingExecutor::synchronize,
@@ -305,8 +304,7 @@ PYBIND11_MODULE(_native, m) {
                              "Check if executor is initialized.");
 
   // --- Bind Utility Functions ---
-  m.def("get_available_devices",
-        &sigtekx::signal_utils::get_available_devices,
+  m.def("get_available_devices", &sigtekx::signal_utils::get_available_devices,
         "Gets a list of available CUDA devices.");
   m.def("select_best_device", &sigtekx::signal_utils::select_best_device,
         "Selects the best available CUDA device.");

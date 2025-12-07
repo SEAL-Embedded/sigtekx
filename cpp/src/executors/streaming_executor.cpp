@@ -325,7 +325,8 @@ class StreamingExecutor::Impl {
         IONO_NVTX_RANGE("Wait for Consumer Result", profiling::colors::PURPLE);
         std::unique_lock<std::mutex> lock(result_mutex_);
 
-        // Wait up to 2 seconds for result (config_.timeout_ms or default 2000ms)
+        // Wait up to 2 seconds for result (config_.timeout_ms or default
+        // 2000ms)
         const auto timeout = std::chrono::milliseconds(
             config_.timeout_ms > 0 ? config_.timeout_ms : 2000);
         const auto deadline = std::chrono::steady_clock::now() + timeout;
@@ -358,7 +359,8 @@ class StreamingExecutor::Impl {
             std::chrono::duration<float, std::micro>(end_time - start_time);
         stats_.latency_us = duration.count();
         stats_.frames_processed++;
-        stats_.throughput_gbps = calculate_throughput(num_samples, duration.count());
+        stats_.throughput_gbps =
+            calculate_throughput(num_samples, duration.count());
       } else {
         throw std::runtime_error(
             "Async processing timeout: consumer thread did not produce result");
@@ -374,15 +376,16 @@ class StreamingExecutor::Impl {
       // This prevents ring buffer overflow during warmup when many consecutive
       // submit() calls accumulate samples faster than they're drained (due to
       // overlap). Without this, after N warmup iterations:
-      // ring_buffer.available() ≈ N × hop_size, which quickly exceeds ring buffer
-      // capacity.
+      // ring_buffer.available() ≈ N × hop_size, which quickly exceeds ring
+      // buffer capacity.
       size_t batches_processed = 0;
 
       while (true) {
         // Check if all channels have enough samples for one frame
         bool all_channels_ready = true;
         for (int ch = 0; ch < config_.channels; ++ch) {
-          if (input_ring_buffers_[ch]->available() < samples_needed_per_channel) {
+          if (input_ring_buffers_[ch]->available() <
+              samples_needed_per_channel) {
             all_channels_ready = false;
             break;
           }
@@ -707,7 +710,8 @@ class StreamingExecutor::Impl {
    * @brief Background thread consumer loop for async processing.
    *
    * Continuously drains ring buffers and processes frames on GPU.
-   * Runs until stop_flag_ is set. Uses condition variable for efficient waiting.
+   * Runs until stop_flag_ is set. Uses condition variable for efficient
+   * waiting.
    */
   void consumer_loop() {
     IONO_NVTX_RANGE("Consumer Thread", profiling::colors::PURPLE);
@@ -727,7 +731,8 @@ class StreamingExecutor::Impl {
           // Check if we have enough samples in ALL channels
           bool have_data = true;
           for (int ch = 0; ch < config_.channels; ++ch) {
-            if (input_ring_buffers_[ch]->available() < samples_needed_per_channel) {
+            if (input_ring_buffers_[ch]->available() <
+                samples_needed_per_channel) {
               have_data = false;
               break;
             }
@@ -745,7 +750,8 @@ class StreamingExecutor::Impl {
         // Check if all channels have enough samples
         bool all_ready = true;
         for (int ch = 0; ch < config_.channels; ++ch) {
-          if (input_ring_buffers_[ch]->available() < samples_needed_per_channel) {
+          if (input_ring_buffers_[ch]->available() <
+              samples_needed_per_channel) {
             all_ready = false;
             break;
           }
@@ -797,12 +803,13 @@ class StreamingExecutor::Impl {
   ProcessingStats stats_{};
 
   // Async producer-consumer infrastructure (v0.9.5+)
-  std::thread consumer_thread_;                    // Background processing thread
-  std::atomic<bool> stop_flag_{false};             // Signal to stop consumer thread
-  std::condition_variable cv_data_ready_;          // Notify consumer of new data
-  std::mutex cv_mutex_;                            // Mutex for condition variable only
-  std::queue<std::vector<float>> result_queue_;    // Completed results from consumer
-  std::mutex result_mutex_;                        // Protects result_queue_
+  std::thread consumer_thread_;            // Background processing thread
+  std::atomic<bool> stop_flag_{false};     // Signal to stop consumer thread
+  std::condition_variable cv_data_ready_;  // Notify consumer of new data
+  std::mutex cv_mutex_;                    // Mutex for condition variable only
+  std::queue<std::vector<float>>
+      result_queue_;         // Completed results from consumer
+  std::mutex result_mutex_;  // Protects result_queue_
 };
 
 // ============================================================================

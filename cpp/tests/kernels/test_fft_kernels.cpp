@@ -46,7 +46,7 @@ extern void launch_scale_fft(float2* data, int num_elements, float scale,
                              cudaStream_t stream);
 
 }  // namespace kernels
-}  // namespace ionosense
+}  // namespace sigtekx
 
 /**
  * @class FFTKernelsTest

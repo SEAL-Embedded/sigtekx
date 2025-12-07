@@ -15,10 +15,10 @@ from sigtekx.exceptions import (
     EnvironmentMismatchError,
     ExperimentError,
     InsufficientDataError,
-    SigTekXError,
     ReportGenerationError,
     ReproducibilityError,
     ResourceExhaustedError,
+    SigTekXError,
     ValidationError,
     WorkflowError,
 )

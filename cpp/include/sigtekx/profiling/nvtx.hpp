@@ -104,16 +104,16 @@ inline std::string format_memory_range(const std::string& operation,
 // Public Macros
 // -----------------------------------------------------------------------------
 #ifdef SIGTEKX_ENABLE_PROFILING
-#define IONO_NVTX_RANGE(name, color_argb)                          \
+#define IONO_NVTX_RANGE(name, color_argb)                        \
   sigtekx::profiling::ScopedRange IONO_UNIQUE_ID(_nvtx_range_) { \
-    (name), (color_argb)                                           \
+    (name), (color_argb)                                         \
   }
-#define IONO_NVTX_RANGE_FUNCTION(color_argb)                          \
+#define IONO_NVTX_RANGE_FUNCTION(color_argb)                        \
   sigtekx::profiling::ScopedRange IONO_UNIQUE_ID(_nvtx_fn_range_) { \
-    __FUNCTION__, (color_argb)                                        \
+    __FUNCTION__, (color_argb)                                      \
   }
-#define IONO_NVTX_MARK(message, color_argb)                     \
-  do {                                                          \
+#define IONO_NVTX_MARK(message, color_argb)                   \
+  do {                                                        \
     if (sigtekx::profiling::profiling_enabled())              \
       sigtekx::profiling::nvtx_mark((message), (color_argb)); \
   } while (0)
