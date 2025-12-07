@@ -52,7 +52,7 @@ inline std::vector<float> compute_pipeline_reference(
     window_functions::WindowKind window_type = window_functions::WindowKind::HANN,
     float scale_factor = -1.0f  // -1 means auto (1/N)
 ) {
-  IONO_NVTX_RANGE("Pipeline Reference Computation", profiling::colors::PURPLE);
+  SIGTEKX_NVTX_RANGE("Pipeline Reference Computation", profiling::colors::PURPLE);
 
   const size_t num_bins = static_cast<size_t>(nfft / 2 + 1);
   const size_t complex_output_size = num_bins * batch;
@@ -66,7 +66,7 @@ inline std::vector<float> compute_pipeline_reference(
   // Step 1: Generate window coefficients (PERIODIC symmetry, no sqrt)
   std::vector<float> window_coeffs(nfft);
   {
-    IONO_NVTX_RANGE("Generate Window Coefficients", profiling::colors::CYAN);
+    SIGTEKX_NVTX_RANGE("Generate Window Coefficients", profiling::colors::CYAN);
     window_functions::fill_window(
         window_coeffs.data(),
         nfft,
@@ -79,7 +79,7 @@ inline std::vector<float> compute_pipeline_reference(
   // Step 2: Apply window to input on CPU
   std::vector<float> windowed_input(input.size());
   {
-    IONO_NVTX_RANGE("Apply Window", profiling::colors::CYAN);
+    SIGTEKX_NVTX_RANGE("Apply Window", profiling::colors::CYAN);
     for (int b = 0; b < batch; ++b) {
       for (int i = 0; i < nfft; ++i) {
         const int idx = b * nfft + i;
@@ -103,13 +103,13 @@ inline std::vector<float> compute_pipeline_reference(
   cufftHandle plan;
   int n[1] = {nfft};
   {
-    IONO_NVTX_RANGE("Create cuFFT Plan", profiling::colors::DARK_GRAY);
+    SIGTEKX_NVTX_RANGE("Create cuFFT Plan", profiling::colors::DARK_GRAY);
     cufftPlanMany(&plan, 1, n, nullptr, 1, nfft, nullptr, 1, num_bins,
                   CUFFT_R2C, batch);
   }
 
   {
-    IONO_NVTX_RANGE("Execute cuFFT R2C", profiling::colors::PURPLE);
+    SIGTEKX_NVTX_RANGE("Execute cuFFT R2C", profiling::colors::PURPLE);
     cufftExecR2C(plan, d_input, d_complex_output);
   }
 
@@ -122,7 +122,7 @@ inline std::vector<float> compute_pipeline_reference(
   // Step 6: Compute magnitude with 1/N scaling on CPU
   std::vector<float> output(magnitude_output_size);
   {
-    IONO_NVTX_RANGE("Compute Magnitude", profiling::colors::CYAN);
+    SIGTEKX_NVTX_RANGE("Compute Magnitude", profiling::colors::CYAN);
     for (size_t i = 0; i < complex_output_size; ++i) {
       const float real = complex_output[i].x;
       const float imag = complex_output[i].y;

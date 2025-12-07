@@ -146,7 +146,7 @@ function Invoke-Test {
                 # Check preset-specific build directory first, then fallback to generic
                 $presetBuildDir = Join-Path $script:BuildDir $script:BuildPreset
                 $testExe = if (Test-Path $presetBuildDir) {
-                    Join-Path $presetBuildDir "test_engine.exe"
+                    Join-Path $presetBuildDir "sigtekx_tests.exe"
                 } else {
                     Join-Path $script:BuildDir "Release/tests/test_runner.exe"
                 }
@@ -166,7 +166,7 @@ function Invoke-Test {
             # Check preset-specific build directory first, then fallback to generic
             $presetBuildDir = Join-Path $script:BuildDir $script:BuildPreset
             $testExe = if (Test-Path $presetBuildDir) {
-                Join-Path $presetBuildDir "test_engine.exe"
+                Join-Path $presetBuildDir "sigtekx_tests.exe"
             } else {
                 Join-Path $script:BuildDir "Release/tests/test_runner.exe"
             }
@@ -218,7 +218,7 @@ function Invoke-Coverage {
 
     # Step 2: Run tests with coverage
     Write-Status "Running C++ tests with coverage analysis..."
-    $testExe = Join-Path $script:BuildDir "windows-coverage/test_engine.exe"
+    $testExe = Join-Path $script:BuildDir "windows-coverage/sigtekx_tests.exe"
     if (-not (Test-Path $testExe)) {
         Write-Error "Test executable not found at: $testExe"
         exit 1

@@ -75,7 +75,7 @@ TEST_F(SignalUtilsTest, SelectBestDeviceReturnsValidIndex) {
 
   // Verify device index is valid
   int device_count = 0;
-  IONO_CUDA_CHECK(cudaGetDeviceCount(&device_count));
+  SIGTEKX_CUDA_CHECK(cudaGetDeviceCount(&device_count));
   EXPECT_LT(device, device_count);
 }
 
@@ -84,15 +84,15 @@ TEST_F(SignalUtilsTest, SelectBestDeviceSelectsHighestSMCount) {
 
   // Get properties of selected device
   cudaDeviceProp best_prop{};
-  IONO_CUDA_CHECK(cudaGetDeviceProperties(&best_prop, best_device));
+  SIGTEKX_CUDA_CHECK(cudaGetDeviceProperties(&best_prop, best_device));
 
   // Verify it has the highest SM count
   int device_count = 0;
-  IONO_CUDA_CHECK(cudaGetDeviceCount(&device_count));
+  SIGTEKX_CUDA_CHECK(cudaGetDeviceCount(&device_count));
 
   for (int i = 0; i < device_count; ++i) {
     cudaDeviceProp prop{};
-    IONO_CUDA_CHECK(cudaGetDeviceProperties(&prop, i));
+    SIGTEKX_CUDA_CHECK(cudaGetDeviceProperties(&prop, i));
     EXPECT_LE(prop.multiProcessorCount, best_prop.multiProcessorCount);
   }
 }

@@ -92,38 +92,38 @@ inline std::string format_memory_range(const std::string& operation,
 // -----------------------------------------------------------------------------
 // Unique-ID helper for macros
 // -----------------------------------------------------------------------------
-#define IONO_DETAIL_CONCAT_INNER(x, y) x##y
-#define IONO_DETAIL_CONCAT(x, y) IONO_DETAIL_CONCAT_INNER(x, y)
+#define SIGTEKX_DETAIL_CONCAT_INNER(x, y) x##y
+#define SIGTEKX_DETAIL_CONCAT(x, y) SIGTEKX_DETAIL_CONCAT_INNER(x, y)
 #ifdef _MSC_VER
-#define IONO_UNIQUE_ID(prefix) IONO_DETAIL_CONCAT(prefix, __COUNTER__)
+#define SIGTEKX_UNIQUE_ID(prefix) SIGTEKX_DETAIL_CONCAT(prefix, __COUNTER__)
 #else
-#define IONO_UNIQUE_ID(prefix) IONO_DETAIL_CONCAT(prefix, __LINE__)
+#define SIGTEKX_UNIQUE_ID(prefix) SIGTEKX_DETAIL_CONCAT(prefix, __LINE__)
 #endif
 
 // -----------------------------------------------------------------------------
 // Public Macros
 // -----------------------------------------------------------------------------
 #ifdef SIGTEKX_ENABLE_PROFILING
-#define IONO_NVTX_RANGE(name, color_argb)                        \
-  sigtekx::profiling::ScopedRange IONO_UNIQUE_ID(_nvtx_range_) { \
-    (name), (color_argb)                                         \
+#define SIGTEKX_NVTX_RANGE(name, color_argb)                        \
+  sigtekx::profiling::ScopedRange SIGTEKX_UNIQUE_ID(_nvtx_range_) { \
+    (name), (color_argb)                                            \
   }
-#define IONO_NVTX_RANGE_FUNCTION(color_argb)                        \
-  sigtekx::profiling::ScopedRange IONO_UNIQUE_ID(_nvtx_fn_range_) { \
-    __FUNCTION__, (color_argb)                                      \
+#define SIGTEKX_NVTX_RANGE_FUNCTION(color_argb)                        \
+  sigtekx::profiling::ScopedRange SIGTEKX_UNIQUE_ID(_nvtx_fn_range_) { \
+    __FUNCTION__, (color_argb)                                         \
   }
-#define IONO_NVTX_MARK(message, color_argb)                   \
-  do {                                                        \
-    if (sigtekx::profiling::profiling_enabled())              \
-      sigtekx::profiling::nvtx_mark((message), (color_argb)); \
+#define SIGTEKX_NVTX_MARK(message, color_argb)                   \
+  do {                                                           \
+    if (sigtekx::profiling::profiling_enabled())                 \
+      sigtekx::profiling::nvtx_mark((message), (color_argb));    \
   } while (0)
 #else
 // No-op implementations when profiling is disabled at compile time
 inline ScopedRange::ScopedRange(const char*, uint32_t) : pImpl(nullptr) {}
 inline ScopedRange::~ScopedRange() {}
-#define IONO_NVTX_RANGE(name, color_argb) ((void)0)
-#define IONO_NVTX_RANGE_FUNCTION(color_argb) ((void)0)
-#define IONO_NVTX_MARK(message, color_argb) ((void)0)
+#define SIGTEKX_NVTX_RANGE(name, color_argb) ((void)0)
+#define SIGTEKX_NVTX_RANGE_FUNCTION(color_argb) ((void)0)
+#define SIGTEKX_NVTX_MARK(message, color_argb) ((void)0)
 #endif
 
 }  // namespace profiling

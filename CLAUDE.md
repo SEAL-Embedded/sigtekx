@@ -326,7 +326,7 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 # Then run benchmark
-./build/windows-rel/benchmark_engine.exe --full
+./build/windows-rel/sigtekx_benchmark.exe --full
 ```
 
 **Best solution:** Use `scripts/init_pwsh.ps1` to start your dev session (handles this automatically).
@@ -346,7 +346,7 @@ If `nsys profile` fails with "No such file or directory", the issue is usually:
 New-Item -ItemType Directory -Path artifacts\profiling -Force | Out-Null
 
 # Then profile (all backslashes)
-nsys profile -o artifacts\profiling\cpp_dev .\build\windows-rel\benchmark_engine.exe --profile
+nsys profile -o artifacts\profiling\cpp_dev .\build\windows-rel\sigtekx_benchmark.exe --profile
 ```
 
 **Important:** On Windows, always use `\` (backslashes) in paths, not `/` (forward slashes).
@@ -367,7 +367,7 @@ The `.gitignore` already excludes `artifacts/` from version control.
 
 # Manual coverage workflow (if needed)
 ./scripts/cli.ps1 build -Preset windows-coverage    # Build with coverage
-./build/windows-coverage/test_engine.exe            # Run tests
+./build/windows-coverage/sigtekx_tests.exe            # Run tests
 gcovr --root . --filter "cpp/.*" --html-details artifacts/reports/coverage-cpp/index.html
 ```
 

@@ -37,7 +37,7 @@ namespace benchmark {
 template<typename ExecutorT>
 inline RealtimeResults run_realtime_benchmark(ExecutorT& executor,
                                                const BenchmarkConfig& config) {
-  IONO_NVTX_RANGE("Realtime Benchmark", profiling::colors::ORANGE);
+  SIGTEKX_NVTX_RANGE("Realtime Benchmark", profiling::colors::ORANGE);
 
   RealtimeResults results;
 
@@ -67,7 +67,7 @@ inline RealtimeResults run_realtime_benchmark(ExecutorT& executor,
 
   while (std::chrono::high_resolution_clock::now() < end) {
     const std::string iter_name = "Frame " + std::to_string(frame_count + 1);
-    IONO_NVTX_RANGE(iter_name.c_str(), profiling::colors::ORANGE);
+    SIGTEKX_NVTX_RANGE(iter_name.c_str(), profiling::colors::ORANGE);
 
     // Use CPU-side timing for realtime benchmark
     // For high-frequency measurements (>5000 FPS), CPU timing provides better

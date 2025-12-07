@@ -36,7 +36,7 @@ namespace benchmark {
  * @param config Benchmark configuration
  */
 inline void run_warmup(BatchExecutor& executor, const BenchmarkConfig& config) {
-  IONO_NVTX_RANGE("Warmup Phase", profiling::colors::LIGHT_GRAY);
+  SIGTEKX_NVTX_RANGE("Warmup Phase", profiling::colors::LIGHT_GRAY);
 
   std::vector<float> warmup_input(static_cast<size_t>(config.nfft) *
                                    config.channels);
@@ -45,13 +45,13 @@ inline void run_warmup(BatchExecutor& executor, const BenchmarkConfig& config) {
 
   for (int i = 0; i < config.warmup_iterations; ++i) {
     const std::string name = "Warmup " + std::to_string(i);
-    IONO_NVTX_RANGE(name.c_str(), profiling::colors::LIGHT_GRAY);
+    SIGTEKX_NVTX_RANGE(name.c_str(), profiling::colors::LIGHT_GRAY);
     executor.submit(warmup_input.data(), warmup_output.data(),
                     warmup_input.size());
   }
 
   {
-    IONO_NVTX_RANGE("Warmup Sync", profiling::colors::YELLOW);
+    SIGTEKX_NVTX_RANGE("Warmup Sync", profiling::colors::YELLOW);
     executor.synchronize();
   }
 }
@@ -72,7 +72,7 @@ inline void run_warmup(BatchExecutor& executor, const BenchmarkConfig& config) {
  */
 inline LatencyResults run_latency_benchmark(BatchExecutor& executor,
                                              const BenchmarkConfig& config) {
-  IONO_NVTX_RANGE("Latency Benchmark", profiling::colors::NVIDIA_BLUE);
+  SIGTEKX_NVTX_RANGE("Latency Benchmark", profiling::colors::NVIDIA_BLUE);
 
   LatencyResults results;
 
@@ -94,7 +94,7 @@ inline LatencyResults run_latency_benchmark(BatchExecutor& executor,
   for (int i = 0; i < config.iterations; ++i) {
     const std::string iter_name = "Iteration " + std::to_string(i + 1) + "/" +
                                   std::to_string(config.iterations);
-    IONO_NVTX_RANGE(iter_name.c_str(), profiling::colors::NVIDIA_BLUE);
+    SIGTEKX_NVTX_RANGE(iter_name.c_str(), profiling::colors::NVIDIA_BLUE);
 
     // Use CUDA events to measure GPU execution time directly
     // This eliminates CPU-side timing overhead and OS scheduler noise
@@ -114,7 +114,7 @@ inline LatencyResults run_latency_benchmark(BatchExecutor& executor,
   cudaEventDestroy(stop_event);
 
   // Compute statistics
-  IONO_NVTX_RANGE("Compute Statistics", profiling::colors::CYAN);
+  SIGTEKX_NVTX_RANGE("Compute Statistics", profiling::colors::CYAN);
 
   std::vector<float> sorted_latencies = results.latencies_us;
   std::sort(sorted_latencies.begin(), sorted_latencies.end());
@@ -213,7 +213,7 @@ inline LatencyResults run_latency_benchmark(BatchExecutor& executor,
  */
 inline ThroughputResults run_throughput_benchmark(BatchExecutor& executor,
                                                    const BenchmarkConfig& config) {
-  IONO_NVTX_RANGE("Throughput Benchmark", profiling::colors::GREEN);
+  SIGTEKX_NVTX_RANGE("Throughput Benchmark", profiling::colors::GREEN);
 
   ThroughputResults results;
 
@@ -232,7 +232,7 @@ inline ThroughputResults run_throughput_benchmark(BatchExecutor& executor,
 
   while (std::chrono::high_resolution_clock::now() < end) {
     const std::string iter_name = "Frame " + std::to_string(frame_count + 1);
-    IONO_NVTX_RANGE(iter_name.c_str(), profiling::colors::GREEN);
+    SIGTEKX_NVTX_RANGE(iter_name.c_str(), profiling::colors::GREEN);
 
     executor.submit(input.data(), output.data(), input_size);
     frame_count++;
@@ -274,7 +274,7 @@ inline ThroughputResults run_throughput_benchmark(BatchExecutor& executor,
  */
 inline RealtimeResults run_realtime_benchmark(BatchExecutor& executor,
                                                const BenchmarkConfig& config) {
-  IONO_NVTX_RANGE("Realtime Benchmark", profiling::colors::ORANGE);
+  SIGTEKX_NVTX_RANGE("Realtime Benchmark", profiling::colors::ORANGE);
 
   RealtimeResults results;
 
@@ -304,7 +304,7 @@ inline RealtimeResults run_realtime_benchmark(BatchExecutor& executor,
 
   while (std::chrono::high_resolution_clock::now() < end) {
     const std::string iter_name = "Frame " + std::to_string(frame_count + 1);
-    IONO_NVTX_RANGE(iter_name.c_str(), profiling::colors::ORANGE);
+    SIGTEKX_NVTX_RANGE(iter_name.c_str(), profiling::colors::ORANGE);
 
     // Use CPU-side timing for realtime benchmark
     // For high-frequency measurements (>5000 FPS), CPU timing provides better
@@ -393,7 +393,7 @@ inline RealtimeResults run_realtime_benchmark(BatchExecutor& executor,
  */
 inline AccuracyResults run_accuracy_benchmark(BatchExecutor& executor,
                                                const BenchmarkConfig& config) {
-  IONO_NVTX_RANGE("Accuracy Benchmark", profiling::colors::PURPLE);
+  SIGTEKX_NVTX_RANGE("Accuracy Benchmark", profiling::colors::PURPLE);
 
   AccuracyResults results;
 
@@ -403,7 +403,7 @@ inline AccuracyResults run_accuracy_benchmark(BatchExecutor& executor,
 
   // Single test: Pure sine wave with full pipeline validation
   {
-    IONO_NVTX_RANGE("Pipeline Reference Test", profiling::colors::PURPLE);
+    SIGTEKX_NVTX_RANGE("Pipeline Reference Test", profiling::colors::PURPLE);
 
     // Generate pure sine at frequency bin 10
     std::vector<float> input = generate_test_signal(

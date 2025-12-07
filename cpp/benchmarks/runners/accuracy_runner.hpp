@@ -46,7 +46,7 @@ namespace benchmark {
 template<typename ExecutorT>
 inline AccuracyResults run_accuracy_benchmark(ExecutorT& executor,
                                                const BenchmarkConfig& config) {
-  IONO_NVTX_RANGE("Accuracy Benchmark", profiling::colors::PURPLE);
+  SIGTEKX_NVTX_RANGE("Accuracy Benchmark", profiling::colors::PURPLE);
 
   AccuracyResults results;
 
@@ -56,7 +56,7 @@ inline AccuracyResults run_accuracy_benchmark(ExecutorT& executor,
 
   // Single test: Pure sine wave with full pipeline validation
   {
-    IONO_NVTX_RANGE("Pipeline Reference Test", profiling::colors::PURPLE);
+    SIGTEKX_NVTX_RANGE("Pipeline Reference Test", profiling::colors::PURPLE);
 
     // Generate pure sine at frequency bin 10
     std::vector<float> input = generate_test_signal(

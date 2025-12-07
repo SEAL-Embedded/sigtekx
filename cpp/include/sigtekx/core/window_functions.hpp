@@ -45,9 +45,9 @@
 namespace sigtekx::window_functions {
 
 #if defined(__CUDACC__)
-#define IONO_HD __host__ __device__
+#define SIGTEKX_HD __host__ __device__
 #else
-#define IONO_HD
+#define SIGTEKX_HD
 #endif
 
 enum class WindowKind { RECTANGULAR, HANN, BLACKMAN };
@@ -65,7 +65,7 @@ inline constexpr double PI = 3.14159265358979323846264338327950288;
  * @param symmetry Window symmetry mode (see module-level documentation).
  * @return N or (N-1) based on symmetry, with safety for edge cases.
  */
-IONO_HD inline double safe_denominator(int size, WindowSymmetry symmetry) {
+SIGTEKX_HD inline double safe_denominator(int size, WindowSymmetry symmetry) {
   if (symmetry == WindowSymmetry::PERIODIC) {
     return size > 0 ? static_cast<double>(size) : 1.0;
   }
@@ -86,7 +86,7 @@ IONO_HD inline double safe_denominator(int size, WindowSymmetry symmetry) {
  * - index >= size: Out-of-bounds index
  * - Non-finite result: Numerical instability detected
  */
-IONO_HD inline double hann_base(
+SIGTEKX_HD inline double hann_base(
     int index, int size, WindowSymmetry symmetry = WindowSymmetry::PERIODIC) {
   // Input validation
   if (size <= 0 || index < 0 || index >= size) {
@@ -133,7 +133,7 @@ IONO_HD inline double hann_base(
  * - index >= size: Out-of-bounds index
  * - Non-finite result: Numerical instability detected
  */
-IONO_HD inline double blackman_base(
+SIGTEKX_HD inline double blackman_base(
     int index, int size, WindowSymmetry symmetry = WindowSymmetry::PERIODIC) {
   // Input validation
   if (size <= 0 || index < 0 || index >= size) {
@@ -177,7 +177,7 @@ IONO_HD inline double blackman_base(
  * @return The window coefficient, or NaN (GPU) / throws exception (CPU) on
  * error.
  */
-IONO_HD inline double base(WindowKind kind, int index, int size,
+SIGTEKX_HD inline double base(WindowKind kind, int index, int size,
                            WindowSymmetry symmetry = WindowSymmetry::PERIODIC) {
   switch (kind) {
     case WindowKind::RECTANGULAR:
@@ -216,7 +216,7 @@ IONO_HD inline double base(WindowKind kind, int index, int size,
  * @return The final window value, or NaN (GPU) / throws exception (CPU) on
  * error.
  */
-IONO_HD inline float window_value(
+SIGTEKX_HD inline float window_value(
     WindowKind kind, int index, int size, bool sqrt_norm,
     WindowSymmetry symmetry = WindowSymmetry::PERIODIC) {
   const double value = base(kind, index, size, symmetry);
@@ -277,6 +277,6 @@ inline void fill_window(float* destination, int size, WindowKind kind,
   }
 }
 
-#undef IONO_HD
+#undef SIGTEKX_HD
 
 }  // namespace sigtekx::window_functions

@@ -393,7 +393,7 @@ sigxc bench
 
 **Note:** `ionoc` automatically creates the `artifacts\profiling` directory, so this error should not occur when using the CLI.
 
-If you're running benchmark_engine.exe directly (not through `ionoc`) and encounter path issues:
+If you're running sigtekx_benchmark.exe directly (not through `ionoc`) and encounter path issues:
 
 ```powershell
 # Solution: Use ionoc instead (recommended)
@@ -405,14 +405,14 @@ New-Item -ItemType Directory -Path artifacts\profiling -Force | Out-Null
 
 ### Build Errors
 
-If benchmark_engine.exe is not found:
+If sigtekx_benchmark.exe is not found:
 
 ```powershell
 # Rebuild the project
 sigx build
 
 # Check if executable exists
-ls build\windows-rel\benchmark_engine.exe
+ls build\windows-rel\sigtekx_benchmark.exe
 ```
 
 ## Performance Targets

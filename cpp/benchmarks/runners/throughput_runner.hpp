@@ -33,7 +33,7 @@ namespace benchmark {
 template<typename ExecutorT>
 inline ThroughputResults run_throughput_benchmark(ExecutorT& executor,
                                                    const BenchmarkConfig& config) {
-  IONO_NVTX_RANGE("Throughput Benchmark", profiling::colors::GREEN);
+  SIGTEKX_NVTX_RANGE("Throughput Benchmark", profiling::colors::GREEN);
 
   ThroughputResults results;
 
@@ -52,7 +52,7 @@ inline ThroughputResults run_throughput_benchmark(ExecutorT& executor,
 
   while (std::chrono::high_resolution_clock::now() < end) {
     const std::string iter_name = "Frame " + std::to_string(frame_count + 1);
-    IONO_NVTX_RANGE(iter_name.c_str(), profiling::colors::GREEN);
+    SIGTEKX_NVTX_RANGE(iter_name.c_str(), profiling::colors::GREEN);
 
     executor.submit(input.data(), output.data(), input_size);
     frame_count++;

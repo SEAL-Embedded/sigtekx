@@ -1,5 +1,5 @@
 /**
- * @file benchmark_engine.cpp
+ * @file sigtekx_benchmark.cpp
  * @brief Standalone C++ benchmark executable with preset system.
  *
  * This executable provides comprehensive benchmarking capabilities for C++
@@ -148,7 +148,7 @@ static void run_benchmarks_with_executor(ExecutorT& executor,
 
   // Cleanup
   {
-    IONO_NVTX_RANGE("Cleanup", profiling::colors::RED);
+    SIGTEKX_NVTX_RANGE("Cleanup", profiling::colors::RED);
     executor.reset();
   }
 }
@@ -182,7 +182,7 @@ static RuntimeInfo get_cuda_runtime_info() {
 
 int main(int argc, char* argv[]) {
   try {
-    IONO_NVTX_RANGE("Main", profiling::colors::NVIDIA_BLUE);
+    SIGTEKX_NVTX_RANGE("Main", profiling::colors::NVIDIA_BLUE);
 
     // Check CUDA availability
     int device_count = 0;
@@ -227,7 +227,7 @@ int main(int argc, char* argv[]) {
     if (config.exec_mode == ExecutorConfig::ExecutionMode::BATCH) {
       BatchExecutor executor;
       {
-        IONO_NVTX_RANGE("Executor Initialization (BATCH)", profiling::colors::DARK_GRAY);
+        SIGTEKX_NVTX_RANGE("Executor Initialization (BATCH)", profiling::colors::DARK_GRAY);
         auto stages = StageFactory::create_default_pipeline();
         executor.initialize(executor_config, std::move(stages));
       }
@@ -235,7 +235,7 @@ int main(int argc, char* argv[]) {
     } else {
       StreamingExecutor executor;
       {
-        IONO_NVTX_RANGE("Executor Initialization (STREAMING)", profiling::colors::DARK_GRAY);
+        SIGTEKX_NVTX_RANGE("Executor Initialization (STREAMING)", profiling::colors::DARK_GRAY);
         auto stages = StageFactory::create_default_pipeline();
         executor.initialize(executor_config, std::move(stages));
       }

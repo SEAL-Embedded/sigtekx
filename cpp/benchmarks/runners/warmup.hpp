@@ -28,7 +28,7 @@ namespace benchmark {
  */
 template<typename ExecutorT>
 inline void run_warmup(ExecutorT& executor, const BenchmarkConfig& config) {
-  IONO_NVTX_RANGE("Warmup Phase", profiling::colors::LIGHT_GRAY);
+  SIGTEKX_NVTX_RANGE("Warmup Phase", profiling::colors::LIGHT_GRAY);
 
   std::vector<float> warmup_input(static_cast<size_t>(config.nfft) *
                                    config.channels);
@@ -37,13 +37,13 @@ inline void run_warmup(ExecutorT& executor, const BenchmarkConfig& config) {
 
   for (int i = 0; i < config.warmup_iterations; ++i) {
     const std::string name = "Warmup " + std::to_string(i);
-    IONO_NVTX_RANGE(name.c_str(), profiling::colors::LIGHT_GRAY);
+    SIGTEKX_NVTX_RANGE(name.c_str(), profiling::colors::LIGHT_GRAY);
     executor.submit(warmup_input.data(), warmup_output.data(),
                     warmup_input.size());
   }
 
   {
-    IONO_NVTX_RANGE("Warmup Sync", profiling::colors::YELLOW);
+    SIGTEKX_NVTX_RANGE("Warmup Sync", profiling::colors::YELLOW);
     executor.synchronize();
   }
 }

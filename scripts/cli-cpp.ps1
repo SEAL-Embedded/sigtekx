@@ -19,7 +19,7 @@ $script:ProjectRoot = (Get-Item -Path (Join-Path $PSScriptRoot "..")).FullName
 $script:BuildDir = Join-Path $ProjectRoot "build"
 $script:BuildPreset = if ($env:BUILD_PRESET) { $env:BUILD_PRESET } else { "windows-rel" }
 $script:ProfilingDir = Join-Path $ProjectRoot "artifacts\profiling"
-$script:BenchmarkExe = Join-Path $BuildDir "$script:BuildPreset\benchmark_engine.exe"
+$script:BenchmarkExe = Join-Path $BuildDir "$script:BuildPreset\sigtekx_benchmark.exe"
 
 # --- Utility Functions -------------------------------------------------------
 function Write-Status {
@@ -328,7 +328,7 @@ function Invoke-Compare {
 
     Write-Status "Comparing benchmark results..."
 
-    # Simple CSV comparison (assumes format from benchmark_engine.exe)
+    # Simple CSV comparison (assumes format from sigtekx_benchmark.exe)
     Write-Host "📊 Benchmark Comparison" -ForegroundColor Cyan
     Write-Host "Before: $beforeFile" -ForegroundColor DarkGray
     Write-Host "After:  $afterFile" -ForegroundColor DarkGray

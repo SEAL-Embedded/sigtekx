@@ -68,12 +68,12 @@ class CudaException;
 class CufftException;
 
 /**
- * @def IONO_CUDA_CHECK(call)
+ * @def SIGTEKX_CUDA_CHECK(call)
  * @brief Macro to check the return value of a CUDA Runtime API call.
  * @param call The CUDA API call to execute.
  * @throws CudaException if the call does not return cudaSuccess.
  */
-#define IONO_CUDA_CHECK(call)                                \
+#define SIGTEKX_CUDA_CHECK(call)                                \
   do {                                                       \
     cudaError_t error = call;                                \
     if (error != cudaSuccess) {                              \
@@ -82,12 +82,12 @@ class CufftException;
   } while (0)
 
 /**
- * @def IONO_CUFFT_CHECK(call)
+ * @def SIGTEKX_CUFFT_CHECK(call)
  * @brief Macro to check the return value of a cuFFT API call.
  * @param call The cuFFT API call to execute.
  * @throws CufftException if the call does not return CUFFT_SUCCESS.
  */
-#define IONO_CUFFT_CHECK(call)                                 \
+#define SIGTEKX_CUFFT_CHECK(call)                                 \
   do {                                                         \
     cufftResult result = call;                                 \
     if (result != CUFFT_SUCCESS) {                             \
@@ -198,7 +198,7 @@ class CudaStream {
    * @brief Default constructor. Creates a new non-blocking CUDA stream.
    */
   CudaStream() : stream_(nullptr) {
-    IONO_CUDA_CHECK(cudaStreamCreateWithFlags(&stream_, cudaStreamNonBlocking));
+    SIGTEKX_CUDA_CHECK(cudaStreamCreateWithFlags(&stream_, cudaStreamNonBlocking));
   }
 
   /**
@@ -264,7 +264,7 @@ class CudaStream {
    * @brief Synchronizes the stream. Blocks the host until all preceding
    * commands in the stream are complete.
    */
-  void synchronize() const { IONO_CUDA_CHECK(cudaStreamSynchronize(stream_)); }
+  void synchronize() const { SIGTEKX_CUDA_CHECK(cudaStreamSynchronize(stream_)); }
 
   /**
    * @brief Queries the status of the stream.
@@ -274,7 +274,7 @@ class CudaStream {
   bool query() const {
     cudaError_t status = cudaStreamQuery(stream_);
     if (status == cudaErrorNotReady) return false;
-    IONO_CUDA_CHECK(status);
+    SIGTEKX_CUDA_CHECK(status);
     return true;
   }
 
@@ -298,7 +298,7 @@ class CudaEvent {
    * performance.
    */
   CudaEvent() : event_(nullptr) {
-    IONO_CUDA_CHECK(cudaEventCreateWithFlags(&event_, cudaEventDisableTiming));
+    SIGTEKX_CUDA_CHECK(cudaEventCreateWithFlags(&event_, cudaEventDisableTiming));
   }
 
   /**
@@ -306,7 +306,7 @@ class CudaEvent {
    * @param flags Flags for cudaEventCreateWithFlags (e.g., 0 for timing).
    */
   explicit CudaEvent(unsigned int flags) : event_(nullptr) {
-    IONO_CUDA_CHECK(cudaEventCreateWithFlags(&event_, flags));
+    SIGTEKX_CUDA_CHECK(cudaEventCreateWithFlags(&event_, flags));
   }
 
   /**
@@ -362,13 +362,13 @@ class CudaEvent {
    * default stream (0).
    */
   void record(cudaStream_t stream = 0) {
-    IONO_CUDA_CHECK(cudaEventRecord(event_, stream));
+    SIGTEKX_CUDA_CHECK(cudaEventRecord(event_, stream));
   }
 
   /**
    * @brief Synchronizes the host thread with this event.
    */
-  void synchronize() const { IONO_CUDA_CHECK(cudaEventSynchronize(event_)); }
+  void synchronize() const { SIGTEKX_CUDA_CHECK(cudaEventSynchronize(event_)); }
 
   /**
    * @brief Queries the status of the event.
@@ -377,7 +377,7 @@ class CudaEvent {
   bool query() const {
     cudaError_t status = cudaEventQuery(event_);
     if (status == cudaErrorNotReady) return false;
-    IONO_CUDA_CHECK(status);
+    SIGTEKX_CUDA_CHECK(status);
     return true;
   }
 
@@ -389,7 +389,7 @@ class CudaEvent {
    */
   float elapsed_ms(const CudaEvent& start) const {
     float ms = 0.0f;
-    IONO_CUDA_CHECK(cudaEventElapsedTime(&ms, start.event_, event_));
+    SIGTEKX_CUDA_CHECK(cudaEventElapsedTime(&ms, start.event_, event_));
     return ms;
   }
 
@@ -415,7 +415,7 @@ class DeviceBuffer {
   explicit DeviceBuffer(size_t count) : ptr_(nullptr), size_(0) {
     if (count > 0) {
       size_ = count;
-      IONO_CUDA_CHECK(cudaMalloc(&ptr_, count * sizeof(T)));
+      SIGTEKX_CUDA_CHECK(cudaMalloc(&ptr_, count * sizeof(T)));
     }
   }
 
@@ -468,7 +468,7 @@ class DeviceBuffer {
       }
       size_ = new_count;
       if (size_ > 0) {
-        IONO_CUDA_CHECK(cudaMalloc(&ptr_, size_ * sizeof(T)));
+        SIGTEKX_CUDA_CHECK(cudaMalloc(&ptr_, size_ * sizeof(T)));
       }
     }
   }
@@ -479,7 +479,7 @@ class DeviceBuffer {
    */
   void memset(int value = 0) {
     if (ptr_ && size_ > 0) {
-      IONO_CUDA_CHECK(cudaMemset(ptr_, value, bytes()));
+      SIGTEKX_CUDA_CHECK(cudaMemset(ptr_, value, bytes()));
     }
   }
 
@@ -494,7 +494,7 @@ class DeviceBuffer {
     if (count > size_) {
       throw std::runtime_error("Copy size exceeds buffer capacity");
     }
-    IONO_CUDA_CHECK(cudaMemcpyAsync(ptr_, host_ptr, count * sizeof(T),
+    SIGTEKX_CUDA_CHECK(cudaMemcpyAsync(ptr_, host_ptr, count * sizeof(T),
                                     cudaMemcpyHostToDevice, stream));
   }
 
@@ -508,7 +508,7 @@ class DeviceBuffer {
     if (count > size_) {
       throw std::runtime_error("Copy size exceeds buffer capacity");
     }
-    IONO_CUDA_CHECK(cudaMemcpyAsync(host_ptr, ptr_, count * sizeof(T),
+    SIGTEKX_CUDA_CHECK(cudaMemcpyAsync(host_ptr, ptr_, count * sizeof(T),
                                     cudaMemcpyDeviceToHost, stream));
   }
 
@@ -535,7 +535,7 @@ class PinnedHostBuffer {
   explicit PinnedHostBuffer(size_t count) : ptr_(nullptr), size_(0) {
     if (count > 0) {
       size_ = count;
-      IONO_CUDA_CHECK(
+      SIGTEKX_CUDA_CHECK(
           cudaHostAlloc(&ptr_, count * sizeof(T), cudaHostAllocDefault));
     }
   }
@@ -599,7 +599,7 @@ class PinnedHostBuffer {
       }
       size_ = new_count;
       if (size_ > 0) {
-        IONO_CUDA_CHECK(
+        SIGTEKX_CUDA_CHECK(
             cudaHostAlloc(&ptr_, size_ * sizeof(T), cudaHostAllocDefault));
       }
     }
@@ -691,19 +691,19 @@ class CufftPlan {
   void create_plan_many(int rank, int* n, int* inembed, int istride, int idist,
                         int* onembed, int ostride, int odist, cufftType type,
                         int batch, cudaStream_t stream) {
-    IONO_CUFFT_CHECK(cufftCreate(&plan_));
-    IONO_CUFFT_CHECK(cufftSetAutoAllocation(plan_, 0));
-    IONO_CUFFT_CHECK(cufftMakePlanMany(plan_, rank, n, inembed, istride, idist,
+    SIGTEKX_CUFFT_CHECK(cufftCreate(&plan_));
+    SIGTEKX_CUFFT_CHECK(cufftSetAutoAllocation(plan_, 0));
+    SIGTEKX_CUFFT_CHECK(cufftMakePlanMany(plan_, rank, n, inembed, istride, idist,
                                        onembed, ostride, odist, type, batch,
                                        &work_size_));
 
     if (work_size_ > 0) {
       // Allocate work area if cuFFT requires it
       work_area_.resize(work_size_);
-      IONO_CUFFT_CHECK(cufftSetWorkArea(plan_, work_area_.get()));
+      SIGTEKX_CUFFT_CHECK(cufftSetWorkArea(plan_, work_area_.get()));
     }
 
-    IONO_CUFFT_CHECK(cufftSetStream(plan_, stream));
+    SIGTEKX_CUFFT_CHECK(cufftSetStream(plan_, stream));
   }
 
   /**
@@ -712,7 +712,7 @@ class CufftPlan {
    * @param output Pointer to the complex output data on the device.
    */
   void exec_r2c(cufftReal* input, cufftComplex* output) const {
-    IONO_CUFFT_CHECK(cufftExecR2C(plan_, input, output));
+    SIGTEKX_CUFFT_CHECK(cufftExecR2C(plan_, input, output));
   }
 
   /**

@@ -40,27 +40,27 @@ class BatchExecutor::Impl {
     // a full reset if they're configured before first CUDA API call.
     cudaError_t err = cudaSetDeviceFlags(cudaDeviceScheduleBlockingSync);
     if (err != cudaSuccess && err != cudaErrorSetOnActiveProcess) {
-      IONO_CUDA_CHECK(err);  // Throw if it's a real error
+      SIGTEKX_CUDA_CHECK(err);  // Throw if it's a real error
     }
     // cudaErrorSetOnActiveProcess is expected if CUDA was already initialized
 
     // Select best device
     int device_count = 0;
-    IONO_CUDA_CHECK(cudaGetDeviceCount(&device_count));
+    SIGTEKX_CUDA_CHECK(cudaGetDeviceCount(&device_count));
     if (device_count == 0) {
       throw std::runtime_error("No CUDA-capable devices found.");
     }
 
     device_id_ = signal_utils::select_best_device();
-    IONO_CUDA_CHECK(cudaSetDevice(device_id_));
-    IONO_CUDA_CHECK(cudaGetDeviceProperties(&device_props_, device_id_));
+    SIGTEKX_CUDA_CHECK(cudaSetDevice(device_id_));
+    SIGTEKX_CUDA_CHECK(cudaGetDeviceProperties(&device_props_, device_id_));
   }
 
   ~Impl() { reset(); }
 
   void initialize(const ExecutorConfig& config,
                   std::vector<std::unique_ptr<ProcessingStage>> stages) {
-    IONO_NVTX_RANGE("BatchExecutor::Initialize", profiling::colors::DARK_GRAY);
+    SIGTEKX_NVTX_RANGE("BatchExecutor::Initialize", profiling::colors::DARK_GRAY);
 
     if (initialized_) {
       reset();
@@ -82,13 +82,13 @@ class BatchExecutor::Impl {
 
     // Set device if specified
     if (config_.device_id >= 0) {
-      IONO_CUDA_CHECK(cudaSetDevice(config_.device_id));
+      SIGTEKX_CUDA_CHECK(cudaSetDevice(config_.device_id));
       device_id_ = config_.device_id;
     }
 
     // Create CUDA streams
     {
-      IONO_NVTX_RANGE("Create CUDA Streams", profiling::colors::DARK_GRAY);
+      SIGTEKX_NVTX_RANGE("Create CUDA Streams", profiling::colors::DARK_GRAY);
       streams_.clear();
       for (int i = 0; i < config_.stream_count; ++i) {
         streams_.emplace_back();
@@ -97,7 +97,7 @@ class BatchExecutor::Impl {
 
     // Create CUDA events for synchronization
     {
-      IONO_NVTX_RANGE("Create CUDA Events", profiling::colors::DARK_GRAY);
+      SIGTEKX_NVTX_RANGE("Create CUDA Events", profiling::colors::DARK_GRAY);
       events_.clear();
       for (int i = 0; i < config_.pinned_buffer_count * 2; ++i) {
         events_.emplace_back(cudaEventDisableTiming);
@@ -106,7 +106,7 @@ class BatchExecutor::Impl {
 
     // Initialize all pipeline stages
     {
-      IONO_NVTX_RANGE("Initialize Pipeline Stages", profiling::colors::MAGENTA);
+      SIGTEKX_NVTX_RANGE("Initialize Pipeline Stages", profiling::colors::MAGENTA);
       StageConfig stage_config{};
       stage_config.nfft = config_.nfft;
       stage_config.channels = config_.channels;
@@ -127,7 +127,7 @@ class BatchExecutor::Impl {
           static_cast<StageConfig::OutputMode>(config_.output_mode);
 
       for (auto& stage : stages_) {
-        IONO_NVTX_RANGE("Init Stage", profiling::colors::DARK_GRAY);
+        SIGTEKX_NVTX_RANGE("Init Stage", profiling::colors::DARK_GRAY);
         stage->initialize(stage_config, streams_[0].get());
       }
     }
@@ -145,7 +145,7 @@ class BatchExecutor::Impl {
           static_cast<size_t>(config_.pinned_buffer_count) * sizeof(float);
       const std::string alloc_msg = profiling::format_memory_range(
           "Allocate Device Buffers", total_bytes);
-      IONO_NVTX_RANGE(alloc_msg.c_str(), profiling::colors::CYAN);
+      SIGTEKX_NVTX_RANGE(alloc_msg.c_str(), profiling::colors::CYAN);
 
       d_input_buffers_.clear();
       d_output_buffers_.clear();
@@ -172,20 +172,20 @@ class BatchExecutor::Impl {
 
     stats_ = ProcessingStats{};
     stats_.is_warmup = false;
-    IONO_NVTX_MARK("Initialization Complete", profiling::colors::CYAN);
+    SIGTEKX_NVTX_MARK("Initialization Complete", profiling::colors::CYAN);
   }
 
   void reset() {
-    IONO_NVTX_RANGE_FUNCTION(profiling::colors::RED);
+    SIGTEKX_NVTX_RANGE_FUNCTION(profiling::colors::RED);
     if (!initialized_) return;
 
     {
-      IONO_NVTX_RANGE("Synchronize All Streams", profiling::colors::YELLOW);
+      SIGTEKX_NVTX_RANGE("Synchronize All Streams", profiling::colors::YELLOW);
       synchronize();
     }
 
     {
-      IONO_NVTX_RANGE("Release Resources", profiling::colors::RED);
+      SIGTEKX_NVTX_RANGE("Release Resources", profiling::colors::RED);
       stages_.clear();
       streams_.clear();
       events_.clear();
@@ -196,11 +196,11 @@ class BatchExecutor::Impl {
 
     frame_counter_ = 0;
     initialized_ = false;
-    IONO_NVTX_MARK("Reset Complete", profiling::colors::RED);
+    SIGTEKX_NVTX_MARK("Reset Complete", profiling::colors::RED);
   }
 
   void submit(const float* input, float* output, size_t num_samples) {
-    IONO_NVTX_RANGE_FUNCTION(profiling::colors::NVIDIA_BLUE);
+    SIGTEKX_NVTX_RANGE_FUNCTION(profiling::colors::NVIDIA_BLUE);
     if (!initialized_) {
       throw std::runtime_error("Executor not initialized");
     }
@@ -225,11 +225,11 @@ class BatchExecutor::Impl {
     // Guard buffer reuse with D2H sync
     // Critical for correctness with round-robin buffer reuse
     if (frame_counter_ >= static_cast<size_t>(config_.pinned_buffer_count)) {
-      IONO_NVTX_RANGE("Wait for Buffer Availability",
+      SIGTEKX_NVTX_RANGE("Wait for Buffer Availability",
                       profiling::colors::YELLOW);
-      IONO_CUDA_CHECK(
+      SIGTEKX_CUDA_CHECK(
           cudaStreamSynchronize(streams_[compute_stream_idx].get()));
-      IONO_CUDA_CHECK(cudaStreamSynchronize(streams_[d2h_stream_idx].get()));
+      SIGTEKX_CUDA_CHECK(cudaStreamSynchronize(streams_[d2h_stream_idx].get()));
     }
 
     // H2D Transfer
@@ -237,18 +237,18 @@ class BatchExecutor::Impl {
       const size_t bytes = num_samples * sizeof(float);
       const std::string h2d_msg =
           profiling::format_memory_range("H2D Transfer", bytes);
-      IONO_NVTX_RANGE(h2d_msg.c_str(), profiling::colors::GREEN);
+      SIGTEKX_NVTX_RANGE(h2d_msg.c_str(), profiling::colors::GREEN);
       d_input.copy_from_host(input, num_samples,
                              streams_[h2d_stream_idx].get());
       e_h2d_done.record(streams_[h2d_stream_idx].get());
     }
 
     // Processing Pipeline
-    IONO_CUDA_CHECK(cudaStreamWaitEvent(streams_[compute_stream_idx].get(),
+    SIGTEKX_CUDA_CHECK(cudaStreamWaitEvent(streams_[compute_stream_idx].get(),
                                         e_h2d_done.get(), 0));
 
     {
-      IONO_NVTX_RANGE("Compute Pipeline", profiling::colors::PURPLE);
+      SIGTEKX_NVTX_RANGE("Compute Pipeline", profiling::colors::PURPLE);
       // Generalized stage execution with dynamic buffer routing
       // Strategy:
       // - First stage: always operates on d_input (may be in-place)
@@ -294,7 +294,7 @@ class BatchExecutor::Impl {
         // Process this stage with CURRENT input size
         {
           const std::string stage_msg = "Stage: " + stage_name;
-          IONO_NVTX_RANGE(stage_msg.c_str(), profiling::colors::MAGENTA);
+          SIGTEKX_NVTX_RANGE(stage_msg.c_str(), profiling::colors::MAGENTA);
           stage->process(current_input, current_output, current_size,
                          streams_[compute_stream_idx].get());
         }
@@ -327,8 +327,8 @@ class BatchExecutor::Impl {
       const size_t bytes = complex_elements * sizeof(float);
       const std::string d2h_msg =
           profiling::format_memory_range("D2H Transfer", bytes);
-      IONO_NVTX_RANGE(d2h_msg.c_str(), profiling::colors::ORANGE);
-      IONO_CUDA_CHECK(cudaStreamWaitEvent(streams_[d2h_stream_idx].get(),
+      SIGTEKX_NVTX_RANGE(d2h_msg.c_str(), profiling::colors::ORANGE);
+      SIGTEKX_CUDA_CHECK(cudaStreamWaitEvent(streams_[d2h_stream_idx].get(),
                                           e_compute_done.get(), 0));
       d_output.copy_to_host(output, complex_elements,
                             streams_[d2h_stream_idx].get());
@@ -336,8 +336,8 @@ class BatchExecutor::Impl {
 
     // Final synchronization
     {
-      IONO_NVTX_RANGE("Stream Sync", profiling::colors::YELLOW);
-      IONO_CUDA_CHECK(cudaStreamSynchronize(streams_[d2h_stream_idx].get()));
+      SIGTEKX_NVTX_RANGE("Stream Sync", profiling::colors::YELLOW);
+      SIGTEKX_CUDA_CHECK(cudaStreamSynchronize(streams_[d2h_stream_idx].get()));
     }
 
     // Update statistics
@@ -354,7 +354,7 @@ class BatchExecutor::Impl {
 
   void submit_async(const float* input, size_t num_samples,
                     ResultCallback callback) {
-    IONO_NVTX_RANGE_FUNCTION(profiling::colors::NVIDIA_BLUE);
+    SIGTEKX_NVTX_RANGE_FUNCTION(profiling::colors::NVIDIA_BLUE);
     if (!initialized_) {
       throw std::runtime_error("Executor not initialized");
     }
@@ -369,7 +369,7 @@ class BatchExecutor::Impl {
     submit(input, output.data(), num_samples);
 
     if (callback) {
-      IONO_NVTX_RANGE("Result Callback", profiling::colors::CYAN);
+      SIGTEKX_NVTX_RANGE("Result Callback", profiling::colors::CYAN);
       // Note: Third parameter is num_frames. Currently passes config_.channels
       // because each submit() processes 1 temporal frame with N spatial
       // channels, producing N spectra. In future versions with true temporal
@@ -380,7 +380,7 @@ class BatchExecutor::Impl {
   }
 
   void synchronize() {
-    IONO_NVTX_RANGE_FUNCTION(profiling::colors::YELLOW);
+    SIGTEKX_NVTX_RANGE_FUNCTION(profiling::colors::YELLOW);
     for (auto& s : streams_) {
       s.synchronize();
     }

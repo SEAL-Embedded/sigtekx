@@ -24,7 +24,7 @@
 using namespace sigtekx;
 
 static std::vector<float> generate_test_signal(int nfft, int batch) {
-  IONO_NVTX_RANGE("Generate Test Signal", profiling::colors::CYAN);
+  SIGTEKX_NVTX_RANGE("Generate Test Signal", profiling::colors::CYAN);
   std::vector<float> signal(static_cast<size_t>(nfft) * batch);
   std::mt19937 gen(12345);
   std::normal_distribution<float> dist(0.0f, 1.0f);
@@ -34,17 +34,17 @@ static std::vector<float> generate_test_signal(int nfft, int batch) {
 
 static void run_warmup(BatchExecutor& executor, int warmup_iters, int nfft,
                        int batch) {
-  IONO_NVTX_RANGE("Warmup Phase", profiling::colors::LIGHT_GRAY);
+  SIGTEKX_NVTX_RANGE("Warmup Phase", profiling::colors::LIGHT_GRAY);
   std::vector<float> warmup_input(static_cast<size_t>(nfft) * batch, 0.0f);
   std::vector<float> warmup_output(static_cast<size_t>(nfft / 2 + 1) * batch);
   for (int i = 0; i < warmup_iters; ++i) {
     const std::string name = "Warmup " + std::to_string(i);
-    IONO_NVTX_RANGE(name.c_str(), profiling::colors::LIGHT_GRAY);
+    SIGTEKX_NVTX_RANGE(name.c_str(), profiling::colors::LIGHT_GRAY);
     executor.submit(warmup_input.data(), warmup_output.data(),
                     warmup_input.size());
   }
   {
-    IONO_NVTX_RANGE("Warmup Sync", profiling::colors::YELLOW);
+    SIGTEKX_NVTX_RANGE("Warmup Sync", profiling::colors::YELLOW);
     executor.synchronize();
   }
 }
@@ -74,7 +74,7 @@ TEST(NvtxProfilingTest, BenchmarkPhasesRun) {
   cfg.device_id = -1;  // auto-select
 
   {
-    IONO_NVTX_RANGE("Executor Initialization", profiling::colors::DARK_GRAY);
+    SIGTEKX_NVTX_RANGE("Executor Initialization", profiling::colors::DARK_GRAY);
     auto stages = StageFactory::create_default_pipeline();
     EXPECT_NO_THROW(executor.initialize(cfg, std::move(stages)));
     EXPECT_TRUE(executor.is_initialized());
@@ -90,10 +90,10 @@ TEST(NvtxProfilingTest, BenchmarkPhasesRun) {
   latencies.reserve(iterations);
 
   {
-    IONO_NVTX_RANGE("Benchmark Phase", profiling::colors::NVIDIA_BLUE);
+    SIGTEKX_NVTX_RANGE("Benchmark Phase", profiling::colors::NVIDIA_BLUE);
     for (int i = 0; i < iterations; ++i) {
       const std::string iter_name = "Benchmark Iteration " + std::to_string(i);
-      IONO_NVTX_RANGE(iter_name.c_str(), profiling::colors::NVIDIA_BLUE);
+      SIGTEKX_NVTX_RANGE(iter_name.c_str(), profiling::colors::NVIDIA_BLUE);
       auto t0 = std::chrono::high_resolution_clock::now();
       EXPECT_NO_THROW(
           executor.submit(input.data(), output.data(), input.size()));
@@ -105,7 +105,7 @@ TEST(NvtxProfilingTest, BenchmarkPhasesRun) {
 
   // Sync and analyze
   {
-    IONO_NVTX_RANGE("Results Analysis", profiling::colors::CYAN);
+    SIGTEKX_NVTX_RANGE("Results Analysis", profiling::colors::CYAN);
     executor.synchronize();
     ASSERT_EQ(latencies.size(), static_cast<size_t>(iterations));
     const float mean =
@@ -118,7 +118,7 @@ TEST(NvtxProfilingTest, BenchmarkPhasesRun) {
 
   // Cleanup
   {
-    IONO_NVTX_RANGE("Cleanup Phase", profiling::colors::RED);
+    SIGTEKX_NVTX_RANGE("Cleanup Phase", profiling::colors::RED);
     executor.reset();
     EXPECT_FALSE(executor.is_initialized());
   }

@@ -7,7 +7,7 @@ project(sigtekx LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 ## CUDA settings are configured conditionally later when SIGTEKX_WITH_CUDA is ON
 
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)     # (PIC) For ion_engine static lib to be used in _native shared lib - Important for Linux!
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)     # (PIC) For sigtekx_core static lib to be used in _native shared lib - Important for Linux!
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF) # (IPO) Interferes with nvcc's own LTO; Can damage _native bindings; Do not enable/remove!
 # Use the static C-Runtime on MSVC to match CUDA::cudart_static and avoid DLL dependencies
 if(MSVC)
@@ -149,7 +149,7 @@ FetchContent_Declare(
 # Core static lib with CUDA kernels
 # ============================================================================
 if(SIGTEKX_WITH_CUDA)
-add_library(ion_engine OBJECT
+add_library(sigtekx_core OBJECT
     # CUDA kernels (STFT pipeline operations)
     cpp/src/kernels/fft_wrapper.cu
 
@@ -165,15 +165,15 @@ add_library(ion_engine OBJECT
     cpp/src/executors/batch_executor.cpp
     cpp/src/executors/streaming_executor.cpp
 )
-target_include_directories(ion_engine PUBLIC
+target_include_directories(sigtekx_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/cpp/include
     ${CUDAToolkit_INCLUDE_DIRS}
 )
-set_target_properties(ion_engine PROPERTIES CUDA_SEPARABLE_COMPILATION ON) # Enables device code linking between .cu files - Important!
-target_link_libraries(ion_engine PUBLIC CUDA::cufft)
+set_target_properties(sigtekx_core PROPERTIES CUDA_SEPARABLE_COMPILATION ON) # Enables device code linking between .cu files - Important!
+target_link_libraries(sigtekx_core PUBLIC CUDA::cufft)
 if(SIGTEKX_WITH_NVTX)
   # Always compile profiling code; runtime will dynamically load NVTX if present
-  target_compile_definitions(ion_engine PUBLIC SIGTEKX_ENABLE_PROFILING)
+  target_compile_definitions(sigtekx_core PUBLIC SIGTEKX_ENABLE_PROFILING)
 endif()
 endif()
 
@@ -186,13 +186,13 @@ if(SIGTEKX_WITH_PYTHON AND SIGTEKX_WITH_CUDA)
 
     target_include_directories(_native PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/cpp/include)
     target_link_libraries(_native PRIVATE
-        "$<TARGET_OBJECTS:ion_engine>"
+        "$<TARGET_OBJECTS:sigtekx_core>"
         pybind11::module
         CUDA::cudart_static
         CUDA::cufft
     )
     if(SIGTEKX_WITH_NVTX)
-        # _native compiles only bindings.cpp; profiling is handled in ion_engine object TUs.
+        # _native compiles only bindings.cpp; profiling is handled in sigtekx_core object TUs.
         target_compile_definitions(_native PRIVATE SIGTEKX_ENABLE_PROFILING)
     endif()
 
@@ -216,10 +216,10 @@ if(SIGTEKX_WITH_PYTHON AND SIGTEKX_WITH_CUDA)
         endif()
     else()
         # Developer builds: drop beside the python package tree
-        set(_ION_PY_OUT "${CMAKE_CURRENT_SOURCE_DIR}/src/sigtekx/core")
+        set(_SIGTEKX_PY_OUT "${CMAKE_CURRENT_SOURCE_DIR}/src/sigtekx/core")
         set_target_properties(_native PROPERTIES
-            LIBRARY_OUTPUT_DIRECTORY  "${_ION_PY_OUT}"
-            RUNTIME_OUTPUT_DIRECTORY  "${_ION_PY_OUT}"
+            LIBRARY_OUTPUT_DIRECTORY  "${_SIGTEKX_PY_OUT}"
+            RUNTIME_OUTPUT_DIRECTORY  "${_SIGTEKX_PY_OUT}"
             CUDA_SEPARABLE_COMPILATION ON
             CUDA_RESOLVE_DEVICE_SYMBOLS ON
         )
@@ -261,7 +261,7 @@ if(SIGTEKX_WITH_PYTHON AND SIGTEKX_WITH_CUDA)
                         COMMENT "[sigtekx] Staging CUDA runtime DLLs to ${_LIBS_DIR}"
                     )
                 else()
-                    message(WARNING "[sigtekx] CUDA runtime DLLs not found in ${_FOUND_DIR}. Runtime may rely on system PATH.")
+                    message(STATUS "[sigtekx] CUDA DLLs not found in ${_FOUND_DIR} - will use system PATH (normal for some conda builds)")
                 endif()
             else()
                 message(STATUS "[sigtekx] No CUDA bin directory found for DLL staging; skipping.")
@@ -287,20 +287,20 @@ if(SIGTEKX_WITH_TESTS AND SIGTEKX_WITH_CUDA)
     FetchContent_MakeAvailable(googletest)
 
     # Automatically include all unit test sources (organized in subdirectories)
-    file(GLOB_RECURSE TEST_ENGINE_SOURCES CONFIGURE_DEPENDS
+    file(GLOB_RECURSE SIGTEKX_TEST_SOURCES CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/cpp/tests/**/*.cpp"
     )
-    list(SORT TEST_ENGINE_SOURCES)
+    list(SORT SIGTEKX_TEST_SOURCES)
 
-    add_executable(test_engine ${TEST_ENGINE_SOURCES})
-    set_target_properties(test_engine PROPERTIES CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+    add_executable(sigtekx_tests ${SIGTEKX_TEST_SOURCES})
+    set_target_properties(sigtekx_tests PROPERTIES CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 
     # Add include dirs and set CUDA properties for the test executable - Important!
-    target_include_directories(test_engine PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/cpp/include)
+    target_include_directories(sigtekx_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/cpp/include)
 
-    # Link against the object files from ion_engine directly + GTest + CUDA
-    target_link_libraries(test_engine PRIVATE
-        "$<TARGET_OBJECTS:ion_engine>"
+    # Link against the object files from sigtekx_core directly + GTest + CUDA
+    target_link_libraries(sigtekx_tests PRIVATE
+        "$<TARGET_OBJECTS:sigtekx_core>"
         GTest::gtest_main
         CUDA::cudart_static
         CUDA::cufft
@@ -308,27 +308,27 @@ if(SIGTEKX_WITH_TESTS AND SIGTEKX_WITH_CUDA)
     # NVTX3 is header-only in our integration; no additional linking required
 
     include(GoogleTest)
-    gtest_discover_tests(test_engine)
+    gtest_discover_tests(sigtekx_tests)
 
     # ========================================================================
     # C++ Standalone Benchmark (Development Only)
     # ========================================================================
     # This executable is for C++ kernel development and iteration BEFORE Python
     # integration. For production profiling, use `iprof` with Python benchmarks.
-    add_executable(benchmark_engine
+    add_executable(sigtekx_benchmark
         cpp/benchmarks/main.cpp
     )
-    set_target_properties(benchmark_engine PROPERTIES CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+    set_target_properties(sigtekx_benchmark PROPERTIES CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 
-    target_include_directories(benchmark_engine PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/cpp/include)
+    target_include_directories(sigtekx_benchmark PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/cpp/include)
 
-    target_link_libraries(benchmark_engine PRIVATE
-        "$<TARGET_OBJECTS:ion_engine>"
+    target_link_libraries(sigtekx_benchmark PRIVATE
+        "$<TARGET_OBJECTS:sigtekx_core>"
         CUDA::cudart_static
         CUDA::cufft
     )
 
     if(SIGTEKX_WITH_NVTX)
-        target_compile_definitions(benchmark_engine PRIVATE SIGTEKX_ENABLE_PROFILING)
+        target_compile_definitions(sigtekx_benchmark PRIVATE SIGTEKX_ENABLE_PROFILING)
     endif()
 endif()

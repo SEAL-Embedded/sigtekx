@@ -22,11 +22,11 @@
       "binaryDir": "${sourceDir}/build/linux-rel",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "IONO_WITH_TESTS": "ON",
-        "IONO_WITH_GRAPHS": "ON",
-        "IONO_WITH_PYTHON": "ON",
-        "IONO_WITH_NVTX": "ON",
-        "IONO_WITH_TIDY": "OFF"
+        "SIGTEKX_WITH_TESTS": "ON",
+        "SIGTEKX_WITH_GRAPHS": "ON",
+        "SIGTEKX_WITH_PYTHON": "ON",
+        "SIGTEKX_WITH_NVTX": "ON",
+        "SIGTEKX_WITH_TIDY": "OFF"
       }
     },
     {
@@ -37,11 +37,11 @@
       "binaryDir": "${sourceDir}/build/linux-debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "IONO_WITH_TESTS": "ON",
-        "IONO_WITH_GRAPHS": "ON",
-        "IONO_WITH_PYTHON": "ON",
-        "IONO_WITH_NVTX": "ON",
-        "IONO_WITH_TIDY": "OFF"
+        "SIGTEKX_WITH_TESTS": "ON",
+        "SIGTEKX_WITH_GRAPHS": "ON",
+        "SIGTEKX_WITH_PYTHON": "ON",
+        "SIGTEKX_WITH_NVTX": "ON",
+        "SIGTEKX_WITH_TIDY": "OFF"
       }
     },
     {
@@ -52,11 +52,11 @@
       "binaryDir": "${sourceDir}/build/windows-rel",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "IONO_WITH_TESTS": "ON",
-        "IONO_WITH_GRAPHS": "ON",
-        "IONO_WITH_PYTHON": "ON",
-        "IONO_WITH_NVTX": "ON",
-        "IONO_WITH_TIDY": "OFF"
+        "SIGTEKX_WITH_TESTS": "ON",
+        "SIGTEKX_WITH_GRAPHS": "ON",
+        "SIGTEKX_WITH_PYTHON": "ON",
+        "SIGTEKX_WITH_NVTX": "ON",
+        "SIGTEKX_WITH_TIDY": "OFF"
       }
     },
     {
@@ -67,11 +67,11 @@
       "binaryDir": "${sourceDir}/build/windows-debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "IONO_WITH_TESTS": "ON",
-        "IONO_WITH_GRAPHS": "ON",
-        "IONO_WITH_PYTHON": "ON",
-        "IONO_WITH_NVTX": "ON",
-        "IONO_WITH_TIDY": "OFF"
+        "SIGTEKX_WITH_TESTS": "ON",
+        "SIGTEKX_WITH_GRAPHS": "ON",
+        "SIGTEKX_WITH_PYTHON": "ON",
+        "SIGTEKX_WITH_NVTX": "ON",
+        "SIGTEKX_WITH_TIDY": "OFF"
       }
     },
     {
@@ -82,12 +82,12 @@
       "binaryDir": "${sourceDir}/build/windows-coverage",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "IONO_WITH_TESTS": "ON",
-        "IONO_WITH_GRAPHS": "ON",
-        "IONO_WITH_PYTHON": "OFF",
-        "IONO_WITH_NVTX": "ON",
-        "IONO_WITH_TIDY": "OFF",
-        "IONO_ENABLE_COVERAGE": "ON"
+        "SIGTEKX_WITH_TESTS": "ON",
+        "SIGTEKX_WITH_GRAPHS": "ON",
+        "SIGTEKX_WITH_PYTHON": "OFF",
+        "SIGTEKX_WITH_NVTX": "ON",
+        "SIGTEKX_WITH_TIDY": "OFF",
+        "SIGTEKX_ENABLE_COVERAGE": "ON"
       }
     },
     {
@@ -98,11 +98,11 @@
       "binaryDir": "${sourceDir}/build/windows-vs",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "IONO_WITH_TESTS": "ON",
-        "IONO_WITH_GRAPHS": "ON",
-        "IONO_WITH_PYTHON": "ON",
-        "IONO_WITH_NVTX": "ON",
-        "IONO_WITH_TIDY": "OFF"
+        "SIGTEKX_WITH_TESTS": "ON",
+        "SIGTEKX_WITH_GRAPHS": "ON",
+        "SIGTEKX_WITH_PYTHON": "ON",
+        "SIGTEKX_WITH_NVTX": "ON",
+        "SIGTEKX_WITH_TIDY": "OFF"
       }
     },
     {
@@ -112,10 +112,10 @@
       "description": "Builds without C++ tests for CPU-only CI runner.",
       "binaryDir": "${sourceDir}/build/ci",
       "cacheVariables": {
-        "IONO_WITH_TESTS": "OFF",
-        "IONO_WITH_PYTHON": "ON",
-        "IONO_WITH_NVTX": "ON",
-        "IONO_WITH_TIDY": "OFF"
+        "SIGTEKX_WITH_TESTS": "OFF",
+        "SIGTEKX_WITH_PYTHON": "ON",
+        "SIGTEKX_WITH_NVTX": "ON",
+        "SIGTEKX_WITH_TIDY": "OFF"
       }
     }
   ],

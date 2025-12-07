@@ -57,12 +57,12 @@ class WindowStage::Impl {
   Impl() = default;
 
   void initialize(const StageConfig& config, cudaStream_t stream) {
-    IONO_NVTX_RANGE("WindowStage::Initialize", profiling::colors::DARK_GRAY);
+    SIGTEKX_NVTX_RANGE("WindowStage::Initialize", profiling::colors::DARK_GRAY);
     config_ = config;
 
     // Generate window coefficients on the host CPU.
     {
-      IONO_NVTX_RANGE("Generate Window Coefficients",
+      SIGTEKX_NVTX_RANGE("Generate Window Coefficients",
                       profiling::colors::DARK_GRAY);
       std::vector<float> host_window(config.nfft);
       bool sqrt_norm = (config.window_norm == StageConfig::WindowNorm::SQRT);
@@ -74,7 +74,7 @@ class WindowStage::Impl {
       // Note: SQRT normalization is already applied during generation
       // UNITY normalization needs to be applied here
       if (config.window_norm == StageConfig::WindowNorm::UNITY) {
-        IONO_NVTX_RANGE("Apply UNITY Normalization", profiling::colors::CYAN);
+        SIGTEKX_NVTX_RANGE("Apply UNITY Normalization", profiling::colors::CYAN);
         window_utils::normalize_window(host_window.data(), config.nfft,
                                        config.window_norm);
       }
@@ -85,7 +85,7 @@ class WindowStage::Impl {
         const size_t bytes = static_cast<size_t>(config.nfft) * sizeof(float);
         const std::string msg =
             profiling::format_memory_range("Upload Window Coefficients", bytes);
-        IONO_NVTX_RANGE(msg.c_str(), profiling::colors::GREEN);
+        SIGTEKX_NVTX_RANGE(msg.c_str(), profiling::colors::GREEN);
       }
       d_window_.copy_from_host(host_window.data(), config.nfft, stream);
     }
@@ -93,19 +93,19 @@ class WindowStage::Impl {
     // Ensure the window is fully uploaded before subsequent stages might use
     // it.
     {
-      IONO_NVTX_RANGE("Window Upload Sync", profiling::colors::YELLOW);
-      IONO_CUDA_CHECK(cudaStreamSynchronize(stream));
+      SIGTEKX_NVTX_RANGE("Window Upload Sync", profiling::colors::YELLOW);
+      SIGTEKX_CUDA_CHECK(cudaStreamSynchronize(stream));
     }
 
     initialized_ = true;
-    IONO_NVTX_MARK("WindowStage Ready", profiling::colors::CYAN);
+    SIGTEKX_NVTX_MARK("WindowStage Ready", profiling::colors::CYAN);
   }
 
   void process(void* input, void* output, size_t num_samples,
                cudaStream_t stream) {
     const std::string range_name =
         profiling::format_stage_range("Window", config_.channels, config_.nfft);
-    IONO_NVTX_RANGE(range_name.c_str(), profiling::colors::PURPLE);
+    SIGTEKX_NVTX_RANGE(range_name.c_str(), profiling::colors::PURPLE);
     if (!initialized_) {
       throw std::runtime_error("WindowStage not initialized");
     }
@@ -118,7 +118,7 @@ class WindowStage::Impl {
     float* output_ptr = static_cast<float*>(output);
 
     {
-      IONO_NVTX_RANGE("Window Kernel Launch", profiling::colors::PURPLE);
+      SIGTEKX_NVTX_RANGE("Window Kernel Launch", profiling::colors::PURPLE);
       kernels::launch_apply_window(input_ptr, output_ptr, d_window_.get(),
                                    config_.nfft, config_.channels, config_.nfft,
                                    stream);
@@ -162,12 +162,12 @@ class FFTStage::Impl {
   Impl() = default;
 
   void initialize(const StageConfig& config, cudaStream_t stream) {
-    IONO_NVTX_RANGE("FFTStage::Initialize", profiling::colors::DARK_GRAY);
+    SIGTEKX_NVTX_RANGE("FFTStage::Initialize", profiling::colors::DARK_GRAY);
     config_ = config;
 
     // Configure dimensions for a batched 1D Real-to-Complex transform.
     {
-      IONO_NVTX_RANGE("Create cuFFT Plan", profiling::colors::DARK_GRAY);
+      SIGTEKX_NVTX_RANGE("Create cuFFT Plan", profiling::colors::DARK_GRAY);
       int n[] = {config.nfft};
       plan_.create_plan_many(
           1,                    // rank (1D transform)
@@ -183,14 +183,14 @@ class FFTStage::Impl {
           stream);
     }
     initialized_ = true;
-    IONO_NVTX_MARK("FFTStage Ready", profiling::colors::CYAN);
+    SIGTEKX_NVTX_MARK("FFTStage Ready", profiling::colors::CYAN);
   }
 
   void process(void* input, void* output, size_t num_samples,
                cudaStream_t /*stream*/) {
     const std::string range_name =
         profiling::format_stage_range("FFT", config_.channels, config_.nfft);
-    IONO_NVTX_RANGE(range_name.c_str(), profiling::colors::PURPLE);
+    SIGTEKX_NVTX_RANGE(range_name.c_str(), profiling::colors::PURPLE);
     if (!initialized_) {
       throw std::runtime_error("FFTStage not initialized");
     }
@@ -201,7 +201,7 @@ class FFTStage::Impl {
 
     // Execute the R2C transform. Input is real, output is complex.
     {
-      IONO_NVTX_RANGE("cuFFT Execution", profiling::colors::PURPLE);
+      SIGTEKX_NVTX_RANGE("cuFFT Execution", profiling::colors::PURPLE);
       cufftReal* fft_real_input = static_cast<cufftReal*>(input);
       cufftComplex* fft_cplx_output = reinterpret_cast<cufftComplex*>(output);
       plan_.exec_r2c(fft_real_input, fft_cplx_output);
@@ -243,13 +243,13 @@ class MagnitudeStage::Impl {
   Impl() = default;
 
   void initialize(const StageConfig& cfg, cudaStream_t /*stream*/) {
-    IONO_NVTX_RANGE("MagnitudeStage::Initialize", profiling::colors::DARK_GRAY);
+    SIGTEKX_NVTX_RANGE("MagnitudeStage::Initialize", profiling::colors::DARK_GRAY);
     config_ = cfg;
     num_output_bins_ = static_cast<int>(config_.nfft / 2 + 1);
 
     // Pre-calculate the scaling factor based on the selected policy.
     {
-      IONO_NVTX_RANGE("Calculate Scaling Factor", profiling::colors::CYAN);
+      SIGTEKX_NVTX_RANGE("Calculate Scaling Factor", profiling::colors::CYAN);
       switch (config_.scale_policy) {
         case StageConfig::ScalePolicy::ONE_OVER_N:
           scale_ = 1.0f / static_cast<float>(config_.nfft);
@@ -270,7 +270,7 @@ class MagnitudeStage::Impl {
                cudaStream_t stream) {
     const std::string range_name = profiling::format_stage_range(
         "Magnitude", config_.channels, config_.nfft);
-    IONO_NVTX_RANGE(range_name.c_str(), profiling::colors::PURPLE);
+    SIGTEKX_NVTX_RANGE(range_name.c_str(), profiling::colors::PURPLE);
     if (!initialized_) {
       throw std::runtime_error("MagnitudeStage not initialized");
     }
@@ -297,7 +297,7 @@ class MagnitudeStage::Impl {
     }
 
     {
-      IONO_NVTX_RANGE("Magnitude Kernel Launch", profiling::colors::PURPLE);
+      SIGTEKX_NVTX_RANGE("Magnitude Kernel Launch", profiling::colors::PURPLE);
       kernels::launch_magnitude(complex_input, mag_output, bins_per_frame,
                                 frames, inferred_stride, scale_, stream);
     }
@@ -332,18 +332,18 @@ size_t MagnitudeStage::get_workspace_size() const {
 // ============================================================================
 
 std::unique_ptr<ProcessingStage> StageFactory::create(StageType type) {
-  IONO_NVTX_RANGE("StageFactory::Create", profiling::colors::DARK_GRAY);
+  SIGTEKX_NVTX_RANGE("StageFactory::Create", profiling::colors::DARK_GRAY);
   switch (type) {
     case StageType::WINDOW: {
-      IONO_NVTX_MARK("Create WindowStage", profiling::colors::MAGENTA);
+      SIGTEKX_NVTX_MARK("Create WindowStage", profiling::colors::MAGENTA);
       return std::make_unique<WindowStage>();
     }
     case StageType::FFT: {
-      IONO_NVTX_MARK("Create FFTStage", profiling::colors::MAGENTA);
+      SIGTEKX_NVTX_MARK("Create FFTStage", profiling::colors::MAGENTA);
       return std::make_unique<FFTStage>();
     }
     case StageType::MAGNITUDE: {
-      IONO_NVTX_MARK("Create MagnitudeStage", profiling::colors::MAGENTA);
+      SIGTEKX_NVTX_MARK("Create MagnitudeStage", profiling::colors::MAGENTA);
       return std::make_unique<MagnitudeStage>();
     }
     default: {
@@ -355,13 +355,13 @@ std::unique_ptr<ProcessingStage> StageFactory::create(StageType type) {
 
 std::vector<std::unique_ptr<ProcessingStage>>
 StageFactory::create_default_pipeline() {
-  IONO_NVTX_RANGE("StageFactory::CreateDefaultPipeline",
+  SIGTEKX_NVTX_RANGE("StageFactory::CreateDefaultPipeline",
                   profiling::colors::DARK_GRAY);
   std::vector<std::unique_ptr<ProcessingStage>> stages;
   stages.push_back(create(StageType::WINDOW));
   stages.push_back(create(StageType::FFT));
   stages.push_back(create(StageType::MAGNITUDE));
-  IONO_NVTX_MARK("Default Pipeline Created", profiling::colors::MAGENTA);
+  SIGTEKX_NVTX_MARK("Default Pipeline Created", profiling::colors::MAGENTA);
   return stages;
 }
 
@@ -396,14 +396,14 @@ window_functions::WindowSymmetry to_window_symmetry(
 
 void generate_window(float* window, int size, StageConfig::WindowType type,
                      bool sqrt_norm, StageConfig::WindowSymmetry symmetry) {
-  IONO_NVTX_RANGE("Generate Window", profiling::colors::DARK_GRAY);
+  SIGTEKX_NVTX_RANGE("Generate Window", profiling::colors::DARK_GRAY);
   const auto kind = to_window_kind(type);
   const auto sym = to_window_symmetry(symmetry);
   window_functions::fill_window(window, size, kind, sqrt_norm, sym);
 }
 
 void normalize_window(float* window, int size, StageConfig::WindowNorm norm) {
-  IONO_NVTX_RANGE("Normalize Window", profiling::colors::DARK_GRAY);
+  SIGTEKX_NVTX_RANGE("Normalize Window", profiling::colors::DARK_GRAY);
   if (norm == StageConfig::WindowNorm::UNITY) {
     float sum = 0.0f;
     for (int i = 0; i < size; ++i) {

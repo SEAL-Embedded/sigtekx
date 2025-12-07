@@ -38,7 +38,7 @@ namespace benchmark {
 template<typename ExecutorT>
 inline LatencyResults run_latency_benchmark(ExecutorT& executor,
                                              const BenchmarkConfig& config) {
-  IONO_NVTX_RANGE("Latency Benchmark", profiling::colors::NVIDIA_BLUE);
+  SIGTEKX_NVTX_RANGE("Latency Benchmark", profiling::colors::NVIDIA_BLUE);
 
   LatencyResults results;
 
@@ -60,7 +60,7 @@ inline LatencyResults run_latency_benchmark(ExecutorT& executor,
   for (int i = 0; i < config.iterations; ++i) {
     const std::string iter_name = "Iteration " + std::to_string(i + 1) + "/" +
                                   std::to_string(config.iterations);
-    IONO_NVTX_RANGE(iter_name.c_str(), profiling::colors::NVIDIA_BLUE);
+    SIGTEKX_NVTX_RANGE(iter_name.c_str(), profiling::colors::NVIDIA_BLUE);
 
     // Use CUDA events to measure GPU execution time directly
     // This eliminates CPU-side timing overhead and OS scheduler noise
@@ -80,7 +80,7 @@ inline LatencyResults run_latency_benchmark(ExecutorT& executor,
   cudaEventDestroy(stop_event);
 
   // Compute statistics
-  IONO_NVTX_RANGE("Compute Statistics", profiling::colors::CYAN);
+  SIGTEKX_NVTX_RANGE("Compute Statistics", profiling::colors::CYAN);
 
   std::vector<float> sorted_latencies = results.latencies_us;
   std::sort(sorted_latencies.begin(), sorted_latencies.end());

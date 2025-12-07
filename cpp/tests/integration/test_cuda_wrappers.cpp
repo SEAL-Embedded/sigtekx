@@ -306,7 +306,7 @@ TEST_F(CudaWrappersTest, CufftPlanExecute) {
 TEST_F(CudaWrappersTest, ErrorHandling) {
   // Test that an invalid CUDA call throws the correct exception.
   try {
-    IONO_CUDA_CHECK(cudaSetDevice(9999));  // Invalid device ID
+    SIGTEKX_CUDA_CHECK(cudaSetDevice(9999));  // Invalid device ID
     FAIL() << "Expected CudaException was not thrown.";
   } catch (const CudaException& e) {
     EXPECT_EQ(e.error(), cudaErrorInvalidDevice);
@@ -345,10 +345,10 @@ TEST_F(CudaWrappersTest, StreamEventSynchronization) {
   event.record(stream1.get());
 
   // Stream 2 waits for the event from stream 1
-  IONO_CUDA_CHECK(cudaStreamWaitEvent(stream2.get(), event.get(), 0));
+  SIGTEKX_CUDA_CHECK(cudaStreamWaitEvent(stream2.get(), event.get(), 0));
 
   // Operation in stream 2 can now proceed
-  IONO_CUDA_CHECK(cudaMemcpyAsync(buffer2.get(), buffer1.get(), buffer1.bytes(),
+  SIGTEKX_CUDA_CHECK(cudaMemcpyAsync(buffer2.get(), buffer1.get(), buffer1.bytes(),
                                   cudaMemcpyDeviceToDevice, stream2.get()));
 
   stream2.synchronize();

@@ -51,7 +51,7 @@ enum class SignalType {
 inline std::vector<float> generate_test_signal(
     int nfft, int batch, int seed = 42,
     SignalType type = SignalType::WHITE_NOISE) {
-  IONO_NVTX_RANGE("Generate Test Signal", profiling::colors::CYAN);
+  SIGTEKX_NVTX_RANGE("Generate Test Signal", profiling::colors::CYAN);
   std::vector<float> signal(static_cast<size_t>(nfft) * batch);
   std::mt19937 gen(seed);
 

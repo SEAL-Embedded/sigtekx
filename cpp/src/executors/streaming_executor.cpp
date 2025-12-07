@@ -41,26 +41,26 @@ class StreamingExecutor::Impl {
     // calls. This eliminates CPU spin-waiting and OS scheduler interference.
     cudaError_t err = cudaSetDeviceFlags(cudaDeviceScheduleBlockingSync);
     if (err != cudaSuccess && err != cudaErrorSetOnActiveProcess) {
-      IONO_CUDA_CHECK(err);
+      SIGTEKX_CUDA_CHECK(err);
     }
 
     // Select best device
     int device_count = 0;
-    IONO_CUDA_CHECK(cudaGetDeviceCount(&device_count));
+    SIGTEKX_CUDA_CHECK(cudaGetDeviceCount(&device_count));
     if (device_count == 0) {
       throw std::runtime_error("No CUDA-capable devices found.");
     }
 
     device_id_ = signal_utils::select_best_device();
-    IONO_CUDA_CHECK(cudaSetDevice(device_id_));
-    IONO_CUDA_CHECK(cudaGetDeviceProperties(&device_props_, device_id_));
+    SIGTEKX_CUDA_CHECK(cudaSetDevice(device_id_));
+    SIGTEKX_CUDA_CHECK(cudaGetDeviceProperties(&device_props_, device_id_));
   }
 
   ~Impl() { reset(); }
 
   void initialize(const ExecutorConfig& config,
                   std::vector<std::unique_ptr<ProcessingStage>> stages) {
-    IONO_NVTX_RANGE("StreamingExecutor::Initialize",
+    SIGTEKX_NVTX_RANGE("StreamingExecutor::Initialize",
                     profiling::colors::DARK_GRAY);
 
     if (initialized_) {
@@ -89,7 +89,7 @@ class StreamingExecutor::Impl {
 
     // Set device if specified
     if (config_.device_id >= 0) {
-      IONO_CUDA_CHECK(cudaSetDevice(config_.device_id));
+      SIGTEKX_CUDA_CHECK(cudaSetDevice(config_.device_id));
       device_id_ = config_.device_id;
     }
 
@@ -119,7 +119,7 @@ class StreamingExecutor::Impl {
       const std::string ring_msg = profiling::format_memory_range(
           "Allocate Per-Channel Ring Buffers",
           ring_capacity_per_channel * config_.channels * sizeof(float));
-      IONO_NVTX_RANGE(ring_msg.c_str(), profiling::colors::CYAN);
+      SIGTEKX_NVTX_RANGE(ring_msg.c_str(), profiling::colors::CYAN);
 
       // Create one ring buffer per channel
       input_ring_buffers_.resize(config_.channels);
@@ -133,14 +133,14 @@ class StreamingExecutor::Impl {
     {
       const std::string staging_msg = profiling::format_memory_range(
           "Allocate Staging Buffer", buffer_size * sizeof(float));
-      IONO_NVTX_RANGE(staging_msg.c_str(), profiling::colors::CYAN);
+      SIGTEKX_NVTX_RANGE(staging_msg.c_str(), profiling::colors::CYAN);
       h_batch_staging_.resize(buffer_size);
       h_batch_staging_.memset(0);
     }
 
     // Create CUDA streams
     {
-      IONO_NVTX_RANGE("Create CUDA Streams", profiling::colors::DARK_GRAY);
+      SIGTEKX_NVTX_RANGE("Create CUDA Streams", profiling::colors::DARK_GRAY);
       streams_.clear();
       for (int i = 0; i < config_.stream_count; ++i) {
         streams_.emplace_back();
@@ -149,7 +149,7 @@ class StreamingExecutor::Impl {
 
     // Create CUDA events for synchronization
     {
-      IONO_NVTX_RANGE("Create CUDA Events", profiling::colors::DARK_GRAY);
+      SIGTEKX_NVTX_RANGE("Create CUDA Events", profiling::colors::DARK_GRAY);
       events_.clear();
       for (int i = 0; i < config_.pinned_buffer_count * 2; ++i) {
         events_.emplace_back(cudaEventDisableTiming);
@@ -158,7 +158,7 @@ class StreamingExecutor::Impl {
 
     // Initialize all pipeline stages
     {
-      IONO_NVTX_RANGE("Initialize Pipeline Stages", profiling::colors::MAGENTA);
+      SIGTEKX_NVTX_RANGE("Initialize Pipeline Stages", profiling::colors::MAGENTA);
       StageConfig stage_config{};
       stage_config.nfft = config_.nfft;
       stage_config.channels = config_.channels;
@@ -179,7 +179,7 @@ class StreamingExecutor::Impl {
           static_cast<StageConfig::OutputMode>(config_.output_mode);
 
       for (auto& stage : stages_) {
-        IONO_NVTX_RANGE("Init Stage", profiling::colors::DARK_GRAY);
+        SIGTEKX_NVTX_RANGE("Init Stage", profiling::colors::DARK_GRAY);
         stage->initialize(stage_config, streams_[0].get());
       }
     }
@@ -191,7 +191,7 @@ class StreamingExecutor::Impl {
           static_cast<size_t>(config_.pinned_buffer_count) * sizeof(float);
       const std::string alloc_msg = profiling::format_memory_range(
           "Allocate Device Buffers", total_bytes);
-      IONO_NVTX_RANGE(alloc_msg.c_str(), profiling::colors::CYAN);
+      SIGTEKX_NVTX_RANGE(alloc_msg.c_str(), profiling::colors::CYAN);
 
       d_input_buffers_.clear();
       d_output_buffers_.clear();
@@ -221,21 +221,21 @@ class StreamingExecutor::Impl {
 
     // Start consumer thread if async mode is enabled (v0.9.5+)
     if (config_.enable_background_thread) {
-      IONO_NVTX_RANGE("Start Consumer Thread", profiling::colors::PURPLE);
+      SIGTEKX_NVTX_RANGE("Start Consumer Thread", profiling::colors::PURPLE);
       stop_flag_.store(false, std::memory_order_release);
       consumer_thread_ = std::thread(&Impl::consumer_loop, this);
     }
 
-    IONO_NVTX_MARK("Initialization Complete", profiling::colors::CYAN);
+    SIGTEKX_NVTX_MARK("Initialization Complete", profiling::colors::CYAN);
   }
 
   void reset() {
-    IONO_NVTX_RANGE_FUNCTION(profiling::colors::RED);
+    SIGTEKX_NVTX_RANGE_FUNCTION(profiling::colors::RED);
     if (!initialized_) return;
 
     // Stop consumer thread if running (v0.9.5+)
     if (consumer_thread_.joinable()) {
-      IONO_NVTX_RANGE("Stop Consumer Thread", profiling::colors::PURPLE);
+      SIGTEKX_NVTX_RANGE("Stop Consumer Thread", profiling::colors::PURPLE);
       stop_flag_.store(true, std::memory_order_release);
       cv_data_ready_.notify_all();  // Wake up consumer thread if waiting
       consumer_thread_.join();      // Wait for thread to exit cleanly
@@ -248,12 +248,12 @@ class StreamingExecutor::Impl {
     }
 
     {
-      IONO_NVTX_RANGE("Synchronize All Streams", profiling::colors::YELLOW);
+      SIGTEKX_NVTX_RANGE("Synchronize All Streams", profiling::colors::YELLOW);
       synchronize();
     }
 
     {
-      IONO_NVTX_RANGE("Release Resources", profiling::colors::RED);
+      SIGTEKX_NVTX_RANGE("Release Resources", profiling::colors::RED);
       stages_.clear();
       streams_.clear();
       events_.clear();
@@ -273,11 +273,11 @@ class StreamingExecutor::Impl {
 
     frame_counter_ = 0;
     initialized_ = false;
-    IONO_NVTX_MARK("Reset Complete", profiling::colors::RED);
+    SIGTEKX_NVTX_MARK("Reset Complete", profiling::colors::RED);
   }
 
   void submit(const float* input, float* output, size_t num_samples) {
-    IONO_NVTX_RANGE_FUNCTION(profiling::colors::NVIDIA_BLUE);
+    SIGTEKX_NVTX_RANGE_FUNCTION(profiling::colors::NVIDIA_BLUE);
     if (!initialized_) {
       throw std::runtime_error("Executor not initialized");
     }
@@ -299,7 +299,7 @@ class StreamingExecutor::Impl {
 
     // Push samples to per-channel ring buffers (channel-major layout)
     {
-      IONO_NVTX_RANGE("Push to Per-Channel Ring Buffers",
+      SIGTEKX_NVTX_RANGE("Push to Per-Channel Ring Buffers",
                       profiling::colors::CYAN);
       for (int ch = 0; ch < config_.channels; ++ch) {
         const float* channel_input = input + ch * samples_per_channel;
@@ -313,7 +313,7 @@ class StreamingExecutor::Impl {
     // Dual-mode processing: async producer-consumer or synchronous
     if (config_.enable_background_thread) {
       // ===== ASYNC MODE: Producer-consumer pattern (v0.9.5+) =====
-      IONO_NVTX_RANGE("Async Mode: Notify Consumer", profiling::colors::PURPLE);
+      SIGTEKX_NVTX_RANGE("Async Mode: Notify Consumer", profiling::colors::PURPLE);
 
       // Notify consumer thread that new data is available
       cv_data_ready_.notify_one();
@@ -322,7 +322,7 @@ class StreamingExecutor::Impl {
       std::vector<float> result;
       bool got_result = false;
       {
-        IONO_NVTX_RANGE("Wait for Consumer Result", profiling::colors::PURPLE);
+        SIGTEKX_NVTX_RANGE("Wait for Consumer Result", profiling::colors::PURPLE);
         std::unique_lock<std::mutex> lock(result_mutex_);
 
         // Wait up to 2 seconds for result (config_.timeout_ms or default
@@ -416,7 +416,7 @@ class StreamingExecutor::Impl {
 
   void submit_async(const float* input, size_t num_samples,
                     ResultCallback callback) {
-    IONO_NVTX_RANGE_FUNCTION(profiling::colors::NVIDIA_BLUE);
+    SIGTEKX_NVTX_RANGE_FUNCTION(profiling::colors::NVIDIA_BLUE);
     if (!initialized_) {
       throw std::runtime_error("Executor not initialized");
     }
@@ -460,7 +460,7 @@ class StreamingExecutor::Impl {
       // Invoke callback immediately (true async with background thread is
       // v0.9.5+)
       if (callback) {
-        IONO_NVTX_RANGE("Result Callback", profiling::colors::CYAN);
+        SIGTEKX_NVTX_RANGE("Result Callback", profiling::colors::CYAN);
         // Note: Third parameter is num_frames. Currently passes
         // config_.channels because each processed batch is 1 temporal frame
         // with N spatial channels, producing N spectra. In future versions with
@@ -473,7 +473,7 @@ class StreamingExecutor::Impl {
   }
 
   void synchronize() {
-    IONO_NVTX_RANGE_FUNCTION(profiling::colors::YELLOW);
+    SIGTEKX_NVTX_RANGE_FUNCTION(profiling::colors::YELLOW);
     for (auto& s : streams_) {
       s.synchronize();
     }
@@ -549,12 +549,12 @@ class StreamingExecutor::Impl {
   }
 
   void process_one_batch(float* output) {
-    IONO_NVTX_RANGE("Process One Batch", profiling::colors::PURPLE);
+    SIGTEKX_NVTX_RANGE("Process One Batch", profiling::colors::PURPLE);
 
     // Extract one frame per channel independently to staging buffer
     // Output layout: channel-major [ch0[0..nfft-1], ch1[0..nfft-1], ...]
     {
-      IONO_NVTX_RANGE("Extract Per-Channel Frames", profiling::colors::GREEN);
+      SIGTEKX_NVTX_RANGE("Extract Per-Channel Frames", profiling::colors::GREEN);
       for (int ch = 0; ch < config_.channels; ++ch) {
         float* channel_staging = h_batch_staging_.get() + ch * config_.nfft;
 
@@ -569,7 +569,7 @@ class StreamingExecutor::Impl {
     // This implements the sliding window for STFT overlap independently per
     // channel
     {
-      IONO_NVTX_RANGE("Advance Per-Channel Ring Buffers",
+      SIGTEKX_NVTX_RANGE("Advance Per-Channel Ring Buffers",
                       profiling::colors::GREEN);
       for (int ch = 0; ch < config_.channels; ++ch) {
         input_ring_buffers_[ch]->advance(hop_size_);
@@ -593,11 +593,11 @@ class StreamingExecutor::Impl {
 
     // Guard buffer reuse with synchronization
     if (frame_counter_ >= static_cast<uint64_t>(config_.pinned_buffer_count)) {
-      IONO_NVTX_RANGE("Wait for Buffer Availability",
+      SIGTEKX_NVTX_RANGE("Wait for Buffer Availability",
                       profiling::colors::YELLOW);
-      IONO_CUDA_CHECK(
+      SIGTEKX_CUDA_CHECK(
           cudaStreamSynchronize(streams_[compute_stream_idx].get()));
-      IONO_CUDA_CHECK(cudaStreamSynchronize(streams_[d2h_stream_idx].get()));
+      SIGTEKX_CUDA_CHECK(cudaStreamSynchronize(streams_[d2h_stream_idx].get()));
     }
 
     // H2D Transfer
@@ -607,18 +607,18 @@ class StreamingExecutor::Impl {
       const size_t bytes = num_samples * sizeof(float);
       const std::string h2d_msg =
           profiling::format_memory_range("H2D Transfer", bytes);
-      IONO_NVTX_RANGE(h2d_msg.c_str(), profiling::colors::GREEN);
+      SIGTEKX_NVTX_RANGE(h2d_msg.c_str(), profiling::colors::GREEN);
       d_input.copy_from_host(h_batch_staging_.get(), num_samples,
                              streams_[h2d_stream_idx].get());
       e_h2d_done.record(streams_[h2d_stream_idx].get());
     }
 
     // Processing Pipeline
-    IONO_CUDA_CHECK(cudaStreamWaitEvent(streams_[compute_stream_idx].get(),
+    SIGTEKX_CUDA_CHECK(cudaStreamWaitEvent(streams_[compute_stream_idx].get(),
                                         e_h2d_done.get(), 0));
 
     {
-      IONO_NVTX_RANGE("Compute Pipeline", profiling::colors::PURPLE);
+      SIGTEKX_NVTX_RANGE("Compute Pipeline", profiling::colors::PURPLE);
 
       if (stages_.empty()) {
         throw std::runtime_error("Empty pipeline in process_one_batch()");
@@ -655,7 +655,7 @@ class StreamingExecutor::Impl {
         // Process this stage
         {
           const std::string stage_msg = "Stage: " + stage_name;
-          IONO_NVTX_RANGE(stage_msg.c_str(), profiling::colors::MAGENTA);
+          SIGTEKX_NVTX_RANGE(stage_msg.c_str(), profiling::colors::MAGENTA);
           stage->process(current_input, current_output, current_size,
                          streams_[compute_stream_idx].get());
         }
@@ -683,8 +683,8 @@ class StreamingExecutor::Impl {
       const size_t bytes = complex_elements * sizeof(float);
       const std::string d2h_msg =
           profiling::format_memory_range("D2H Transfer", bytes);
-      IONO_NVTX_RANGE(d2h_msg.c_str(), profiling::colors::ORANGE);
-      IONO_CUDA_CHECK(cudaStreamWaitEvent(streams_[d2h_stream_idx].get(),
+      SIGTEKX_NVTX_RANGE(d2h_msg.c_str(), profiling::colors::ORANGE);
+      SIGTEKX_CUDA_CHECK(cudaStreamWaitEvent(streams_[d2h_stream_idx].get(),
                                           e_compute_done.get(), 0));
       d_output.copy_to_host(output, complex_elements,
                             streams_[d2h_stream_idx].get());
@@ -692,8 +692,8 @@ class StreamingExecutor::Impl {
 
     // Final synchronization
     {
-      IONO_NVTX_RANGE("Stream Sync", profiling::colors::YELLOW);
-      IONO_CUDA_CHECK(cudaStreamSynchronize(streams_[d2h_stream_idx].get()));
+      SIGTEKX_NVTX_RANGE("Stream Sync", profiling::colors::YELLOW);
+      SIGTEKX_CUDA_CHECK(cudaStreamSynchronize(streams_[d2h_stream_idx].get()));
     }
 
     frame_counter_++;
@@ -714,10 +714,10 @@ class StreamingExecutor::Impl {
    * waiting.
    */
   void consumer_loop() {
-    IONO_NVTX_RANGE("Consumer Thread", profiling::colors::PURPLE);
+    SIGTEKX_NVTX_RANGE("Consumer Thread", profiling::colors::PURPLE);
 
     // Set CUDA context for this thread
-    IONO_CUDA_CHECK(cudaSetDevice(device_id_));
+    SIGTEKX_CUDA_CHECK(cudaSetDevice(device_id_));
 
     const size_t samples_needed_per_channel = static_cast<size_t>(config_.nfft);
     const size_t output_size =

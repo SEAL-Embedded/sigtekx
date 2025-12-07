@@ -298,7 +298,7 @@ __global__ void scale_fft_output_kernel(float2* __restrict__ data,
 
 void launch_apply_window(const float* input, float* output, const float* window,
                          int nfft, int batch, int stride, cudaStream_t stream) {
-  IONO_NVTX_RANGE("launch_apply_window", profiling::colors::PURPLE);
+  SIGTEKX_NVTX_RANGE("launch_apply_window", profiling::colors::PURPLE);
   const int total_elements = nfft * batch;
   const int threads = std::min(MAX_THREADS_PER_BLOCK, total_elements);
   const int blocks = (total_elements + threads - 1) / threads;
@@ -308,7 +308,7 @@ void launch_apply_window(const float* input, float* output, const float* window,
 
 void launch_real_to_complex(const float* input, float2* output, int nfft,
                             int batch, int stride, cudaStream_t stream) {
-  IONO_NVTX_RANGE("launch_real_to_complex", profiling::colors::PURPLE);
+  SIGTEKX_NVTX_RANGE("launch_real_to_complex", profiling::colors::PURPLE);
   const int total_elements = nfft * batch;
   const int threads = std::min(MAX_THREADS_PER_BLOCK, total_elements);
   const int blocks = (total_elements + threads - 1) / threads;
@@ -319,7 +319,7 @@ void launch_real_to_complex(const float* input, float2* output, int nfft,
 void launch_window_and_convert(const float* input, float2* output,
                                const float* window, int nfft, int batch,
                                int stride, cudaStream_t stream) {
-  IONO_NVTX_RANGE("launch_window_and_convert", profiling::colors::PURPLE);
+  SIGTEKX_NVTX_RANGE("launch_window_and_convert", profiling::colors::PURPLE);
   const int total_elements = nfft * batch;
   const int threads = std::min(MAX_THREADS_PER_BLOCK, total_elements);
   const int blocks = (total_elements + threads - 1) / threads;
@@ -329,7 +329,7 @@ void launch_window_and_convert(const float* input, float2* output,
 
 void launch_magnitude(const float2* input, float* output, int num_bins,
                       int batch, float scale, cudaStream_t stream) {
-  IONO_NVTX_RANGE("launch_magnitude", profiling::colors::PURPLE);
+  SIGTEKX_NVTX_RANGE("launch_magnitude", profiling::colors::PURPLE);
   const int total_elements = num_bins * batch;
   const int threads = std::min(MAX_THREADS_PER_BLOCK, total_elements);
   const int blocks = (total_elements + threads - 1) / threads;
@@ -340,7 +340,7 @@ void launch_magnitude(const float2* input, float* output, int num_bins,
 void launch_magnitude(const float2* input, float* output, int num_bins,
                       int batch, int input_stride, float scale,
                       cudaStream_t stream) {
-  IONO_NVTX_RANGE("launch_magnitude_strided", profiling::colors::PURPLE);
+  SIGTEKX_NVTX_RANGE("launch_magnitude_strided", profiling::colors::PURPLE);
   const int total_elements = num_bins * batch;
   const int threads = std::min(MAX_THREADS_PER_BLOCK, total_elements);
   const int blocks = (total_elements + threads - 1) / threads;
@@ -350,7 +350,7 @@ void launch_magnitude(const float2* input, float* output, int num_bins,
 
 void launch_magnitude_squared(const float2* input, float* output, int num_bins,
                               int batch, float scale, cudaStream_t stream) {
-  IONO_NVTX_RANGE("launch_magnitude_squared", profiling::colors::PURPLE);
+  SIGTEKX_NVTX_RANGE("launch_magnitude_squared", profiling::colors::PURPLE);
   const int total_elements = num_bins * batch;
   const int threads = std::min(MAX_THREADS_PER_BLOCK, total_elements);
   const int blocks = (total_elements + threads - 1) / threads;
@@ -360,7 +360,7 @@ void launch_magnitude_squared(const float2* input, float* output, int num_bins,
 
 void launch_scale_fft(float2* data, int num_elements, float scale,
                       cudaStream_t stream) {
-  IONO_NVTX_RANGE("launch_scale_fft", profiling::colors::PURPLE);
+  SIGTEKX_NVTX_RANGE("launch_scale_fft", profiling::colors::PURPLE);
   const int threads = std::min(MAX_THREADS_PER_BLOCK, num_elements);
   const int blocks = (num_elements + threads - 1) / threads;
   scale_fft_output_kernel<<<blocks, threads, 0, stream>>>(data, num_elements,

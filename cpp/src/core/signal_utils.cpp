@@ -21,7 +21,7 @@ namespace sigtekx {
 namespace signal_utils {
 
 std::vector<std::string> get_available_devices() {
-  IONO_NVTX_RANGE_FUNCTION(profiling::colors::CYAN);
+  SIGTEKX_NVTX_RANGE_FUNCTION(profiling::colors::CYAN);
   std::vector<std::string> devices;
   int device_count = 0;
   if (cudaGetDeviceCount(&device_count) == cudaSuccess) {
@@ -39,9 +39,9 @@ std::vector<std::string> get_available_devices() {
 }
 
 int select_best_device() {
-  IONO_NVTX_RANGE_FUNCTION(profiling::colors::CYAN);
+  SIGTEKX_NVTX_RANGE_FUNCTION(profiling::colors::CYAN);
   int device_count = 0;
-  IONO_CUDA_CHECK(cudaGetDeviceCount(&device_count));
+  SIGTEKX_CUDA_CHECK(cudaGetDeviceCount(&device_count));
   if (device_count == 0) {
     throw std::runtime_error("No CUDA devices found for selection.");
   }
@@ -50,7 +50,7 @@ int select_best_device() {
   int best_sm_count = -1;
   for (int i = 0; i < device_count; ++i) {
     cudaDeviceProp prop{};
-    IONO_CUDA_CHECK(cudaGetDeviceProperties(&prop, i));
+    SIGTEKX_CUDA_CHECK(cudaGetDeviceProperties(&prop, i));
     if (prop.multiProcessorCount > best_sm_count) {
       best_sm_count = prop.multiProcessorCount;
       best_device = i;
@@ -60,7 +60,7 @@ int select_best_device() {
 }
 
 bool validate_config(const SignalConfig& cfg, std::string& error_msg) {
-  IONO_NVTX_RANGE_FUNCTION(profiling::colors::CYAN);
+  SIGTEKX_NVTX_RANGE_FUNCTION(profiling::colors::CYAN);
   if (cfg.nfft <= 0 || (cfg.nfft & (cfg.nfft - 1)) != 0) {
     error_msg = "nfft must be a positive power of 2.";
     return false;
@@ -90,7 +90,7 @@ bool validate_config(const SignalConfig& cfg, std::string& error_msg) {
 }
 
 size_t estimate_memory_usage(const SignalConfig& cfg) {
-  IONO_NVTX_RANGE_FUNCTION(profiling::colors::CYAN);
+  SIGTEKX_NVTX_RANGE_FUNCTION(profiling::colors::CYAN);
   size_t total = 0;
   const size_t input_bytes =
       static_cast<size_t>(cfg.nfft) * cfg.channels * sizeof(float);
