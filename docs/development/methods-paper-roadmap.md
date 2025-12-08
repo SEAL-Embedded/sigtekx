@@ -6,6 +6,22 @@
 
 ---
 
+## Table of Contents
+
+- [Executive Summary](#executive-summary)
+- [Project Goals and Needs](#project-goals-and-needs)
+- [Current State Analysis](#current-state-analysis)
+- [The Dual-Plane Architecture](#the-dual-plane-architecture)
+- [Priority Task Roadmap](#priority-task-roadmap)
+- [Metrics for Paper Defense](#metrics-for-paper-defense)
+- [Experiments for Paper Defense](#experiments-for-paper-defense)
+- [Target Hardware Considerations](#target-hardware-considerations)
+- [Development Timeline Strategy](#development-timeline-strategy)
+- [Risk Mitigation](#risk-mitigation)
+- [Success Criteria for v1.0 Paper](#success-criteria-for-v10-paper)
+- [Critical Files Reference](#critical-files-reference)
+- [Conclusion](#conclusion)
+
 ## Executive Summary
 
 ### The Core Value Proposition
