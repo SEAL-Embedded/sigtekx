@@ -17,6 +17,7 @@
 - [Experiments for Paper Defense](#experiments-for-paper-defense)
 - [Target Hardware Considerations](#target-hardware-considerations)
 - [Development Timeline Strategy](#development-timeline-strategy)
+- [Publication Strategy and Venues](#publication-strategy-and-venues)
 - [Risk Mitigation](#risk-mitigation)
 - [Success Criteria for v1.0 Paper](#success-criteria-for-v10-paper)
 - [Critical Files Reference](#critical-files-reference)
@@ -877,6 +878,56 @@ pipeline = (PipelineBuilder()
 | Phase 4 | Full scaling analysis | Paper Figure 2 |
 
 **Benefit**: Early experiments guide optimization priorities, prevent late surprises.
+
+---
+
+## Publication Strategy and Venues
+
+**Objective**: Convert roadmap milestones into citable artifacts while maintaining IEEE 1074 traceability. The plan deliberately staggers architecture, software, and domain-facing narratives so each submission reinforces the others.
+
+| Venue | Focus | Deadline / Cadence | Gate Deliverables |
+|-------|-------|--------------------|-------------------|
+| [IEEE HPEC](https://ieee-hpec.org/call-for-papers/) | High-performance + embedded architectures | 14 Jul 2025 (extended “midnight AoE”) | Phase 1-4 benchmarks, split-plane diagrams, PCIe saturation metrics |
+| [SC Workshops - PyHPC](https://sc24.supercomputing.org/program/workshops/) | Python in production HPC workflows | Align with SC camera-ready (~Sep) | Demo notebooks + control-plane decoupling story |
+| [JOSS](https://github.com/openjournals/joss) | Open-source software quality (docs, CI, tests, DOI) | Rolling review (2–4 weeks typical) | Tagged v1.0 release, CLI walkthroughs, reproducible config snapshots |
+| [Radio Science](https://en.wikipedia.org/wiki/Radio_Science) / [IEEE GRSL](https://www.ieeegrss.org/publications/geoscience-remote-sensing-letters/) | Applied geophysics / remote sensing letters | Rolling, but expect 8–12 week review loops | Ionosphere case study, anomaly catalog, field validation logs |
+
+### Primary push — IEEE HPEC (architecture spotlight)
+- HPEC’s Embedded HPC track explicitly calls for efficiency-focused architectures; the 2025 CFP emphasizes convergence of HPC and embedded deployments plus quantitative benchmarking, which mirrors the dual-plane story and the “95% PCIe saturation” proof point.
+- Target content: zero-copy memory redesign, per-stage GPU timing, and the comparative latency/RTF plots produced at the end of Phase 4.
+- Prep actions:
+  1. Convert Phase 1–3 design notes into a 6-page IEEE format manuscript with NVTX timelines and CUDA occupancy charts.
+  2. Capture deterministic benchmark scripts under `benchmarks/hpec/` so reviewers can replay the headline numbers.
+  3. Schedule dry-run talks during Weeks 10-12 to rehearse the “Python vs FPGA” narrative for the embedded audience.
+
+### Backup visibility — PyHPC workshop at SC
+- PyHPC is the natural overflow channel if HPEC slots fill; the workshop focuses on taming Python overhead in HPC pipelines, which is exactly what the split-plane + Numba bridge demonstrates.
+- Because SC workshops often request concise 4-page write-ups plus live demos, emphasize the control-plane snapshots, Streamlit dashboards, and CLI ergonomics.
+- Prep actions:
+  1. Record a short screencast of the pipeline builder + `iono check` CLI to play during the live demo.
+  2. Trim the HPEC manuscript into a workshop version that foregrounds developer experience (Numba, PyTorch, callbacks).
+  3. Packaged conda environment + `scripts/cli.ps1 demo` target to ensure on-site reproducibility.
+
+### Software credit — JOSS (code publication)
+- JOSS reviews the repository itself (docs, CI, tests) and mints a DOI immediately upon acceptance, providing long-lived credit for the engineering work independently of the methods paper.
+- Submission sequencing: cut a v1.0.0 release right after HPEC acceptance notifications, when Phase 4 benchmarks and documentation are frozen.
+- Prep actions:
+  1. Assemble the lightweight `paper.md` with problem statement, statement of need, architecture overview, and example code blocks referencing the CLI workflow.
+  2. Ensure CI mirrors the “iono check” target (ruff, mypy, pytest, clang-tidy presets) so JOSS reviewers can reproduce the green badge without manual steps.
+  3. Link the documentation set (`README`, `PROJECT_STRUCTURE`, `docs/architecture/*`) inside the submission to satisfy JOSS’s documentation checklist.
+
+### Domain validation — Radio Science or IEEE GRSL
+- Radio Science welcomes remote sensing methods with rigorous propagation analysis, while IEEE GRSL targets short letters on geoscience remote sensing innovations; both require demonstrating that the architecture enabled new science (e.g., transient ionosphere captures that offline batch methods missed).
+- Risk: these venues demand vetted field data, so defer submission until the long-duration stress tests, anomaly catalog, and domain-specific tolerances (SNR, false-alarm rates) are signed off by the science collaborators.
+- Prep actions:
+  1. Build a “mission data” appendix that inventories immutable raw captures, derived spectrograms, and MLflow metadata so reviewers can audit provenance.
+  2. Explicitly compare SigTekX streaming results against a CuPy (batch) baseline to prove the “previously impossible” claim.
+  3. Document tolerance/uncertainty modeling (IEEE 754 rounding, denormal handling) inside `docs/validation/ionosphere.md` for citation.
+
+### Timeline coupling
+- Weeks 10–12 in the development plan already align with HPEC drafting; keep that slot focused on architecture plots and editing cycles.
+- Induct a short "publication retro" gate at the end of each phase to update tables, figures, and appendices while data is fresh, which reduces thrash when multiple submissions overlap.
+- Maintain a shared `publications/` directory with checklists (LaTeX template, figure sources, reviewer feedback) so future venues inherit the same rigor with minimal overhead.
 
 ---
 
