@@ -1,4 +1,4 @@
-"""Utility functions for ionosense-hpc with NVTX profiling support.
+"""Utility functions for SigTekX with NVTX profiling support.
 
 This package re-exports selected helpers and provides lazy wrappers for
 signal generators to avoid importing heavy optional deps at module import time.
@@ -16,7 +16,7 @@ from .device import (
     monitor_device,
 )
 from .gpu_clocks import GpuClockManager, check_clock_locking_available
-from .logging import log_config, log_device_info, log_performance, logger, setup_logging
+from .logging import log_config, log_device_info, log_performance, setup_logging
 from .profiling import (
     NVTX_AVAILABLE,
     ProfileCategory,
@@ -77,7 +77,6 @@ __all__ = [
     'GpuClockManager',
     'check_clock_locking_available',
     # Logging utilities
-    'logger',
     'setup_logging',
     'log_config',
     'log_performance',

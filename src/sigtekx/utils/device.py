@@ -1,11 +1,11 @@
 """CUDA device query and management utilities."""
 
 import contextlib
+import logging
 from typing import Any
 
 from sigtekx.core.engine import _import_cpp_engine
 from sigtekx.exceptions import DeviceNotFoundError, DllLoadError
-from sigtekx.utils.logging import logger
 
 try:
     import pynvml
@@ -14,6 +14,8 @@ try:
 except ImportError:
     # Optional dependency: gracefully fall back to the C++ backend queries.
     NVML_AVAILABLE = False
+
+logger = logging.getLogger(__name__)
 
 
 def _shutdown_nvml_safely() -> None:

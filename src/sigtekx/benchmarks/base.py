@@ -8,6 +8,7 @@ RSE/RE/IEEE standards for reproducibility and statistical rigor.
 import abc
 import hashlib
 import json
+import logging
 import os
 import platform
 import subprocess
@@ -25,7 +26,6 @@ import numpy as np
 import yaml  # type: ignore[import-untyped]
 from pydantic import BaseModel, Field
 
-from sigtekx.utils import logger
 from sigtekx.utils.profiling import (
     ProfileColor,
     ProfilingDomain,
@@ -37,6 +37,7 @@ from sigtekx.utils.profiling import (
 )
 
 T = TypeVar('T')
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -330,7 +331,6 @@ class BaseBenchmark(abc.ABC):
         # Check GPU availability (only hard-require if configured)
         try:
             from sigtekx.utils import gpu_count
-            from sigtekx.utils import logger as _logger
             n_gpu = gpu_count()
             if self.config.require_gpu:
                 if n_gpu == 0:
@@ -338,7 +338,7 @@ class BaseBenchmark(abc.ABC):
             else:
                 if n_gpu == 0:
                     # Allow running in CPU/test environments; warn for visibility
-                    _logger.warning("No CUDA devices available; proceeding in CPU/test mode")
+                    logger.warning("No CUDA devices available; proceeding in CPU/test mode")
         except Exception as e:
             # Don't block execution on environment probe errors in baseline validation
             if self.config.require_gpu:

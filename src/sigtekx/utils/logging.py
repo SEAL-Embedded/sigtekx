@@ -13,9 +13,13 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from sigtekx.config.schemas import EngineConfig
 
-logger = logging.getLogger('sigtekx')
+PACKAGE_LOGGER_NAME = "sigtekx"
+_package_logger = logging.getLogger(PACKAGE_LOGGER_NAME)
+if not any(isinstance(h, logging.NullHandler) for h in _package_logger.handlers):
+    _package_logger.addHandler(logging.NullHandler())
+logger = logging.getLogger(__name__)
 
-def _env_truthy(name:str, default:bool | None = None) -> bool | None:
+def _env_truthy(name: str, default: bool | None = None) -> bool | None:
     v = os.environ.get(name)
     if v is None:
         return default
@@ -100,8 +104,9 @@ def setup_logging(
         color_env = _env_truthy("IONO_LOG_COLOR")
         use_color = color if color is not None else (color_env if color_env is not None else _should_color())
 
-    logger.setLevel(getattr(logging, lvl_str.upper(), logging.INFO))
-    logger.handlers.clear()
+    package_logger = logging.getLogger(PACKAGE_LOGGER_NAME)
+    package_logger.setLevel(getattr(logging, lvl_str.upper(), logging.INFO))
+    package_logger.handlers.clear()
 
     # --- Console Handler ---
     console_handler: logging.Handler | None = None
@@ -126,7 +131,7 @@ def setup_logging(
         formatter = _ColorFormatter(fmt, datefmt=datefmt, use_color=use_color)
         console_handler.setFormatter(formatter)
 
-    logger.addHandler(console_handler)
+    package_logger.addHandler(console_handler)
 
     # --- File Handler ---
     if log_file:
@@ -135,11 +140,11 @@ def setup_logging(
             os.makedirs(log_path, exist_ok=True)
         file_handler = logging.FileHandler(log_file)
         file_handler.setFormatter(logging.Formatter(fmt, datefmt=datefmt))
-        logger.addHandler(file_handler)
+        package_logger.addHandler(file_handler)
 
 
-    logger.propagate = False
-    return logger
+    package_logger.propagate = False
+    return package_logger
 
 def log_config(config: 'EngineConfig', level: int = logging.INFO) -> None:
     """Logs key engine configuration parameters."""

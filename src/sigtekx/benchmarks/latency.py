@@ -5,6 +5,7 @@ Latency benchmark with IEEE-compliant statistical analysis and
 GPU-accurate timing using CUDA events.
 """
 
+import logging
 import time
 from typing import Any
 
@@ -13,7 +14,7 @@ import numpy as np
 from sigtekx import Engine
 from sigtekx.benchmarks.base import BaseBenchmark, BenchmarkConfig, BenchmarkResult
 from sigtekx.config import EngineConfig, get_preset
-from sigtekx.utils import logger, make_test_batch
+from sigtekx.utils import make_test_batch
 from sigtekx.utils.paths import get_benchmark_run_dir, normalize_benchmark_name
 from sigtekx.utils.profiling import (
     ProfileColor,
@@ -22,6 +23,8 @@ from sigtekx.utils.profiling import (
     setup_range,
     teardown_range,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class LatencyBenchmarkConfig(BenchmarkConfig):

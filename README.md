@@ -109,6 +109,24 @@ with Engine(preset='default') as engine:
     print(f"Output shape: {spectrum.shape}")
 ```
 
+#### Logging
+
+- Imports are silent by default; a `NullHandler` is attached to the `sigtekx` logger so user code controls logging.
+- Enable logging via standard configuration or the helper:
+
+```python
+import logging
+from sigtekx.utils.logging import setup_logging
+
+logging.basicConfig(level="INFO")   # your handlers/formatting
+setup_logging(level="DEBUG")        # optional: rich console formatter for sigtekx*
+
+log = logging.getLogger("sigtekx.benchmarks")
+log.info("Benchmark ready")
+```
+
+Environment knobs: `IONO_LOG_LEVEL=DEBUG` and `IONO_LOG_COLOR=0/1` drive `setup_logging` without code changes.
+
 ### Key Terminology
 
 SigTekX uses industry-standard terminology for signal processing dimensions (v0.9.5+):

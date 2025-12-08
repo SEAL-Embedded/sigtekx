@@ -23,13 +23,14 @@ Example:
 """
 
 import json
+import logging
 import platform
 import subprocess
 from contextlib import contextmanager, suppress
 from pathlib import Path
 from typing import Any
 
-from sigtekx.utils.logging import logger
+logger = logging.getLogger(__name__)
 
 
 class GpuClockManager:
