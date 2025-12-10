@@ -5,6 +5,7 @@ Numerical accuracy validation benchmark following IEEE standards.
 Upgraded to use BaseBenchmark framework for research-grade validation.
 """
 
+import logging
 from typing import Any, cast
 
 import numpy as np
@@ -14,7 +15,7 @@ from scipy.fft import rfft
 from sigtekx import Engine
 from sigtekx.benchmarks.base import BaseBenchmark, BenchmarkConfig, BenchmarkResult
 from sigtekx.config import EngineConfig, ExecutionMode, get_preset
-from sigtekx.utils import logger, make_chirp, make_multitone, make_noise, make_sine
+from sigtekx.utils import make_chirp, make_multitone, make_noise, make_sine
 from sigtekx.utils.paths import get_benchmark_run_dir, normalize_benchmark_name
 from sigtekx.utils.profiling import (
     ProfileColor,
@@ -24,6 +25,8 @@ from sigtekx.utils.profiling import (
 )
 from sigtekx.utils.reproducibility import DeterministicGenerator
 from sigtekx.utils.signals import make_dc_signal, make_impulse
+
+logger = logging.getLogger(__name__)
 
 
 class AccuracyBenchmarkConfig(BenchmarkConfig):

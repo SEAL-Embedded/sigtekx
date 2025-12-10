@@ -9,6 +9,7 @@ and the correctness of the custom color formatter.
 import logging
 import re
 import sys
+import warnings
 from collections.abc import Generator
 from pathlib import Path
 
@@ -78,6 +79,34 @@ def mock_stats_data() -> dict:
 
 class TestSetupLogging:
     """Tests the main `setup_logging` function."""
+
+    def test_import_is_silent(self, capsys):
+        """Ensure importing the package does not configure logging or emit output."""
+        root_logger = logging.getLogger()
+        original_root_handlers = root_logger.handlers[:]
+        package_logger = logging.getLogger("sigtekx")
+        original_pkg_handlers = package_logger.handlers[:]
+        original_pkg_level = package_logger.level
+        original_pkg_propagate = package_logger.propagate
+
+        try:
+            package_logger.handlers.clear()
+            capsys.readouterr()  # reset capture buffers
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                import importlib
+                import sigtekx  # noqa: F401
+                importlib.reload(sigtekx)
+            captured = capsys.readouterr()
+            assert captured.out == ""
+            assert captured.err == ""
+            assert root_logger.handlers == original_root_handlers
+            package_logger = logging.getLogger("sigtekx")
+            assert any(isinstance(h, logging.NullHandler) for h in package_logger.handlers)
+        finally:
+            package_logger.handlers = original_pkg_handlers
+            package_logger.setLevel(original_pkg_level)
+            package_logger.propagate = original_pkg_propagate
 
     def test_default_setup(self, clean_logger: logging.Logger):
         """Test logger setup with default parameters."""

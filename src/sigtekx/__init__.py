@@ -8,6 +8,7 @@ for reproducible performance evaluation.
 """
 
 import contextlib
+import logging
 import os
 import platform
 import sys
@@ -378,10 +379,10 @@ def self_test(verbose: bool = True) -> bool:
 # Package Initialization
 # ============================================================================
 
-# Set up logging on import
-from .utils.logging import setup_logging
-
-setup_logging()
+# Add a NullHandler so library imports don't configure user logging
+_package_logger = logging.getLogger(__name__)
+if not any(isinstance(h, logging.NullHandler) for h in _package_logger.handlers):
+    _package_logger.addHandler(logging.NullHandler())
 
 # Warn if running in an environment without GPU
 try:
