@@ -16,7 +16,7 @@ from .device import (
     monitor_device,
 )
 from .gpu_clocks import GpuClockManager, check_clock_locking_available
-from .logging import log_config, log_device_info, log_performance, setup_logging
+from .logging import logger, log_config, log_device_info, log_performance, setup_logging
 from .profiling import (
     NVTX_AVAILABLE,
     ProfileCategory,
@@ -77,6 +77,7 @@ __all__ = [
     'GpuClockManager',
     'check_clock_locking_available',
     # Logging utilities
+    'logger',
     'setup_logging',
     'log_config',
     'log_performance',

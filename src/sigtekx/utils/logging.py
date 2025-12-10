@@ -14,10 +14,11 @@ if TYPE_CHECKING:
     from sigtekx.config.schemas import EngineConfig
 
 PACKAGE_LOGGER_NAME = "sigtekx"
-_package_logger = logging.getLogger(PACKAGE_LOGGER_NAME)
-if not any(isinstance(h, logging.NullHandler) for h in _package_logger.handlers):
-    _package_logger.addHandler(logging.NullHandler())
-logger = logging.getLogger(__name__)
+package_logger = logging.getLogger(PACKAGE_LOGGER_NAME)
+if not any(isinstance(h, logging.NullHandler) for h in package_logger.handlers):
+    package_logger.addHandler(logging.NullHandler())
+# Compatibility alias for callers expecting a shared package logger
+logger = package_logger
 
 def _env_truthy(name: str, default: bool | None = None) -> bool | None:
     v = os.environ.get(name)
