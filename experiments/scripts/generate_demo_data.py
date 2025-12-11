@@ -61,7 +61,7 @@ class EnhancedDemoGenerator:
             ("balanced", 512, 4, "Balanced latency/throughput", "balanced"),
             ("standard", 1024, 8, "Standard multichannel", "balanced"),
             ("throughput", 2048, 16, "Throughput-optimized", "throughput"),
-            ("large", 4096, 32, "Large batch processing", "throughput"),
+            ("large", 4096, 32, "Large multichannel processing", "throughput"),
             ("extreme", 8192, 64, "Maximum parallelism", "throughput"),
         ]
 
@@ -81,13 +81,13 @@ class EnhancedDemoGenerator:
             "statistical_analysis": []
         }
 
-        for config_name, nfft, batch, description, category in configs:
-            print(f"\n[{config_name.upper()}] FFT={nfft}, Batch={batch}")
+        for config_name, nfft, channels, description, category in configs:
+            print(f"\n[{config_name.upper()}] FFT={nfft}, Channels={channels}")
             print(f"  Category: {category}, Description: {description}")
 
             engine_config = EngineConfig(
                 nfft=nfft,
-                channels=batch,
+                channels=channels,
                 overlap=0.5,
                 sample_rate_hz=48000,
                 stream_count=3,
@@ -101,20 +101,20 @@ class EnhancedDemoGenerator:
             )
 
             # Calculate theoretical metrics
-            bytes_per_frame = (nfft * batch * 4 * 2)  # Input + output
+            bytes_per_frame = (nfft * channels * 4 * 2)  # Input + output
             theoretical_min_latency_us = bytes_per_frame / (self.theoretical_limits["memory_bandwidth_gbs"] * 1e3)
 
             config_info = {
                 "name": config_name,
                 "nfft": nfft,
-                "channels": batch,
+                "channels": channels,
                 "category": category,
                 "description": description,
-                "total_samples": nfft * batch,
+                "total_samples": nfft * channels,
                 "memory_footprint_mb": round(bytes_per_frame / 1e6, 3),
                 "theoretical_min_latency_us": round(theoretical_min_latency_us, 2),
-                "compute_operations": nfft * batch * np.log2(nfft) * 5,  # FFT complexity
-                "parallelism_factor": batch * (nfft / 1024)  # Relative parallelism
+                "compute_operations": nfft * channels * np.log2(nfft) * 5,  # FFT complexity
+                "parallelism_factor": channels * (nfft / 1024)  # Relative parallelism
             }
             analysis_data["configurations"].append(config_info)
 
@@ -489,12 +489,12 @@ class EnhancedDemoGenerator:
             print(f"\nStudy: {study_name}")
             study_results = []
 
-            for config_name, nfft, batch, description in configs:
+            for config_name, nfft, channels, description in configs:
                 print(f"  Testing {config_name}...")
 
                 engine_config = EngineConfig(
                     nfft=nfft,
-                    channels=batch,
+                    channels=channels,
                     overlap=0.5,
                     sample_rate_hz=48000,
                     warmup_iters=50,
@@ -507,7 +507,7 @@ class EnhancedDemoGenerator:
                     "config_name": config_name,
                     "description": description,
                     "nfft": nfft,
-                    "channels": batch,
+                    "channels": channels,
                     "metrics": metrics["measurements"]
                 })
 

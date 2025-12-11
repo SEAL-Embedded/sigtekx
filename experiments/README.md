@@ -179,7 +179,7 @@ Parameter sweeps for comprehensive analysis:
 | Experiment | Description | Parameters |
 |------------|-------------|------------|
 | `ionosphere_resolution` | NFFT sweep | 4096-32768, overlap 0.5-0.875 |
-| `ionosphere_temporal` | Overlap study | 0.25-0.9375, batch 16-128 |
+| `ionosphere_temporal` | Overlap study | 0.25-0.9375, channels 16-128 |
 | `ionosphere_multiscale` | Cross-scale | Multiple engine configs |
 | `ionosphere_test` | Quick validation | Smaller parameters |
 

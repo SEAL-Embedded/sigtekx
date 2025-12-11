@@ -13,6 +13,8 @@
 #include <sstream>
 #include <stdexcept>
 
+#include <cufft.h>
+
 #include "sigtekx/core/cuda_wrappers.hpp"
 #include "sigtekx/core/signal_config.hpp"
 #include "sigtekx/profiling/nvtx.hpp"
@@ -106,6 +108,36 @@ size_t estimate_memory_usage(const SignalConfig& cfg) {
   total += static_cast<size_t>(cfg.nfft) * cfg.channels * sizeof(float) * 2;
 
   return total;
+}
+
+size_t estimate_cufft_workspace_bytes(size_t nfft, size_t channels,
+                                       bool is_real_input,
+                                       bool use_fallback_on_error) {
+  SIGTEKX_NVTX_RANGE_FUNCTION(profiling::colors::CYAN);
+
+  size_t work_size = 0;
+  cufftType fft_type = is_real_input ? CUFFT_R2C : CUFFT_C2C;
+
+  cufftResult result = cufftEstimate1d(static_cast<int>(nfft), fft_type,
+                                       static_cast<int>(channels), &work_size);
+
+  if (result != CUFFT_SUCCESS) {
+    if (use_fallback_on_error) {
+      // Conservative fallback: complex FFT workspace (8 bytes) with 2× safety margin
+      work_size = nfft * channels * sizeof(float) * 2 * 2;
+    } else {
+      std::ostringstream oss;
+      oss << "cufftEstimate1d failed with error code " << result
+          << " for nfft=" << nfft << ", channels=" << channels;
+      throw std::runtime_error(oss.str());
+    }
+  } else if (work_size == 0 && use_fallback_on_error) {
+    // cuFFT succeeded but returned 0 workspace (may auto-allocate internally)
+    // Conservative fallback for safety: 2× the typical workspace estimate
+    work_size = nfft * channels * sizeof(float) * 2 * 2;
+  }
+
+  return work_size;
 }
 
 }  // namespace signal_utils

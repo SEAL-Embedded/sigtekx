@@ -66,6 +66,25 @@ std::vector<std::string> get_available_devices();
 int select_best_device();
 bool validate_config(const SignalConfig& config, std::string& error_msg);
 size_t estimate_memory_usage(const SignalConfig& config);
+
+/**
+ * @brief Query precise cuFFT workspace memory requirement.
+ *
+ * Uses cufftEstimate1d() for lightweight estimation without CUDA context.
+ * Falls back to heuristic on failure. Results may be 5-10% conservative
+ * compared to actual runtime requirements.
+ *
+ * @param nfft FFT size (must be > 0)
+ * @param channels Number of parallel FFT batches (must be > 0)
+ * @param is_real_input True for R2C transforms, False for C2C
+ * @param use_fallback_on_error If true, returns heuristic estimate on API failure
+ * @return Workspace size in bytes
+ *
+ * @throws std::runtime_error If cuFFT API fails and use_fallback_on_error is false
+ */
+size_t estimate_cufft_workspace_bytes(size_t nfft, size_t channels,
+                                       bool is_real_input = true,
+                                       bool use_fallback_on_error = true);
 }  // namespace signal_utils
 
 }  // namespace sigtekx

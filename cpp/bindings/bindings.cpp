@@ -309,6 +309,45 @@ PYBIND11_MODULE(_native, m) {
   m.def("select_best_device", &sigtekx::signal_utils::select_best_device,
         "Selects the best available CUDA device.");
 
+  m.def("estimate_cufft_workspace_bytes",
+        &sigtekx::signal_utils::estimate_cufft_workspace_bytes,
+        py::arg("nfft"),
+        py::arg("channels"),
+        py::arg("is_real_input") = true,
+        py::arg("use_fallback_on_error") = true,
+        R"pbdoc(
+            Query precise cuFFT workspace memory requirement.
+
+            Uses lightweight cufftEstimate1d() API for accurate pre-flight memory
+            estimation without requiring CUDA context or plan creation. Results may
+            be 5-10% conservative compared to actual runtime requirements.
+
+            Args:
+                nfft: FFT size (must be > 0)
+                channels: Number of parallel FFT batches (must be > 0)
+                is_real_input: True for real-to-complex (R2C), False for complex-to-complex (C2C)
+                use_fallback_on_error: If True, returns heuristic estimate on API failure
+
+            Returns:
+                Workspace size in bytes (integer)
+
+            Raises:
+                RuntimeError: If cuFFT API fails and use_fallback_on_error=False
+
+            Examples:
+                >>> from sigtekx.core import _native
+                >>> workspace_bytes = _native.estimate_cufft_workspace_bytes(
+                ...     nfft=4096, channels=8
+                ... )
+                >>> print(f"Workspace: {workspace_bytes / 1024**2:.2f} MB")
+                Workspace: 2.05 MB
+
+            Note:
+                cuFFT may return 0 for smaller transforms that don't require workspace,
+                or may auto-allocate workspace internally. In such cases, the function
+                falls back to a conservative heuristic estimate when use_fallback_on_error=True.
+        )pbdoc");
+
   m.attr("__version__") = "0.9.4";
   m.attr("__architecture_version__") = "cpp-abs (pipeline/executor split)";
 }

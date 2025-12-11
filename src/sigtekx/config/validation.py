@@ -69,8 +69,21 @@ def estimate_memory_usage_mb(config: EngineConfig,
     per_buffer = input_size + output_size + complex_size
     total_bytes = per_buffer * config.pinned_buffer_count
 
-    # Add workspace estimates
-    cufft_workspace = config.nfft * config.channels * 8  # Rough estimate
+    # Add cuFFT workspace estimate (precise query with intelligent fallback)
+    try:
+        # Import inside function to avoid circular import
+        from sigtekx.core import _native
+        cufft_workspace = _native.estimate_cufft_workspace_bytes(
+            nfft=config.nfft,
+            channels=config.channels,
+            is_real_input=True,  # We use R2C transforms
+            use_fallback_on_error=True  # Enables heuristic fallback
+        )
+    except Exception:
+        # Conservative fallback if binding fails unexpectedly
+        # Estimate: complex FFT workspace (8 bytes per sample) with 2× safety margin
+        cufft_workspace = config.nfft * config.channels * 8 * 2
+
     total_bytes += cufft_workspace
 
     # Window coefficients

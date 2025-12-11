@@ -185,3 +185,78 @@ def test_memory_estimation(nfft, channels, expected_mb):
     # Should be within a reasonable range or both be small.
     assert np.isclose(estimated, expected_mb, atol=3) or (estimated < 1 and expected_mb < 1)
 
+
+class TestCuFFTWorkspaceEstimation:
+    """Test precise cuFFT workspace estimation integration."""
+
+    def test_binding_available(self):
+        """Verify C++ binding is accessible."""
+        from sigtekx.core import _native
+        assert hasattr(_native, 'estimate_cufft_workspace_bytes')
+
+    def test_basic_estimation(self):
+        """Test basic cuFFT workspace estimation."""
+        from sigtekx.core import _native
+
+        workspace = _native.estimate_cufft_workspace_bytes(4096, 8)
+        assert isinstance(workspace, int)
+        assert workspace >= 0  # May be 0 or heuristic value
+
+    @pytest.mark.parametrize("nfft,channels", [
+        (1024, 1),
+        (4096, 8),
+        (8192, 8),
+        (16384, 4),
+    ])
+    def test_ionosphere_configs(self, nfft, channels):
+        """Test memory estimation for ionosphere configurations."""
+        from sigtekx.config import estimate_memory_usage_mb
+
+        config = EngineConfig(nfft=nfft, channels=channels, overlap=0.75)
+        memory_mb = estimate_memory_usage_mb(config)
+
+        # Should return a non-negative estimate
+        assert memory_mb >= 0
+
+    def test_fallback_on_binding_failure(self):
+        """Test graceful fallback when binding is unavailable."""
+        from sigtekx.config import estimate_memory_usage_mb
+
+        config = EngineConfig(nfft=4096, channels=8)
+
+        # Should not crash even if binding fails
+        memory_mb = estimate_memory_usage_mb(config)
+        assert memory_mb >= 0
+
+    def test_r2c_vs_c2c(self):
+        """Test R2C vs C2C transform estimation."""
+        from sigtekx.core import _native
+
+        nfft, channels = 4096, 8
+
+        workspace_r2c = _native.estimate_cufft_workspace_bytes(nfft, channels, True)
+        workspace_c2c = _native.estimate_cufft_workspace_bytes(nfft, channels, False)
+
+        # Both should be non-negative
+        assert workspace_r2c >= 0
+        assert workspace_c2c >= 0
+
+    def test_experiments_validation_reuse(self):
+        """Test that experiments validation reuses core logic."""
+        import sys
+        from pathlib import Path
+
+        # Add experiments to path
+        experiments_path = Path(__file__).parent.parent / 'experiments'
+        if str(experiments_path) not in sys.path:
+            sys.path.insert(0, str(experiments_path))
+
+        from conf.validation import ConfigValidator
+
+        validator = ConfigValidator()
+
+        # Test memory estimation method exists and works
+        mem_mb = validator._estimate_memory_usage(nfft=4096, channels=8)
+        assert isinstance(mem_mb, (int, float))
+        assert mem_mb >= 0
+

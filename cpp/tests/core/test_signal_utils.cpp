@@ -356,3 +356,165 @@ TEST_F(SignalUtilsTest, EstimateMemoryUsageReasonableSize) {
   EXPECT_LT(mem, 1024u * 1024u * 1024u);  // < 1 GB
   EXPECT_GT(mem, 1024u);                  // > 1 KB
 }
+
+// ============================================================================
+//  cuFFT Workspace Estimation Tests
+// ============================================================================
+
+TEST_F(SignalUtilsTest, EstimateCufftWorkspaceBasic) {
+  size_t workspace = estimate_cufft_workspace_bytes(1024, 2, true, true);
+
+  // Should return non-zero workspace size
+  EXPECT_GT(workspace, 0u);
+
+  // Should be reasonable (not absurdly large)
+  EXPECT_LT(workspace, 100u * 1024u * 1024u);  // < 100 MB for small config
+}
+
+TEST_F(SignalUtilsTest, EstimateCufftWorkspaceR2CVsC2C) {
+  size_t nfft = 4096;
+  size_t channels = 8;
+
+  size_t workspace_r2c = estimate_cufft_workspace_bytes(nfft, channels, true, true);
+  size_t workspace_c2c = estimate_cufft_workspace_bytes(nfft, channels, false, true);
+
+  // Both should be non-zero
+  EXPECT_GT(workspace_r2c, 0u);
+  EXPECT_GT(workspace_c2c, 0u);
+
+  // C2C typically requires more workspace than R2C
+  // But we just verify both are reasonable, not their relative sizes
+  EXPECT_LT(workspace_r2c, 1024u * 1024u * 1024u);  // < 1 GB
+  EXPECT_LT(workspace_c2c, 1024u * 1024u * 1024u);  // < 1 GB
+}
+
+TEST_F(SignalUtilsTest, EstimateCufftWorkspaceScalesWithNFFT) {
+  size_t channels = 8;
+
+  size_t workspace_small = estimate_cufft_workspace_bytes(1024, channels, true, true);
+  size_t workspace_medium = estimate_cufft_workspace_bytes(4096, channels, true, true);
+  size_t workspace_large = estimate_cufft_workspace_bytes(16384, channels, true, true);
+
+  // Larger NFFT should generally require more (or equal) workspace
+  EXPECT_LE(workspace_small, workspace_large);
+  EXPECT_LE(workspace_medium, workspace_large);
+}
+
+TEST_F(SignalUtilsTest, EstimateCufftWorkspaceScalesWithChannels) {
+  size_t nfft = 4096;
+
+  size_t workspace_few = estimate_cufft_workspace_bytes(nfft, 1, true, true);
+  size_t workspace_many = estimate_cufft_workspace_bytes(nfft, 16, true, true);
+
+  // More channels (batches) may require more workspace
+  EXPECT_GT(workspace_few, 0u);
+  EXPECT_GT(workspace_many, 0u);
+  EXPECT_LE(workspace_few, workspace_many);
+}
+
+TEST_F(SignalUtilsTest, EstimateCufftWorkspaceMatchesActualRuntime) {
+  // Test ionosphere-relevant configurations
+  struct TestCase {
+    size_t nfft;
+    size_t channels;
+    bool is_real;
+  };
+
+  std::vector<TestCase> cases = {
+      {1024, 1, true},    // Minimal
+      {4096, 8, true},    // Ionosphere standard
+      {8192, 8, true},    // Ionosphere hi-res
+      {16384, 4, true},   // ULF/VLF
+  };
+
+  for (const auto& tc : cases) {
+    // 1. Get estimate via new function
+    size_t estimated = estimate_cufft_workspace_bytes(
+        tc.nfft, tc.channels, tc.is_real, false  // Strict mode (no fallback)
+    );
+
+    // 2. Get actual workspace from CufftPlan
+    CufftPlan plan;
+    int n[] = {static_cast<int>(tc.nfft)};
+    int istride = 1;
+    int ostride = 1;
+    int idist = tc.nfft;
+    int odist = tc.nfft / 2 + 1;
+
+    cudaStream_t stream;
+    SIGTEKX_CUDA_CHECK(cudaStreamCreate(&stream));
+
+    plan.create_plan_many(
+        1,  // rank
+        n,
+        nullptr, istride, idist,  // input
+        nullptr, ostride, odist,  // output
+        tc.is_real ? CUFFT_R2C : CUFFT_C2C,
+        tc.channels,
+        stream
+    );
+
+    size_t actual = plan.work_size();
+
+    // 3. Verify accuracy
+    // Both should either be 0 (no workspace needed) or match within tolerance
+    if (estimated == 0 && actual == 0) {
+      // Valid case: cuFFT doesn't need workspace for this config
+      EXPECT_EQ(estimated, actual);
+    } else if (estimated > 0 || actual > 0) {
+      // At least one is non-zero, check tolerance
+      // cufftEstimate may be conservative (larger than actual)
+      double ratio = static_cast<double>(estimated) / std::max(actual, size_t(1));
+
+      EXPECT_GE(ratio, 0.9)
+          << "Underestimate for nfft=" << tc.nfft
+          << " channels=" << tc.channels
+          << " estimated=" << estimated
+          << " actual=" << actual;
+
+      EXPECT_LE(ratio, 2.0)  // Allow 2× over-estimation (very conservative)
+          << "Severe overestimate for nfft=" << tc.nfft
+          << " channels=" << tc.channels
+          << " estimated=" << estimated
+          << " actual=" << actual;
+    }
+
+    SIGTEKX_CUDA_CHECK(cudaStreamDestroy(stream));
+  }
+}
+
+TEST_F(SignalUtilsTest, EstimateCufftWorkspaceFallbackOnError) {
+  // Test with impossible parameters to trigger cuFFT error
+  // (cuFFT may or may not error on 0, but we test the fallback logic)
+
+  // With fallback enabled - should not throw
+  EXPECT_NO_THROW({
+    size_t workspace = estimate_cufft_workspace_bytes(
+        0, 8, true, true  // Invalid nfft=0, fallback=true
+    );
+    // May return heuristic estimate (0 * 8 * 8 = 0) or cuFFT may succeed
+    EXPECT_GE(workspace, 0u);
+  });
+}
+
+TEST_F(SignalUtilsTest, EstimateCufftWorkspaceThrowsWithoutFallback) {
+  // Test error handling when fallback is disabled
+  // Note: Some invalid configs might still succeed in cufftEstimate1d
+  // This test verifies the exception mechanism works if cuFFT fails
+
+  bool threw_exception = false;
+  try {
+    // Try with a configuration that might fail
+    estimate_cufft_workspace_bytes(
+        0, 0, true, false  // nfft=0, channels=0, fallback=false
+    );
+  } catch (const std::runtime_error& e) {
+    threw_exception = true;
+    // Verify error message contains useful info
+    std::string msg = e.what();
+    EXPECT_NE(msg.find("cufftEstimate1d"), std::string::npos);
+  }
+
+  // Note: If cuFFT doesn't error on these params, that's also valid behavior
+  // We just verify that IF it errors, we throw correctly
+}

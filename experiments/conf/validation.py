@@ -11,6 +11,9 @@ from typing import Any
 
 import yaml
 
+from sigtekx.config import EngineConfig
+from sigtekx.config.validation import estimate_memory_usage_mb
+
 
 class ConfigValidationError(ValueError):
     """Raised when configuration validation fails."""
@@ -49,10 +52,16 @@ class ConfigValidator:
 
         return len(self.errors) == 0, self.warnings, self.errors
 
-    def validate_engine_params(self, nfft: int, batch: int, overlap: float,
+    def validate_engine_params(self, nfft: int, channels: int, overlap: float,
                              sample_rate_hz: int = 48000) -> tuple[bool, list[str], list[str]]:
         """
         Validate engine parameters for compatibility and performance.
+
+        Args:
+            nfft: FFT size
+            channels: Number of independent signal channels
+            overlap: Frame overlap factor
+            sample_rate_hz: Sample rate in Hz
 
         Returns:
             (is_valid, warnings, errors)
@@ -64,8 +73,8 @@ class ConfigValidator:
         if nfft < 128 or nfft > 65536:
             self.errors.append(f"NFFT {nfft} outside valid range [128, 65536]")
 
-        if batch < 1 or batch > 256:
-            self.errors.append(f"Batch size {batch} outside valid range [1, 256]")
+        if channels < 1 or channels > 256:
+            self.errors.append(f"Channels {channels} outside valid range [1, 256]")
 
         if overlap < 0.0 or overlap >= 1.0:
             self.errors.append(f"Overlap {overlap} outside valid range [0.0, 1.0)")
@@ -75,7 +84,7 @@ class ConfigValidator:
             self.errors.append(f"NFFT {nfft} is not a power of 2 (required for FFT efficiency)")
 
         # Memory estimation and warnings
-        estimated_memory_mb = self._estimate_memory_usage(nfft, batch)
+        estimated_memory_mb = self._estimate_memory_usage(nfft, channels)
         if estimated_memory_mb > 8000:  # 8GB
             self.errors.append(f"Estimated memory usage {estimated_memory_mb:.0f}MB exceeds 8GB limit")
         elif estimated_memory_mb > 4000:  # 4GB
@@ -85,15 +94,15 @@ class ConfigValidator:
         if nfft > 16384:
             self.warnings.append(f"Large NFFT {nfft} may impact real-time performance")
 
-        if batch > 64:
-            self.warnings.append(f"Large batch size {batch} may increase latency")
+        if channels > 64:
+            self.warnings.append(f"Large channel count {channels} may increase latency")
 
         if overlap > 0.9:
             self.warnings.append(f"Very high overlap {overlap} increases computational load")
 
         # Compatibility checks
-        if nfft >= 8192 and batch >= 32:
-            self.warnings.append("Large NFFT + large batch may exceed GPU memory")
+        if nfft >= 8192 and channels >= 32:
+            self.warnings.append(f"Large NFFT + many channels may exceed GPU memory")
 
         # Real-time feasibility
         samples_per_frame = int(nfft * (1.0 - overlap))
@@ -109,11 +118,11 @@ class ConfigValidator:
             return
 
         nfft = engine_config.get('nfft', 2048)
-        batch = engine_config.get('batch', 8)
+        channels = engine_config.get('channels', 8)
         overlap = engine_config.get('overlap', 0.5)
         sample_rate = engine_config.get('sample_rate_hz', 48000)
 
-        is_valid, warnings, errors = self.validate_engine_params(nfft, batch, overlap, sample_rate)
+        is_valid, warnings, errors = self.validate_engine_params(nfft, channels, overlap, sample_rate)
         self.warnings.extend(warnings)
         self.errors.extend(errors)
 
@@ -163,18 +172,25 @@ class ConfigValidator:
             if nfft < 1024:
                 self.warnings.append("NFFT < 1024 may have insufficient frequency resolution for ionosphere analysis")
 
-    def _estimate_memory_usage(self, nfft: int, batch: int) -> float:
-        """Estimate GPU memory usage in MB."""
-        # Rough estimation based on typical FFT memory requirements
-        # Complex data (8 bytes per sample) + intermediate buffers
-        samples_per_batch = nfft * batch
-        input_buffer_mb = (samples_per_batch * 8) / (1024 * 1024)  # Complex float32
-        fft_workspace_mb = input_buffer_mb * 2  # FFT workspace
-        output_buffer_mb = input_buffer_mb  # Output buffer
-        overhead_mb = 100  # CUDA overhead
+    def _estimate_memory_usage(self, nfft: int, channels: int) -> float:
+        """Estimate GPU memory usage using core validation logic.
 
-        total_mb = input_buffer_mb + fft_workspace_mb + output_buffer_mb + overhead_mb
-        return total_mb
+        Args:
+            nfft: FFT size
+            channels: Number of independent signal channels
+
+        Returns:
+            Estimated memory usage in MB
+        """
+        # Create minimal EngineConfig for estimation
+        config = EngineConfig(
+            nfft=nfft,
+            channels=channels,
+            overlap=0.75,  # Default ionosphere overlap
+            sample_rate_hz=48000,  # Standard sample rate
+            pinned_buffer_count=2  # Minimum for double buffering
+        )
+        return estimate_memory_usage_mb(config)
 
 
 def validate_config_file(config_path: str) -> bool:
