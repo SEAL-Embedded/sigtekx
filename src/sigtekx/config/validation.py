@@ -1,11 +1,22 @@
 """Configuration validation utilities."""
 
+from typing import Final
 import warnings
 
 import numpy as np
 
 from sigtekx.config.schemas import EngineConfig
 from sigtekx.exceptions import ConfigError, ValidationError
+
+# Memory safety thresholds
+DEVICE_MEMORY_SAFETY_FACTOR: Final[float] = 0.9  # Reserve 10% GPU memory for overhead
+
+# Hardware compatibility thresholds
+MINIMUM_COMPUTE_CAPABILITY_MAJOR: Final[int] = 6  # Pascal+ architecture required
+MINIMUM_COMPUTE_CAPABILITY_MINOR: Final[int] = 0
+
+# Performance warning thresholds
+LARGE_FFT_SIZE_WARNING: Final[int] = 16384  # Warn for very large FFTs
 
 
 def validate_config_device_compatibility(
@@ -25,7 +36,8 @@ def validate_config_device_compatibility(
     """
     # Memory check
     estimated_mb = estimate_memory_usage_mb(config)
-    if estimated_mb > device_memory_mb * 0.9:  # Leave 10% headroom
+    available_memory_mb = device_memory_mb * DEVICE_MEMORY_SAFETY_FACTOR
+    if estimated_mb > available_memory_mb:
         raise ConfigError(
             f"Configuration requires ~{estimated_mb}MB but device has {device_memory_mb}MB",
             hint="Reduce batch size or nfft"
@@ -33,15 +45,20 @@ def validate_config_device_compatibility(
 
     # Compute capability check
     major, minor = compute_capability
-    if major < 6:
+    if major < MINIMUM_COMPUTE_CAPABILITY_MAJOR:
         warnings.warn(
-            f"GPU compute capability {major}.{minor} is below recommended 6.0",
+            (
+                "GPU compute capability "
+                f"{major}.{minor} is below recommended "
+                f"{MINIMUM_COMPUTE_CAPABILITY_MAJOR}."
+                f"{MINIMUM_COMPUTE_CAPABILITY_MINOR}"
+            ),
             RuntimeWarning,
             stacklevel=2
         )
 
     # Large FFT warning
-    if config.nfft > 16384:
+    if config.nfft > LARGE_FFT_SIZE_WARNING:
         warnings.warn(
             f"Large FFT size ({config.nfft}) may impact real-time performance",
             RuntimeWarning,
