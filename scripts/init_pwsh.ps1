@@ -333,7 +333,7 @@ function global:sigx {
     }
 
     # Only allow commands that actually exist in simplified CLI
-    $validCommands = @('setup','build','test','coverage','lint','format','clean','doctor','help','profile','typecheck','diagrams')
+    $validCommands = @('setup','build','test','coverage','lint','format','clean','doctor','help','profile','typecheck','diagrams','dev')
     if ($Args.Count -gt 0 -and $Args[0] -notin $validCommands) {
         Write-Warning "Command '$($Args[0])' not available. Use 'sigx help' for available commands."
         Write-Host "💡 For research workflows, use direct tools:" -ForegroundColor Cyan
@@ -574,7 +574,8 @@ function global:sxpc  { sigxc profile @args }   # C++ profiling shortcut
 # Help shortcuts (use CLI help instead of removed learn commands)
 function global:sxh { sigx help }
 
-# Diagram generation shortcut
+# Diagram generation shortcut (use 'sigx diagrams' for full command)
+# Development workflow shortcut
 function global:sxd {
     [CmdletBinding()]
     param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
@@ -587,9 +588,9 @@ function global:sxd {
     }
 
     if ($common.Count -gt 0) {
-        sigx @common diagrams @Args
+        sigx @common dev @Args
     } else {
-        sigx diagrams @Args
+        sigx dev @Args
     }
 }
 
@@ -601,7 +602,7 @@ function global:sxreload {
 }
 
 # Tab-completion (only for commands that actually exist)
-$global:IonoVerbs   = @('setup','build','test','coverage','lint','format','clean','doctor','help','profile','typecheck','diagrams')
+$global:IonoVerbs   = @('setup','build','test','coverage','lint','format','clean','doctor','help','profile','typecheck','diagrams','dev')
 $global:IonoTargets = @('python','cpp','all','py','sys','-Clean','--clean','-Verbose','--verbose','--debug','--release','-Fix','-Check','-Coverage','-Pattern','-All','nsys','ncu','latency','throughput','accuracy','realtime','custom','-Full','-NoOpen','-Mode','-Script','-Kernel','-Duration','--format','--force','svg','png','pdf','cpp_class_hierarchy','cpp_components_pipeline','cpp_sequence_execution','cpp_memory_layout','py_package_architecture','py_analysis_workflow','py_workflow_sequence','sys_architecture_overview')
 
 # sigxc tab-completion

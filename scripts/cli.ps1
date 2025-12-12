@@ -520,6 +520,141 @@ function Invoke-Doctor {
     }
 }
 
+function Invoke-Dev {
+    <#
+    .SYNOPSIS
+    Display development workflow quick reference with dynamic experiment discovery
+    #>
+    param(
+        [bool]$Verbose = $false
+    )
+
+    # Dynamic experiment discovery
+    $experimentDir = Join-Path $script:ProjectRoot "experiments/conf/experiment"
+    $experiments = @()
+
+    if (Test-Path $experimentDir) {
+        $experiments = Get-ChildItem -Path $experimentDir -Filter "*.yaml" -File |
+            ForEach-Object { $_.BaseName } |
+            Sort-Object
+    }
+
+    # Display header
+    Write-Host @"
+╔════════════════════════════════════════════════════════════════════════╗
+║  SIGTEKX DEVELOPMENT WORKFLOW QUICK REFERENCE                          ║
+╚════════════════════════════════════════════════════════════════════════╝
+
+"@ -ForegroundColor Cyan
+
+    # Python Single Experiments
+    Write-Host "═══ PYTHON SINGLE EXPERIMENTS ═══" -ForegroundColor Green
+    Write-Host "  python benchmarks/run_latency.py experiment=baseline +benchmark=latency" -ForegroundColor Gray
+    Write-Host "  python benchmarks/run_throughput.py experiment=ionosphere_temporal +benchmark=throughput" -ForegroundColor Gray
+    Write-Host "  python benchmarks/run_realtime.py experiment=ionosphere_realtime +benchmark=realtime" -ForegroundColor Gray
+    Write-Host "  python benchmarks/run_accuracy.py experiment=baseline +benchmark=accuracy" -ForegroundColor Gray
+    Write-Host ""
+
+    # Python Multi-Run Experiments
+    Write-Host "═══ PYTHON MULTI-RUN EXPERIMENTS ═══" -ForegroundColor Green
+    Write-Host "  python benchmarks/run_latency.py --multirun experiment=ionosphere_resolution +benchmark=latency" -ForegroundColor Gray
+    Write-Host "  python benchmarks/run_throughput.py --multirun experiment=ionosphere_multiscale +benchmark=throughput" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "  Quick test (lightweight):" -ForegroundColor DarkCyan
+    Write-Host "  python benchmarks/run_throughput.py --multirun experiment=ionosphere_test +benchmark=throughput" -ForegroundColor Gray
+    Write-Host ""
+
+    # Snakemake Workflows
+    Write-Host "═══ SNAKEMAKE WORKFLOWS ═══" -ForegroundColor Green
+    Write-Host "  snakemake --cores 4 --snakefile experiments/Snakefile" -ForegroundColor Gray
+    Write-Host "  snakemake --dry-run --snakefile experiments/Snakefile" -ForegroundColor DarkGray -NoNewline
+    Write-Host "  # Preview" -ForegroundColor DarkCyan
+    Write-Host ""
+
+    # UI and Analysis Tools
+    Write-Host "═══ ANALYSIS & VISUALIZATION ═══" -ForegroundColor Green
+    Write-Host "  sigx dashboard" -ForegroundColor Gray -NoNewline
+    Write-Host "                                   # Streamlit (recommended)" -ForegroundColor DarkCyan
+    Write-Host "  streamlit run experiments/streamlit/app.py" -ForegroundColor DarkGray -NoNewline
+    Write-Host "      # Alternative" -ForegroundColor DarkCyan
+    Write-Host "  mlflow ui --backend-store-uri file://./artifacts/mlruns" -ForegroundColor Gray -NoNewline
+    Write-Host "  # Experiment tracking" -ForegroundColor DarkCyan
+    Write-Host ""
+
+    # Available Experiments (Dynamic)
+    Write-Host "═══ AVAILABLE EXPERIMENTS ($($experiments.Count)) ═══" -ForegroundColor Green
+
+    if ($experiments.Count -eq 0) {
+        Write-Host "  No experiments found in experiments/conf/experiment/" -ForegroundColor Red
+    } else {
+        # Group experiments by category
+        $ionosphere = $experiments | Where-Object { $_ -like "ionosphere_*" }
+        $baseline = $experiments | Where-Object { $_ -like "baseline*" -or $_ -like "profiling*" }
+        $scaling = $experiments | Where-Object { $_ -like "*scaling*" -or $_ -like "*sweep*" -or $_ -like "*grid*" }
+        $other = $experiments | Where-Object {
+            $_ -notin $ionosphere -and $_ -notin $baseline -and $_ -notin $scaling
+        }
+
+        if ($ionosphere.Count -gt 0) {
+            Write-Host "  Ionosphere Research:" -ForegroundColor Yellow
+            foreach ($exp in $ionosphere) {
+                Write-Host "    - $exp" -ForegroundColor Gray
+            }
+        }
+
+        if ($scaling.Count -gt 0) {
+            Write-Host "  Performance Scaling:" -ForegroundColor Yellow
+            foreach ($exp in $scaling) {
+                Write-Host "    - $exp" -ForegroundColor Gray
+            }
+        }
+
+        if ($baseline.Count -gt 0) {
+            Write-Host "  Baseline & Profiling:" -ForegroundColor Yellow
+            foreach ($exp in $baseline) {
+                Write-Host "    - $exp" -ForegroundColor Gray
+            }
+        }
+
+        if ($other.Count -gt 0) {
+            Write-Host "  Other:" -ForegroundColor Yellow
+            foreach ($exp in $other) {
+                Write-Host "    - $exp" -ForegroundColor Gray
+            }
+        }
+    }
+
+    Write-Host ""
+
+    # Verbose mode - show experiment details
+    if ($Verbose -and $experiments.Count -gt 0) {
+        Write-Host "═══ EXPERIMENT DETAILS (--verbose) ═══" -ForegroundColor Green
+        foreach ($exp in $experiments | Select-Object -First 5) {
+            $yamlPath = Join-Path $experimentDir "$exp.yaml"
+            $content = Get-Content $yamlPath -Raw
+
+            Write-Host "  $exp" -ForegroundColor Cyan -NoNewline
+
+            # Extract description if available
+            if ($content -match 'description:\s*(.+)') {
+                Write-Host " - $($matches[1])" -ForegroundColor DarkGray
+            } else {
+                Write-Host ""
+            }
+        }
+
+        if ($experiments.Count -gt 5) {
+            Write-Host "  ... and $($experiments.Count - 5) more (use 'sigx dev --verbose' for all)" -ForegroundColor DarkCyan
+        }
+        Write-Host ""
+    }
+
+    # Footer
+    Write-Host "Tip: Use 'sigx help' for full CLI reference" -ForegroundColor DarkCyan
+    Write-Host "     See CLAUDE.md for detailed workflow documentation" -ForegroundColor DarkCyan
+    Write-Host ""
+}
+
 # ==============================================================================
 # Diagram Generation Helper Functions
 # ==============================================================================
@@ -1060,6 +1195,21 @@ Research & Benchmarking:
   dvc status && dvc repro
 
 ═══════════════════════════════════════════════════════════════════════════
+DEVELOPMENT WORKFLOWS
+═══════════════════════════════════════════════════════════════════════════
+
+  dev [--verbose]         Display development workflow quick reference
+                          - Direct commands for Python experiments (copy-paste ready)
+                          - Snakemake workflow commands
+                          - MLflow and Streamlit UI commands
+                          - Dynamically lists available experiments
+
+  Examples:
+    sigx dev              # Show workflow quick reference
+    sigx dev --verbose    # Include experiment details
+    sxd                   # Shorthand version
+
+═══════════════════════════════════════════════════════════════════════════
 ADDITIONAL RESOURCES
 ═══════════════════════════════════════════════════════════════════════════
 
@@ -1261,6 +1411,16 @@ try {
             }
 
             Invoke-Profile @params
+        }
+        "dev"      {
+            $params = @{}
+
+            # Check for verbose flag
+            if ($commonVerbose -or $normalizedArgs -contains "-verbose" -or $normalizedArgs -contains "--verbose") {
+                $params.Verbose = $true
+            }
+
+            Invoke-Dev @params
         }
         default {
             Write-Error "Unknown command: $Command"
