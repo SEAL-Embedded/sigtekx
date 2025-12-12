@@ -2,7 +2,7 @@
 
 import contextlib
 import logging
-from typing import Any
+from typing import Any, Generator
 
 from sigtekx.core.engine import _import_cpp_engine
 from sigtekx.exceptions import DeviceNotFoundError, DllLoadError
@@ -18,12 +18,36 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-def _shutdown_nvml_safely() -> None:
-    """Best-effort NVML shutdown without propagating errors."""
+@contextlib.contextmanager
+def nvml_context() -> Generator[None, None, None]:
+    """Context manager for safe NVML library usage.
+
+    Ensures nvmlInit() is called on entry and nvmlShutdown() is called on exit,
+    even if exceptions occur. Provides proper resource cleanup and error logging.
+
+    Yields:
+        None
+
+    Example:
+        >>> with nvml_context():
+        ...     handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+        ...     name = pynvml.nvmlDeviceGetName(handle)
+
+    Note:
+        If NVML_AVAILABLE is False, this context manager is a no-op.
+    """
     if not NVML_AVAILABLE:
+        yield
         return
-    with contextlib.suppress(pynvml.NVMLError):
-        pynvml.nvmlShutdown()
+
+    try:
+        pynvml.nvmlInit()
+        yield
+    finally:
+        try:
+            pynvml.nvmlShutdown()
+        except Exception as e:
+            logger.debug("NVML shutdown error (expected if init failed): %s", e)
 
 
 def gpu_count() -> int:
@@ -34,15 +58,11 @@ def gpu_count() -> int:
     """
     if NVML_AVAILABLE:
         try:
-            pynvml.nvmlInit()
-            try:
+            with nvml_context():
                 return int(pynvml.nvmlDeviceGetCount())
-            finally:
-                _shutdown_nvml_safely()
         except pynvml.NVMLError as exc:
             logger.warning("NVML query failed: %s", exc)
         except Exception as exc:  # pragma: no cover - defensive safeguard
-            _shutdown_nvml_safely()
             raise DeviceNotFoundError("Failed to query CUDA devices via NVML") from exc
 
     try:
@@ -99,11 +119,7 @@ def device_info(device_id: int | None = None) -> dict[str, Any]:
 
     if NVML_AVAILABLE:
         try:
-            # Add timeout for NVML operations to prevent hanging
-            import threading
-
-            def nvml_with_timeout():
-                pynvml.nvmlInit()
+            with nvml_context():
                 handle = pynvml.nvmlDeviceGetHandleByIndex(device_id)
 
                 info['name'] = pynvml.nvmlDeviceGetName(handle)
@@ -115,6 +131,7 @@ def device_info(device_id: int | None = None) -> dict[str, Any]:
                 major, minor = pynvml.nvmlDeviceGetCudaComputeCapability(handle)
                 info['compute_capability'] = (major, minor)
 
+                # Optional fields with individual error handling
                 with contextlib.suppress(pynvml.NVMLError):
                     info['temperature_c'] = pynvml.nvmlDeviceGetTemperature(
                         handle, pynvml.NVML_TEMPERATURE_GPU
@@ -128,26 +145,12 @@ def device_info(device_id: int | None = None) -> dict[str, Any]:
                     info['utilization_gpu'] = util.gpu
                     info['utilization_memory'] = util.memory
 
-            # Run NVML operations in a thread with timeout
-            nvml_thread = threading.Thread(target=nvml_with_timeout)
-            nvml_thread.daemon = True
-            nvml_thread.start()
-            nvml_thread.join(timeout=5.0)  # 5 second timeout
-
-            if nvml_thread.is_alive():
-                logger.warning("NVML device query timed out after 5 seconds")
-                # Thread is still running, but we'll continue without GPU info
-            else:
-                # Thread completed successfully, info was populated
-                pass
-
-            _shutdown_nvml_safely()
         except pynvml.NVMLError as exc:
             logger.warning("NVML device query failed: %s", exc)
         except Exception as exc:
-            _shutdown_nvml_safely()
-            logger.warning("Failed to query CUDA device via NVML: %s", exc)
+            logger.warning("Unexpected NVML error: %s", exc)
 
+    # Fallback to C++ backend if name still 'Unknown'
     if info['name'] == 'Unknown':
         try:
             cpp_module = _import_cpp_engine()
