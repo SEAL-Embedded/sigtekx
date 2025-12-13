@@ -250,13 +250,13 @@ class EngineStateError(SigTekXError):
 
     error_code = "E3010"
 
-    def __init__(self, message: str, current_state: str | None = None):
-        hint = None
-        if current_state == "uninitialized":
-            hint = "Call initialize() or use the Engine context manager"
-        elif current_state == "processing":
-            hint = "Wait for current operation to complete"
-        super().__init__(message, hint, current_state=current_state)
+    def __init__(self, message: str, current_state: str | None = None, hint: str | None = None, **kwargs):
+        if hint is None:
+            if current_state == "uninitialized":
+                hint = "Call initialize() or use the Engine context manager"
+            elif current_state == "processing":
+                hint = "Wait for current operation to complete"
+        super().__init__(message, hint, current_state=current_state, **kwargs)
         self.current_state = current_state
 
 
@@ -296,6 +296,77 @@ class EngineRuntimeError(SigTekXError):
                 hint = "Check that nfft is a power of 2 and channels > 0"
         super().__init__(message, hint, cuda_error=cuda_error)
         self.cuda_error = cuda_error
+
+
+class EngineCleanupError(EngineStateError):
+    """Error during engine cleanup/shutdown.
+
+    Raised when engine cleanup fails in ways that may indicate resource leaks
+    or unrecoverable errors during shutdown.
+
+    Parameters
+    ----------
+    message : str
+        Error description.
+    cleanup_step : str, optional
+        Cleanup step that failed (e.g., 'synchronize', 'reset', 'memory_validation').
+    gpu_memory_leaked_mb : int, optional
+        Amount of GPU memory potentially leaked in MB (if detectable).
+    original_error : Exception, optional
+        Original exception from cleanup operation.
+    **context_kwargs : dict
+        Additional context passed to EngineStateError.
+
+    Attributes
+    ----------
+    error_code : str
+        Stable error identifier (E3030).
+    cleanup_step : str or None
+        Cleanup step that failed.
+    gpu_memory_leaked_mb : int or None
+        Amount of GPU memory potentially leaked.
+    original_error : Exception or None
+        Original exception from cleanup.
+    hint : str or None
+        Auto-generated based on error: memory leaks suggest context manager
+        usage, CUDA errors explain expected shutdown behavior.
+    context : dict
+        Inherited from SigTekXError.
+    """
+
+    error_code = "E3030"
+
+    def __init__(
+        self,
+        message: str,
+        cleanup_step: str | None = None,
+        gpu_memory_leaked_mb: int | None = None,
+        original_error: Exception | None = None,
+        **context_kwargs
+    ):
+        hint = None
+        if gpu_memory_leaked_mb and gpu_memory_leaked_mb > 0:
+            hint = f"GPU memory leak detected ({gpu_memory_leaked_mb} MB). "
+            hint += "Ensure all engines are properly closed with context managers"
+        elif original_error:
+            error_str = str(original_error).lower()
+            if "cuda" in error_str and "device" in error_str:
+                hint = "CUDA device error during cleanup (often expected during shutdown)"
+            elif "memory" in error_str:
+                hint = "Memory error during cleanup - check for resource exhaustion"
+
+        super().__init__(
+            message,
+            current_state="cleanup",
+            hint=hint,
+            cleanup_step=cleanup_step,
+            gpu_memory_leaked_mb=gpu_memory_leaked_mb,
+            original_error=str(original_error) if original_error else None,
+            **context_kwargs
+        )
+        self.cleanup_step = cleanup_step
+        self.gpu_memory_leaked_mb = gpu_memory_leaked_mb
+        self.original_error = original_error
 
 
 # ============================================================================

@@ -2,6 +2,7 @@
 
 import contextlib
 import logging
+import os
 from typing import Any, Generator
 
 from sigtekx.core.engine import _import_cpp_engine
@@ -259,3 +260,68 @@ def monitor_device(device_id: int | None = None) -> str:
         lines.append(f"  GPU Utilization: {info['utilization_gpu']}%")
 
     return '\n'.join(lines)
+
+
+def get_gpu_memory_snapshot(device_id: int | None = None) -> dict[str, int]:
+    """Get GPU memory snapshot for leak detection.
+
+    Returns memory usage in MB. Uses NVML if available, gracefully returns
+    zeros if NVML is not available.
+
+    Args:
+        device_id: Device to query (None for current device)
+
+    Returns:
+        Dictionary with:
+            - total_mb: Total GPU memory (int)
+            - used_mb: Used GPU memory (int)
+            - free_mb: Free GPU memory (int)
+            - allocated_mb: Allocated by current process (int, if available)
+
+    Example:
+        >>> snapshot = get_gpu_memory_snapshot(0)
+        >>> print(f"GPU memory used: {snapshot['used_mb']} MB")
+    """
+    snapshot = {
+        'total_mb': 0,
+        'used_mb': 0,
+        'free_mb': 0,
+        'allocated_mb': 0,
+    }
+
+    if not NVML_AVAILABLE:
+        logger.debug("NVML not available, returning zero memory snapshot")
+        return snapshot
+
+    if device_id is None:
+        try:
+            device_id = current_device()
+        except Exception:
+            logger.debug("Could not determine current device, using 0")
+            device_id = 0
+
+    try:
+        with nvml_context():
+            handle = pynvml.nvmlDeviceGetHandleByIndex(device_id)
+
+            # Basic memory info
+            mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+            snapshot['total_mb'] = mem_info.total // (1024 * 1024)
+            snapshot['free_mb'] = mem_info.free // (1024 * 1024)
+            snapshot['used_mb'] = mem_info.used // (1024 * 1024)
+
+            # Try to get per-process memory (NVML 11.0+)
+            with contextlib.suppress(pynvml.NVMLError, AttributeError):
+                proc_info = pynvml.nvmlDeviceGetComputeRunningProcesses(handle)
+                current_pid = os.getpid()
+                for proc in proc_info:
+                    if proc.pid == current_pid:
+                        snapshot['allocated_mb'] = proc.usedGpuMemory // (1024 * 1024)
+                        break
+
+    except pynvml.NVMLError as e:
+        logger.debug("NVML query failed during memory snapshot: %s", e)
+    except Exception as e:
+        logger.debug("Unexpected error during memory snapshot: %s", e)
+
+    return snapshot

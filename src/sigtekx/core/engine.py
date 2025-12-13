@@ -493,25 +493,193 @@ class Engine:
         # Re-initialize
         self._initialize()
 
+    def _should_track_cleanup_memory(self) -> bool:
+        """Determine if GPU memory tracking should be enabled during cleanup.
+
+        Controlled by SIGX_TRACK_CLEANUP_MEMORY environment variable.
+        Defaults to True in debug builds (__debug__==True), False in release.
+
+        Returns:
+            bool: True if memory tracking should be enabled
+        """
+        import os
+        env_val = os.environ.get('SIGX_TRACK_CLEANUP_MEMORY', '').strip().lower()
+
+        if env_val in {'1', 'true', 'yes', 'on'}:
+            return True
+        elif env_val in {'0', 'false', 'no', 'off'}:
+            return False
+        else:
+            # Default: enabled in debug builds, disabled in release
+            return __debug__
+
     def close(self) -> None:
         """Close engine and release all resources.
 
-        After calling close(), the engine cannot be used again.
-        Automatically called when using context manager.
+        Performs comprehensive cleanup with optional GPU memory leak detection.
+
+        Build Mode Behavior:
+            Debug builds: Verbose logging, raises EngineCleanupError on serious errors
+            Release builds: Minimal logging, logs but doesn't raise
+
+        Raises:
+            EngineCleanupError: In debug builds only, on serious errors (GPU memory
+                leaks, unknown C++ errors)
 
         Examples:
             >>> engine.close()
         """
+        # Step 0: Early return if already closed (idempotent)
         if self._closed:
             return
 
+        # Step 1: Determine logging verbosity and memory tracking
+        from sigtekx.utils.logging import logger, _is_running_under_profiler
+
+        verbose = __debug__ and not _is_running_under_profiler()
+        track_memory = self._should_track_cleanup_memory()
+
+        if verbose:
+            logger.debug("Engine cleanup started (device_id=%s)",
+                         self._config.device_id if hasattr(self._config, 'device_id') else 0)
+
+        # Step 2: GPU memory snapshot (before cleanup)
+        memory_before = None
+        device_id = self._config.device_id if hasattr(self._config, 'device_id') else 0
+
+        if track_memory:
+            try:
+                from sigtekx.utils.device import get_gpu_memory_snapshot
+                memory_before = get_gpu_memory_snapshot(device_id)
+                if verbose:
+                    logger.debug("GPU memory before cleanup: used=%d MB",
+                               memory_before['used_mb'])
+            except Exception as e:
+                logger.debug("Failed to capture memory snapshot (before): %s", e)
+                memory_before = None
+
+        # Step 3: Cleanup operations with error classification
+        cleanup_errors = []
+
         if self._cpp_engine is not None:
-            with contextlib.suppress(Exception):
+            # Step 3a: Synchronize pending operations
+            if verbose:
+                logger.debug("Cleanup step: synchronize pending operations")
+
+            try:
+                self._cpp_engine.synchronize()
+            except RuntimeError as e:
+                error_str = str(e).lower()
+
+                if "cuda" in error_str and ("device" in error_str or "context" in error_str):
+                    logger.info("CUDA device error during synchronize (expected): %s", e)
+                else:
+                    logger.warning("Synchronization failed during cleanup: %s", e)
+                    cleanup_errors.append(('synchronize', e))
+            except Exception as e:
+                logger.warning("Unexpected error during synchronize: %s", e)
+                cleanup_errors.append(('synchronize', e))
+
+            # Step 3b: Reset C++ engine
+            if verbose:
+                logger.debug("Cleanup step: reset C++ engine")
+
+            try:
                 self._cpp_engine.reset()
+            except RuntimeError as e:
+                error_str = str(e).lower()
+
+                if "cuda" in error_str and ("device" in error_str or "context" in error_str):
+                    logger.info("CUDA device error during reset (expected): %s", e)
+                elif "memory" in error_str or "allocation" in error_str:
+                    logger.error("Memory error during reset: %s", e)
+                    cleanup_errors.append(('reset_memory', e))
+                else:
+                    logger.warning("C++ reset failed: %s", e)
+                    cleanup_errors.append(('reset', e))
+            except Exception as e:
+                logger.error("Unexpected C++ error during reset: %s", e)
+                cleanup_errors.append(('reset_unknown', e))
+
+        # Step 4: Clear Python state
+        if verbose:
+            logger.debug("Cleanup step: clear Python state")
 
         self._cpp_engine = None
         self._initialized = False
+
+        # Step 5: GPU memory validation (after cleanup)
+        memory_leaked_mb = 0
+
+        if track_memory and memory_before is not None:
+            if verbose:
+                logger.debug("Cleanup step: validate GPU memory released")
+
+            try:
+                from sigtekx.utils.device import get_gpu_memory_snapshot
+                memory_after = get_gpu_memory_snapshot(device_id)
+
+                memory_leaked_mb = memory_after['used_mb'] - memory_before['used_mb']
+
+                if verbose:
+                    logger.debug("GPU memory after cleanup: used=%d MB (delta=%+d MB)",
+                               memory_after['used_mb'], memory_leaked_mb)
+
+                # 10 MB threshold for reporting
+                LEAK_THRESHOLD_MB = 10
+
+                if memory_leaked_mb > LEAK_THRESHOLD_MB:
+                    logger.error("Potential GPU memory leak detected: %d MB not released",
+                               memory_leaked_mb)
+                    cleanup_errors.append((
+                        'memory_leak',
+                        RuntimeError(f"GPU memory increased by {memory_leaked_mb} MB during cleanup")
+                    ))
+                elif memory_leaked_mb > 0:
+                    logger.debug("Minor GPU memory delta: %d MB (within normal variance)",
+                               memory_leaked_mb)
+            except Exception as e:
+                logger.debug("Failed to validate memory release: %s", e)
+
+        # Step 6: Mark as closed
         self._closed = True
+
+        if verbose:
+            logger.debug("Engine cleanup completed (errors=%d)", len(cleanup_errors))
+
+        # Step 7: Report accumulated errors
+        if cleanup_errors:
+            error_messages = []
+            serious_errors = []
+
+            for step, error in cleanup_errors:
+                error_messages.append(f"{step}: {error}")
+
+                # Serious errors: memory leaks, unknown errors
+                if step in ('reset_memory', 'reset_unknown', 'memory_leak'):
+                    serious_errors.append((step, error))
+
+            # Raise in debug builds only
+            should_raise = __debug__ and len(serious_errors) > 0
+
+            if should_raise:
+                from sigtekx.exceptions import EngineCleanupError
+
+                primary_step, primary_error = serious_errors[0]
+                raise EngineCleanupError(
+                    f"Engine cleanup failed at step '{primary_step}' (with {len(cleanup_errors)} total errors)",
+                    cleanup_step=primary_step,
+                    gpu_memory_leaked_mb=memory_leaked_mb if memory_leaked_mb > 0 else None,
+                    original_error=primary_error,
+                    all_errors=error_messages,
+                    gpu_memory_before=memory_before,
+                    device_id=device_id
+                )
+            else:
+                logger.error("Engine cleanup completed with %d errors (not raising in release build)",
+                            len(cleanup_errors))
+                for msg in error_messages:
+                    logger.error("  - %s", msg)
 
     def synchronize(self) -> None:
         """Synchronize all GPU operations.
@@ -618,18 +786,24 @@ class Engine:
         """Exit context manager and ensure cleanup."""
         self._in_context = False
 
+        # Synchronize pending operations
         if self._initialized and self._cpp_engine is not None:
-            with contextlib.suppress(Exception):
+            try:
                 self._cpp_engine.synchronize()
+            except Exception as e:
+                from sigtekx.utils.logging import logger
+                logger.warning("Synchronization failed during context exit: %s", e)
 
+        # Log user exception if present
         if exc_type is not None:
-            warnings.warn(
-                "Engine closed due to exception",
-                ResourceWarning,
-                stacklevel=2
-            )
+            from sigtekx.utils.logging import logger
+            logger.warning("Engine context exited due to exception: %s", exc_val)
 
+        # Close engine (may raise EngineCleanupError in debug builds)
         self.close()
+
+        # Return None to propagate user exceptions
+        return None
 
     # -------------------------------------------------------------------------
     # Class Methods
@@ -664,15 +838,34 @@ class Engine:
         return f"<Engine state={state} config={self._config}>"
 
     def __del__(self) -> None:
-        """Ensure cleanup on deletion."""
+        """Ensure cleanup on deletion.
+
+        Note: GPU memory tracking is disabled in __del__ to avoid NVML/CUDA
+        issues during interpreter shutdown.
+        """
         if not self._closed and self._initialized:
             warnings.warn(
                 "Engine not properly closed. Use context manager or call close()",
                 ResourceWarning,
                 stacklevel=2
             )
-            with contextlib.suppress(Exception):
-                self.close()
+
+            # Temporarily disable memory tracking for this cleanup
+            try:
+                import os
+                original_env = os.environ.get('SIGX_TRACK_CLEANUP_MEMORY')
+                os.environ['SIGX_TRACK_CLEANUP_MEMORY'] = '0'
+
+                try:
+                    self.close()
+                finally:
+                    if original_env is None:
+                        os.environ.pop('SIGX_TRACK_CLEANUP_MEMORY', None)
+                    else:
+                        os.environ['SIGX_TRACK_CLEANUP_MEMORY'] = original_env
+            except Exception:
+                # Finalizers must not raise
+                pass
 
 
 # -----------------------------------------------------------------------------
