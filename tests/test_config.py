@@ -171,12 +171,16 @@ class TestValidation:
 
 
 @pytest.mark.parametrize("nfft,channels,expected_mb", [
-    (1024, 2, 0),     # Small config
-    (4096, 32, 6),    # Medium config
-    (16384, 128, 56) # REVISED: Corrected expected value from 104 to 56
+    (1024, 2, 0),     # Small config: 0.04 MB buffers + 0.03 MB workspace ≈ 0 MB
+    (4096, 32, 4),    # Medium config: 2.50 MB buffers + 2.00 MB workspace ≈ 4 MB
+    (16384, 128, 72)  # Large config: 40.00 MB buffers + 32.00 MB workspace ≈ 72 MB
 ])
 def test_memory_estimation(nfft, channels, expected_mb):
-    """Test memory usage estimation."""
+    """Test memory usage estimation.
+
+    Validates GPU memory estimates using precise cuFFT workspace calculation
+    from cufftEstimate1d() API (introduced in commit 5297b0c).
+    """
     from sigtekx.config import estimate_memory_usage_mb
 
     config = EngineConfig(nfft=nfft, channels=channels)
