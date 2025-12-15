@@ -14,21 +14,22 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <memory>
 #include <string>
 
 namespace sigtekx {
 namespace profiling {
 
 // -----------------------------------------------------------------------------
-// Runtime toggle
+// Runtime profiling query
 // -----------------------------------------------------------------------------
 // Implemented in src/profiling_nvtx.cu when profiling is enabled.
+// Note: Profiling is compile-time enabled/disabled via SIGTEKX_ENABLE_PROFILING.
+// The profiling_enabled() function allows runtime checks within enabled builds.
 #ifdef SIGTEKX_ENABLE_PROFILING
 bool profiling_enabled();
-void set_profiling_enabled(bool enable);
 #else
 inline bool profiling_enabled() { return false; }
-inline void set_profiling_enabled(bool /*enable*/) {}
 #endif
 
 // -----------------------------------------------------------------------------
@@ -62,7 +63,7 @@ class ScopedRange {
 
  private:
   struct Impl;  // defined in .cu when profiling is enabled
-  Impl* pImpl;  // opaque to C++ translation units
+  std::unique_ptr<Impl> pImpl;  // RAII-managed Pimpl
 };
 
 // Lightweight marker
@@ -119,8 +120,8 @@ inline std::string format_memory_range(const std::string& operation,
   } while (0)
 #else
 // No-op implementations when profiling is disabled at compile time
-inline ScopedRange::ScopedRange(const char*, uint32_t) : pImpl(nullptr) {}
-inline ScopedRange::~ScopedRange() {}
+inline ScopedRange::ScopedRange(const char*, uint32_t) {}
+inline ScopedRange::~ScopedRange() = default;
 #define SIGTEKX_NVTX_RANGE(name, color_argb) ((void)0)
 #define SIGTEKX_NVTX_RANGE_FUNCTION(color_argb) ((void)0)
 #define SIGTEKX_NVTX_MARK(message, color_argb) ((void)0)

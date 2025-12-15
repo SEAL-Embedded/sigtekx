@@ -16,11 +16,10 @@ namespace sigtekx {
 namespace profiling {
 
 #ifdef SIGTEKX_ENABLE_PROFILING
-// Single runtime toggle shared across all TUs
-static bool g_profiling_enabled = true;
+// Profiling state (compile-time enabled, always on at runtime)
+static constexpr bool g_profiling_enabled = true;
 
 bool profiling_enabled() { return g_profiling_enabled; }
-void set_profiling_enabled(bool enable) { g_profiling_enabled = enable; }
 // Convert 0xAARRGGBB to nvtx3::argb
 static inline nvtx3::v1::argb to_argb(uint32_t argb) {
   return nvtx3::v1::argb{static_cast<unsigned char>((argb >> 24) & 0xFF),
@@ -37,13 +36,13 @@ struct ScopedRange::Impl {
                                           to_argb(color)}) {}
 };
 
-ScopedRange::ScopedRange(const char* name, uint32_t color) : pImpl(nullptr) {
+ScopedRange::ScopedRange(const char* name, uint32_t color) {
   if (g_profiling_enabled) {
-    pImpl = new Impl(name, color);
+    pImpl = std::make_unique<Impl>(name, color);
   }
 }
 
-ScopedRange::~ScopedRange() { delete pImpl; }
+ScopedRange::~ScopedRange() = default;
 
 void nvtx_mark(const char* message, uint32_t color) {
   if (g_profiling_enabled) {
