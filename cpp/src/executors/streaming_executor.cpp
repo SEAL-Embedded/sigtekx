@@ -331,20 +331,35 @@ class StreamingExecutor::Impl {
             config_.timeout_ms > 0 ? config_.timeout_ms : 2000);
         const auto deadline = std::chrono::steady_clock::now() + timeout;
 
-        while (result_queue_.empty() &&
-               std::chrono::steady_clock::now() < deadline) {
-          // Wait with timeout, checking periodically
-          if (std::cv_status::timeout ==
-              std::condition_variable_any().wait_until(lock, deadline)) {
-            break;  // Timeout reached
+        // Wait with predicate checking both result availability and stop condition
+        if (!cv_data_ready_.wait_until(lock, deadline, [this] {
+              return !result_queue_.empty() || stop_flag_.load(std::memory_order_acquire);
+            })) {
+          // Predicate returned false (timeout occurred)
+          if (stop_flag_.load(std::memory_order_acquire)) {
+            throw std::runtime_error(
+                "Async processing stopped during wait");
           }
+          throw std::runtime_error(
+              "Async processing timeout: no result after " +
+              std::to_string(config_.timeout_ms > 0 ? config_.timeout_ms : 2000) + "ms");
         }
 
-        if (!result_queue_.empty()) {
-          result = std::move(result_queue_.front());
-          result_queue_.pop();
-          got_result = true;
+        // Predicate ensures result is available (unless stopped)
+        if (stop_flag_.load(std::memory_order_acquire)) {
+          throw std::runtime_error(
+              "Async processing stopped before result ready");
         }
+
+        // Result must be available if we reach here
+        if (result_queue_.empty()) {
+          throw std::runtime_error(
+              "Internal error: result queue empty after CV wait returned");
+        }
+
+        result = std::move(result_queue_.front());
+        result_queue_.pop();
+        got_result = true;
       }
 
       if (got_result) {
@@ -767,11 +782,12 @@ class StreamingExecutor::Impl {
         // Process one batch (this calls process_one_batch internally)
         process_one_batch(result.data());
 
-        // Store result in queue
+        // Store result in queue and notify waiting producer
         {
           std::lock_guard<std::mutex> lock(result_mutex_);
           result_queue_.push(std::move(result));
         }
+        cv_data_ready_.notify_one();  // Wake producer (outside lock for efficiency)
       }
     }
   }

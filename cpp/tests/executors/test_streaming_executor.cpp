@@ -198,6 +198,149 @@ TEST_F(StreamingExecutorTest, StatsReporting) {
 }
 
 // ============================================================================
+//  Async Processing Tests (Background Thread Mode)
+// ============================================================================
+
+TEST_F(StreamingExecutorTest, AsyncProcessingSuccess) {
+  // Enable background thread
+  config_.mode = ExecutorConfig::ExecutionMode::STREAMING;
+  config_.enable_background_thread = true;
+  config_.timeout_ms = 2000;  // 2 second timeout
+
+  StreamingExecutor executor;
+  PipelineBuilder builder;
+  auto stages = builder.with_config(StageConfig{config_.nfft, config_.channels})
+                    .add_window(StageConfig::WindowType::HANN)
+                    .add_fft()
+                    .add_magnitude()
+                    .build();
+  executor.initialize(config_, std::move(stages));
+
+  const size_t input_size = config_.nfft * config_.channels;
+  const size_t output_size = config_.num_output_bins() * config_.channels;
+  auto input = generate_sinusoid(input_size, 10.0f);
+  std::vector<float> output(output_size);
+
+  auto start = std::chrono::steady_clock::now();
+  EXPECT_NO_THROW(executor.submit(input.data(), output.data(), input_size));
+  auto elapsed = std::chrono::steady_clock::now() - start;
+
+  // Should complete quickly (not timeout)
+  EXPECT_LT(elapsed, std::chrono::milliseconds(500));
+
+  // Verify output has non-zero values
+  bool has_nonzero = false;
+  for (float val : output) {
+    if (val > 1e-6f) {
+      has_nonzero = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(has_nonzero);
+}
+
+TEST_F(StreamingExecutorTest, AsyncProcessingTimeout) {
+  config_.mode = ExecutorConfig::ExecutionMode::STREAMING;
+  config_.enable_background_thread = true;
+  config_.timeout_ms = 50;  // Very short timeout
+
+  StreamingExecutor executor;
+  PipelineBuilder builder;
+  auto stages = builder.with_config(StageConfig{config_.nfft, config_.channels})
+                    .add_window(StageConfig::WindowType::HANN)
+                    .add_fft()
+                    .add_magnitude()
+                    .build();
+  executor.initialize(config_, std::move(stages));
+
+  const size_t input_size = config_.nfft * config_.channels;
+  const size_t output_size = config_.num_output_bins() * config_.channels;
+  // Submit HALF the required samples - consumer will wait forever for complete frame
+  auto input = generate_sinusoid(input_size / 2, 10.0f);
+  std::vector<float> output(output_size);
+
+  // Should timeout because consumer waits for complete frame that never arrives
+  EXPECT_THROW({
+    executor.submit(input.data(), output.data(), input_size / 2);
+  }, std::runtime_error);
+}
+
+TEST_F(StreamingExecutorTest, AsyncProcessingStopDuringWait) {
+  config_.mode = ExecutorConfig::ExecutionMode::STREAMING;
+  config_.enable_background_thread = true;
+  config_.timeout_ms = 5000;  // Long timeout
+
+  StreamingExecutor executor;
+  PipelineBuilder builder;
+  auto stages = builder.with_config(StageConfig{config_.nfft, config_.channels})
+                    .add_window(StageConfig::WindowType::HANN)
+                    .add_fft()
+                    .add_magnitude()
+                    .build();
+  executor.initialize(config_, std::move(stages));
+
+  const size_t input_size = config_.nfft * config_.channels;
+  const size_t output_size = config_.num_output_bins() * config_.channels;
+  // Submit partial samples - consumer will wait indefinitely for complete frame
+  auto input = generate_sinusoid(input_size / 2, 10.0f);
+  std::vector<float> output(output_size);
+
+  // Start async operation in separate thread (will wait forever for complete frame)
+  std::thread submit_thread([&]() {
+    EXPECT_THROW({
+      executor.submit(input.data(), output.data(), input_size / 2);
+    }, std::runtime_error);
+  });
+
+  // Wait briefly to ensure submit is waiting, then trigger shutdown
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  executor.reset();  // Triggers stop_flag_
+
+  submit_thread.join();
+}
+
+TEST_F(StreamingExecutorTest, MultipleAsyncSubmits) {
+  config_.mode = ExecutorConfig::ExecutionMode::STREAMING;
+  config_.enable_background_thread = true;
+  config_.timeout_ms = 2000;
+
+  StreamingExecutor executor;
+  PipelineBuilder builder;
+  auto stages = builder.with_config(StageConfig{config_.nfft, config_.channels})
+                    .add_window(StageConfig::WindowType::HANN)
+                    .add_fft()
+                    .add_magnitude()
+                    .build();
+  executor.initialize(config_, std::move(stages));
+
+  const size_t input_size = config_.nfft * config_.channels;
+  const size_t output_size = config_.num_output_bins() * config_.channels;
+
+  // Submit 3 frames consecutively (limited to avoid ring buffer overflow with overlap)
+  // Ring buffer capacity is 3*nfft, and with 0.75 overlap, each frame leaves
+  // 0.75*nfft samples in buffer, so 3 submits = 3*nfft samples ≈ capacity limit
+  for (int i = 0; i < 3; ++i) {
+    auto input = generate_sinusoid(input_size, 10.0f + i);
+    std::vector<float> output(output_size);
+
+    EXPECT_NO_THROW(executor.submit(input.data(), output.data(), input_size));
+
+    // Verify output
+    bool has_nonzero = false;
+    for (float val : output) {
+      if (val > 1e-6f) {
+        has_nonzero = true;
+        break;
+      }
+    }
+    EXPECT_TRUE(has_nonzero);
+
+    // Small delay to allow consumer to process and free ring buffer space
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+}
+
+// ============================================================================
 //  Capability Tests (Stub Behavior)
 // ============================================================================
 
