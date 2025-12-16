@@ -4,6 +4,27 @@ This directory contains pre-formatted GitHub issues ready to be copied into the 
 
 ## Files
 
+### Phase 0: Pre-Phase 1 Audit Fixes (Foundation)
+
+| File | Issue | Priority | Severity | Effort |
+|------|-------|----------|----------|--------|
+| `phase0/001-fix-streaming-executor-cv-wait.md` | Fix Broken Condition Variable Wait | **CRITICAL** | High | 1-2 hours |
+| `phase0/002-fix-python-bindings-dangling-pointer.md` | Fix Dangling Pointer in Python Bindings | **CRITICAL** | High | 30 mins |
+| `phase0/003-document-streaming-executor-thread-safety.md` | Document Thread-Safety Contract | HIGH | Medium | 2-3 hours |
+| `phase0/004-optimize-streaming-executor-sync.md` | Optimize Redundant Synchronization | MEDIUM | Low | 3-4 hours |
+| `phase0/005-fix-benchmark-latency-resource-leak.md` | Fix Resource Leak in benchmark_latency() | MEDIUM-HIGH | Medium | 30 mins |
+| `phase0/006-fix-unsafe-config-override.md` | Fix Unsafe Configuration Override | MEDIUM-HIGH | Medium | 1 hour |
+| `phase0/007-fix-silent-fallback-in-device-info.md` | Fix Silent Fallback in device_info | MEDIUM | Low | 1-2 hours |
+| `phase0/008-complete-stageconfig-binding.md` | Complete StageConfig Binding | MEDIUM | Low | 2-3 hours |
+| `phase0/009-add-missing-runtimeinfo-binding.md` | Add Missing RuntimeInfo Binding | MEDIUM | Low | 1-2 hours |
+| `phase0/010-fix-csv-append-race-condition.md` | Fix CSV Append Race Condition | HIGH | High | 1-2 hours |
+| `phase0/011-add-warmup-to-throughput-accuracy-benchmarks.md` | Add Warmup to Benchmarks | MEDIUM-HIGH | Medium | 1-2 hours |
+| `phase0/012-add-error-logging-in-mlflow.md` | Add Error Logging in MLflow | MEDIUM | Low | 2-3 hours |
+
+**Total Phase 0 Effort:** ~17-24 hours (5 critical/high issues: ~6 hours)
+
+### Phase 1-4: Methods Paper Roadmap Issues
+
 | File | Issue | Priority | Phase | Effort |
 |------|-------|----------|-------|--------|
 | `001-fix-dataarchiver-race-condition.md` | Fix DataArchiver Race Condition | Medium | Phase 0/1 | 1-2 hours |
@@ -36,9 +57,31 @@ This directory contains pre-formatted GitHub issues ready to be copied into the 
 
 ## Roadmap Alignment
 
-These issues are aligned with the [Methods Paper Roadmap](../development/methods-paper-roadmap.md):
+These issues are aligned with the [Methods Paper Roadmap](../development/methods-paper-roadmap.md) and the [Phase 1 Readiness Audit](../development/phase1-readiness-audit.md):
 
-### Phase 0 (Pre-Phase 1 - Infrastructure Preparation)
+### Phase 0: Foundation Audit Fixes (NEW - December 2025)
+
+**Critical Issues (Must Fix Before Phase 1):**
+- **phase0/001**: Fix broken CV wait in StreamingExecutor (async mode non-functional)
+- **phase0/002**: Fix dangling pointer in Python bindings (segfault risk)
+- **phase0/010**: Fix CSV race condition (data corruption in multirun)
+
+**High Priority (Strongly Recommended):**
+- **phase0/003**: Document thread-safety contract (prevents misuse)
+- **phase0/005**: Fix resource leak in `benchmark_latency()` (memory safety)
+- **phase0/006**: Fix unsafe config override (validation bypass)
+- **phase0/011**: Add warmup to benchmarks (measurement bias)
+
+**Medium Priority (Nice to Have):**
+- **phase0/004**: Optimize streaming sync (performance)
+- **phase0/007**: Fix silent device_info fallback (diagnostics)
+- **phase0/008**: Complete StageConfig binding (API completeness)
+- **phase0/009**: Add RuntimeInfo binding (diagnostics)
+- **phase0/012**: Add error logging in MLflow (monitoring)
+
+**Verdict:** CONDITIONAL GO - Fix 5 critical/high issues (~6 hours) before Phase 1
+
+### Phase 0: Infrastructure Preparation (Original Roadmap)
 - **Issue #1**: DataArchiver race condition fix (needed for parallel experiments)
 - **Issue #2**: Stage Registry refactoring (Python-only preparation)
 
