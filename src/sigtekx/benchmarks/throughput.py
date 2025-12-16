@@ -33,6 +33,7 @@ class ThroughputBenchmarkConfig(BenchmarkConfig):
     """Configuration for throughput benchmarking."""
 
     # Throughput-specific parameters
+    warmup_duration_s: float | None = None  # Optional warmup duration when warmup_iterations > 0
     test_duration_s: float = 10.0  # Duration for sustained throughput test
     data_size_gb: float | None = None  # Total data to process (overrides duration)
 
@@ -74,6 +75,7 @@ class ThroughputBenchmark(BaseBenchmark):
         self.engine_config: EngineConfig | None = None
         self.test_data: np.ndarray | None = None
         self.resource_samples: list[dict[str, Any]] = []
+        self._in_warmup: bool = False
 
     def setup(self) -> None:
         """Initialize engine for throughput testing (NVTX-instrumented)."""
@@ -113,6 +115,13 @@ class ThroughputBenchmark(BaseBenchmark):
         with nvtx_range("ThroughputMeasurement", color=ProfileColor.NVIDIA_BLUE, domain=ProfilingDomain.BENCHMARK):
             metrics: dict[str, float] = {}
 
+            warmup_duration_s = (
+                self.config.warmup_duration_s
+                if self._in_warmup and self.config.warmup_duration_s is not None
+                else None
+            )
+            duration_s = warmup_duration_s or self.config.test_duration_s
+
             # Determine test parameters
             bytes_per_sample = 4  # float32
             samples_per_batch = self.engine_config.nfft * self.engine_config.channels
@@ -124,8 +133,8 @@ class ThroughputBenchmark(BaseBenchmark):
                 test_mode = 'data_size'
             else:
                 estimated_fps = 1000
-                n_batches = int(self.config.test_duration_s * estimated_fps)
-                test_mode = 'duration'
+                n_batches = int(duration_s * estimated_fps)
+                test_mode = 'warmup_duration' if warmup_duration_s is not None else 'duration'
 
             if self.config.measure_memory_bandwidth:
                 initial_mem_mb, total_mem_mb = get_memory_usage()
@@ -145,7 +154,7 @@ class ThroughputBenchmark(BaseBenchmark):
                                 with nvtx_range("SampleResources", color=ProfileColor.ORANGE):
                                     self._sample_resources()
                 else:
-                    while (time.perf_counter() - start_time) < self.config.test_duration_s:
+                    while (time.perf_counter() - start_time) < duration_s:
                         with nvtx_range(f"Frame_{frames_processed}", color=ProfileColor.PURPLE):
                             _ = self.engine.process(self.test_data)
                             bytes_processed += bytes_per_batch
@@ -562,4 +571,3 @@ if __name__ == '__main__':
     print(f"  Frames/second: {fps:.1f}")
     print(f"  GB/second: {gbs:.2f}")
     print(f"  MS/second: {sps/1e6:.2f}")
-

@@ -427,21 +427,26 @@ class BaseBenchmark(abc.ABC):
                     self.setup()
 
                 # Warmup phase
+                setattr(self, "_in_warmup", False)
                 if self.config.warmup_iterations > 0:
-                    with warmup_range(
-                        f"Warmup_{self.config.warmup_iterations}_iterations"
-                    ):
-                        logger.info(
-                            f"Running {self.config.warmup_iterations} warmup iterations..."
-                        )
-                        for w in range(self.config.warmup_iterations):
-                            with nvtx_range(
-                                f"WarmupIter_{w}",
-                                color=ProfileColor.LIGHT_GRAY,
-                                domain=ProfilingDomain.BENCHMARK,
-                                payload=w,
-                            ):
-                                _ = self.execute_iteration()
+                    try:
+                        setattr(self, "_in_warmup", True)
+                        with warmup_range(
+                            f"Warmup_{self.config.warmup_iterations}_iterations"
+                        ):
+                            logger.info(
+                                f"Running {self.config.warmup_iterations} warmup iterations..."
+                            )
+                            for w in range(self.config.warmup_iterations):
+                                with nvtx_range(
+                                    f"WarmupIter_{w}",
+                                    color=ProfileColor.LIGHT_GRAY,
+                                    domain=ProfilingDomain.BENCHMARK,
+                                    payload=w,
+                                ):
+                                    _ = self.execute_iteration()
+                    finally:
+                        setattr(self, "_in_warmup", False)
 
                 # Measurement phase
                 with nvtx_range(
@@ -720,6 +725,5 @@ def save_benchmark_results(
         raise ValueError(f"Unsupported format: {format}")
 
     logger.info(f"Results saved to {output_path}")
-
 
 

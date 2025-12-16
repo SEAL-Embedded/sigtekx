@@ -7,7 +7,8 @@ engine:
 name: throughput
 type: throughput
 iterations: 1
-warmup_iterations: 0
+warmup_iterations: 3               # Warmup duration (seconds) to absorb GPU cold-start bias
+warmup_duration_s: 3.0             # Length of warmup window before measurement
 test_duration_s: 10.0              # Reduced from 30s for faster iteration
 data_size_gb: null
 test_channel_counts: [1, 2, 4, 8, 16, 32, 64, 128]
