@@ -12,9 +12,12 @@ experiments/
 │   ├── metrics.py    # Scientific metrics
 │   └── models.py     # Data models
 │
+├── validation/       # Quality-check validation scripts
+│   └── warmup_impact.py  # Validates warmup removes cold-start bias
+│
 ├── streamlit/        # Interactive dashboard (PRIMARY)
 │   ├── app.py        # Main dashboard entry point
-│   ├── pages/        # Three interactive pages
+│   ├── pages/        # Four interactive pages
 │   └── utils/        # Data loading utilities
 │
 ├── quarto/           # Static reports (FUTURE)
@@ -24,6 +27,10 @@ experiments/
 │   ├── benchmark/    # Benchmark configs (latency, throughput, etc.)
 │   ├── engine/       # Engine configs (ionosphere_realtime, etc.)
 │   └── experiment/   # Experiment sweeps (ionosphere_resolution, etc.)
+│
+├── scripts/          # Utility scripts
+│   ├── quick_plot.py  # Quick visualization tool
+│   └── generate_demo_data.py  # Demo data generation
 │
 └── Snakefile         # Workflow orchestration
 ```
@@ -46,10 +53,11 @@ streamlit run experiments/streamlit/app.py
 # Access at http://localhost:8501
 ```
 
-**Three Interactive Pages:**
+**Four Interactive Pages:**
 1. **General Performance** - Throughput, latency, accuracy, scaling (6 tabs)
 2. **Ionosphere Research** - VLF/ULF phenomena, RTF analysis, resolution trade-offs (7 tabs)
 3. **Configuration Explorer** - Interactive filtering and comparison
+4. **System Health** - Overall system capabilities, soft real-time metrics (6 tabs)
 
 **When to use:**
 - Daily benchmark analysis

@@ -2,16 +2,24 @@
 
 ## Problem
 
-We need to **prove RTF < 0.3** for primary ionosphere configurations. Without validation, the real-time performance claim lacks scientific evidence for the methods paper.
+We need to **prove RTF ≥ 3.0** for primary ionosphere configurations. Without validation, the real-time performance claim lacks scientific evidence for the methods paper.
+
+**RTF Definition:**
+```
+RTF = (Processing Speed) / (Required Speed) = (FPS × Hop Size) / Sample Rate
+- RTF ≥ 3.0: Production target (3× faster than real-time)
+- RTF ≥ 1.0: Real-time capable
+- RTF < 1.0: Cannot keep up
+```
 
 **Roadmap Context** (`docs/development/methods-paper-roadmap.md` Phase 4 Task 4.2):
 - Test matrix: NFFT 2048/4096/8192 × 2 channels, NFFT 4096 × 8 channels
-- Target: RTF < 0.3 for all configs
+- Target: RTF ≥ 3.0 for all configs
 - 10-second streams per config
 - Critical for v1.0 paper: validates soft real-time claim
 
 **Impact:**
-- Cannot claim "RTF < 0.3" in paper without experimental proof
+- Cannot claim "RTF ≥ 3.0" in paper without experimental proof
 - Real-time performance unvalidated across parameter space
 - Missing key metric for Table 1 and Figure 2 in methods paper
 

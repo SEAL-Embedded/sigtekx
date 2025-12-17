@@ -29,7 +29,7 @@ def run_throughput_benchmark(warmup_iterations: int, warmup_duration_s: float, l
             capture_output=True,
             text=True,
             timeout=120,
-            cwd=Path(__file__).parent,
+            cwd=Path(__file__).parent.parent.parent,  # 3 levels up to project root
         )
 
         # Look for metrics in stdout/stderr
