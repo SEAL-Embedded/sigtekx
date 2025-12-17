@@ -31,6 +31,7 @@ class RealtimeBenchmarkConfig(BenchmarkConfig):
     """Configuration for real-time streaming benchmark."""
 
     # Real-time specific parameters
+    warmup_duration_s: float | None = None  # Optional warmup duration when warmup_iterations > 0
     stream_duration_s: float = 10.0
     frame_deadline_ms: float | None = None  # Auto-calculated from hop_duration if None
     strict_timing: bool = True  # Use busy-wait for precise timing
@@ -65,6 +66,7 @@ class RealtimeBenchmark(BaseBenchmark):
         self.frame_times: list[float] = []
         self.deadline_misses: list[int] = []
         self.dropped_frames: int = 0
+        self._in_warmup: bool = False
 
     def setup(self) -> None:
         """Initialize engine and prepare streaming infrastructure (NVTX-instrumented)."""
@@ -95,13 +97,20 @@ class RealtimeBenchmark(BaseBenchmark):
                     rng=np.random.default_rng(self.config.seed),
                 )
 
-            # Calculate total frames
+            # Calculate total frames (use warmup duration if in warmup phase)
+            warmup_duration_s = (
+                self.config.warmup_duration_s
+                if self._in_warmup and self.config.warmup_duration_s is not None
+                else None
+            )
+            duration_s = warmup_duration_s or self.config.stream_duration_s
+
             self.total_frames = int(
-                self.config.stream_duration_s * 1000 / self.config.frame_deadline_ms
+                duration_s * 1000 / self.config.frame_deadline_ms
             )
 
             logger.info("Real-time benchmark initialized:")
-            logger.info(f"  Duration: {self.config.stream_duration_s}s")
+            logger.info(f"  Duration: {duration_s}s" + (" (warmup)" if warmup_duration_s else ""))
             if self.config.frame_deadline_ms is not None:
                 logger.info(f"  Frame deadline: {self.config.frame_deadline_ms:.2f}ms")
             else:
