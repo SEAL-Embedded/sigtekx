@@ -7,6 +7,8 @@ engine:
 name: realtime
 type: realtime
 iterations: 1
+warmup_iterations: 1               # Single warmup iteration (duration controlled by warmup_duration_s)
+warmup_duration_s: 3.0             # Warmup duration: 3 seconds to absorb GPU cold-start bias
 stream_duration_s: 10.0
 frame_deadline_ms: null
 strict_timing: true

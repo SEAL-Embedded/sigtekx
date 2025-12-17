@@ -167,9 +167,41 @@ class PerformancePlotter:
         x_col: str,
         y_col: str,
         z_col: str,
+        title: str | None = None,
+        colorscale: str = 'Viridis',
+        color_midpoint: float | None = None,
+        color_range: tuple[float, float] | None = None,
+        use_categorical_axes: bool = True,
         output_path: Path | None = None
     ) -> go.Figure:
-        """Plot 2D heatmap of performance metrics."""
+        """
+        Plot 2D heatmap of performance metrics.
+
+        Args:
+            data: Benchmark data DataFrame
+            x_col: Column name for x-axis
+            y_col: Column name for y-axis
+            z_col: Column name for color values
+            title: Custom title (default: "{z_col} Heatmap")
+            colorscale: Plotly colorscale name (default: 'Viridis')
+                       Use 'RdYlGn_r' for RTF (reversed: red=high=bad, green=low=good)
+            color_midpoint: Anchor point for diverging color scales (e.g., 0.40 for RTF)
+            color_range: Min/max for color scale (e.g., [0, 1.0] for RTF)
+            use_categorical_axes: Use categorical axes for equal spacing (default: True)
+            output_path: Optional path to save HTML figure
+
+        Returns:
+            Plotly figure object
+
+        Example (RTF heatmap with academic convention):
+            >>> fig = plotter.plot_heatmap(
+            ...     data, 'engine_nfft', 'engine_channels', 'rtf',
+            ...     title='RTF Heatmap - Academic Convention',
+            ...     colorscale='RdYlGn_r',
+            ...     color_midpoint=0.40,
+            ...     color_range=[0, 1.0]
+            ... )
+        """
         pivot = data.pivot_table(values=z_col, index=y_col, columns=x_col, aggfunc='mean')
 
         # Dynamically adjust figure height based on number of y-axis values
@@ -178,20 +210,33 @@ class PerformancePlotter:
         figure_height = max(400, 50 * num_y_values + 150)  # Minimum 400px, ~50px per row + margins
         figure_width = max(600, 80 * len(pivot.columns) + 200)  # Scale width with columns too
 
-        # Use INDICES for y-axis to ensure equal spacing (not actual values)
-        # This prevents exponential spacing for powers-of-2 like channels (2, 4, 8, 16, 32, 64, 128)
-        y_indices = list(range(len(pivot.index)))
+        # Prepare heatmap data
+        heatmap_kwargs = {
+            'z': pivot.values,
+            'x': pivot.columns if not use_categorical_axes else [str(int(v) if isinstance(v, (int, float)) else v) for v in pivot.columns],
+            'colorscale': colorscale,
+            'colorbar': dict(title=z_col)
+        }
 
-        fig = go.Figure(data=go.Heatmap(
-            z=pivot.values,
-            x=pivot.columns,
-            y=y_indices,  # Use indices (0, 1, 2, ...) not actual values
-            colorscale='Viridis',
-            colorbar=dict(title=z_col)
-        ))
+        # Use categorical spacing if requested (prevents exponential spacing for powers-of-2)
+        if use_categorical_axes:
+            y_indices = list(range(len(pivot.index)))
+            heatmap_kwargs['y'] = y_indices
+        else:
+            heatmap_kwargs['y'] = pivot.index
+
+        # Add color range and midpoint if specified (for RTF academic convention)
+        if color_range is not None:
+            heatmap_kwargs['zmin'] = color_range[0]
+            heatmap_kwargs['zmax'] = color_range[1]
+
+        if color_midpoint is not None:
+            heatmap_kwargs['zmid'] = color_midpoint
+
+        fig = go.Figure(data=go.Heatmap(**heatmap_kwargs))
 
         fig.update_layout(
-            title=f"{z_col} Heatmap",
+            title=title or f"{z_col} Heatmap",
             xaxis_title=x_col,
             yaxis_title=y_col,
             height=figure_height,
@@ -199,19 +244,26 @@ class PerformancePlotter:
             margin=dict(l=80, r=80, t=100, b=80)  # Adequate margins for tick labels
         )
 
-        # Map indices to actual values with categorical tick labels
-        # This gives equal visual spacing for all values (fixes exponential spacing issue)
-        fig.update_yaxes(
-            tickmode='array',
-            tickvals=y_indices,  # Show all values
-            ticktext=[str(int(val)) if isinstance(val, (int, float)) else str(val) for val in pivot.index],
-            tickfont=dict(size=11)  # Readable font size
-        )
+        if use_categorical_axes:
+            # Map indices to actual values with categorical tick labels
+            # This gives equal visual spacing for all values (fixes exponential spacing issue)
+            y_indices = list(range(len(pivot.index)))
+            fig.update_yaxes(
+                tickmode='array',
+                tickvals=y_indices,  # Show all values
+                ticktext=[str(int(val)) if isinstance(val, (int, float)) else str(val) for val in pivot.index],
+                tickfont=dict(size=11)  # Readable font size
+            )
 
-        # Also improve x-axis readability
-        fig.update_xaxes(
-            tickfont=dict(size=11)
-        )
+            # Force categorical x-axis as well
+            fig.update_xaxes(
+                type='category',
+                tickfont=dict(size=11)
+            )
+        else:
+            # Improve axis readability without categorical spacing
+            fig.update_xaxes(tickfont=dict(size=11))
+            fig.update_yaxes(tickfont=dict(size=11))
 
         if output_path:
             fig.write_html(str(output_path))

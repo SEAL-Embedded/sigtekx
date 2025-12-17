@@ -7,9 +7,11 @@ building blocks that remain in the library.
 """
 
 import json
+from pathlib import Path
 
 import numpy as np
 import pytest
+from omegaconf import OmegaConf
 
 from sigtekx.benchmarks import (
     BaseBenchmark,
@@ -128,3 +130,27 @@ class TestBaseBenchmark:
         assert config_dict['iterations'] == 500
         assert 'engine_config' in config_dict
 
+
+class TestBenchmarkWarmupConfiguration:
+    """Ensure benchmark configs include warmup defaults and allow overrides."""
+
+    def test_throughput_config_has_warmup(self):
+        config = OmegaConf.load(Path("experiments/conf/benchmark/throughput.yaml"))
+
+        assert 'warmup_iterations' in config
+        assert int(config.warmup_iterations) >= 1
+        assert float(config.warmup_duration_s) >= 1.0
+
+    def test_accuracy_config_has_warmup(self):
+        config = OmegaConf.load(Path("experiments/conf/benchmark/accuracy.yaml"))
+
+        assert 'warmup_iterations' in config
+        assert int(config.warmup_iterations) >= 1
+
+    def test_warmup_override_allows_zero(self):
+        config = OmegaConf.create({
+            "warmup_iterations": 0,
+            "iterations": 10,
+        })
+
+        assert config.warmup_iterations == 0

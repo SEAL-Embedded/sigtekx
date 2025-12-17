@@ -1,7 +1,8 @@
 name: profiling_throughput
 type: throughput
 iterations: 1
-warmup_iterations: 0
+warmup_iterations: 1                # Single warmup iteration (duration controlled by warmup_duration_s)
+warmup_duration_s: 1.0              # Warmup duration: 1 second to remove cold-start overhead
 test_duration_s: 3.0              # Reduced from 10s for fast profiling
 data_size_gb: null
 test_channel_counts: [1, 2, 4, 8, 16, 32, 64, 128]

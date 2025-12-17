@@ -7,7 +7,7 @@ engine:
 name: accuracy
 type: accuracy
 iterations: 10
-warmup_iterations: 0
+warmup_iterations: 2               # Warmup iterations before measurement (2 x 8 signals)
 absolute_tolerance: 1.0e-6
 relative_tolerance: 1.0e-5
 snr_threshold_db: 60.0

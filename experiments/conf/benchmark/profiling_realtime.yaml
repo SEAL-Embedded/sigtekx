@@ -1,7 +1,9 @@
 name: profiling_realtime
 type: realtime
 iterations: 1
-stream_duration_s: 3.0           # Reduced from 10s for fast profiling
+warmup_iterations: 1               # Single warmup iteration (duration controlled by warmup_duration_s)
+warmup_duration_s: 1.0             # Warmup duration: 1 second to remove cold-start overhead
+stream_duration_s: 3.0             # Reduced from 10s for fast profiling
 frame_deadline_ms: null
 strict_timing: true
 measure_jitter: true

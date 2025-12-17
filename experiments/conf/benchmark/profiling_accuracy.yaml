@@ -1,7 +1,7 @@
 name: profiling_accuracy
 type: accuracy
 iterations: 2                     # Reduced from 10 for fast profiling
-warmup_iterations: 0
+warmup_iterations: 1               # Single warmup iteration for profiling runs
 absolute_tolerance: 1.0e-6
 relative_tolerance: 1.0e-5
 snr_threshold_db: 60.0

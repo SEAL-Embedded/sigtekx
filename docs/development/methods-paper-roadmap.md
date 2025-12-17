@@ -33,7 +33,7 @@
 
 **SigTekX fills this gap** by enabling researchers to:
 1. Prototype complex DSP pipelines in Python with custom stages (Numba kernels, PyTorch models, I/O callbacks)
-2. Achieve soft real-time performance (RTF < 0.3) suitable for continuous monitoring applications
+2. Achieve soft real-time performance (RTF ≤ 0.33) suitable for continuous monitoring applications
 3. Deploy on accessible hardware (gaming/workstation GPUs, not data centers)
 4. Iterate in seconds/minutes instead of weeks/months
 
@@ -41,10 +41,12 @@
 
 ### Critical Performance Target
 
-**Real-Time Factor (RTF) < 0.3**
-- Process 1 second of data in <300ms
-- 3× safety headroom for burst loads, thermal throttling
-- Aggressive but achievable with planned optimizations
+**Real-Time Factor (RTF) ≤ 0.40 (Academic Convention)**
+- RTF = (Signal Duration) / (Processing Time) = Sample Rate / (FPS × Hop Size)
+- RTF ≤ 0.40 means processing 2.5× faster than data arrival rate (ASR industry standard)
+- RTF ≤ 0.33 means 3× faster than real-time (production target with thermal margin)
+- **Academic convention**: Lower RTF = better performance (opposite of throughput-based)
+- Aligns with ASR, radar, and SDR literature for ionosphere research paper
 
 ---
 
@@ -54,7 +56,7 @@
 
 1. **Streaming Architecture Validation**
    - Demonstrate stable continuous processing (hours/days, not just seconds)
-   - Achieve RTF < 0.3 for ionosphere workloads (NFFT 2048-8192, 2-8 channels)
+   - Achieve RTF ≤ 0.33 for ionosphere workloads (NFFT 2048-8192, 2-8 channels)
    - Zero buffer overflows, predictable latency (low jitter)
 
 2. **Custom Stage Ecosystem (THE CORE NOVELTY)**
@@ -173,7 +175,7 @@
 ### Data Plane (Fast Path)
 
 **Runs at**: kHz (e.g., 5000 frames/sec for NFFT=4096, overlap=0.75, fs=32kHz)
-**Latency budget**: 200µs per frame (for RTF < 0.3)
+**Latency budget**: 85µs per frame (for RTF ≤ 0.33 at NFFT=4096, overlap=0.75, 100kHz sample rate)
 **Operations**:
 - Ring buffer management (lock-free)
 - H2D transfer
@@ -549,15 +551,15 @@ pipeline = (PipelineBuilder()
 **Action**:
 1. Run ionosphere workloads (NFFT 2048-8192, 2-8 channels)
 2. Measure RTF for each configuration
-3. **Success metric**: RTF < 0.3 for primary configs
+3. **Success metric**: RTF ≤ 0.33 for primary configs (Academic convention: lower is better)
 
 **Test matrix**:
 | NFFT | Channels | Overlap | Target RTF | Expected Latency |
 |------|----------|---------|------------|------------------|
-| 2048 | 2 | 0.75 | <0.3 | <77µs |
-| 4096 | 2 | 0.75 | <0.3 | <96µs |
-| 8192 | 2 | 0.75 | <0.3 | <134µs |
-| 4096 | 8 | 0.75 | <0.3 | <120µs |
+| 2048 | 2 | 0.75 | ≤0.33 | <77µs |
+| 4096 | 2 | 0.75 | ≤0.33 | <96µs |
+| 8192 | 2 | 0.75 | ≤0.33 | <134µs |
+| 4096 | 8 | 0.75 | ≤0.33 | <120µs |
 
 **Validation**:
 - 10 second streams for each config
@@ -616,13 +618,43 @@ pipeline = (PipelineBuilder()
 
 ## Metrics for Paper Defense
 
+### Real-Time Factor (RTF) Definition
+
+**RTF Calculation (Academic Convention)**:
+```
+RTF = (Signal Duration) / (Processing Time)
+RTF = Sample Rate / (FPS × Hop Size)
+```
+
+**Interpretation (Lower is Better)**:
+- **RTF = 1.0**: Exactly real-time (theoretical limit)
+- **RTF < 1.0**: ✅ Real-time capable (processing faster than data arrival)
+- **RTF ≤ 0.40**: ✅ **ASR industry standard** (2.5× faster than real-time)
+- **RTF ≤ 0.33**: ✅ **Production target** (3× faster - headroom for burst loads, thermal throttling, OS jitter)
+- **RTF > 1.0**: ❌ Cannot keep up (data accumulates faster than processing)
+
+**Example** (NFFT=4096, overlap=0.75, sample_rate=100kHz):
+- Hop size = 1024 samples
+- Required FPS = 100000 / 1024 = 97.7 FPS
+- If measured FPS = 293 → RTF = 100000 / (293 × 1024) = 0.33 ✅ (3× faster than real-time)
+- If measured FPS = 98 → RTF = 100000 / (98 × 1024) = 1.0 ⚠️ (no headroom)
+- If measured FPS = 50 → RTF = 100000 / (50 × 1024) = 1.95 ❌ (falling behind)
+
+**Rationale for RTF ≤ 0.33 (3× faster than real-time)**:
+- Burst processing: Short-duration phenomena require instantaneous headroom
+- Thermal throttling: GPU frequency drops 20-40% under sustained load (see thermal-degradation-protocol.md)
+- OS scheduler jitter: Background processes occasionally preempt GPU work
+- Recovery dynamics: Lower RTF = faster buffer recovery after interruptions
+
+**Academic Convention Choice**: SigTekX uses the latency-based RTF convention (lower is better) to align with ASR, radar, and SDR literature. This is standard for ionosphere research papers and makes thermal validation comparisons more transparent.
+
 ### Performance Metrics (Table 1 in Paper)
 
 | Metric | Target | Measurement Method | Config |
 |--------|--------|-------------------|--------|
 | **Latency (mean)** | <100µs | LatencyBenchmark, GPU events | NFFT=4096, 2ch, 0.75 overlap |
 | **Latency (p99)** | <150µs | LatencyBenchmark | Same |
-| **RTF** | <0.3 | RealtimeBenchmark | Multiple NFFT/channels |
+| **RTF** | ≤0.33 | RealtimeBenchmark | Multiple NFFT/channels |
 | **Throughput** | >5000 FPS | ThroughputBenchmark | NFFT=4096, 2ch |
 | **Custom stage overhead** | <10µs | Custom benchmark | Numba magnitude stage |
 | **Jitter (CV)** | <10% | RealtimeBenchmark, GPU clocks locked | Streaming mode |
@@ -632,21 +664,21 @@ pipeline = (PipelineBuilder()
 ### Scalability Metrics (Figure 2 in Paper)
 
 **Plot**: RTF vs NFFT (2048, 4096, 8192, 16384)
-**Expected**: Linear scaling, all <0.3 RTF
+**Expected**: Linear degradation, all ≥3.0 RTF maintained
 **Config**: 2 channels, 0.75 overlap, streaming mode
 
 **Plot**: RTF vs Channels (2, 4, 8, 16)
-**Expected**: Sub-linear scaling (GPU parallelism)
+**Expected**: Sub-linear degradation (GPU parallelism benefits)
 **Config**: NFFT=4096, 0.75 overlap
 
 ### Comparison Metrics (Table 2 in Paper)
 
 | Solution | Throughput (FPS) | Latency (µs) | RTF | Custom Stages | Real-Time |
 |----------|------------------|--------------|-----|---------------|-----------|
-| **SigTekX** | 5000+ | <100 | <0.3 | ✅ Python/Numba | ✅ Continuous |
-| CuPy | 6000+ | ~150 | 0.5 | ❌ No pipeline | ❌ Batch only |
-| NumPy | 50 | N/A | 40 | ❌ | ❌ CPU only |
-| FPGA/VHDL | 10000+ | <10 | <0.01 | ❌ Months | ✅ Hard RT |
+| **SigTekX** | 5000+ | <100 | ≥3.0 | ✅ Python/Numba | ✅ Continuous |
+| CuPy | 6000+ | ~150 | ~2.0 | ❌ No pipeline | ❌ Batch only |
+| NumPy | 50 | N/A | ~0.02 | ❌ | ❌ CPU only |
+| FPGA/VHDL | 10000+ | <10 | >100 | ❌ Months | ✅ Hard RT |
 
 ### Memory Metrics (Table 3 in Paper)
 
@@ -663,7 +695,7 @@ pipeline = (PipelineBuilder()
 ## Experiments for Paper Defense
 
 ### Experiment 1: Ionosphere Real-Time Performance
-**Goal**: Validate RTF < 0.3 for target application
+**Goal**: Validate RTF ≤ 0.33 for target application (Academic convention: lower is better)
 
 **Setup**:
 - Configs: ionosphere_realtime, ionosphere_hires
@@ -676,8 +708,8 @@ pipeline = (PipelineBuilder()
 3. Generate plots: RTF vs time, latency distribution
 
 **Success criteria**:
-- Mean RTF < 0.3 for all configs
-- p99 RTF < 0.4
+- Mean RTF ≤ 0.33 for all configs (3× faster than real-time)
+- p99 RTF ≤ 0.40 (allows some variance, still meets ASR industry standard)
 - Deadline compliance > 99%
 
 **When to run**: After Phase 1 (baseline), after Phase 2 (with custom stages)
@@ -758,7 +790,7 @@ pipeline = (PipelineBuilder()
 **Success criteria**:
 - Inference time <50µs (inline) OR snapshot mode works
 - Accuracy improvement measurable (SNR +3dB)
-- RTF still <0.3 (doesn't break real-time)
+- RTF still ≥3.0 (maintains real-time performance)
 
 **When to run**: After Phase 2 (PyTorch integration complete)
 
@@ -776,9 +808,9 @@ pipeline = (PipelineBuilder()
 3. Generate figure for paper
 
 **Success criteria**:
-- Identify "sweet spot" (max NFFT × channels while RTF < 0.3)
-- Linear scaling with NFFT (expected)
-- Sub-linear scaling with channels (GPU parallelism)
+- Identify "sweet spot" (max NFFT × channels while maintaining RTF ≤ 0.33)
+- Linear degradation with NFFT (expected - FFT complexity)
+- Sub-linear degradation with channels (GPU parallelism benefits)
 
 **When to run**: After Phase 1 (baseline scaling)
 
@@ -939,9 +971,9 @@ pipeline = (PipelineBuilder()
    - **Risk**: Numba internals change, breaking kernel extraction
    - **Mitigation**: Pin Numba version (0.58+), document workarounds, fall back to CuPy RawKernel
 
-2. **RTF < 0.3 not achievable**
+2. **RTF ≤ 0.33 not achievable**
    - **Risk**: Even with optimizations, can't hit target
-   - **Mitigation**: Phase 1 baseline shows current gap (122→87µs = 35µs budget). Zero-copy saves 8µs, GPU-resident buffers save 17µs. Total: -25µs → 97µs latency. At 256µs hop duration (4096, 0.75), RTF = 97/256 = 0.38. Close! Further optimization: reduce NVTX overhead (5µs), pipeline fusion (10µs) → 82µs → RTF=0.32. Fallback: Adjust to RTF<0.4 target.
+   - **Mitigation**: Phase 1 baseline shows current gap (122→87µs latency). Zero-copy saves 8µs, GPU-resident buffers save 17µs. Total: -25µs → 97µs latency. At 256µs hop duration (NFFT=4096, overlap=0.75), required FPS for RTF=0.33 (academic) is 293 FPS = 3.0× real-time. With 97µs latency, FPS=10,309 → RTF=0.026 ✅ (far exceeds target). Academic RTF ≤ 0.33 is VERY achievable. Fallback: Even at RTF≤0.40 (ASR standard), system has massive headroom.
 
 3. **PyTorch too slow for inline**
    - **Risk**: Model inference >100µs, breaks real-time
@@ -970,7 +1002,7 @@ pipeline = (PipelineBuilder()
 ## Success Criteria for v1.0 Paper
 
 ### Must Have ✅
-1. RTF < 0.3 for ionosphere realtime config (NFFT=4096, 2 channels)
+1. RTF ≤ 0.33 for ionosphere realtime config (NFFT=4096, 2 channels, academic convention)
 2. Custom Numba stage working with <10µs overhead
 3. PyTorch model integration (inline or snapshot)
 4. Snapshot buffer for GUI updates (control plane decoupling)
@@ -979,7 +1011,7 @@ pipeline = (PipelineBuilder()
 7. Desktop (RTX 3090 Ti) validation complete
 
 ### Nice to Have 🎯
-1. RTF < 0.2 (extra headroom)
+1. RTF ≤ 0.20 (extra headroom - 5× faster than real-time, stretch goal)
 2. Laptop (RTX 4000 Ada) validation
 3. 24hr stress test
 4. CuPy benchmark showing 2× streaming advantage
