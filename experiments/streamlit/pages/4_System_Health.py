@@ -30,6 +30,17 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from analysis.metrics import classify_rtf
 from analysis.visualization import PerformancePlotter, VisualizationConfig
 from utils.data_loader import load_benchmark_data
+from utils.rtf_helpers import (
+    RTF_REALTIME_LIMIT,
+    RTF_AGGRESSIVE_TARGET,
+    RTF_PRODUCTION_TARGET,
+    RTF_HEATMAP_COLORSCALE,
+    RTF_HEATMAP_MIDPOINT,
+    RTF_HEATMAP_RANGE,
+    calculate_rtf_statistics,
+    get_rtf_heatmap_interpretation_text,
+    add_rtf_threshold_lines
+)
 
 # Page configuration
 st.set_page_config(page_title="System Health", page_icon="🏥", layout="wide")
@@ -92,25 +103,22 @@ with tabs[0]:
     # Key metrics (4 columns)
     col1, col2, col3, col4 = st.columns(4)
 
-    # 1. Soft Real-Time Coverage (RTF >=1.0)
+    # 1. Real-Time Capable (RTF ≤1.0) - Academic Convention
     if 'rtf' in data.columns:
-        rtf_data = data[data['rtf'].notna()]
-        soft_realtime_coverage = (rtf_data['rtf'] >= 1.0).sum() / len(rtf_data) * 100
+        rtf_stats = calculate_rtf_statistics(data)
 
         col1.metric(
             "Real-Time Capable",
-            f"{soft_realtime_coverage:.1f}%",
-            help="Percentage of configurations achieving RTF ≥1.0 (can process real-time data)"
+            f"{rtf_stats['realtime_capable_pct']:.1f}%",
+            help=f"Percentage of configurations achieving RTF ≤{RTF_REALTIME_LIMIT} (faster than real-time)"
         )
 
-    # 2. Aggressive Real-Time Coverage (RTF >=3.0)
+    # 2. High Performance (RTF ≤0.33) - Academic Convention
     if 'rtf' in data.columns:
-        aggressive_coverage = (rtf_data['rtf'] >= 3.0).sum() / len(rtf_data) * 100
-
         col2.metric(
             "High Performance",
-            f"{aggressive_coverage:.1f}%",
-            help="Percentage achieving RTF ≥3.0 (3× faster than real-time, can handle 3+ streams)"
+            f"{rtf_stats['aggressive_pct']:.1f}%",
+            help=f"Percentage achieving RTF ≤{RTF_AGGRESSIVE_TARGET} (3× faster than real-time, production target)"
         )
 
     # 3. Peak Throughput
@@ -143,8 +151,8 @@ with tabs[0]:
     with col1:
         st.markdown("""
         **Soft Real-Time Processing**
-        - RTF ≥1.0: Can process real-time data streams
-        - RTF ≥3.0: 3× safety margin for burst loads, thermal throttling
+        - RTF ≤1.0: Can process real-time data streams
+        - RTF ≤0.33: 3× safety margin for burst loads, thermal throttling
         - Continuous processing: hours/days, not just batch jobs
 
         **Python Flexibility**
@@ -175,15 +183,15 @@ with tabs[1]:
     st.markdown("""
     **Real-Time Factor (RTF)** is the key metric for soft real-time systems:
 
-    RTF = (Processing Speed) / (Required Speed) = (FPS × Hop Size) / Sample Rate
+    RTF = (Signal Duration) / (Processing Time) = Sample Rate / (FPS × Hop Size)
 
-    **Interpretation:**
-    - **RTF = 1.0**: Exactly real-time (can process one stream without falling behind)
-    - **RTF > 1.0**: ✅ Faster than real-time (headroom for burst loads)
-    - **RTF ≥ 3.0**: ✅ Can process 3+ streams simultaneously or handle 3× burst loads
-    - **RTF < 1.0**: ❌ Cannot keep up (data accumulates faster than processing)
+    **Interpretation (Academic Convention - Lower is Better):**
+    - **RTF = 1.0**: Exactly real-time (theoretical limit)
+    - **RTF < 1.0**: ✅ Faster than real-time (headroom for burst loads)
+    - **RTF ≤ 0.33**: ✅ 3× faster than real-time (production target, 3× safety margin)
+    - **RTF > 1.0**: ❌ Cannot keep up (processing slower than data arrival)
 
-    **SigTekX Target:** RTF ≥3.0 for production deployment (3× safety headroom)
+    **SigTekX Target:** RTF ≤0.40 for production deployment (ASR industry standard)
     """)
 
     if 'rtf' in data.columns:
@@ -201,11 +209,11 @@ with tabs[1]:
             color_discrete_sequence=['#636EFA']
         )
 
-        # Add vertical lines for thresholds
-        fig.add_vline(x=1.0, line_dash="dash", line_color="orange",
-                     annotation_text="Real-Time Threshold: RTF=1.0", annotation_position="top left")
-        fig.add_vline(x=3.0, line_dash="dash", line_color="green",
-                     annotation_text="Target: RTF≥3.0", annotation_position="top right")
+        # Add vertical lines for thresholds (Academic Convention: lower is better)
+        fig.add_vline(x=RTF_REALTIME_LIMIT, line_dash="dash", line_color="orange",
+                     annotation_text=f"Real-Time Limit: RTF={RTF_REALTIME_LIMIT}", annotation_position="top right")
+        fig.add_vline(x=RTF_AGGRESSIVE_TARGET, line_dash="dash", line_color="green",
+                     annotation_text=f"Target: RTF≤{RTF_AGGRESSIVE_TARGET}", annotation_position="top left")
 
         st.plotly_chart(fig, use_container_width=True)
 
@@ -240,10 +248,10 @@ with tabs[1]:
             points='all'
         )
 
-        fig.add_hline(y=1.0, line_dash="dash", line_color="orange",
-                     annotation_text="Real-Time: 1.0")
-        fig.add_hline(y=3.0, line_dash="dash", line_color="green",
-                     annotation_text="Target: 3.0")
+        fig.add_hline(y=RTF_REALTIME_LIMIT, line_dash="dash", line_color="orange",
+                     annotation_text=f"Real-Time Limit: {RTF_REALTIME_LIMIT}")
+        fig.add_hline(y=RTF_AGGRESSIVE_TARGET, line_dash="dash", line_color="green",
+                     annotation_text=f"Target: {RTF_AGGRESSIVE_TARGET}")
 
         st.plotly_chart(fig, use_container_width=True)
 
@@ -451,69 +459,89 @@ with tabs[4]:
 
     st.divider()
 
-    # Performance Heatmap (if grid data available)
-    st.subheader("Performance Heatmap")
+    # RTF Heatmaps (if grid data available)
+    st.subheader("Performance Heatmaps")
 
-    if 'engine_nfft' in data.columns and 'engine_channels' in data.columns:
-        if 'rtf' in data.columns:
-            # NFFT range selector to prevent extreme values from skewing visualization
-            nfft_values = sorted(data['engine_nfft'].unique())
+    # Common NFFT range selector for both heatmaps
+    if 'engine_nfft' in data.columns and 'rtf' in data.columns:
+        nfft_values = sorted(data['engine_nfft'].unique())
 
-            # Define preset ranges
-            nfft_range_options = {
-                "Standard (≤16384)": 16384,
-                "High-Res (≤32768)": 32768,
-                "Extended (≤65536)": 65536,
-                "All (includes 131k)": max(nfft_values)
-            }
+        # Define preset ranges
+        nfft_range_options = {
+            "Standard (≤16384)": 16384,
+            "High-Res (≤32768)": 32768,
+            "Extended (≤65536)": 65536,
+            "All (includes 131k)": max(nfft_values)
+        }
 
-            selected_range = st.selectbox(
-                "NFFT Range",
-                options=list(nfft_range_options.keys()),
-                index=1,  # Default to High-Res (≤32768)
-                help="Filter NFFT values to prevent extreme values from compressing the heatmap scale"
+        selected_range = st.selectbox(
+            "NFFT Range",
+            options=list(nfft_range_options.keys()),
+            index=1,  # Default to High-Res (≤32768)
+            help="Filter NFFT values to prevent extreme values from compressing the heatmap scale"
+        )
+
+        max_nfft = nfft_range_options[selected_range]
+        filtered_data = data[data['engine_nfft'] <= max_nfft].copy()
+
+        # Heatmap 1: RTF vs Channels and NFFT (Channel Scaling)
+        if 'engine_channels' in filtered_data.columns:
+            st.markdown("### RTF vs Channels × NFFT (Channel Scaling)")
+
+            fig = plotter.plot_heatmap(
+                filtered_data,
+                x_col='engine_nfft',
+                y_col='engine_channels',
+                z_col='rtf',
+                title=f"RTF Heatmap: Channels × NFFT (≤{max_nfft:,}) - Academic Convention",
+                colorscale=RTF_HEATMAP_COLORSCALE,
+                color_midpoint=RTF_HEATMAP_MIDPOINT,
+                color_range=RTF_HEATMAP_RANGE
             )
-
-            max_nfft = nfft_range_options[selected_range]
-            filtered_data = data[data['engine_nfft'] <= max_nfft].copy()
-
-            # Create pivot table for heatmap
-            heatmap_data = filtered_data.pivot_table(
-                values='rtf',
-                index='engine_channels',
-                columns='engine_nfft',
-                aggfunc='mean'
-            )
-
-            # Convert to evenly-spaced blocks with proper labels
-            fig = px.imshow(
-                heatmap_data.values,  # Use values only for even spacing
-                title=f"RTF Heatmap (NFFT ≤{max_nfft:,})",
-                labels={'x': 'NFFT', 'y': 'Channels', 'color': 'RTF'},
-                color_continuous_scale='RdYlGn',  # Red=bad, yellow=acceptable, green=ideal
-                color_continuous_midpoint=2.0,  # Anchor yellow at RTF=2.0 (middle of 1.0-3.0 range)
-                range_color=[0, 6],  # Cap scale: red<1.0, yellow 1.0-3.0, green 3.0-6.0+
-                aspect='auto',
-                x=[str(int(val)) for val in heatmap_data.columns],  # NFFT labels
-                y=[str(int(val)) for val in heatmap_data.index]     # Channel labels
-            )
-
-            # Force categorical axes for even spacing (prevents powers-of-2 skewing)
-            fig.update_xaxes(type='category')
-            fig.update_yaxes(type='category')
 
             st.plotly_chart(fig, use_container_width=True)
 
-            st.markdown("""
-            **Interpretation:**
-            - Green regions: RTF ≥3.0 (ideal for production, 3× headroom)
-            - Yellow regions: RTF 1.0-3.0 (real-time capable, limited headroom)
-            - Red regions: RTF <1.0 (cannot keep up with real-time)
-            """)
+            st.markdown(get_rtf_heatmap_interpretation_text())
+            st.markdown("This heatmap shows how channel count affects RTF across NFFT sizes.")
+
+        # Heatmap 2: RTF vs Overlap and NFFT (Overlap Scaling - Non-Linear)
+        if 'engine_overlap' in filtered_data.columns:
+            st.divider()
+            st.markdown("### RTF vs Overlap × NFFT (Overlap Scaling - Non-Linear)")
+
+            # Filter to data with overlap information
+            overlap_data = filtered_data[filtered_data['engine_overlap'].notna()].copy()
+
+            if len(overlap_data) > 0:
+                fig = plotter.plot_heatmap(
+                    overlap_data,
+                    x_col='engine_nfft',
+                    y_col='engine_overlap',
+                    z_col='rtf',
+                    title=f"RTF Heatmap: Overlap × NFFT (≤{max_nfft:,}) - Academic Convention",
+                    colorscale=RTF_HEATMAP_COLORSCALE,
+                    color_midpoint=RTF_HEATMAP_MIDPOINT,
+                    color_range=RTF_HEATMAP_RANGE
+                )
+
+                st.plotly_chart(fig, use_container_width=True)
+
+                st.markdown("""
+                **Interpretation (Non-Linear Overlap Scaling):**
+                - **Overlap scaling is non-linear**: 50% → 75% (2× load), 90% → 95% (2× load)
+                - **Green regions**: RTF ≤0.33 even at high overlap (GPU parallelism advantage)
+                - **Yellow/Red progression**: Shows computational load increasing with overlap
+                - **Scientific necessity**: VLF ionosphere monitoring requires 90-95% overlap for fine temporal structure
+
+                **Key Insight**: GPU maintains real-time performance (RTF <1.0) even at extreme overlap where CPU would fail.
+                This demonstrates the GPU parallelism advantage for high-overlap STFT processing.
+                """)
+            else:
+                st.info("ℹ️ No overlap sweep data available. Run ionosphere_temporal experiment for overlap analysis.")
         else:
-            st.info("ℹ️ RTF heatmap requires throughput/realtime benchmark data.")
+            st.info("ℹ️ No overlap data available in this dataset.")
     else:
-        st.info("ℹ️ Heatmap requires NFFT/channels grid sweep data.")
+        st.info("ℹ️ RTF heatmaps require throughput/realtime benchmark data with NFFT sweeps.")
 
 # ============================================================================
 # TAB 6: BENCHMARK COVERAGE

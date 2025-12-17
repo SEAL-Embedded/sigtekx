@@ -121,7 +121,7 @@ with tabs[0]:
 
     - **Time Resolution:** Ability to capture fast transients and temporal evolution
     - **Frequency Resolution:** Spectral detail for phenomenon identification and characterization
-    - **Real-Time Factor (RTF):** Processing capability for live monitoring (RTF > 1.0 required)
+    - **Real-Time Factor (RTF):** Processing capability for live monitoring (RTF < 1.0 required, academic convention)
     - **Multi-Channel Support:** Direction finding and polarization analysis capabilities (dual-channel E-W/N-S dipole pair)
     """)
 
@@ -170,7 +170,7 @@ with tabs[2]:
         st.info("No RTF data available")
     else:
         rtf_stats = data['rtf'].describe()
-        realtime_count = (data['rtf'] >= 1.0).sum()
+        realtime_count = (data['rtf'] <= 1.0).sum()
         total_count = len(data)
         realtime_pct = (realtime_count / total_count) * 100
 
@@ -179,20 +179,21 @@ with tabs[2]:
         col1, col2, col3, col4 = st.columns(4)
         col1.metric(
             "Mean RTF",
-            f"{rtf_stats['mean']:.2f}x",
-            help="Real-Time Factor - ratio of processing speed to data rate, >1.0 means faster than real-time"
+            f"{rtf_stats['mean']:.3f}",
+            help="Real-Time Factor (Academic Convention) - lower is better, <1.0 means faster than real-time"
         )
-        col2.metric("Median RTF", f"{rtf_stats['50%']:.2f}x")
-        col3.metric("Max RTF", f"{rtf_stats['max']:.2f}x")
+        col2.metric("Median RTF", f"{rtf_stats['50%']:.3f}")
+        col3.metric("Min RTF", f"{rtf_stats['min']:.3f}", help="Lowest RTF = Best performance")
         col4.metric("Real-Time Capable", f"{realtime_count}/{total_count} ({realtime_pct:.1f}%)")
 
         st.divider()
 
-        st.markdown("### Interpretation")
+        st.markdown("### Interpretation (Academic Convention - Lower is Better)")
         st.markdown("""
-        - **RTF > 1.0:** Real-time processing capable
-        - **RTF > 2.0:** Headroom for additional processing (e.g., beamforming)
-        - **RTF < 1.0:** Cannot keep up with live data (offline processing only)
+        - **RTF < 1.0:** ✅ Real-time processing capable (faster than real-time)
+        - **RTF ≤ 0.40:** ✅ Excellent headroom for additional processing (e.g., beamforming, ASR industry standard)
+        - **RTF ≤ 0.33:** ✅ Production target (3× faster than real-time, thermal margin)
+        - **RTF > 1.0:** ❌ Cannot keep up with live data (offline processing only)
         """)
 
         # RTF scaling plot
@@ -207,12 +208,12 @@ with tabs[2]:
                 group_by='engine_overlap',
             )
 
-            # Add threshold line
+            # Add threshold line (Academic Convention: lower is better)
             fig.add_hline(
                 y=1.0,
                 line_dash="dash",
                 line_color="red",
-                annotation_text="Real-time threshold (RTF=1.0)",
+                annotation_text="Real-time limit (RTF=1.0, values above cannot keep up)",
                 annotation_position="right"
             )
 

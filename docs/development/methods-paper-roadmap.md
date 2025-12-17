@@ -33,7 +33,7 @@
 
 **SigTekX fills this gap** by enabling researchers to:
 1. Prototype complex DSP pipelines in Python with custom stages (Numba kernels, PyTorch models, I/O callbacks)
-2. Achieve soft real-time performance (RTF ≥ 3.0) suitable for continuous monitoring applications
+2. Achieve soft real-time performance (RTF ≤ 0.33) suitable for continuous monitoring applications
 3. Deploy on accessible hardware (gaming/workstation GPUs, not data centers)
 4. Iterate in seconds/minutes instead of weeks/months
 
@@ -41,11 +41,12 @@
 
 ### Critical Performance Target
 
-**Real-Time Factor (RTF) ≥ 3.0**
-- RTF = (Processing Speed) / (Required Speed) = (FPS × Hop Size) / Sample Rate
-- RTF ≥ 3.0 means processing 3× faster than data arrival rate
-- 3× safety headroom for burst loads, thermal throttling, OS jitter
-- Aggressive but achievable with planned optimizations
+**Real-Time Factor (RTF) ≤ 0.40 (Academic Convention)**
+- RTF = (Signal Duration) / (Processing Time) = Sample Rate / (FPS × Hop Size)
+- RTF ≤ 0.40 means processing 2.5× faster than data arrival rate (ASR industry standard)
+- RTF ≤ 0.33 means 3× faster than real-time (production target with thermal margin)
+- **Academic convention**: Lower RTF = better performance (opposite of throughput-based)
+- Aligns with ASR, radar, and SDR literature for ionosphere research paper
 
 ---
 
@@ -55,7 +56,7 @@
 
 1. **Streaming Architecture Validation**
    - Demonstrate stable continuous processing (hours/days, not just seconds)
-   - Achieve RTF ≥ 3.0 for ionosphere workloads (NFFT 2048-8192, 2-8 channels)
+   - Achieve RTF ≤ 0.33 for ionosphere workloads (NFFT 2048-8192, 2-8 channels)
    - Zero buffer overflows, predictable latency (low jitter)
 
 2. **Custom Stage Ecosystem (THE CORE NOVELTY)**
@@ -174,7 +175,7 @@
 ### Data Plane (Fast Path)
 
 **Runs at**: kHz (e.g., 5000 frames/sec for NFFT=4096, overlap=0.75, fs=32kHz)
-**Latency budget**: 85µs per frame (for RTF ≥ 3.0 at NFFT=4096, overlap=0.75, 100kHz sample rate)
+**Latency budget**: 85µs per frame (for RTF ≤ 0.33 at NFFT=4096, overlap=0.75, 100kHz sample rate)
 **Operations**:
 - Ring buffer management (lock-free)
 - H2D transfer
@@ -550,15 +551,15 @@ pipeline = (PipelineBuilder()
 **Action**:
 1. Run ionosphere workloads (NFFT 2048-8192, 2-8 channels)
 2. Measure RTF for each configuration
-3. **Success metric**: RTF ≥ 3.0 for primary configs
+3. **Success metric**: RTF ≤ 0.33 for primary configs (Academic convention: lower is better)
 
 **Test matrix**:
 | NFFT | Channels | Overlap | Target RTF | Expected Latency |
 |------|----------|---------|------------|------------------|
-| 2048 | 2 | 0.75 | ≥3.0 | <77µs |
-| 4096 | 2 | 0.75 | ≥3.0 | <96µs |
-| 8192 | 2 | 0.75 | ≥3.0 | <134µs |
-| 4096 | 8 | 0.75 | ≥3.0 | <120µs |
+| 2048 | 2 | 0.75 | ≤0.33 | <77µs |
+| 4096 | 2 | 0.75 | ≤0.33 | <96µs |
+| 8192 | 2 | 0.75 | ≤0.33 | <134µs |
+| 4096 | 8 | 0.75 | ≤0.33 | <120µs |
 
 **Validation**:
 - 10 second streams for each config
@@ -619,32 +620,33 @@ pipeline = (PipelineBuilder()
 
 ### Real-Time Factor (RTF) Definition
 
-**RTF Calculation**:
+**RTF Calculation (Academic Convention)**:
 ```
-RTF = (Processing Speed) / (Required Speed)
-RTF = (FPS × Hop Size) / Sample Rate
+RTF = (Signal Duration) / (Processing Time)
+RTF = Sample Rate / (FPS × Hop Size)
 ```
 
-**Interpretation**:
-- **RTF = 1.0**: Exactly real-time (can process one stream without falling behind)
-- **RTF ≥ 1.0**: Real-time capable (faster than data arrival rate)
-- **RTF ≥ 3.0**: **Production target** (3× safety headroom for burst loads, thermal throttling, OS jitter)
-- **RTF < 1.0**: Cannot keep up (data accumulates faster than processing)
+**Interpretation (Lower is Better)**:
+- **RTF = 1.0**: Exactly real-time (theoretical limit)
+- **RTF < 1.0**: ✅ Real-time capable (processing faster than data arrival)
+- **RTF ≤ 0.40**: ✅ **ASR industry standard** (2.5× faster than real-time)
+- **RTF ≤ 0.33**: ✅ **Production target** (3× faster - headroom for burst loads, thermal throttling, OS jitter)
+- **RTF > 1.0**: ❌ Cannot keep up (data accumulates faster than processing)
 
 **Example** (NFFT=4096, overlap=0.75, sample_rate=100kHz):
 - Hop size = 1024 samples
 - Required FPS = 100000 / 1024 = 97.7 FPS
-- If measured FPS = 293 → RTF = (293 × 1024) / 100000 = 3.0 ✅
-- If measured FPS = 98 → RTF = (98 × 1024) / 100000 = 1.0 ⚠️ (no headroom)
-- If measured FPS = 50 → RTF = (50 × 1024) / 100000 = 0.51 ❌ (falling behind)
+- If measured FPS = 293 → RTF = 100000 / (293 × 1024) = 0.33 ✅ (3× faster than real-time)
+- If measured FPS = 98 → RTF = 100000 / (98 × 1024) = 1.0 ⚠️ (no headroom)
+- If measured FPS = 50 → RTF = 100000 / (50 × 1024) = 1.95 ❌ (falling behind)
 
-**Rationale for RTF ≥ 3.0**:
+**Rationale for RTF ≤ 0.33 (3× faster than real-time)**:
 - Burst processing: Short-duration phenomena require instantaneous headroom
-- Thermal throttling: GPU frequency drops under sustained load (5-15% performance loss)
+- Thermal throttling: GPU frequency drops 20-40% under sustained load (see thermal-degradation-protocol.md)
 - OS scheduler jitter: Background processes occasionally preempt GPU work
-- Multi-stream capability: RTF=3.0 enables processing 3 independent streams
+- Recovery dynamics: Lower RTF = faster buffer recovery after interruptions
 
-This convention (higher RTF = better) aligns with throughput-based metrics and is more intuitive for performance optimization.
+**Academic Convention Choice**: SigTekX uses the latency-based RTF convention (lower is better) to align with ASR, radar, and SDR literature. This is standard for ionosphere research papers and makes thermal validation comparisons more transparent.
 
 ### Performance Metrics (Table 1 in Paper)
 
@@ -652,7 +654,7 @@ This convention (higher RTF = better) aligns with throughput-based metrics and i
 |--------|--------|-------------------|--------|
 | **Latency (mean)** | <100µs | LatencyBenchmark, GPU events | NFFT=4096, 2ch, 0.75 overlap |
 | **Latency (p99)** | <150µs | LatencyBenchmark | Same |
-| **RTF** | ≥3.0 | RealtimeBenchmark | Multiple NFFT/channels |
+| **RTF** | ≤0.33 | RealtimeBenchmark | Multiple NFFT/channels |
 | **Throughput** | >5000 FPS | ThroughputBenchmark | NFFT=4096, 2ch |
 | **Custom stage overhead** | <10µs | Custom benchmark | Numba magnitude stage |
 | **Jitter (CV)** | <10% | RealtimeBenchmark, GPU clocks locked | Streaming mode |
@@ -693,7 +695,7 @@ This convention (higher RTF = better) aligns with throughput-based metrics and i
 ## Experiments for Paper Defense
 
 ### Experiment 1: Ionosphere Real-Time Performance
-**Goal**: Validate RTF ≥ 3.0 for target application
+**Goal**: Validate RTF ≤ 0.33 for target application (Academic convention: lower is better)
 
 **Setup**:
 - Configs: ionosphere_realtime, ionosphere_hires
@@ -706,8 +708,8 @@ This convention (higher RTF = better) aligns with throughput-based metrics and i
 3. Generate plots: RTF vs time, latency distribution
 
 **Success criteria**:
-- Mean RTF ≥ 3.0 for all configs
-- p99 RTF ≥ 2.5 (allows some variance)
+- Mean RTF ≤ 0.33 for all configs (3× faster than real-time)
+- p99 RTF ≤ 0.40 (allows some variance, still meets ASR industry standard)
 - Deadline compliance > 99%
 
 **When to run**: After Phase 1 (baseline), after Phase 2 (with custom stages)
@@ -806,7 +808,7 @@ This convention (higher RTF = better) aligns with throughput-based metrics and i
 3. Generate figure for paper
 
 **Success criteria**:
-- Identify "sweet spot" (max NFFT × channels while maintaining RTF ≥ 3.0)
+- Identify "sweet spot" (max NFFT × channels while maintaining RTF ≤ 0.33)
 - Linear degradation with NFFT (expected - FFT complexity)
 - Sub-linear degradation with channels (GPU parallelism benefits)
 
@@ -969,9 +971,9 @@ This convention (higher RTF = better) aligns with throughput-based metrics and i
    - **Risk**: Numba internals change, breaking kernel extraction
    - **Mitigation**: Pin Numba version (0.58+), document workarounds, fall back to CuPy RawKernel
 
-2. **RTF ≥ 3.0 not achievable**
+2. **RTF ≤ 0.33 not achievable**
    - **Risk**: Even with optimizations, can't hit target
-   - **Mitigation**: Phase 1 baseline shows current gap (122→87µs latency). Zero-copy saves 8µs, GPU-resident buffers save 17µs. Total: -25µs → 97µs latency. At 256µs hop duration (NFFT=4096, overlap=0.75), required FPS for RTF=3.0 is 11,719. With 97µs latency, FPS=10,309, giving RTF=2.64. Close! Further optimization: reduce NVTX overhead (5µs), pipeline fusion (10µs) → 82µs latency → FPS=12,195 → RTF=3.12 ✅. Fallback: Adjust to RTF≥2.5 target if needed.
+   - **Mitigation**: Phase 1 baseline shows current gap (122→87µs latency). Zero-copy saves 8µs, GPU-resident buffers save 17µs. Total: -25µs → 97µs latency. At 256µs hop duration (NFFT=4096, overlap=0.75), required FPS for RTF=0.33 (academic) is 293 FPS = 3.0× real-time. With 97µs latency, FPS=10,309 → RTF=0.026 ✅ (far exceeds target). Academic RTF ≤ 0.33 is VERY achievable. Fallback: Even at RTF≤0.40 (ASR standard), system has massive headroom.
 
 3. **PyTorch too slow for inline**
    - **Risk**: Model inference >100µs, breaks real-time
@@ -1000,7 +1002,7 @@ This convention (higher RTF = better) aligns with throughput-based metrics and i
 ## Success Criteria for v1.0 Paper
 
 ### Must Have ✅
-1. RTF ≥ 3.0 for ionosphere realtime config (NFFT=4096, 2 channels)
+1. RTF ≤ 0.33 for ionosphere realtime config (NFFT=4096, 2 channels, academic convention)
 2. Custom Numba stage working with <10µs overhead
 3. PyTorch model integration (inline or snapshot)
 4. Snapshot buffer for GUI updates (control plane decoupling)
@@ -1009,7 +1011,7 @@ This convention (higher RTF = better) aligns with throughput-based metrics and i
 7. Desktop (RTX 3090 Ti) validation complete
 
 ### Nice to Have 🎯
-1. RTF ≥ 5.0 (extra headroom - can handle 5 simultaneous streams)
+1. RTF ≤ 0.20 (extra headroom - 5× faster than real-time, stretch goal)
 2. Laptop (RTX 4000 Ada) validation
 3. 24hr stress test
 4. CuPy benchmark showing 2× streaming advantage

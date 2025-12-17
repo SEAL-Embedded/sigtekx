@@ -6,6 +6,7 @@ This script is Hydra-aware and logs results to MLflow.
 Communication with other scripts happens through artifact files.
 """
 
+import sys
 import warnings
 from pathlib import Path
 
@@ -16,6 +17,10 @@ from omegaconf import DictConfig, OmegaConf
 
 from sigtekx.benchmarks import ThroughputBenchmark, ThroughputBenchmarkConfig
 from sigtekx.config import EngineConfig
+
+# Add experiments directory to path for metrics import
+sys.path.insert(0, str(Path(__file__).parent.parent / "experiments"))
+from analysis.metrics import calculate_rtf
 
 
 @hydra.main(version_base=None, config_path="../experiments/conf", config_name="config")
@@ -110,10 +115,10 @@ def run_throughput_benchmark(cfg: DictConfig) -> float:
         time_resolution_ms = (engine_config.nfft / engine_config.sample_rate_hz) * 1000
         freq_resolution_hz = engine_config.sample_rate_hz / engine_config.nfft
 
-        # Real-Time Factor (RTF): ratio of processing speed to signal speed
-        # RTF = (fps * hop_size) / sample_rate_hz
-        # RTF = 1.0 means exactly real-time, RTF > 1.0 means faster than real-time
-        rtf = (fps * hop_size) / engine_config.sample_rate_hz if fps > 0 else 0.0
+        # Real-Time Factor (RTF): Academic convention (lower is better)
+        # RTF = sample_rate_hz / (fps * hop_size)
+        # RTF < 1.0 means faster than real-time, RTF > 1.0 means falling behind
+        rtf = calculate_rtf(fps, hop_size, engine_config.sample_rate_hz)
 
         # Save enriched summary with scientific metrics
         summary = {

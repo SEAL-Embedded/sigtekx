@@ -39,19 +39,32 @@ def calculate_effective_fps(sample_rate_hz: int, hop_size: int) -> float:
 
 def calculate_rtf(fps: float, hop_size: int, sample_rate_hz: int) -> float:
     """
-    Calculate Real-Time Factor (RTF).
+    Calculate Real-Time Factor (RTF) using academic convention.
 
-    RTF = (processing speed) / (signal speed)
-    RTF = (fps * hop_size) / sample_rate_hz
+    RTF = (signal duration) / (processing time)
+    RTF = sample_rate_hz / (fps * hop_size)
+
+    This is the latency-based convention used in ASR, radar, and SDR literature.
+    Lower RTF values indicate better performance.
 
     Interpretation:
-    - RTF = 1.0: Exactly real-time (can process one stream)
-    - RTF = 2.0: Can process 2 real-time streams simultaneously
-    - RTF = 0.5: Can only process at half real-time speed
+    - RTF < 1.0: Faster than real-time (good) ✅
+    - RTF = 1.0: Exactly real-time (theoretical limit)
+    - RTF > 1.0: Slower than real-time (falling behind) ❌
+
+    Example:
+        >>> calculate_rtf(fps=250, hop_size=1024, sample_rate_hz=100000)
+        0.39  # Processing uses 39% of available time (good)
+
+    Note:
+        This is the INVERSE of throughput-based RTF used in GPU metrics.
+        Academic RTF = 1.0 / Throughput RTF
     """
     if fps <= 0:
-        return 0.0
-    return (fps * hop_size) / sample_rate_hz
+        return float('inf')  # Cannot process (worst case)
+
+    # Academic convention: RTF = signal_duration / processing_time (lower is better)
+    return sample_rate_hz / (fps * hop_size)
 
 
 def calculate_all_scientific_metrics(
@@ -155,21 +168,36 @@ def assess_ionosphere_suitability(
 
 def classify_rtf(rtf: float) -> tuple[str, str]:
     """
-    Classify Real-Time Factor performance.
+    Classify Real-Time Factor performance using academic convention.
+
+    Academic RTF: Lower is better (RTF < 1.0 = good performance)
 
     Args:
-        rtf: Real-Time Factor
+        rtf: Real-Time Factor (academic convention, lower is better)
 
     Returns:
         Tuple of (classification, description)
+
+    Classification Tiers:
+        - RTF ≤ 0.10: Exceptional (10× faster than real-time)
+        - RTF ≤ 0.20: Excellent (5× faster than real-time)
+        - RTF ≤ 0.33: Very Good (3× faster than real-time)
+        - RTF ≤ 0.40: Good (2.5× faster, ASR industry standard)
+        - RTF ≤ 0.50: Acceptable (2× faster than real-time)
+        - RTF ≤ 1.0: Marginal (barely real-time)
+        - RTF > 1.0: Insufficient (falling behind)
     """
-    if rtf >= 2.0:
-        return ("excellent", "Can process 2+ real-time streams simultaneously")
-    elif rtf >= 1.0:
-        return ("good", "Can process real-time data without falling behind")
-    elif rtf >= 0.5:
-        return ("marginal", "Near real-time, may have occasional delays")
-    elif rtf >= 0.1:
-        return ("insufficient", "Cannot keep up with real-time data")
+    if rtf <= 0.10:
+        return ("exceptional", "RTF ≤0.10: Exceptional performance (10× faster than real-time)")
+    elif rtf <= 0.20:
+        return ("excellent", "RTF ≤0.20: Excellent performance (5× faster than real-time)")
+    elif rtf <= 0.33:
+        return ("very_good", "RTF ≤0.33: Very good performance (3× faster than real-time)")
+    elif rtf <= 0.40:
+        return ("good", "RTF ≤0.40: Good performance (ASR industry standard)")
+    elif rtf <= 0.50:
+        return ("acceptable", "RTF ≤0.50: Acceptable performance (2× faster than real-time)")
+    elif rtf <= 1.0:
+        return ("marginal", "RTF ≤1.0: Marginal performance (barely real-time)")
     else:
-        return ("very_poor", "Significantly slower than real-time")
+        return ("insufficient", f"RTF ={rtf:.2f}: Cannot keep up with real-time data")
