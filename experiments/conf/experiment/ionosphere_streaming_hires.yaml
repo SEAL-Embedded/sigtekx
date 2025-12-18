@@ -1,0 +1,99 @@
+# @package _global_
+
+# Ionosphere Streaming High-Resolution (48kHz STREAMING mode, High NFFT)
+# ========================================================================
+# High-NFFT streaming validation for Schumann resonance detection.
+# Currently max NFFT in streaming is 8192 - this validates 16k-131k streaming.
+#
+# Validates: Can we achieve RTF ≤ 1.0 at NFFT=65536 for <0.5Hz frequency resolution?
+
+defaults:
+  - override /engine: ionosphere_48k
+
+experiment:
+  name: ionosphere_streaming_hires
+  description: >-
+    High-resolution STREAMING mode for Schumann resonance detection at 48kHz.
+    Validates real-time capability at ultra-high NFFT (16k-131k) for
+    sub-1Hz frequency resolution in continuous monitoring applications.
+  tags: [ionosphere, streaming, high-resolution, schumann, elf, realtime]
+  experiment_group: ionosphere
+  sample_rate_category: 48kHz
+
+# Multirun configuration
+# 4 NFFT × 3 overlap = 12 configurations
+# NFFT range: 16384-131072 (ultra-high resolution for Schumann/ELF)
+# Overlap: 0.75-0.9375 (high temporal resolution required)
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      # High NFFT sweep for Schumann resonances
+      # 16384: 0.34s frames, 2.9Hz resolution (baseline high-res)
+      # 32768: 0.68s frames, 1.5Hz resolution (Schumann capable)
+      # 65536: 1.37s frames, 0.73Hz resolution (target: <1Hz)
+      # 131072: 2.73s frames, 0.37Hz resolution (extreme resolution)
+      engine.nfft: 16384,32768,65536,131072
+
+      # High overlap for temporal resolution
+      # 0.75: 25% hop (standard high-overlap)
+      # 0.875: 12.5% hop (high temporal resolution)
+      # 0.9375: 6.25% hop (extreme temporal resolution)
+      engine.overlap: 0.75,0.875,0.9375
+
+      # Fixed dual-channel configuration (E-W and N-S antennas)
+      engine.channels: 2
+
+      # STREAMING mode (for real-time compliance validation)
+      engine.mode: streaming
+
+# Analysis configuration
+analysis:
+  statistical_tests: [shapiro, kruskal]
+  confidence_level: 0.95
+  min_samples: 50
+
+  # High-NFFT streaming focus metrics
+  focus_metrics:
+    - rtf                       # PRIMARY: RTF ≤ 1.0 for real-time capability
+    - frequency_resolution_hz   # Target: <0.5Hz for Schumann detection
+    - time_resolution_ms        # Frame duration at high NFFT
+    - deadline_compliance_rate  # Real-time deadline compliance
+    - mean_jitter_ms           # Timing stability
+    - frames_dropped           # Data loss (should be 0)
+
+  # High-NFFT streaming thresholds
+  thresholds:
+    max_rtf: 1.0               # Real-time capability required
+    max_freq_resolution_hz: 1.0  # <1Hz for Schumann resonances
+    min_compliance_rate: 0.99   # 99% deadline compliance
+    max_frame_drops: 0          # Zero data loss
+
+# Ionosphere ELF/Schumann monitoring parameters
+ionosphere:
+  sample_rate_hz: 48000
+  frequency_bands: [elf]       # ELF only (3-30Hz)
+  target_phenomena:
+    - schumann_resonances      # 7.8Hz, 14.3Hz, 20.8Hz, 27.3Hz, 33.8Hz
+  schumann_harmonics: [7.8, 14.3, 20.8, 27.3, 33.8]  # Hz
+  min_frequency_resolution_hz: 0.5  # Required for Schumann detection
+  continuous_monitoring: true  # STREAMING mode required
+
+# Performance expectations
+expectations:
+  nfft_16384:
+    rtf: "<0.5"
+    freq_res_hz: 2.9
+    frame_time_ms: 341
+  nfft_32768:
+    rtf: "<0.8"
+    freq_res_hz: 1.5
+    frame_time_ms: 683
+  nfft_65536:
+    rtf: "~1.0"  # Critical validation point
+    freq_res_hz: 0.73
+    frame_time_ms: 1365
+  nfft_131072:
+    rtf: ">1.0?"  # May not be real-time capable
+    freq_res_hz: 0.37
+    frame_time_ms: 2731

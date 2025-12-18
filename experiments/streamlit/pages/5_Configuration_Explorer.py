@@ -45,6 +45,41 @@ except Exception as e:
 # Sidebar filters
 st.sidebar.header("🔍 Filters")
 
+# ============================================================================
+# PROMINENT: Execution Mode Filter (TOP OF SIDEBAR)
+# ============================================================================
+st.sidebar.markdown("### ⚡ Execution Mode")
+st.sidebar.markdown("*Primary filter - mode affects all performance characteristics*")
+
+if 'mode' in config_params:
+    selected_modes = st.sidebar.multiselect(
+        "Execution Mode",
+        options=config_params['mode'],
+        default=config_params['mode'],
+        help="BATCH: discrete frames (minimal overhead), STREAMING: continuous real-time (ring buffer management)"
+    )
+else:
+    selected_modes = None
+
+st.sidebar.divider()
+
+# Benchmark type filter (also prominent)
+if 'benchmark_type' in config_params:
+    selected_benchmarks = st.sidebar.multiselect(
+        "Benchmark Type",
+        options=config_params['benchmark_type'],
+        default=config_params['benchmark_type'],
+        help="throughput, latency, realtime, accuracy"
+    )
+else:
+    selected_benchmarks = None
+
+st.sidebar.divider()
+
+# ============================================================================
+# Standard Filters
+# ============================================================================
+
 # NFFT filter
 if 'nfft' in config_params:
     selected_nfft = st.sidebar.multiselect(
@@ -78,27 +113,6 @@ if 'overlap' in config_params:
     )
 else:
     overlap_range = None
-
-# Execution mode filter
-if 'mode' in config_params:
-    selected_modes = st.sidebar.multiselect(
-        "Execution Mode",
-        options=config_params['mode'],
-        default=config_params['mode'],
-        help="BATCH: discrete frames (minimal overhead), STREAMING: continuous real-time (ring buffer management)"
-    )
-else:
-    selected_modes = None
-
-# Benchmark type filter
-if 'benchmark_type' in config_params:
-    selected_benchmarks = st.sidebar.multiselect(
-        "Benchmark Type",
-        options=config_params['benchmark_type'],
-        default=config_params['benchmark_type'],
-    )
-else:
-    selected_benchmarks = None
 
 # NEW: Experiment group filter
 if 'experiment_group' in config_params:

@@ -1,0 +1,105 @@
+# @package _global_
+
+# Realtime 100kHz (STREAMING mode)
+# =================================
+# General-purpose STREAMING realtime at 100kHz for methods paper.
+# Currently only have 48kHz ionosphere streaming - this validates
+# general-purpose soft real-time capability at academic sample rate.
+#
+# Validates continuous real-time processing with deadline compliance.
+
+defaults:
+  - override /engine: academic_100k
+
+experiment:
+  name: realtime_100k
+  description: >-
+    General-purpose STREAMING mode realtime at 100kHz sample rate.
+    Validates soft real-time capability for methods paper,
+    demonstrating continuous processing with deadline compliance
+    at academic sample rate.
+  tags: [baseline, realtime, streaming, academic, 100khz, methods-paper, soft-realtime]
+  experiment_group: baseline
+  sample_rate_category: 100kHz
+
+# Multirun configuration
+# 4 NFFT × 3 channels × 2 overlap = 24 configurations
+# NFFT range: 1024-8192 (realtime-capable range at 100kHz)
+# Channels: 1, 2, 8 (single, stereo, multi-channel)
+# Overlap: 0.5, 0.75 (temporal resolution vs computational load)
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      # NFFT sweep for real-time capability
+      # 1024: Low latency, fast processing
+      # 2048: Balanced (common real-time STFT)
+      # 4096: Higher resolution, still real-time capable
+      # 8192: High resolution streaming (validation target)
+      engine.nfft: 1024,2048,4096,8192
+
+      # Channel sweep: single to multi-channel
+      # 1: Single channel (baseline)
+      # 2: Stereo (common use case)
+      # 8: Multi-channel (typical array size)
+      engine.channels: 1,2,8
+
+      # Overlap sweep: temporal resolution trade-off
+      # 0.5: 50% overlap (standard streaming)
+      # 0.75: 75% overlap (high temporal resolution)
+      engine.overlap: 0.5,0.75
+
+      # STREAMING mode (continuous real-time processing)
+      engine.mode: streaming
+
+# Analysis configuration
+analysis:
+  statistical_tests: [shapiro, kruskal, mann_whitney]
+  confidence_level: 0.95
+  min_samples: 100
+
+  # Streaming real-time focus metrics
+  focus_metrics:
+    - rtf                       # PRIMARY: Real-Time Factor (must be <1.0)
+    - deadline_compliance_rate  # Deadline hit rate (target: >99%)
+    - mean_jitter_ms           # Timing stability
+    - p99_jitter_ms            # Worst-case jitter
+    - frames_dropped           # Data loss (should be 0)
+    - mean_latency_ms          # Processing latency
+    - frame_time_cv            # Frame time consistency
+
+  # Real-time streaming thresholds
+  thresholds:
+    max_rtf: 1.0               # Real-time capable
+    min_compliance_rate: 0.99   # 99% deadline compliance
+    max_mean_jitter_ms: 5.0    # Stable timing
+    max_frame_drops: 0          # Zero data loss
+    soft_realtime_rtf: 0.33     # Soft real-time target (3× headroom)
+
+# Academic real-time parameters
+academic:
+  sample_rate_hz: 100000       # 100kHz (common academic sample rate)
+  use_case: general_purpose    # Not domain-specific
+  publication_target: methods_paper
+  real_time_class: soft        # Soft real-time (not hard real-time)
+  comparison_baseline: numpy_scipy_offline  # vs offline processing
+
+# Soft real-time positioning (methods paper)
+positioning:
+  gap_filled: "NumPy/SciPy (offline) → SigTekX (soft real-time) → FPGA/VHDL (hard real-time)"
+  value_proposition: >-
+    GPU-accelerated soft real-time STFT in Python with consumer hardware.
+    Bridges gap between offline NumPy and hard real-time FPGA solutions.
+  target_audience: [researchers, engineers, educators]
+  hardware_accessibility: consumer_workstation_gpu  # Not data center GPUs
+
+# Performance expectations
+expectations:
+  real_time:
+    rtf_target: "≤1.0"         # Real-time capable
+    compliance_target: ">99%"  # High reliability
+    jitter_target: "<5ms"      # Stable timing
+  soft_real_time:
+    rtf_target: "≤0.33"        # 3× headroom for I/O
+    compliance_target: ">99.9%" # Very high reliability
+    jitter_target: "<2ms"      # Very stable timing

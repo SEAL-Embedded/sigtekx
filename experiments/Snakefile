@@ -33,6 +33,12 @@ rule all:
         "artifacts/data/accuracy_validation.done",
         "artifacts/data/execution_mode_comparison.done",
 
+        # NEW: Streaming mode gap-filling experiments (Phase 1)
+        "artifacts/data/ionosphere_streaming_throughput.done",
+        "artifacts/data/ionosphere_streaming_hires.done",
+        "artifacts/data/baseline_latency_100k.done",
+        "artifacts/data/realtime_100k.done",
+
         # Static spectrograms
         "artifacts/figures/spectrograms/general_spectrogram.png",
         "artifacts/figures/spectrograms/general_spectrogram.json",
@@ -168,6 +174,54 @@ rule run_execution_mode_comparison:
         python benchmarks/run_latency.py \
             experiment=execution_mode_comparison \
             +benchmark=latency_mode_comparison
+        """
+
+# ============================================================================
+# NEW: Streaming Mode Gap-Filling Experiments (Phase 1)
+# ============================================================================
+
+# Run ionosphere streaming throughput (sustained FPS in STREAMING mode)
+rule run_ionosphere_streaming_throughput:
+    output:
+        touch("artifacts/data/ionosphere_streaming_throughput.done")
+    shell:
+        """
+        python benchmarks/run_throughput.py --multirun \
+            experiment=ionosphere_streaming_throughput \
+            +benchmark=throughput
+        """
+
+# Run ionosphere streaming high-resolution (validate high-NFFT streaming)
+rule run_ionosphere_streaming_hires:
+    output:
+        touch("artifacts/data/ionosphere_streaming_hires.done")
+    shell:
+        """
+        python benchmarks/run_realtime.py --multirun \
+            experiment=ionosphere_streaming_hires \
+            +benchmark=realtime
+        """
+
+# Run baseline latency at 100kHz (BATCH mode for methods paper)
+rule run_baseline_latency_100k:
+    output:
+        touch("artifacts/data/baseline_latency_100k.done")
+    shell:
+        """
+        python benchmarks/run_latency.py --multirun \
+            experiment=baseline_latency_100k \
+            +benchmark=latency
+        """
+
+# Run realtime at 100kHz (STREAMING mode for methods paper)
+rule run_realtime_100k:
+    output:
+        touch("artifacts/data/realtime_100k.done")
+    shell:
+        """
+        python benchmarks/run_realtime.py --multirun \
+            experiment=realtime_100k \
+            +benchmark=realtime
         """
 
 # ============================================================================
