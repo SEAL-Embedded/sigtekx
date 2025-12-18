@@ -119,8 +119,16 @@ def run_accuracy_benchmark(cfg: DictConfig) -> float:
         time_resolution_ms = (engine_config.nfft / engine_config.sample_rate_hz) * 1000
         freq_resolution_hz = engine_config.sample_rate_hz / engine_config.nfft
 
+        # Extract experiment metadata from cfg (with fallbacks)
+        experiment_group = cfg.get('experiment', {}).get('experiment_group', 'unknown')
+        sample_rate_category = cfg.get('experiment', {}).get('sample_rate_category', f"{engine_config.sample_rate_hz/1000:.0f}kHz")
+
         # Save enriched summary with scientific metrics
         summary = {
+            # Experiment metadata (for dashboard filtering)
+            'experiment_group': experiment_group,
+            'sample_rate_category': sample_rate_category,
+
             # Core engine parameters
             'engine_nfft': engine_config.nfft,
             'engine_channels': engine_config.channels,

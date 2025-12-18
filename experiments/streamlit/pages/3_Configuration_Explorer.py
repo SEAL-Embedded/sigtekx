@@ -100,6 +100,28 @@ if 'benchmark_type' in config_params:
 else:
     selected_benchmarks = None
 
+# NEW: Experiment group filter
+if 'experiment_group' in config_params:
+    selected_groups = st.sidebar.multiselect(
+        "Experiment Group",
+        options=config_params['experiment_group'],
+        default=config_params['experiment_group'],
+        help="Filter by experiment category (baseline, scaling, grid, ionosphere, profiling, validation)"
+    )
+else:
+    selected_groups = None
+
+# NEW: Sample rate filter
+if 'sample_rate_category' in config_params:
+    selected_sample_rates = st.sidebar.multiselect(
+        "Sample Rate",
+        options=config_params['sample_rate_category'],
+        default=config_params['sample_rate_category'],
+        help="Filter by sampling frequency (100kHz for academic, 48kHz for ionosphere)"
+    )
+else:
+    selected_sample_rates = None
+
 # Apply filters
 filtered_data = data.copy()
 
@@ -120,6 +142,14 @@ if selected_modes:
 
 if selected_benchmarks:
     filtered_data = filtered_data[filtered_data['benchmark_type'].isin(selected_benchmarks)]
+
+# NEW: Apply experiment group filter
+if selected_groups and 'experiment_group' in filtered_data.columns:
+    filtered_data = filtered_data[filtered_data['experiment_group'].isin(selected_groups)]
+
+# NEW: Apply sample rate filter
+if selected_sample_rates and 'sample_rate_category' in filtered_data.columns:
+    filtered_data = filtered_data[filtered_data['sample_rate_category'].isin(selected_sample_rates)]
 
 # Display filter results
 st.subheader("📊 Filtered Results")

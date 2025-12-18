@@ -73,6 +73,15 @@ def get_available_configurations(data: pd.DataFrame) -> dict[str, list]:
         unique_vals = data['benchmark_type'].dropna().unique()
         config_params['benchmark_type'] = sorted([str(v) for v in unique_vals])
 
+    # NEW: Experiment metadata columns (for dashboard filtering)
+    if 'experiment_group' in data.columns:
+        unique_vals = data['experiment_group'].dropna().unique()
+        config_params['experiment_group'] = sorted([str(v) for v in unique_vals])
+
+    if 'sample_rate_category' in data.columns:
+        unique_vals = data['sample_rate_category'].dropna().unique()
+        config_params['sample_rate_category'] = sorted([str(v) for v in unique_vals])
+
     return config_params
 
 

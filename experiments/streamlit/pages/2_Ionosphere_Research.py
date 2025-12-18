@@ -63,26 +63,38 @@ except Exception as e:
     st.error(f"❌ Error loading data: {e}")
     st.stop()
 
-# Filter to dual-channel data (ionosphere antenna pair: E-W and N-S dipoles)
+# Configurable channel filter with default to dual-channel
+st.sidebar.header("🔍 Channel Filter")
 if 'engine_channels' in data.columns:
-    dual_channel_data = data[data['engine_channels'] == 2].copy()
+    available_channels = sorted(data['engine_channels'].unique())
+    selected_channels = st.sidebar.multiselect(
+        "Channels",
+        options=available_channels,
+        default=[2],  # Default to dual-channel (E-W and N-S dipole pair)
+        help="Filter by channel count. Default: 2 (dual-channel ionosphere antenna pair for E-W and N-S dipoles)"
+    )
 
-    if dual_channel_data.empty:
-        st.warning(
-            "⚠️ **No dual-channel (channels=2) data found.** "
-            "Ionosphere report is designed for dual-channel antenna systems (E-W and N-S dipole pair). "
-            "Please run ionosphere benchmarks with channels=2."
-        )
+    if selected_channels:
+        dual_channel_data = data[data['engine_channels'].isin(selected_channels)].copy()
+
+        if dual_channel_data.empty:
+            st.warning(
+                f"⚠️ **No data found for selected channels: {selected_channels}.** "
+                "Adjust channel filter or run benchmarks with desired channel counts."
+            )
+            st.stop()
+
+        n_filtered = len(data) - len(dual_channel_data)
+        if n_filtered > 0:
+            st.info(
+                f"Filtered {n_filtered} measurements. "
+                f"Using {len(dual_channel_data)} measurements with channels: {selected_channels}."
+            )
+
+        data = dual_channel_data
+    else:
+        st.warning("⚠️ No channels selected. Please select at least one channel count.")
         st.stop()
-
-    n_filtered = len(data) - len(dual_channel_data)
-    if n_filtered > 0:
-        st.info(
-            f"Filtered {n_filtered} non-dual-channel measurements. "
-            f"Using {len(dual_channel_data)} dual-channel measurements for ionosphere analysis."
-        )
-
-    data = dual_channel_data
 else:
     st.warning("'engine_channels' column not found in data. Proceeding without filtering.")
 
@@ -269,23 +281,31 @@ with tabs[3]:
 
         fig = go.Figure()
 
+        # Pre-generate hover text column (vectorized - faster than iterrows)
+        hover_parts = []
+        hover_parts.append("NFFT: " + data['engine_nfft'].astype(str))
+        if 'engine_overlap' in data.columns:
+            hover_parts.append("Overlap: " + data['engine_overlap'].round(3).astype(str))
+        if 'rtf' in data.columns:
+            hover_parts.append("RTF: " + data['rtf'].round(2).astype(str))
+
+        data_hover = data.copy()
+        data_hover['hover_text'] = hover_parts[0]
+        for part in hover_parts[1:]:
+            data_hover['hover_text'] = data_hover['hover_text'] + "<br>" + part
+
         fig.add_trace(go.Scatter(
-            x=data['time_resolution_ms'],
-            y=data['freq_resolution_hz'],
+            x=data_hover['time_resolution_ms'],
+            y=data_hover['freq_resolution_hz'],
             mode='markers',
             marker=dict(
                 size=10,
-                color=data[color_col] if color_col else 'blue',
+                color=data_hover[color_col] if color_col else 'blue',
                 colorscale='Viridis',
                 showscale=True if color_col else False,
                 colorbar=dict(title='RTF') if color_col else None,
             ),
-            text=[
-                f"NFFT: {row['engine_nfft']}<br>" +
-                f"Overlap: {row['engine_overlap']:.3f}<br>" +
-                (f"RTF: {row['rtf']:.2f}" if 'rtf' in data.columns else "")
-                for _, row in data.iterrows()
-            ],
+            text=data_hover['hover_text'],
             hovertemplate='%{text}<extra></extra>',
         ))
 
@@ -333,23 +353,21 @@ with tabs[4]:
         specific ionosphere phenomena.
         """)
 
-        # Assess each configuration
-        suitability_counts = {
-            'lightning_sprites': 0,
-            'sids': 0,
-            'schumann_resonances': 0,
-            'whistlers': 0,
-            'general_vlf': 0
-        }
-
-        for _, row in data.iterrows():
-            assessment = assess_ionosphere_suitability(
+        # Assess each configuration (vectorized - faster than iterrows)
+        assessments = data.apply(
+            lambda row: assess_ionosphere_suitability(
                 row['time_resolution_ms'],
                 row['freq_resolution_hz']
-            )
-            for phenomenon, result in assessment.items():
-                if result['suitable']:
-                    suitability_counts[phenomenon] += 1
+            ),
+            axis=1
+        )
+
+        # Count suitable configs per phenomenon
+        suitability_counts = {}
+        for phenomenon in ['lightning_sprites', 'sids', 'schumann_resonances', 'whistlers', 'general_vlf']:
+            suitability_counts[phenomenon] = assessments.apply(
+                lambda x: x[phenomenon]['suitable']
+            ).sum()
 
         total = len(data)
 
@@ -386,25 +404,26 @@ with tabs[4]:
         st.divider()
         st.subheader("Configuration Suitability Details")
 
-        suitability_data = []
-        for _, row in data.iterrows():
-            assessment = assess_ionosphere_suitability(
-                row['time_resolution_ms'],
-                row['freq_resolution_hz']
-            )
+        # Reuse assessments from above (vectorized - faster than iterrows)
+        data_suitability = data.copy()
+        data_suitability['suitable_for'] = assessments.apply(
+            lambda x: ", ".join([
+                k.replace('_', ' ').title()
+                for k, v in x.items() if v['suitable']
+            ]) or "None"
+        )
 
-            suitable_for = [k.replace('_', ' ').title() for k, v in assessment.items() if v['suitable']]
-
-            suitability_data.append({
-                'NFFT': int(row['engine_nfft']),
-                'Overlap': f"{row['engine_overlap']:.3f}",
-                'Time Res (ms)': f"{row['time_resolution_ms']:.2f}",
-                'Freq Res (Hz)': f"{row['freq_resolution_hz']:.3f}",
-                'Suitable For': ", ".join(suitable_for) if suitable_for else "None"
-            })
+        # Build table directly from DataFrame
+        suitability_df = pd.DataFrame({
+            'NFFT': data_suitability['engine_nfft'].astype(int),
+            'Overlap': data_suitability['engine_overlap'].round(3).astype(str),
+            'Time Res (ms)': data_suitability['time_resolution_ms'].round(2).astype(str),
+            'Freq Res (Hz)': data_suitability['freq_resolution_hz'].round(3).astype(str),
+            'Suitable For': data_suitability['suitable_for']
+        })
 
         st.dataframe(
-            pd.DataFrame(suitability_data),
+            suitability_df,
             use_container_width=True,
             hide_index=True
         )

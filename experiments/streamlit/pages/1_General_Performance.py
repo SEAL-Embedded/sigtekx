@@ -12,6 +12,7 @@ from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
+import plotly.graph_objects as go
 import streamlit as st
 
 # Add parent directory to path
@@ -49,6 +50,35 @@ except Exception as e:
     st.error(f"❌ Error loading data: {e}")
     st.stop()
 
+# Sidebar filters
+st.sidebar.header("🔍 Filters")
+
+# Experiment group filter
+if 'experiment_group' in data.columns:
+    available_groups = sorted(data['experiment_group'].dropna().astype(str).unique())
+    if available_groups:
+        selected_groups = st.sidebar.multiselect(
+            "Experiment Group",
+            options=available_groups,
+            default=available_groups,
+            help="Filter by experiment category (baseline, scaling, grid, ionosphere, profiling, validation)"
+        )
+        if selected_groups:
+            data = data[data['experiment_group'].astype(str).isin(selected_groups)]
+
+# Sample rate filter
+if 'sample_rate_category' in data.columns:
+    available_rates = sorted(data['sample_rate_category'].dropna().astype(str).unique())
+    if available_rates:
+        selected_rates = st.sidebar.multiselect(
+            "Sample Rate",
+            options=available_rates,
+            default=available_rates,
+            help="Filter by sampling frequency (100kHz for academic, 48kHz for ionosphere)"
+        )
+        if selected_rates:
+            data = data[data['sample_rate_category'].astype(str).isin(selected_rates)]
+
 # Create tabs for major sections
 tabs = st.tabs([
     "Executive Summary",
@@ -57,6 +87,7 @@ tabs = st.tabs([
     "Accuracy Analysis",
     "Scaling Analysis",
     "Execution Mode Overhead",
+    "Sample Rate Comparison",
     "Configuration Recommendations"
 ])
 
@@ -631,9 +662,132 @@ python benchmarks/run_latency.py experiment=execution_mode_comparison +benchmark
                     st.warning("Not enough mode data for comparison. Expected both 'batch' and 'streaming' modes.")
 
 # ============================================================================
-# TAB 7: CONFIGURATION RECOMMENDATIONS
+# TAB 7: SAMPLE RATE COMPARISON (100kHz vs 48kHz)
 # ============================================================================
 with tabs[6]:
+    st.header("Sample Rate Comparison: 100kHz vs 48kHz")
+
+    st.markdown("""
+    ### Academic vs Ionosphere Sample Rates
+
+    The project uses two distinct sample rates for different purposes:
+
+    - **100kHz (Academic)**: Full parameter space exploration (221 configs)
+      - All channel counts (1-8 channels)
+      - Wide NFFT range (1024-131072)
+      - Overlap sweeps (0.5-0.9375)
+
+    - **48kHz (Ionosphere)**: Domain-specific VLF/ULF monitoring (34 configs)
+      - Dual-channel only (E-W and N-S dipole pair)
+      - High NFFT (4096-32768 for frequency resolution)
+      - High overlap (0.75-0.9375 for temporal resolution)
+    """)
+
+    # Check if sample_rate_category column exists
+    if 'sample_rate_category' not in data.columns:
+        st.info("ℹ️ Sample rate category data not available. Run experiments with updated metadata.")
+    else:
+        # Split data by sample rate
+        data_100k = data[data['sample_rate_category'] == '100kHz'].copy()
+        data_48k = data[data['sample_rate_category'] == '48kHz'].copy()
+
+        st.divider()
+
+        # Overview metrics
+        st.subheader("📊 Dataset Overview")
+
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Total Configs", len(data))
+        col2.metric("100kHz Configs", len(data_100k))
+        col3.metric("48kHz Configs", len(data_48k))
+        if len(data) > 0:
+            col4.metric("Sample Rate Split", f"{len(data_100k)/len(data)*100:.1f}% / {len(data_48k)/len(data)*100:.1f}%")
+
+        st.divider()
+
+        # Side-by-side comparison
+        st.subheader("⚖️ Performance Comparison")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown("### 100kHz (Academic)")
+
+            if len(data_100k) > 0:
+                if 'frames_per_second' in data_100k.columns:
+                    fps_100k = data_100k['frames_per_second'].mean()
+                    st.metric("Mean Throughput", f"{fps_100k:.1f} FPS")
+
+                if 'mean_latency_us' in data_100k.columns:
+                    lat_100k = data_100k['mean_latency_us'].mean()
+                    st.metric("Mean Latency", f"{lat_100k:.1f} µs")
+
+                if 'rtf' in data_100k.columns:
+                    rtf_100k = data_100k['rtf'].mean()
+                    realtime_100k = (data_100k['rtf'] <= 1.0).sum() / len(data_100k) * 100
+                    st.metric("Mean RTF", f"{rtf_100k:.3f}")
+                    st.metric("Real-Time Capable", f"{realtime_100k:.1f}%")
+            else:
+                st.info("No 100kHz data")
+
+        with col2:
+            st.markdown("### 48kHz (Ionosphere)")
+
+            if len(data_48k) > 0:
+                if 'frames_per_second' in data_48k.columns:
+                    fps_48k = data_48k['frames_per_second'].mean()
+                    st.metric("Mean Throughput", f"{fps_48k:.1f} FPS")
+
+                if 'mean_latency_us' in data_48k.columns:
+                    lat_48k = data_48k['mean_latency_us'].mean()
+                    st.metric("Mean Latency", f"{lat_48k:.1f} µs")
+
+                if 'rtf' in data_48k.columns:
+                    rtf_48k = data_48k['rtf'].mean()
+                    realtime_48k = (data_48k['rtf'] <= 1.0).sum() / len(data_48k) * 100
+                    st.metric("Mean RTF", f"{rtf_48k:.3f}")
+                    st.metric("Real-Time Capable", f"{realtime_48k:.1f}%")
+            else:
+                st.info("No 48kHz data")
+
+        # Visualization
+        if len(data_100k) > 0 and len(data_48k) > 0 and 'rtf' in data.columns:
+            st.divider()
+            st.subheader("📈 RTF Distribution Comparison")
+
+            fig = go.Figure()
+
+            fig.add_trace(go.Histogram(
+                x=data_100k['rtf'],
+                name='100kHz (Academic)',
+                opacity=0.7,
+                marker_color='blue'
+            ))
+
+            fig.add_trace(go.Histogram(
+                x=data_48k['rtf'],
+                name='48kHz (Ionosphere)',
+                opacity=0.7,
+                marker_color='orange'
+            ))
+
+            fig.add_vline(x=1.0, line_dash="dash", line_color="red",
+                         annotation_text="Real-Time Limit (RTF=1.0)")
+
+            fig.update_layout(
+                barmode='overlay',
+                title="RTF Distribution by Sample Rate",
+                xaxis_title="Real-Time Factor (RTF)",
+                yaxis_title="Count",
+                height=500
+            )
+
+            st.plotly_chart(fig, use_container_width=True)
+
+# ============================================================================
+# TAB 8: CONFIGURATION RECOMMENDATIONS
+# ============================================================================
+with tabs[7]:
     st.header("Configuration Recommendations")
 
     st.markdown("""

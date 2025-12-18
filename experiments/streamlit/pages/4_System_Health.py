@@ -72,6 +72,35 @@ except Exception as e:
     st.error(f"❌ Error loading data: {e}")
     st.stop()
 
+# Sidebar filters
+st.sidebar.header("🔍 Filters")
+
+# Experiment group filter
+if 'experiment_group' in data.columns:
+    available_groups = sorted(data['experiment_group'].dropna().astype(str).unique())
+    if available_groups:
+        selected_groups = st.sidebar.multiselect(
+            "Experiment Group",
+            options=available_groups,
+            default=available_groups,
+            help="Filter by experiment category (baseline, scaling, grid, ionosphere, profiling, validation)"
+        )
+        if selected_groups:
+            data = data[data['experiment_group'].astype(str).isin(selected_groups)]
+
+# Sample rate filter
+if 'sample_rate_category' in data.columns:
+    available_rates = sorted(data['sample_rate_category'].dropna().astype(str).unique())
+    if available_rates:
+        selected_rates = st.sidebar.multiselect(
+            "Sample Rate",
+            options=available_rates,
+            default=available_rates,
+            help="Filter by sampling frequency (100kHz for academic, 48kHz for ionosphere)"
+        )
+        if selected_rates:
+            data = data[data['sample_rate_category'].astype(str).isin(selected_rates)]
+
 # Create tabs
 tabs = st.tabs([
     "Executive Summary",
@@ -537,7 +566,7 @@ with tabs[4]:
                 This demonstrates the GPU parallelism advantage for high-overlap STFT processing.
                 """)
             else:
-                st.info("ℹ️ No overlap sweep data available. Run ionosphere_temporal experiment for overlap analysis.")
+                st.info("ℹ️ No overlap sweep data available. Run ionosphere_specialized experiment for overlap analysis.")
         else:
             st.info("ℹ️ No overlap data available in this dataset.")
     else:
