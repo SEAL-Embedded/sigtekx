@@ -1,0 +1,17 @@
+# Academic 100kHz Engine - Full Parameter Space Coverage
+# Purpose: Comprehensive benchmarking for academic publication
+# Coverage: All NFFT ranges, multiple channel counts, various overlaps
+name: academic_100k
+sample_rate_hz: 100000       # 100kHz for academic benchmarking
+mode: batch                  # Batch mode for throughput testing
+stream_count: 4
+pinned_buffer_count: 4
+warmup_iters: 1
+timeout_ms: 5000
+use_cuda_graphs: false
+enable_profiling: false
+
+# Default values (overridden in experiment sweeps)
+nfft: 4096
+channels: 32
+overlap: 0.5

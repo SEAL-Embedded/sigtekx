@@ -1,0 +1,42 @@
+# @package _global_
+
+# Low-NFFT Scaling (100kHz Only)
+# ===============================
+# Low-NFFT characterization (256-2048) demonstrating GPU parallelism with extreme channel counts.
+# Fills the low-NFFT gap in parameter space and shows time resolution capabilities.
+# 48kHz skipped (low NFFT not relevant for VLF/ULF ionosphere phenomena).
+
+defaults:
+  - override /engine: academic_100k
+
+experiment:
+  name: low_nfft_scaling
+  description: >-
+    Low-NFFT characterization (256-2048) demonstrating GPU parallelism
+    with extreme channel counts at 100kHz. Fills gap in parameter space
+    and demonstrates fast time resolution (2.56ms-20.48ms at 100kHz).
+  tags: [low-nfft, scaling, parallelism, time-resolution, publication]
+  experiment_group: scaling
+  sample_rate_category: 100kHz
+
+# Multirun configuration
+# 4 NFFT × 8 channels × 1 overlap = 32 configurations
+# Time resolution at 100kHz:
+#   NFFT=256:  2.56ms  (fast transients)
+#   NFFT=512:  5.12ms
+#   NFFT=1024: 10.24ms
+#   NFFT=2048: 20.48ms
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      engine.nfft: 256,512,1024,2048
+      engine.channels: 1,2,4,8,16,32,64,128  # Extreme channel counts for parallelism study
+      engine.overlap: 0.5                     # Standard overlap
+
+# Analysis configuration
+analysis:
+  statistical_tests: [shapiro, kruskal]
+  confidence_level: 0.95
+  min_samples: 30
+  focus_metrics: [latency, throughput, rtf, gpu_utilization, parallelism_efficiency]

@@ -1,0 +1,17 @@
+# Ionosphere 48kHz Engine - VLF/ULF Specialized
+# Purpose: Ionosphere phenomena detection (constrained parameter space)
+# Coverage: 2 channels only, high overlap, high NFFT
+name: ionosphere_48k
+sample_rate_hz: 48000        # 48kHz standard for ionosphere monitoring
+mode: batch                  # Batch mode for throughput testing
+stream_count: 4
+pinned_buffer_count: 4
+warmup_iters: 1
+timeout_ms: 8000             # Extended for larger FFTs
+use_cuda_graphs: false
+enable_profiling: false
+
+# Default values (overridden in experiment sweeps)
+nfft: 8192
+channels: 2                  # Fixed: dual-channel antenna array
+overlap: 0.75

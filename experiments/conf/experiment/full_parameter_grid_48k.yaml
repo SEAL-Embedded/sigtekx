@@ -1,0 +1,42 @@
+# @package _global_
+
+# Full Parameter Grid - 48kHz Ionosphere
+# =======================================
+# Ionosphere-specific parameter exploration at 48kHz (constrained: 2 channels, high overlap/NFFT).
+# Part of grid experiment group.
+
+defaults:
+  - override /engine: ionosphere_48k
+
+experiment:
+  name: full_parameter_grid_48k
+  description: >-
+    Complete parameter space grid at 48kHz (ionosphere-specific, 2 channels, high overlap/NFFT).
+    Part of grid experiment group with full_parameter_grid_100k.
+  tags: [grid, comprehensive, 48kHz, ionosphere, publication]
+  experiment_group: grid
+  sample_rate_category: 48kHz
+
+# Multirun configuration
+# 4 NFFT × 1 channel × 3 overlap = 12 configurations
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      engine.nfft: 4096,8192,16384,32768          # High NFFT for ionosphere
+      engine.channels: 2                          # Fixed: dual-channel antenna
+      engine.overlap: 0.75,0.875,0.9375          # High overlap for temporal resolution
+
+# Analysis configuration
+analysis:
+  statistical_tests: [shapiro, kruskal]
+  confidence_level: 0.95
+  min_samples: 50
+  focus_metrics: [latency, throughput, rtf, frequency_resolution, temporal_resolution]
+
+# Ionosphere-specific parameters
+ionosphere:
+  frequency_bands: [vlf, ulf]
+  phenomena: [whistlers, schumann, lightning, sprites]
+  analysis_window_s: 60.0
+  minimum_snr_db: 10.0

@@ -6,6 +6,7 @@ experiment:
   name: ionosphere_test
   description: Fast test version of ionosphere resolution analysis
   tags: [ionosphere, test, quick]
+  experiment_group: profiling
 
 # Lightweight multirun for testing
 hydra:

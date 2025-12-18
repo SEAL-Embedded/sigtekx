@@ -1,0 +1,42 @@
+# @package _global_
+
+# Baseline 48kHz Ionosphere Characterization
+# ===========================================
+# Ionosphere-specific benchmarking at 48kHz (constrained: 2 channels, high overlap, high NFFT).
+# Part of baseline experiment group.
+
+defaults:
+  - override /engine: ionosphere_48k
+
+experiment:
+  name: baseline_48k
+  description: >-
+    Ionosphere-specific performance characterization at 48kHz (2 channels, high overlap/NFFT).
+    Part of baseline experiment group with baseline_100k.
+  tags: [baseline, 48kHz, ionosphere, publication]
+  experiment_group: baseline
+  sample_rate_category: 48kHz
+
+# Multirun configuration
+# 2 NFFT × 1 channel × 2 overlap = 4 configurations
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      engine.nfft: 8192,16384
+      engine.channels: 2          # Fixed: dual-channel antenna
+      engine.overlap: 0.75,0.875  # High overlap for temporal resolution
+
+# Analysis configuration
+analysis:
+  statistical_tests: [shapiro, kruskal]
+  confidence_level: 0.95
+  min_samples: 30
+  focus_metrics: [latency, throughput, rtf, gpu_utilization]
+
+# Ionosphere-specific parameters
+ionosphere:
+  frequency_bands: [vlf, ulf]  # VLF: 3-30kHz, ULF: <3kHz
+  phenomena: [whistlers, schumann, lightning]
+  analysis_window_s: 60.0
+  minimum_snr_db: 10.0

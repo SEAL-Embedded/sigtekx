@@ -14,6 +14,7 @@ experiment:
     Optimizes NFFT and overlap for real-time ionosphere phenomena detection
     using streaming executor with deadline compliance monitoring.
   tags: [ionosphere, streaming, realtime, dual-channel, antenna-pair, direction-finding]
+  experiment_group: ionosphere
 
 # Hydra multirun configuration for parameter sweep
 hydra:

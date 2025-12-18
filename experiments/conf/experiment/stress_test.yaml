@@ -1,6 +1,7 @@
 name: stress_test
 description: Long-running stress test for stability
 tags: [stress, stability, reliability]
+experiment_group: profiling
 benchmarks_to_run: [throughput, latency]
 test_duration_hours: 1.0
 monitoring:

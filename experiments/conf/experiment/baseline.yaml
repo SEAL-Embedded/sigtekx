@@ -1,9 +1,0 @@
-name: baseline
-description: Baseline performance characterization
-tags: [baseline, performance]
-benchmarks_to_run: [latency, throughput, accuracy]
-compare_engines: [realtime, throughput, validation]
-analysis:
-  statistical_tests: [shapiro, kruskal]
-  confidence_level: 0.95
-  min_samples: 30

@@ -14,6 +14,7 @@ experiment:
     Tests high NFFT values (8192-32768) with batch executor to complement
     streaming benchmarks and enable batch vs streaming comparison.
   tags: [ionosphere, batch, throughput, dual-channel, offline-analysis]
+  experiment_group: ionosphere
 
 # Hydra multirun configuration for parameter sweep
 hydra:

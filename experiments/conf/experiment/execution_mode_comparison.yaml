@@ -14,6 +14,7 @@ experiment:
     Quantifies ring buffer management overhead in STREAMING mode.
     Results help users choose the right execution mode for their use case.
   tags: [performance, execution-mode, overhead, batch-vs-streaming]
+  experiment_group: profiling
 
 # Hydra multirun configuration for parameter sweep
 hydra:

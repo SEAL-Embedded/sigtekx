@@ -96,15 +96,17 @@ snakemake quarto_reports
 ### Run Benchmarks
 
 ```bash
-# Full ionosphere benchmark suite
+# Full benchmark suite (all experiments)
 snakemake --cores 4 --snakefile experiments/Snakefile
 
 # Quick test run
 snakemake test --snakefile experiments/Snakefile
 
-# Individual experiments
-snakemake run_ionosphere_resolution --snakefile experiments/Snakefile
-snakemake run_ionosphere_temporal --snakefile experiments/Snakefile
+# Individual experiment groups
+snakemake run_baseline_100k --snakefile experiments/Snakefile
+snakemake run_baseline_48k --snakefile experiments/Snakefile
+snakemake run_low_nfft_scaling --snakefile experiments/Snakefile
+snakemake run_ionosphere_specialized --snakefile experiments/Snakefile
 ```
 
 ### View Results
@@ -172,24 +174,55 @@ Hydra Configs → Benchmark Runners → CSV Data → Reporting
 
 Pre-configured settings for common use cases:
 
-| Engine | NFFT | Overlap | Channels | Use Case |
-|--------|------|---------|----------|----------|
-| `ionosphere_realtime` | 2048 | 0.625 | 2 | Real-time processing |
-| `ionosphere_hires` | 8192 | 0.75 | 2 | High-resolution analysis |
-| `ionosphere_longterm` | 4096 | 0.875 | 2 | Long-duration studies |
+| Engine | Sample Rate | NFFT | Overlap | Channels | Use Case |
+|--------|-------------|------|---------|----------|----------|
+| `academic_100k` | 100kHz | Varies | Varies | Varies | Academic benchmarking (full parameter space) |
+| `ionosphere_48k` | 48kHz | Varies | Varies | 2 | Ionosphere phenomena (VLF/ULF, constrained) |
+| `ionosphere_realtime` | 48kHz | 2048 | 0.625 | 2 | Real-time processing |
+| `ionosphere_hires` | 48kHz | 8192 | 0.75 | 2 | High-resolution analysis |
+| `ionosphere_longterm` | 48kHz | 4096 | 0.875 | 2 | Long-duration studies |
+
+**Sample Rate Strategy:**
+- **100kHz**: Academic/general-purpose benchmarking with full parameter coverage (all NFFT, channels, overlaps)
+- **48kHz**: Ionosphere-specific VLF/ULF phenomena (constrained: 2 channels only, high overlap, high NFFT)
 
 ### Experiment Configurations
 
 **Location:** `experiments/conf/experiment/`
 
-Parameter sweeps for comprehensive analysis:
+Experiments are organized into **4 groups** with parallel 48kHz/100kHz sweeps:
 
-| Experiment | Description | Parameters |
-|------------|-------------|------------|
-| `ionosphere_resolution` | NFFT sweep | 4096-32768, overlap 0.5-0.875 |
-| `ionosphere_temporal` | Overlap study | 0.25-0.9375, channels 16-128 |
-| `ionosphere_multiscale` | Cross-scale | Multiple engine configs |
-| `ionosphere_test` | Quick validation | Smaller parameters |
+#### Core Experiments (Baseline, Scaling, Grid)
+
+| Experiment | Group | Sample Rates | Configs | Description |
+|------------|-------|--------------|---------|-------------|
+| `baseline_100k` | baseline | 100kHz | 9 | General characterization (full coverage) |
+| `baseline_48k` | baseline | 48kHz | 4 | Ionosphere characterization (2ch, high overlap/NFFT) |
+| `low_nfft_scaling` | scaling | 100kHz | 32 | Low-NFFT (256-2048) with extreme channels (1-128) |
+| `full_parameter_grid_100k` | grid | 100kHz | 180 | Complete parameter space (512-16384 NFFT) |
+| `full_parameter_grid_48k` | grid | 48kHz | 12 | Ionosphere grid (4096-32768 NFFT, 2ch) |
+
+#### Specialized Experiments (Ionosphere, Profiling, Validation)
+
+| Experiment | Group | Sample Rates | Description |
+|------------|-------|--------------|-------------|
+| `ionosphere_specialized` | ionosphere | 48kHz | VLF/ULF phenomena (lightning, Schumann, whistlers) |
+| `ionosphere_streaming` | ionosphere | 48kHz | Real-time streaming performance |
+| `ionosphere_streaming_latency` | ionosphere | 48kHz | Streaming latency analysis |
+| `ionosphere_batch_throughput` | ionosphere | 48kHz | Offline batch processing |
+| `ionosphere_test` | profiling | 48kHz | Quick validation (lightweight) |
+| `execution_mode_comparison` | profiling | 48kHz | BATCH vs STREAMING overhead |
+| `profiling` | profiling | 48kHz | GPU profiling configuration |
+| `stress_test` | profiling | 48kHz | Long-running stability test |
+| `accuracy_validation` | validation | 1kHz | Numerical correctness validation |
+
+**Total Configurations:**
+- **100kHz (academic)**: 221 configs (baseline=9, scaling=32, grid=180)
+- **48kHz (ionosphere)**: 34 configs (baseline=4, grid=12, specialized=18)
+- **Grand total**: 255 configs across all core experiments
+
+**Consolidated Experiments:**
+This structure replaces 20+ legacy experiments with a clean, organized set of 14 experiments grouped by purpose.
 
 ---
 
@@ -268,17 +301,29 @@ pip install -e ".[benchmark,visualization]"
 ### Run Specific Experiment
 
 ```bash
-# High-resolution analysis
+# Baseline characterization (100kHz academic)
 python benchmarks/run_throughput.py --multirun \
-    experiment=ionosphere_resolution +benchmark=throughput
+    experiment=baseline_100k +benchmark=throughput
 
-# Temporal characteristics study
+# Baseline characterization (48kHz ionosphere)
 python benchmarks/run_throughput.py --multirun \
-    experiment=ionosphere_temporal +benchmark=throughput
+    experiment=baseline_48k +benchmark=throughput
 
-# Multi-scale comprehensive analysis
-python benchmarks/run_latency.py \
-    experiment=ionosphere_multiscale +benchmark=latency
+# Low-NFFT scaling study (fills 256-2048 gap)
+python benchmarks/run_throughput.py --multirun \
+    experiment=low_nfft_scaling +benchmark=throughput
+
+# Full parameter grid (100kHz comprehensive)
+python benchmarks/run_throughput.py --multirun \
+    experiment=full_parameter_grid_100k +benchmark=throughput
+
+# Ionosphere specialized phenomena (VLF/ULF)
+python benchmarks/run_throughput.py --multirun \
+    experiment=ionosphere_specialized +benchmark=throughput
+
+# Quick testing
+python benchmarks/run_throughput.py --multirun \
+    experiment=ionosphere_test +benchmark=throughput
 ```
 
 ### Interactive Exploration
@@ -367,5 +412,5 @@ For questions or contributions:
 
 ---
 
-**Last Updated**: 2025-11-03
-**Version**: 0.9.5
+**Last Updated**: 2025-12-17
+**Version**: 0.10.0 (Experiment Consolidation)

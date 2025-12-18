@@ -1,0 +1,35 @@
+# @package _global_
+
+# Full Parameter Grid - 100kHz Academic
+# ======================================
+# Complete parameter space exploration at 100kHz for academic publication.
+# Comprehensive coverage of NFFT, channels, and overlap combinations.
+
+defaults:
+  - override /engine: academic_100k
+
+experiment:
+  name: full_parameter_grid_100k
+  description: >-
+    Complete parameter space grid at 100kHz (comprehensive academic coverage).
+    Part of grid experiment group with full_parameter_grid_48k.
+  tags: [grid, comprehensive, 100kHz, academic, publication]
+  experiment_group: grid
+  sample_rate_category: 100kHz
+
+# Multirun configuration
+# 6 NFFT × 5 channels × 6 overlap = 180 configurations
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      engine.nfft: 512,1024,2048,4096,8192,16384
+      engine.channels: 1,4,16,64,128        # Representative channel counts
+      engine.overlap: 0.0,0.25,0.5,0.75,0.875,0.9375  # Full overlap range
+
+# Analysis configuration
+analysis:
+  statistical_tests: [shapiro, kruskal]
+  confidence_level: 0.95
+  min_samples: 50
+  focus_metrics: [latency, throughput, rtf, memory_usage, gpu_utilization]

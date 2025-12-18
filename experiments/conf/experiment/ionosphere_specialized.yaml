@@ -1,0 +1,62 @@
+# @package _global_
+
+# Ionosphere Specialized Phenomena (48kHz Only)
+# ==============================================
+# Ionosphere-specific configurations for VLF/ULF phenomena detection.
+# Includes ultra-high NFFT (Schumann resonances), fast transients (lightning/sprites),
+# and high temporal resolution (whistlers).
+#
+# Merges and replaces:
+#   - ionosphere_resolution.yaml
+#   - ionosphere_temporal.yaml
+#   - ionosphere_lightning.yaml
+#   - ionosphere_schumann.yaml
+#   - ionosphere_multiscale.yaml
+#   - ionosphere_nfft_channels_grid.yaml
+
+defaults:
+  - override /engine: ionosphere_48k
+
+experiment:
+  name: ionosphere_specialized
+  description: >-
+    Ionosphere-specific configurations for VLF/ULF phenomena detection at 48kHz.
+    Covers lightning/sprites (fast, low NFFT), standard ionosphere (mid NFFT),
+    and Schumann resonances (ultra-high NFFT). All with 2 channels and high overlap.
+  tags: [ionosphere, vlf, ulf, specialized, phenomena, publication]
+  experiment_group: ionosphere
+  sample_rate_category: 48kHz
+
+# Multirun configuration
+# 6 NFFT × 1 channel × 3 overlap = 18 configurations
+# NFFT breakdown by phenomena:
+#   - Lightning/Sprites: 256, 512 (fast transients, 5.3ms-10.7ms @ 48kHz)
+#   - Standard ionosphere: 4096, 8192 (VLF/ULF, 85ms-171ms @ 48kHz)
+#   - Schumann resonances: 65536, 131072 (ultra-high resolution, 1.37s-2.73s @ 48kHz)
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      engine.nfft: 256,512,4096,8192,65536,131072
+      engine.channels: 2                    # Fixed: dual-channel antenna array
+      engine.overlap: 0.75,0.875,0.9375    # High overlap for temporal resolution
+
+# Analysis configuration
+analysis:
+  statistical_tests: [shapiro, kruskal]
+  confidence_level: 0.95
+  min_samples: 50
+  focus_metrics: [frequency_resolution, temporal_resolution, rtf, detection_sensitivity]
+
+# Ionosphere-specific parameters
+ionosphere:
+  frequency_bands: [vlf, ulf, elf]  # VLF: 3-30kHz, ULF: <3kHz, ELF: 3-30Hz
+  phenomena:
+    - whistlers          # VLF, requires high temporal resolution
+    - schumann           # ELF (7.8Hz, 14Hz, 20Hz), requires ultra-high freq resolution
+    - lightning          # Broadband transients, requires fast time resolution
+    - sprites            # VLF transients associated with lightning
+    - tweeks             # VLF, ionospheric waveguide modes
+  analysis_window_s: 60.0
+  minimum_snr_db: 10.0
+  schumann_harmonics: [7.8, 14.3, 20.8, 27.3, 33.8]  # Hz

@@ -14,6 +14,7 @@ experiment:
     Tests 4096 and 8192 NFFT with streaming executor to characterize
     per-frame processing latency and real-time capabilities.
   tags: [ionosphere, streaming, latency, dual-channel, realtime]
+  experiment_group: ionosphere
 
 # Hydra multirun configuration for parameter sweep
 hydra:
