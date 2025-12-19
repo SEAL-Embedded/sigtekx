@@ -111,17 +111,52 @@ def run_realtime_benchmark(cfg: DictConfig) -> float:
         output_dir = Path(cfg.paths.data)
         output_dir.mkdir(parents=True, exist_ok=True)
 
+        # Extract experiment metadata from config (for dashboard filtering)
+        experiment_group = cfg.get('experiment', {}).get('experiment_group', 'unknown')
+        sample_rate_category = cfg.get('experiment', {}).get('sample_rate_category',
+                                                            f"{int(engine_config.sample_rate_hz/1000)}kHz")
+
+        # Calculate derived metrics (for scientific analysis)
+        hop_size = int(engine_config.nfft * (1 - engine_config.overlap))
+        time_resolution_ms = (engine_config.nfft / engine_config.sample_rate_hz) * 1000
+        freq_resolution_hz = engine_config.sample_rate_hz / engine_config.nfft
+
+        # Calculate RTF (Real-Time Factor) - critical for real-time capability assessment
+        # RTF = mean_latency / frame_duration
+        # where frame_duration = hop_size / sample_rate_hz
+        frame_duration_ms = (hop_size / engine_config.sample_rate_hz) * 1000
+        mean_latency_ms_value = extract_float(stats.get("mean_latency_ms"), 0.0)
+        rtf = (mean_latency_ms_value / frame_duration_ms) if frame_duration_ms > 0 else float('inf')
+
         summary = {
+            # Experiment metadata (for dashboard filtering)
+            "experiment_group": experiment_group,
+            "sample_rate_category": sample_rate_category,
+
+            # Core engine parameters
             "engine_nfft": engine_config.nfft,
             "engine_channels": engine_config.channels,
+            "engine_overlap": engine_config.overlap,
+            "engine_sample_rate_hz": engine_config.sample_rate_hz,
+            "engine_mode": "streaming",  # Realtime is always streaming
+
+            # Derived parameters
+            "hop_size": hop_size,
+            "time_resolution_ms": time_resolution_ms,
+            "freq_resolution_hz": freq_resolution_hz,
+
+            # Realtime benchmark specific
             "stream_duration_s": benchmark_config.stream_duration_s,
             "deadline_compliance_rate": compliance,
-            "mean_latency_ms": extract_float(stats.get("mean_latency_ms"), 0.0),
+            "mean_latency_ms": mean_latency_ms_value,
             "p99_latency_ms": extract_float(stats.get("p99_latency_ms"), 0.0),
             "mean_jitter_ms": extract_float(stats.get("mean_jitter_ms"), 0.0),
             "frames_processed": extract_float(stats.get("frames_processed"), 0.0),
             "deadline_misses": extract_float(stats.get("deadline_misses"), 0.0),
             "frames_dropped": extract_float(stats.get("frames_dropped"), 0.0),
+
+            # Scientific metrics
+            "rtf": rtf,
         }
 
         summary_df = pd.DataFrame([summary])

@@ -37,7 +37,12 @@ try:
     data = load_benchmark_data("artifacts/data")
 
     # AUTOMATIC FILTER: STREAMING mode only
-    streaming_data = data[data['engine_mode'] == 'streaming'].copy()
+    # Defensive: check if column exists before filtering
+    if 'engine_mode' in data.columns:
+        streaming_data = data[data['engine_mode'] == 'streaming'].copy()
+    else:
+        st.warning("⚠️ engine_mode column missing. Showing all data. Please re-run benchmarks to get proper categorization.")
+        streaming_data = data.copy()
 
     if len(streaming_data) == 0:
         st.warning("No STREAMING mode data found. Please run STREAMING mode benchmarks.")
@@ -140,9 +145,11 @@ try:
 
             # Top streaming configs
             st.subheader("Top 10 Sustained Throughput Configurations")
-            top_configs = streaming_data.nlargest(10, 'frames_per_second')[
-                ['engine_nfft', 'engine_channels', 'engine_overlap', 'frames_per_second', 'rtf']
-            ]
+            top_cols = ['engine_nfft', 'engine_channels', 'engine_overlap', 'frames_per_second']
+            if 'rtf' in streaming_data.columns:
+                top_cols.append('rtf')
+            available_top_cols = [col for col in top_cols if col in streaming_data.columns]
+            top_configs = streaming_data.nlargest(10, 'frames_per_second')[available_top_cols]
             st.dataframe(top_configs, use_container_width=True, hide_index=True)
         else:
             st.info("No sustained throughput data available")
@@ -261,10 +268,15 @@ try:
                 schumann_data = high_nfft_data[(high_nfft_data['engine_nfft'] >= 65536) & (high_nfft_data['rtf'] <= 1.0)]
                 if len(schumann_data) > 0:
                     st.success(f"✅ **{len(schumann_data)} configurations** capable of real-time Schumann resonance detection (NFFT ≥ 65536, RTF ≤ 1.0)")
-                    st.dataframe(schumann_data[['engine_nfft', 'engine_channels', 'engine_overlap', 'rtf', 'mean_latency_us']],
+                    schumann_cols = ['engine_nfft', 'engine_channels', 'engine_overlap', 'rtf']
+                    if 'mean_latency_us' in schumann_data.columns:
+                        schumann_cols.append('mean_latency_us')
+                    st.dataframe(schumann_data[schumann_cols],
                                use_container_width=True, hide_index=True)
                 else:
                     st.warning("No configurations capable of real-time Schumann detection (NFFT ≥ 65536 with RTF ≤ 1.0)")
+            else:
+                st.info("RTF data not available for high-NFFT analysis. Please re-run benchmarks.")
 
             # High-NFFT table
             st.subheader("All High-NFFT Streaming Configurations")

@@ -41,14 +41,93 @@ def load_data(data_path: Path) -> pd.DataFrame:
                 df['benchmark_type'] = BenchmarkType.LATENCY.value
             elif 'throughput' in csv_file.name:
                 df['benchmark_type'] = BenchmarkType.THROUGHPUT.value
+            elif 'realtime' in csv_file.name:
+                df['benchmark_type'] = 'realtime'
             elif 'accuracy' in csv_file.name:
                 df['benchmark_type'] = BenchmarkType.ACCURACY.value
+
+            # Harmonize schema for legacy CSVs (backward compatibility)
+            df = _harmonize_schema(df, csv_file.name)
 
             dataframes.append(df)
 
         return pd.concat(dataframes, ignore_index=True)
     else:
         raise ValueError(f"Path not found: {data_path}")
+
+
+def _harmonize_schema(df: pd.DataFrame, filename: str = '') -> pd.DataFrame:
+    """
+    Add missing columns to legacy CSVs for backward compatibility.
+
+    This allows old realtime CSVs (before schema fix) to work with dashboard.
+    New CSVs will have all columns, so this is a no-op for them.
+    """
+    # Add missing metadata columns with fallback values
+    if 'experiment_group' not in df.columns:
+        df['experiment_group'] = 'legacy'
+
+    if 'sample_rate_category' not in df.columns:
+        # Infer from sample_rate_hz if available
+        if 'engine_sample_rate_hz' in df.columns:
+            df['sample_rate_category'] = df['engine_sample_rate_hz'].apply(
+                lambda x: f"{int(x/1000)}kHz" if pd.notna(x) else 'unknown'
+            )
+        else:
+            df['sample_rate_category'] = 'unknown'
+
+    # Add missing engine config columns
+    if 'engine_overlap' not in df.columns:
+        df['engine_overlap'] = 0.0  # Default for realtime benchmarks
+
+    if 'engine_sample_rate_hz' not in df.columns:
+        df['engine_sample_rate_hz'] = 48000  # Default ionosphere sample rate
+
+    if 'engine_mode' not in df.columns:
+        # Infer from benchmark type
+        if 'realtime' in filename.lower():
+            df['engine_mode'] = 'streaming'
+        else:
+            df['engine_mode'] = 'batch'
+
+    # Calculate derived metrics if missing
+    if 'hop_size' not in df.columns:
+        if 'engine_nfft' in df.columns and 'engine_overlap' in df.columns:
+            df['hop_size'] = (df['engine_nfft'] * (1 - df['engine_overlap'])).astype(int)
+        else:
+            df['hop_size'] = pd.NA
+
+    if 'time_resolution_ms' not in df.columns:
+        if 'engine_nfft' in df.columns and 'engine_sample_rate_hz' in df.columns:
+            df['time_resolution_ms'] = (df['engine_nfft'] / df['engine_sample_rate_hz']) * 1000
+        else:
+            df['time_resolution_ms'] = pd.NA
+
+    if 'freq_resolution_hz' not in df.columns:
+        if 'engine_sample_rate_hz' in df.columns and 'engine_nfft' in df.columns:
+            df['freq_resolution_hz'] = df['engine_sample_rate_hz'] / df['engine_nfft']
+        else:
+            df['freq_resolution_hz'] = pd.NA
+
+    # Calculate RTF if missing (for realtime benchmarks)
+    if 'rtf' not in df.columns:
+        if 'mean_latency_ms' in df.columns and 'hop_size' in df.columns and 'engine_sample_rate_hz' in df.columns:
+            # RTF = mean_latency / frame_duration
+            frame_duration_ms = (df['hop_size'] / df['engine_sample_rate_hz']) * 1000
+            df['rtf'] = df['mean_latency_ms'] / frame_duration_ms
+            # Replace inf/nan with high value
+            df['rtf'] = df['rtf'].replace([float('inf'), -float('inf')], float('nan')).fillna(999.0)
+        else:
+            df['rtf'] = pd.NA
+
+    # Harmonize latency units (convert ms to us where needed)
+    if 'mean_latency_ms' in df.columns and 'mean_latency_us' not in df.columns:
+        df['mean_latency_us'] = df['mean_latency_ms'] * 1000
+
+    if 'p99_latency_ms' in df.columns and 'p99_latency_us' not in df.columns:
+        df['p99_latency_us'] = df['p99_latency_ms'] * 1000
+
+    return df
 
 
 def cmd_analyze(args):

@@ -36,7 +36,12 @@ try:
     data = load_benchmark_data("artifacts/data")
 
     # AUTOMATIC FILTER: 100kHz sample rate (academic/general-purpose)
-    methods_data = data[data['sample_rate_category'] == '100kHz'].copy()
+    # Defensive: check if column exists before filtering
+    if 'sample_rate_category' in data.columns:
+        methods_data = data[data['sample_rate_category'] == '100kHz'].copy()
+    else:
+        st.warning("⚠️ sample_rate_category column missing. Showing all data. Please re-run benchmarks to get proper categorization.")
+        methods_data = data.copy()
 
     if len(methods_data) == 0:
         st.warning("No 100kHz data found. Please run academic baseline experiments.")
@@ -154,8 +159,9 @@ try:
                 if len(batch_data) > 0:
                     if 'frames_per_second' in batch_data.columns:
                         st.metric("Peak FPS", f"{batch_data['frames_per_second'].max():.1f}")
+                    # Use mean for batch (less jitter-sensitive)
                     if 'mean_latency_us' in batch_data.columns:
-                        st.metric("Min Latency", f"{batch_data['mean_latency_us'].min():.1f} μs")
+                        st.metric("Mean Latency", f"{batch_data['mean_latency_us'].mean():.1f} μs")
                     if 'gb_per_second' in batch_data.columns:
                         st.metric("Peak Bandwidth", f"{batch_data['gb_per_second'].max():.1f} GB/s")
                 else:
@@ -169,47 +175,80 @@ try:
                     if 'rtf' in streaming_data.columns:
                         realtime_pct = (len(streaming_data[streaming_data['rtf'] <= 1.0]) / len(streaming_data) * 100)
                         st.metric("Real-Time %", f"{realtime_pct:.1f}%")
-                    if 'mean_latency_us' in streaming_data.columns:
-                        st.metric("Mean Latency", f"{streaming_data['mean_latency_us'].mean():.1f} μs")
-                    if 'frames_per_second' in streaming_data.columns:
-                        st.metric("Sustained FPS", f"{streaming_data['frames_per_second'].max():.1f}")
-                else:
-                    st.info("No STREAMING mode data at 100kHz")
 
-            # Latency comparison
-            if len(batch_data) > 0 and len(streaming_data) > 0 and 'mean_latency_us' in methods_data.columns:
+                    # Use p99 for streaming (critical for jitter/real-time)
+                    if 'p99_latency_us' in streaming_data.columns:
+                        p99_values = streaming_data['p99_latency_us'].dropna()
+                        if len(p99_values) > 0:
+                            st.metric("P99 Latency", f"{p99_values.median():.1f} μs",
+                                     help="99th percentile latency - critical for real-time jitter analysis")
+                    elif 'mean_latency_us' in streaming_data.columns:
+                        mean_values = streaming_data['mean_latency_us'].dropna()
+                        if len(mean_values) > 0:
+                            st.metric("Mean Latency", f"{mean_values.mean():.1f} μs")
+
+                    # Calculate FPS from realtime data if frames_per_second is missing/NaN
+                    if 'frames_per_second' in streaming_data.columns:
+                        fps_values = streaming_data['frames_per_second'].dropna()
+                        if len(fps_values) > 0:
+                            st.metric("Sustained FPS", f"{fps_values.max():.1f}")
+                        elif 'frames_processed' in streaming_data.columns and 'stream_duration_s' in streaming_data.columns:
+                            # Calculate from realtime benchmark data
+                            fps_calc = streaming_data['frames_processed'] / streaming_data['stream_duration_s']
+                            fps_calc = fps_calc.dropna()
+                            if len(fps_calc) > 0:
+                                st.metric("Sustained FPS", f"{fps_calc.max():.1f}",
+                                         help="Calculated from frames_processed / stream_duration_s")
+                    elif 'frames_processed' in streaming_data.columns and 'stream_duration_s' in streaming_data.columns:
+                        # Calculate from realtime benchmark data
+                        fps_calc = streaming_data['frames_processed'] / streaming_data['stream_duration_s']
+                        fps_calc = fps_calc.dropna()
+                        if len(fps_calc) > 0:
+                            st.metric("Sustained FPS", f"{fps_calc.max():.1f}",
+                                     help="Calculated from frames_processed / stream_duration_s")
+                else:
+                    st.warning(f"⚠️ No STREAMING mode data at 100kHz (found {len(streaming_data)} rows after filtering)")
+                    st.info(f"Debug: methods_data has {len(methods_data)} total rows, {len(methods_data[methods_data['engine_mode']=='streaming']) if 'engine_mode' in methods_data.columns else 0} streaming")
+
+            # Latency comparison (use p99 for streaming, mean for batch)
+            if len(batch_data) > 0 and len(streaming_data) > 0:
                 st.subheader("Latency Overhead: BATCH vs STREAMING")
 
-                fig = go.Figure()
+                # Determine which latency metric to use for streaming
+                streaming_latency_col = 'p99_latency_us' if 'p99_latency_us' in streaming_data.columns else 'mean_latency_us'
+                streaming_label = 'P99 Latency' if streaming_latency_col == 'p99_latency_us' else 'Mean Latency'
 
-                fig.add_trace(go.Box(
-                    y=batch_data['mean_latency_us'],
-                    name='BATCH',
-                    marker_color='#1f77b4'
-                ))
+                if 'mean_latency_us' in batch_data.columns and streaming_latency_col in streaming_data.columns:
+                    fig = go.Figure()
 
-                fig.add_trace(go.Box(
-                    y=streaming_data['mean_latency_us'],
-                    name='STREAMING',
-                    marker_color='#2ca02c'
-                ))
+                    fig.add_trace(go.Box(
+                        y=batch_data['mean_latency_us'],
+                        name='BATCH (mean)',
+                        marker_color='#1f77b4'
+                    ))
 
-                fig.update_layout(
-                    title="Latency Distribution by Execution Mode (100kHz)",
-                    yaxis_title="Mean Latency (μs)",
-                    yaxis_type="log",
-                    height=500
-                )
+                    fig.add_trace(go.Box(
+                        y=streaming_data[streaming_latency_col],
+                        name=f'STREAMING ({streaming_label.lower()})',
+                        marker_color='#2ca02c'
+                    ))
 
-                st.plotly_chart(fig, use_container_width=True)
+                    fig.update_layout(
+                        title=f"Latency Distribution by Execution Mode (100kHz)<br><sub>BATCH: mean latency | STREAMING: {streaming_label.lower()} (jitter-critical)</sub>",
+                        yaxis_title="Latency (μs)",
+                        yaxis_type="log",
+                        height=500
+                    )
 
-                # Overhead calculation
-                batch_median = batch_data['mean_latency_us'].median()
-                streaming_median = streaming_data['mean_latency_us'].median()
-                overhead_pct = ((streaming_median - batch_median) / batch_median * 100) if batch_median > 0 else 0
+                    st.plotly_chart(fig, use_container_width=True)
 
-                st.metric("STREAMING Overhead", f"{overhead_pct:.1f}%",
-                         help=f"Median latency increase: BATCH={batch_median:.1f}μs → STREAMING={streaming_median:.1f}μs")
+                    # Overhead calculation (comparing medians)
+                    batch_median = batch_data['mean_latency_us'].median()
+                    streaming_median = streaming_data[streaming_latency_col].median()
+                    overhead_pct = ((streaming_median - batch_median) / batch_median * 100) if batch_median > 0 else 0
+
+                    st.metric("STREAMING Overhead", f"{overhead_pct:.1f}%",
+                             help=f"Median latency increase: BATCH (mean)={batch_median:.1f}μs → STREAMING ({streaming_label.lower()})={streaming_median:.1f}μs")
 
             # Decision tree
             st.divider()
@@ -384,9 +423,9 @@ try:
                 st.write(f"{min(overlap_values):.3f} - {max(overlap_values):.3f}")
                 st.write(f"({len(overlap_values)} values)")
 
-        # Parameter space heatmap
+        # Parameter space heatmap (NFFT x Channels)
         if all(col in methods_data.columns for col in ['engine_nfft', 'engine_channels', 'rtf']):
-            st.subheader("Parameter Space Coverage Heatmap")
+            st.subheader("Parameter Space Coverage Heatmap (NFFT × Channels)")
 
             pivot = methods_data.pivot_table(
                 values='rtf',
@@ -395,10 +434,14 @@ try:
                 aggfunc='mean'
             )
 
+            # Convert to string labels for categorical (evenly spaced) axes
+            x_labels = [str(int(x)) for x in pivot.columns]
+            y_labels = [str(int(y)) for y in pivot.index]
+
             fig = go.Figure(data=go.Heatmap(
                 z=pivot.values,
-                x=pivot.columns,
-                y=pivot.index,
+                x=x_labels,
+                y=y_labels,
                 colorscale='RdYlGn_r',
                 text=pivot.values,
                 texttemplate='%{text:.2f}',
@@ -410,10 +453,49 @@ try:
                 title="Mean RTF across Parameter Space (100kHz)",
                 xaxis_title="NFFT Size",
                 yaxis_title="Channel Count",
+                xaxis=dict(type='category'),  # Evenly spaced
+                yaxis=dict(type='category'),  # Evenly spaced
                 height=600
             )
 
             st.plotly_chart(fig, use_container_width=True)
+
+        # Parameter space heatmap (NFFT x Overlap)
+        if all(col in methods_data.columns for col in ['engine_nfft', 'engine_overlap', 'rtf']):
+            st.subheader("RTF Heatmap by NFFT × Overlap")
+
+            pivot_overlap = methods_data.pivot_table(
+                values='rtf',
+                index='engine_overlap',
+                columns='engine_nfft',
+                aggfunc='mean'
+            )
+
+            # Convert to string labels for categorical (evenly spaced) axes
+            x_labels_overlap = [str(int(x)) for x in pivot_overlap.columns]
+            y_labels_overlap = [f"{y:.3f}" for y in pivot_overlap.index]
+
+            fig_overlap = go.Figure(data=go.Heatmap(
+                z=pivot_overlap.values,
+                x=x_labels_overlap,
+                y=y_labels_overlap,
+                colorscale='RdYlGn_r',
+                text=pivot_overlap.values,
+                texttemplate='%{text:.2f}',
+                textfont={"size": 10},
+                colorbar=dict(title="Mean RTF")
+            ))
+
+            fig_overlap.update_layout(
+                title="Mean RTF by NFFT and Overlap (100kHz)",
+                xaxis_title="NFFT Size",
+                yaxis_title="Overlap Fraction",
+                xaxis=dict(type='category'),  # Evenly spaced
+                yaxis=dict(type='category'),  # Evenly spaced
+                height=600
+            )
+
+            st.plotly_chart(fig_overlap, use_container_width=True)
 
         # Extensibility
         st.divider()
