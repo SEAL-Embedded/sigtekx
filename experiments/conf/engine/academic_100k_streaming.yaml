@@ -1,0 +1,17 @@
+# Academic 100kHz STREAMING Engine
+# Purpose: STREAMING mode benchmarking for methods paper
+# Real-time ring buffer overhead characterization at 100kHz
+name: academic_100k_streaming
+sample_rate_hz: 100000       # 100kHz for academic benchmarking
+mode: streaming              # STREAMING mode (continuous processing with ring buffer)
+stream_count: 4              # Ring buffer management
+pinned_buffer_count: 4       # Memory efficiency
+warmup_iters: 1              # Quick warmup
+timeout_ms: 5000             # Reasonable timeout
+use_cuda_graphs: false       # Disabled for streaming
+enable_profiling: false      # Production mode
+
+# Default values (overridden in experiment sweeps)
+nfft: 4096
+channels: 2
+overlap: 0.5

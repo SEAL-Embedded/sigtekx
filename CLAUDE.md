@@ -33,12 +33,12 @@ python benchmarks/run_throughput.py --multirun experiment=ionosphere_test +bench
 
 ### Complete Research Workflow
 ```bash
-# 1. Run benchmark experiments
+# 1. Run benchmark experiments (FULL - takes 30+ minutes)
 snakemake --cores 4 --snakefile experiments/Snakefile
 
 # 2. Launch interactive dashboard to view results
-sigx dashboard
-# OR: streamlit run experiments/streamlit/app.py
+streamlit run experiments/streamlit/app.py --server.port 8501
+# OR: sigx dashboard (alias for above)
 
 # 3. View experiment tracking (optional)
 mlflow ui --backend-store-uri file://./artifacts/mlruns
@@ -46,6 +46,44 @@ mlflow ui --backend-store-uri file://./artifacts/mlruns
 # 4. Data versioning (optional)
 dvc status
 dvc repro
+```
+
+### Targeted Snakemake Runs (Faster Development)
+
+```bash
+# === BATCH MODE ONLY ===
+# Run all BATCH baseline experiments (~10-15 min)
+snakemake --cores 4 --snakefile experiments/Snakefile \
+  run_baseline_batch_100k_latency \
+  run_baseline_batch_100k_throughput \
+  run_baseline_batch_48k_latency \
+  run_baseline_batch_48k_throughput
+
+# === STREAMING MODE ONLY ===
+# Run all STREAMING baseline experiments (~10-15 min)
+snakemake --cores 4 --snakefile experiments/Snakefile \
+  run_baseline_streaming_100k_latency \
+  run_baseline_streaming_100k_throughput \
+  run_baseline_streaming_100k_realtime \
+  run_baseline_streaming_48k_latency \
+  run_baseline_streaming_48k_realtime
+
+# === QUICK COVERAGE FILL ===
+# Fill missing 100kHz STREAMING experiments (latency + throughput)
+snakemake --cores 4 --snakefile experiments/Snakefile \
+  run_baseline_streaming_100k_latency \
+  run_baseline_streaming_100k_throughput
+
+# === SINGLE EXPERIMENT ===
+# Run one specific experiment
+snakemake --cores 4 --snakefile experiments/Snakefile run_baseline_streaming_100k_latency
+snakemake --cores 4 --snakefile experiments/Snakefile run_baseline_streaming_100k_throughput
+snakemake --cores 4 --snakefile experiments/Snakefile run_baseline_streaming_100k_realtime
+
+# === REGENERATE AFTER CODE CHANGES ===
+# Delete marker and re-run specific experiment
+rm artifacts/data/baseline_streaming_100k_latency.done
+snakemake --cores 4 --snakefile experiments/Snakefile run_baseline_streaming_100k_latency
 ```
 
 ## Report Generation Architecture

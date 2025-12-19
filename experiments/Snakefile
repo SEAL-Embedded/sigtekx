@@ -284,7 +284,7 @@ rule run_baseline_streaming_100k_throughput:
         """
         python benchmarks/run_throughput.py --multirun \
             experiment=baseline_streaming_100k_throughput \
-            +benchmark=throughput
+            +benchmark=throughput_streaming
         """
 
 # Run baseline STREAMING latency at 100kHz
@@ -295,7 +295,7 @@ rule run_baseline_streaming_100k_latency:
         """
         python benchmarks/run_latency.py --multirun \
             experiment=baseline_streaming_100k_latency \
-            +benchmark=latency
+            +benchmark=latency_streaming
         """
 
 # Run baseline STREAMING latency at 48kHz
@@ -306,7 +306,7 @@ rule run_baseline_streaming_48k_latency:
         """
         python benchmarks/run_latency.py --multirun \
             experiment=baseline_streaming_48k_latency \
-            +benchmark=latency
+            +benchmark=latency_streaming
         """
 
 # Run baseline STREAMING realtime at 48kHz

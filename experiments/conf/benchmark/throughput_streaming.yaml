@@ -1,0 +1,15 @@
+# Throughput benchmark configuration for STREAMING mode
+# Use this config to profile continuous real-time stream throughput
+# (includes ring buffer management overhead)
+#
+# For maximum discrete throughput, use throughput.yaml instead
+
+defaults:
+  - throughput  # Inherit from base throughput config
+
+# Override engine mode to STREAMING
+engine:
+  mode: streaming
+
+# Benchmark name
+name: throughput_streaming

@@ -8,7 +8,7 @@
 # Measures sustained frames per second in continuous real-time processing.
 
 defaults:
-  - override /engine: academic_100k
+  - override /engine: academic_100k_streaming
 
 experiment:
   name: baseline_streaming_100k_throughput
@@ -48,8 +48,7 @@ hydra:
       # 0.875: 87.5% overlap (very high temporal resolution)
       engine.overlap: 0.5,0.75,0.875
 
-      # STREAMING mode (continuous real-time processing)
-      engine.mode: streaming
+      # Note: STREAMING mode set by academic_100k_streaming engine preset
 
 # Analysis configuration
 analysis:

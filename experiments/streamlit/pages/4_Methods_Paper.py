@@ -177,15 +177,19 @@ try:
                         st.metric("Real-Time %", f"{realtime_pct:.1f}%")
 
                     # Use p99 for streaming (critical for jitter/real-time)
+                    p99_displayed = False
                     if 'p99_latency_us' in streaming_data.columns:
                         p99_values = streaming_data['p99_latency_us'].dropna()
                         if len(p99_values) > 0:
                             st.metric("P99 Latency", f"{p99_values.median():.1f} μs",
                                      help="99th percentile latency - critical for real-time jitter analysis")
-                    elif 'mean_latency_us' in streaming_data.columns:
+                            p99_displayed = True
+
+                    if not p99_displayed and 'mean_latency_us' in streaming_data.columns:
                         mean_values = streaming_data['mean_latency_us'].dropna()
                         if len(mean_values) > 0:
-                            st.metric("Mean Latency", f"{mean_values.mean():.1f} μs")
+                            st.metric("Mean Latency", f"{mean_values.mean():.1f} μs",
+                                     help="Fallback: p99_latency_us not available")
 
                     # Calculate FPS from realtime data if frames_per_second is missing/NaN
                     if 'frames_per_second' in streaming_data.columns:

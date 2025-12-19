@@ -103,12 +103,17 @@ try:
             # Throughput by NFFT
             st.subheader("Throughput Scaling by NFFT")
 
+            # Only use gb_per_second for size if ALL values are valid (no NaNs)
+            size_col = None
+            if 'gb_per_second' in batch_data.columns and batch_data['gb_per_second'].notna().all():
+                size_col = 'gb_per_second'
+
             fig = px.scatter(
                 batch_data,
                 x='engine_nfft',
                 y='frames_per_second',
                 color='engine_channels' if 'engine_channels' in batch_data.columns else None,
-                size='gb_per_second' if 'gb_per_second' in batch_data.columns else None,
+                size=size_col,
                 log_x=True,
                 title="BATCH Mode Throughput vs NFFT",
                 labels={

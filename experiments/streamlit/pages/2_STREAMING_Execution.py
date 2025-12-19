@@ -127,12 +127,17 @@ try:
         if 'frames_per_second' in streaming_data.columns:
             st.subheader("Sustained FPS in STREAMING Mode")
 
+            # Only use engine_overlap for size if ALL values are valid (no NaNs)
+            size_col = None
+            if 'engine_overlap' in streaming_data.columns and streaming_data['engine_overlap'].notna().all():
+                size_col = 'engine_overlap'
+
             fig = px.scatter(
                 streaming_data,
                 x='engine_nfft',
                 y='frames_per_second',
                 color='engine_channels' if 'engine_channels' in streaming_data.columns else None,
-                size='engine_overlap' if 'engine_overlap' in streaming_data.columns else None,
+                size=size_col,
                 log_x=True,
                 title="STREAMING Mode Sustained Throughput",
                 labels={
