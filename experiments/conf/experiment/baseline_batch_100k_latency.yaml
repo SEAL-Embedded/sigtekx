@@ -12,7 +12,7 @@ defaults:
   - override /engine: academic_100k
 
 experiment:
-  name: baseline_latency_100k
+  name: baseline_batch_100k_latency
   description: >-
     Baseline BATCH mode latency characterization at 100kHz sample rate.
     General-purpose academic benchmarking for methods paper,
@@ -22,10 +22,10 @@ experiment:
   sample_rate_category: 100kHz
 
 # Multirun configuration
-# 5 NFFT × 3 channels × 1 overlap = 15 configurations
+# 5 NFFT × 3 channels × 3 overlap = 45 configurations
 # NFFT range: 1024-16384 (typical academic range)
 # Channels: 1, 2, 8 (single, stereo, multi-channel)
-# Overlap: 0.0 (BATCH mode typically uses zero overlap)
+# Overlap: 0.0, 0.5, 0.75 (zero, medium, high)
 hydra:
   mode: MULTIRUN
   sweeper:
@@ -44,8 +44,11 @@ hydra:
       # 8: Multi-channel (typical array size)
       engine.channels: 1,2,8
 
-      # Zero overlap for BATCH mode (discrete frames)
-      engine.overlap: 0.0
+      # Overlap sweep: processing trade-offs
+      # 0.0: Zero overlap (discrete frames)
+      # 0.5: 50% overlap (standard processing)
+      # 0.75: 75% overlap (high temporal coverage)
+      engine.overlap: 0.0,0.5,0.75
 
       # BATCH mode (discrete frame processing)
       engine.mode: batch

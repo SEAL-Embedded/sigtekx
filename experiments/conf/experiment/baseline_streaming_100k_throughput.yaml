@@ -1,0 +1,88 @@
+# @package _global_
+
+# Baseline STREAMING Throughput 100kHz
+# ======================================
+# General-purpose STREAMING mode throughput characterization at 100kHz.
+# Sustained FPS with ring buffer management overhead.
+#
+# Measures sustained frames per second in continuous real-time processing.
+
+defaults:
+  - override /engine: academic_100k
+
+experiment:
+  name: baseline_streaming_100k_throughput
+  description: >-
+    Baseline STREAMING mode throughput at 100kHz. Sustained FPS with
+    ring buffer management overhead.
+  tags: [baseline, streaming, throughput, 100khz, realtime]
+  experiment_group: baseline
+  sample_rate_category: 100kHz
+
+# Multirun configuration
+# 5 NFFT × 3 channels × 3 overlap = 45 configurations
+# NFFT range: 1024-16384 (real-time capable range)
+# Channels: 1, 2, 8 (single, stereo, multi-channel)
+# Overlap: 0.5, 0.75, 0.875 (standard, high, very high)
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      # NFFT sweep for streaming baseline
+      # 1024: Low latency, fast processing
+      # 2048: Balanced (common real-time STFT)
+      # 4096: Higher resolution
+      # 8192: High resolution streaming
+      # 16384: Very high resolution (validation target)
+      engine.nfft: 1024,2048,4096,8192,16384
+
+      # Channel sweep: single to multi-channel
+      # 1: Single channel (baseline)
+      # 2: Stereo (common use case)
+      # 8: Multi-channel (typical array size)
+      engine.channels: 1,2,8
+
+      # Overlap sweep: temporal resolution (no zero overlap for streaming)
+      # 0.5: 50% overlap (standard streaming)
+      # 0.75: 75% overlap (high temporal resolution)
+      # 0.875: 87.5% overlap (very high temporal resolution)
+      engine.overlap: 0.5,0.75,0.875
+
+      # STREAMING mode (continuous real-time processing)
+      engine.mode: streaming
+
+# Analysis configuration
+analysis:
+  statistical_tests: [shapiro, kruskal, mann_whitney]
+  confidence_level: 0.95
+  min_samples: 100
+
+  # Streaming throughput focus metrics
+  focus_metrics:
+    - frames_per_second       # PRIMARY: sustained throughput
+    - rtf                     # Real-Time Factor (must be <1.0 for real-time)
+    - mean_latency_us        # Per-frame latency
+    - frame_time_cv          # Frame time consistency
+    - frames_dropped         # Data loss (should be 0)
+
+  # Streaming throughput thresholds
+  thresholds:
+    max_rtf: 1.0             # Real-time capable
+    max_frame_drops: 0        # Zero data loss
+    max_frame_time_cv: 0.20   # <20% CV for stable timing
+
+# Academic streaming baseline parameters
+academic:
+  sample_rate_hz: 100000       # 100kHz (common academic sample rate)
+  use_case: general_purpose    # Not domain-specific
+  publication_target: methods_paper
+  real_time_class: soft        # Soft real-time (not hard real-time)
+
+# Performance expectations
+expectations:
+  real_time:
+    rtf_target: "≤1.0"        # Real-time capable
+    sustained_fps: ">100"     # Sustained throughput
+  soft_real_time:
+    rtf_target: "≤0.33"       # 3× headroom for I/O
+    sustained_fps: ">300"     # High sustained throughput

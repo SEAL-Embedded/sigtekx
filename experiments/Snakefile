@@ -36,8 +36,19 @@ rule all:
         # NEW: Streaming mode gap-filling experiments (Phase 1)
         "artifacts/data/ionosphere_streaming_throughput.done",
         "artifacts/data/ionosphere_streaming_hires.done",
-        "artifacts/data/baseline_latency_100k.done",
-        "artifacts/data/realtime_100k.done",
+        "artifacts/data/baseline_batch_100k_latency.done",
+        "artifacts/data/baseline_streaming_100k_realtime.done",
+
+        # NEW: Phase 2 - BATCH Baseline Experiments
+        "artifacts/data/baseline_batch_100k_throughput.done",
+        "artifacts/data/baseline_batch_48k_throughput.done",
+        "artifacts/data/baseline_batch_48k_latency.done",
+
+        # NEW: Phase 3 - STREAMING Baseline Experiments
+        "artifacts/data/baseline_streaming_100k_throughput.done",
+        "artifacts/data/baseline_streaming_100k_latency.done",
+        "artifacts/data/baseline_streaming_48k_latency.done",
+        "artifacts/data/baseline_streaming_48k_realtime.done",
 
         # Static spectrograms
         "artifacts/figures/spectrograms/general_spectrogram.png",
@@ -202,25 +213,110 @@ rule run_ionosphere_streaming_hires:
             +benchmark=realtime
         """
 
-# Run baseline latency at 100kHz (BATCH mode for methods paper)
-rule run_baseline_latency_100k:
+# Run baseline BATCH latency at 100kHz (BATCH mode for methods paper)
+rule run_baseline_batch_100k_latency:
     output:
-        touch("artifacts/data/baseline_latency_100k.done")
+        touch("artifacts/data/baseline_batch_100k_latency.done")
     shell:
         """
         python benchmarks/run_latency.py --multirun \
-            experiment=baseline_latency_100k \
+            experiment=baseline_batch_100k_latency \
             +benchmark=latency
         """
 
-# Run realtime at 100kHz (STREAMING mode for methods paper)
-rule run_realtime_100k:
+# Run baseline STREAMING realtime at 100kHz (STREAMING mode for methods paper)
+rule run_baseline_streaming_100k_realtime:
     output:
-        touch("artifacts/data/realtime_100k.done")
+        touch("artifacts/data/baseline_streaming_100k_realtime.done")
     shell:
         """
         python benchmarks/run_realtime.py --multirun \
-            experiment=realtime_100k \
+            experiment=baseline_streaming_100k_realtime \
+            +benchmark=realtime
+        """
+
+# ============================================================================
+# NEW: Phase 2 - BATCH Baseline Experiments
+# ============================================================================
+
+# Run baseline BATCH throughput at 100kHz
+rule run_baseline_batch_100k_throughput:
+    output:
+        touch("artifacts/data/baseline_batch_100k_throughput.done")
+    shell:
+        """
+        python benchmarks/run_throughput.py --multirun \
+            experiment=baseline_batch_100k_throughput \
+            +benchmark=throughput
+        """
+
+# Run baseline BATCH throughput at 48kHz
+rule run_baseline_batch_48k_throughput:
+    output:
+        touch("artifacts/data/baseline_batch_48k_throughput.done")
+    shell:
+        """
+        python benchmarks/run_throughput.py --multirun \
+            experiment=baseline_batch_48k_throughput \
+            +benchmark=throughput
+        """
+
+# Run baseline BATCH latency at 48kHz
+rule run_baseline_batch_48k_latency:
+    output:
+        touch("artifacts/data/baseline_batch_48k_latency.done")
+    shell:
+        """
+        python benchmarks/run_latency.py --multirun \
+            experiment=baseline_batch_48k_latency \
+            +benchmark=latency
+        """
+
+# ============================================================================
+# NEW: Phase 3 - STREAMING Baseline Experiments
+# ============================================================================
+
+# Run baseline STREAMING throughput at 100kHz
+rule run_baseline_streaming_100k_throughput:
+    output:
+        touch("artifacts/data/baseline_streaming_100k_throughput.done")
+    shell:
+        """
+        python benchmarks/run_throughput.py --multirun \
+            experiment=baseline_streaming_100k_throughput \
+            +benchmark=throughput
+        """
+
+# Run baseline STREAMING latency at 100kHz
+rule run_baseline_streaming_100k_latency:
+    output:
+        touch("artifacts/data/baseline_streaming_100k_latency.done")
+    shell:
+        """
+        python benchmarks/run_latency.py --multirun \
+            experiment=baseline_streaming_100k_latency \
+            +benchmark=latency
+        """
+
+# Run baseline STREAMING latency at 48kHz
+rule run_baseline_streaming_48k_latency:
+    output:
+        touch("artifacts/data/baseline_streaming_48k_latency.done")
+    shell:
+        """
+        python benchmarks/run_latency.py --multirun \
+            experiment=baseline_streaming_48k_latency \
+            +benchmark=latency
+        """
+
+# Run baseline STREAMING realtime at 48kHz
+rule run_baseline_streaming_48k_realtime:
+    output:
+        touch("artifacts/data/baseline_streaming_48k_realtime.done")
+    shell:
+        """
+        python benchmarks/run_realtime.py --multirun \
+            experiment=baseline_streaming_48k_realtime \
             +benchmark=realtime
         """
 

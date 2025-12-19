@@ -1,0 +1,91 @@
+# @package _global_
+
+# Baseline STREAMING Latency 100kHz
+# ===================================
+# General-purpose STREAMING mode latency characterization at 100kHz.
+# Per-frame latency with ring buffer overhead quantification.
+#
+# Measures per-frame processing latency in continuous real-time mode.
+
+defaults:
+  - override /engine: academic_100k
+
+experiment:
+  name: baseline_streaming_100k_latency
+  description: >-
+    Baseline STREAMING mode latency at 100kHz. Per-frame latency with
+    ring buffer overhead quantification.
+  tags: [baseline, streaming, latency, 100khz, realtime]
+  experiment_group: baseline
+  sample_rate_category: 100kHz
+
+# Multirun configuration
+# 5 NFFT × 3 channels × 3 overlap = 45 configurations
+# NFFT range: 1024-16384 (real-time capable range)
+# Channels: 1, 2, 8 (single, stereo, multi-channel)
+# Overlap: 0.5, 0.75, 0.875 (standard, high, very high)
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      # NFFT sweep for streaming baseline
+      # 1024: Low latency, fast processing
+      # 2048: Balanced (common real-time STFT)
+      # 4096: Higher resolution
+      # 8192: High resolution streaming
+      # 16384: Very high resolution (validation target)
+      engine.nfft: 1024,2048,4096,8192,16384
+
+      # Channel sweep: single to multi-channel
+      # 1: Single channel (baseline)
+      # 2: Stereo (common use case)
+      # 8: Multi-channel (typical array size)
+      engine.channels: 1,2,8
+
+      # Overlap sweep: temporal resolution (no zero overlap for streaming)
+      # 0.5: 50% overlap (standard streaming)
+      # 0.75: 75% overlap (high temporal resolution)
+      # 0.875: 87.5% overlap (very high temporal resolution)
+      engine.overlap: 0.5,0.75,0.875
+
+      # STREAMING mode (continuous real-time processing)
+      engine.mode: streaming
+
+# Analysis configuration
+analysis:
+  statistical_tests: [shapiro, kruskal, mann_whitney]
+  confidence_level: 0.95
+  min_samples: 100
+
+  # Streaming latency focus metrics
+  focus_metrics:
+    - mean_latency_us          # PRIMARY: average latency
+    - p50_latency_us           # Median latency
+    - p95_latency_us           # 95th percentile
+    - p99_latency_us           # 99th percentile (tail latency)
+    - latency_cv               # Coefficient of variation (stability)
+    - frame_time_cv            # Frame time consistency
+    - rtf                      # Real-Time Factor
+
+  # Streaming latency thresholds
+  thresholds:
+    max_mean_latency_ms: 100   # <100ms for soft real-time
+    max_p99_latency_ms: 200    # <200ms tail latency
+    max_latency_cv: 0.20       # <20% CV for stable performance
+    max_rtf: 1.0               # Real-time capable
+
+# Academic streaming baseline parameters
+academic:
+  sample_rate_hz: 100000       # 100kHz (common academic sample rate)
+  use_case: general_purpose    # Not domain-specific
+  publication_target: methods_paper
+  real_time_class: soft        # Soft real-time (not hard real-time)
+
+# Performance expectations
+expectations:
+  soft_realtime:
+    rtf_target: "≤0.33"       # 3× headroom for I/O and overhead
+    latency_target: "<10ms"   # Per-frame processing
+  real_time:
+    rtf_target: "≤1.0"        # Real-time capable
+    latency_target: "<frame_duration"
