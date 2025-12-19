@@ -205,25 +205,40 @@ try:
                 aggfunc='mean'
             )
 
+            # Convert to categorical labels for even spacing
+            x_labels = [str(int(x)) for x in pivot.columns]
+            y_labels = [str(int(y)) for y in pivot.index]
+
+            # Dynamic height based on number of rows (50px per row, min 400px)
+            heatmap_height = max(400, len(pivot.index) * 50)
+
             fig = go.Figure(data=go.Heatmap(
                 z=pivot.values,
-                x=pivot.columns,
-                y=pivot.index,
+                x=x_labels,
+                y=y_labels,
                 colorscale='Viridis',
                 text=pivot.values,
                 texttemplate='%{text:.1f}',
                 textfont={"size": 10},
-                colorbar=dict(title="FPS")
+                colorbar=dict(title="FPS"),
+                hovertemplate='NFFT: %{x}<br>Channels: %{y}<br>Throughput: %{z:.1f} FPS<extra></extra>'
             ))
 
             fig.update_layout(
                 title="Mean Throughput by NFFT and Channels",
                 xaxis_title="NFFT Size",
                 yaxis_title="Channel Count",
-                height=500
+                xaxis=dict(type='category'),  # Even spacing for x-axis
+                yaxis=dict(type='category'),  # Even spacing for y-axis
+                height=heatmap_height
             )
 
             st.plotly_chart(fig, use_container_width=True)
+
+            # Show missing configurations if any NaN values
+            nan_count = pivot.isna().sum().sum()
+            if nan_count > 0:
+                st.info(f"ℹ️ {nan_count} configuration(s) missing throughput data. Run additional batch throughput experiments to fill gaps.")
 
     with tab5:
         st.header("Accuracy Validation")
@@ -257,7 +272,7 @@ try:
                     title="Accuracy Pass Rate by NFFT",
                     labels={'engine_nfft': 'NFFT Size', 'pass_rate': 'Pass Rate'},
                 )
-                fig.update_yaxis(range=[0, 1])
+                fig.update_yaxes(range=[0, 1])
                 st.plotly_chart(fig, use_container_width=True)
 
             # Accuracy table

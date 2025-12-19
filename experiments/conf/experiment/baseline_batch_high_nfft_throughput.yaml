@@ -1,0 +1,85 @@
+# @package _global_
+
+# Baseline High-NFFT BATCH Throughput (100kHz)
+# ==============================================
+# Fill coverage gaps for high-NFFT batch throughput baseline.
+# Completes the parameter grid for NFFT 16384-131072 with multiple channels.
+#
+# Target missing configurations:
+# - NFFT 16384 × 32 channels (missing from baseline)
+# - NFFT 32768, 65536, 131072 × [1, 4, 8, 16, 32] channels (expand from 2-only)
+
+defaults:
+  - override /engine: academic_100k
+
+experiment:
+  name: baseline_batch_high_nfft_throughput
+  description: >-
+    High-NFFT BATCH mode throughput baseline at 100kHz.
+    Fills coverage gaps for NFFT 16384-131072 with comprehensive
+    channel sweep for academic baseline completeness.
+  tags: [baseline, batch, throughput, high-nfft, 100khz]
+  experiment_group: baseline
+  sample_rate_category: 100kHz
+
+# Multirun configuration
+# High NFFT: 16384, 32768, 65536, 131072
+# Channels: Strategic sweep to fill gaps
+# Overlap: 0.0, 0.5, 0.75 (standard baseline)
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      # High-NFFT sweep
+      # 16384: Very high resolution (need ch=32 to complete)
+      # 32768: Ultra-high resolution (VLF research)
+      # 65536: Extreme resolution (Schumann resonance)
+      # 131072: Maximum resolution (ultra-low frequency)
+      engine.nfft: 16384,32768,65536,131072
+
+      # Channel sweep: Fill missing configurations
+      # 1: Single channel baseline
+      # 4: Quad channel
+      # 8: Octo channel (typical array)
+      # 16: Large array
+      # 32: Very large array
+      engine.channels: 1,4,8,16,32
+
+      # Overlap sweep: standard baseline coverage
+      # 0.0: Zero overlap (discrete frames)
+      # 0.5: 50% overlap (standard processing)
+      # 0.75: 75% overlap (high temporal coverage)
+      engine.overlap: 0.0,0.5,0.75
+
+      # BATCH mode (discrete frame processing)
+      engine.mode: batch
+
+# Analysis configuration
+analysis:
+  statistical_tests: [shapiro, kruskal, mann_whitney]
+  confidence_level: 0.95
+  min_samples: 100
+
+  # Throughput focus metrics
+  focus_metrics:
+    - frames_per_second       # PRIMARY: throughput
+    - gb_per_second          # Memory bandwidth
+    - mean_latency_us        # Per-frame latency
+    - gpu_utilization        # GPU utilization
+
+  # High-NFFT throughput targets (challenging)
+  thresholds:
+    min_fps_16384: 100       # >100 FPS for 16k
+    min_fps_65536: 10        # >10 FPS for 64k
+    max_gpu_utilization: 0.95  # Expect high GPU usage
+
+# Performance expectations (high-NFFT is computationally intensive)
+expectations:
+  high_resolution:
+    nfft: 16384
+    target_fps: ">100"
+    note: "VLF/ULF ionosphere research baseline"
+  extreme_resolution:
+    nfft: 65536
+    target_fps: ">10"
+    note: "Schumann resonance detection capability"

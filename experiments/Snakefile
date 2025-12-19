@@ -43,6 +43,7 @@ rule all:
         "artifacts/data/baseline_batch_100k_throughput.done",
         "artifacts/data/baseline_batch_48k_throughput.done",
         "artifacts/data/baseline_batch_48k_latency.done",
+        "artifacts/data/baseline_batch_high_nfft_throughput.done",
 
         # NEW: Phase 3 - STREAMING Baseline Experiments
         "artifacts/data/baseline_streaming_100k_throughput.done",
@@ -258,6 +259,17 @@ rule run_baseline_batch_48k_throughput:
         """
         python benchmarks/run_throughput.py --multirun \
             experiment=baseline_batch_48k_throughput \
+            +benchmark=throughput
+        """
+
+# Run high-NFFT BATCH throughput baseline (fill coverage gaps)
+rule run_baseline_batch_high_nfft_throughput:
+    output:
+        touch("artifacts/data/baseline_batch_high_nfft_throughput.done")
+    shell:
+        """
+        python benchmarks/run_throughput.py --multirun \
+            experiment=baseline_batch_high_nfft_throughput \
             +benchmark=throughput
         """
 
