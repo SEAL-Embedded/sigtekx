@@ -148,7 +148,9 @@ def run_accuracy_benchmark(cfg: DictConfig) -> float:
         }
 
         summary_df = pd.DataFrame([summary])
-        summary_path = output_dir / f"accuracy_summary_{engine_config.nfft}_{engine_config.channels}.csv"
+        # Include execution mode in filename to prevent batch/streaming collisions
+        exec_mode = engine_config.mode.value if hasattr(engine_config.mode, 'value') else str(engine_config.mode)
+        summary_path = output_dir / f"accuracy_summary_{engine_config.nfft}_{engine_config.channels}_{exec_mode}.csv"
         summary_df.to_csv(summary_path, index=False)
         mlflow.log_artifact(str(summary_path))
 

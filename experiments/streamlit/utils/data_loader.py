@@ -12,12 +12,14 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from analysis.cli import load_data as _load_data_impl
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, show_spinner="Loading benchmark data...")
 def load_benchmark_data(data_path: str | Path = "artifacts/data") -> pd.DataFrame:
     """
     Load benchmark data from CSV files with caching.
 
-    Caches data for 1 hour to improve performance. Data is automatically
+    Caches data for 1 hour to improve performance. To refresh data after
+    running new benchmarks, press 'C' in the dashboard and click 'Clear cache'.
+    Data is automatically
     reloaded when files change or cache expires.
 
     Args:
