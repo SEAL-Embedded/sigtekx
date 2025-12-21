@@ -436,6 +436,12 @@ class StreamingExecutor::Impl {
       throw std::runtime_error("Executor not initialized");
     }
 
+    // THREAD SAFETY:
+    // - Single-producer only. This method assumes a single caller thread.
+    // - RingBuffer is SPSC-friendly but does not protect against multiple
+    //   concurrent producers. Do not call submit_async() concurrently or mix
+    //   with submit() while a background consumer thread is active.
+
     // Validate input size
     if (num_samples % config_.channels != 0) {
       throw std::runtime_error(
@@ -730,6 +736,11 @@ class StreamingExecutor::Impl {
    */
   void consumer_loop() {
     SIGTEKX_NVTX_RANGE("Consumer Thread", profiling::colors::PURPLE);
+
+    // THREAD SAFETY:
+    // - Single consumer thread for ring buffers in async mode.
+    // - Producers push samples via submit(); assumes one producer at a time.
+    // - Coordination uses cv_data_ready_ and result_mutex_.
 
     // Set CUDA context for this thread
     SIGTEKX_CUDA_CHECK(cudaSetDevice(device_id_));

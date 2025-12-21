@@ -1,7 +1,7 @@
-# Thread Safety - v0.9.3
+# Thread Safety - v0.9.5
 
-**Version:** 0.9.3
-**Last Updated:** October 2025
+**Version:** 0.9.5
+**Last Updated:** December 2025
 **Status:** Production Ready
 
 ---
@@ -194,7 +194,7 @@ std::thread t2([&]{ shared_exec.submit(data2, out2, size); });  // ❌ Race!
 | `MagnitudeStage` | ❌ | ✅ | ❌ | Not safe for concurrent `process()` |
 | **Executors** ||||
 | `BatchExecutor` | ❌ | ✅ | ❌ | **Not safe for concurrent `submit()`** |
-| `StreamingExecutor` | ❌ | ✅ | ❌ | Delegates to `BatchExecutor` |
+| `StreamingExecutor` | ❌ | ✅ | ❌ | Single-producer; background thread is single consumer |
 | **Engines** ||||
 | `Engine` (Python) | ❌ | ✅ | ❌ | Wraps executor |
 | `AntennaEngine` | ❌ | ✅ | ❌ | Wraps executor |
@@ -231,6 +231,28 @@ void thread_func(int id) {
 BatchExecutor shared_exec;
 std::thread t1([&]{ shared_exec.submit(...); });  // Data race!
 std::thread t2([&]{ shared_exec.submit(...); });  // Data race!
+```
+
+#### `StreamingExecutor`
+
+**Thread Safety**: ? Not thread-safe, ? Thread-compatible
+
+**Rationale**: Same shared-state constraints as BatchExecutor, plus a
+single-producer/single-consumer ring buffer design in async mode.
+
+**Safe Usage**:
+```cpp
+StreamingExecutor exec;
+exec.initialize(config, std::move(stages));
+exec.submit(data.data(), output.data(), data.size());
+```
+
+**Unsafe Usage**:
+```cpp
+StreamingExecutor exec;
+exec.initialize(config, std::move(stages));
+std::thread t1([&]{ exec.submit(data1, out1, size1); });  // Data race
+std::thread t2([&]{ exec.submit(data2, out2, size2); });  // Data race
 ```
 
 #### `CudaStream`
@@ -629,6 +651,14 @@ t1.join();
 BatchExecutor* exec = new BatchExecutor();
 std::thread t1([&]{ exec->submit(data, output, size); });
 delete exec;  // ❌ Use-after-free if t1 still running
+```
+
+? **Mixing producer paths on the same StreamingExecutor**:
+```cpp
+StreamingExecutor exec;
+exec.initialize(config, std::move(stages));
+std::thread t1([&]{ exec.submit(data1, out1, size1); });
+std::thread t2([&]{ exec.submit_async(data2, size2, callback); });  // ? Race
 ```
 
 ### 7.3 Testing Considerations

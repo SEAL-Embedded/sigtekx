@@ -62,6 +62,35 @@ namespace sigtekx {
  * samples for channel 1, etc. The total num_samples must be a multiple of
  * the number of channels.
  *
+ * **Thread Safety (v0.9.5):**
+ * - Thread-compatible: different StreamingExecutor instances may be used on
+ *   different threads, but a single instance requires external synchronization.
+ * - Single-producer requirement: only one thread may call initialize(),
+ *   reset(), submit(), or submit_async() on the same instance at a time.
+ * - Async/background mode uses a single consumer thread; ring buffers are
+ *   designed for single-producer/single-consumer access and do not protect
+ *   against multiple concurrent producers.
+ * - Do not call submit_async() concurrently with submit() or while a background
+ *   thread is enabled; use one submission path per instance.
+ *
+ * **Safe Usage Pattern:**
+ * ```cpp
+ * StreamingExecutor exec;
+ * exec.initialize(config, stages);
+ * exec.submit(samples_a, output, num_samples);
+ * exec.submit(samples_b, output, num_samples);
+ * ```
+ *
+ * **Unsafe Usage Pattern:**
+ * ```cpp
+ * StreamingExecutor exec;
+ * exec.initialize(config, stages);
+ * std::thread t1([&] { exec.submit(samples_a, output, num_samples); });
+ * std::thread t2([&] { exec.submit(samples_b, output, num_samples); });  // Race
+ * t1.join();
+ * t2.join();
+ * ```
+ *
  * **Future Enhancements (v0.9.5+):**
  * - True async with background thread (submit_async() currently synchronous)
  * - Optional CUDA graph optimization for zero-overhead kernel launches
