@@ -139,9 +139,10 @@ def run_latency_benchmark(cfg: DictConfig) -> float:
         }
 
         summary_df = pd.DataFrame([summary])
-        # Include execution mode in filename to prevent batch/streaming collisions
+        # Include overlap and execution mode in filename to prevent collisions during multirun sweeps
         exec_mode = engine_config.mode.value if hasattr(engine_config.mode, 'value') else str(engine_config.mode)
-        summary_path = output_dir / f"latency_summary_{engine_config.nfft}_{engine_config.channels}_{exec_mode}.csv"
+        overlap_str = f"{engine_config.overlap:.4f}".replace('.', 'p')  # 0.75 -> 0p7500
+        summary_path = output_dir / f"latency_summary_{engine_config.nfft}_{engine_config.channels}_{overlap_str}_{exec_mode}.csv"
         summary_df.to_csv(summary_path, index=False)
         mlflow.log_artifact(str(summary_path))
 
