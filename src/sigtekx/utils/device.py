@@ -112,6 +112,7 @@ def device_info(device_id: int | None = None) -> dict[str, Any]:
         'memory_total_mb': 0,
         'memory_free_mb': 0,
         'compute_capability': (0, 0),
+        'cuda_version': 'Unknown',
         'temperature_c': None,
         'power_w': None,
         'utilization_gpu': None,
@@ -131,6 +132,14 @@ def device_info(device_id: int | None = None) -> dict[str, Any]:
 
                 major, minor = pynvml.nvmlDeviceGetCudaComputeCapability(handle)
                 info['compute_capability'] = (major, minor)
+
+                # Query CUDA driver version (system-level, not per-device)
+                with contextlib.suppress(pynvml.NVMLError):
+                    cuda_version = pynvml.nvmlSystemGetCudaDriverVersion()
+                    # Returns int like 12000 for CUDA 12.0
+                    major_cuda = cuda_version // 1000
+                    minor_cuda = (cuda_version % 1000) // 10
+                    info['cuda_version'] = f"{major_cuda}.{minor_cuda}"
 
                 # Optional fields with individual error handling
                 with contextlib.suppress(pynvml.NVMLError):

@@ -5,6 +5,7 @@ all functionality from the previous three-layer architecture while
 providing a simpler, more obvious interface.
 """
 
+import logging
 import warnings
 from collections.abc import Generator
 
@@ -252,6 +253,118 @@ class TestEngineProperties:
         assert "device_memory_mb" in info
 
         engine.close()
+
+    def test_device_info_logs_cuda_error(self, test_config: EngineConfig, caplog):
+        """Test that CUDA errors are logged at WARNING level."""
+        from unittest.mock import patch
+        from sigtekx.utils.logging import _is_running_under_profiler
+
+        engine = Engine(config=test_config)
+
+        # Patch after engine initialization to test property error handling
+        with patch('sigtekx.utils.device.device_info') as mock_device_info:
+            mock_device_info.side_effect = RuntimeError("CUDA error 999")
+
+            with caplog.at_level(logging.WARNING):
+                info = engine.device_info
+
+            # Should return dict with error field
+            assert 'error' in info
+            assert 'CUDA device query failed' in info['error']
+
+            # Should log warning (unless profiler active)
+            if not _is_running_under_profiler():
+                assert any('CUDA' in record.message for record in caplog.records)
+
+        engine.close()
+
+    def test_device_info_logs_import_error(self, test_config: EngineConfig, caplog):
+        """Test that ImportError is logged when device utils unavailable."""
+        from unittest.mock import patch
+        from sigtekx.utils.logging import _is_running_under_profiler
+
+        engine = Engine(config=test_config)
+
+        # Patch after engine initialization to test property error handling
+        with patch('sigtekx.utils.device.device_info') as mock_device_info:
+            mock_device_info.side_effect = ImportError("No module named 'pynvml'")
+
+            with caplog.at_level(logging.WARNING):
+                info = engine.device_info
+
+            # Should return dict with error field
+            assert 'error' in info
+            assert 'Device utilities not available' in info['error']
+
+            # Should log warning (unless profiler active)
+            if not _is_running_under_profiler():
+                assert any('WARNING' in record.levelname for record in caplog.records)
+
+        engine.close()
+
+    def test_device_info_success_case(self, test_config: EngineConfig):
+        """Test that device_info works correctly in success case."""
+        engine = Engine(config=test_config)
+
+        info = engine.device_info
+
+        # Should have all required keys
+        assert 'device_name' in info
+        assert 'cuda_version' in info
+        assert 'device_memory_mb' in info
+        assert 'device_memory_free_mb' in info
+
+        # Should NOT have error field in success case
+        assert 'error' not in info
+
+        # Device name should not be "Unknown" (we have a real GPU in tests)
+        assert info['device_name'] != 'Unknown'
+
+        engine.close()
+
+    def test_device_info_unexpected_error(self, test_config: EngineConfig, caplog):
+        """Test that unexpected errors are logged at DEBUG level."""
+        from unittest.mock import patch
+
+        engine = Engine(config=test_config)
+
+        # Patch after engine initialization to test property error handling
+        with patch('sigtekx.utils.device.device_info') as mock_device_info:
+            mock_device_info.side_effect = ValueError("Unexpected error")
+
+            with caplog.at_level(logging.DEBUG):
+                info = engine.device_info
+
+            # Should return dict with error field
+            assert 'error' in info
+            assert 'Device info unavailable' in info['error']
+
+            # Should log at DEBUG level
+            assert any('Unexpected error' in record.message for record in caplog.records if record.levelname == 'DEBUG')
+
+        engine.close()
+
+    def test_device_info_uninitialized_engine(self):
+        """Test that device_info returns safe defaults for uninitialized engine."""
+        # Create config but don't initialize engine
+        from sigtekx.config import EngineConfig
+        config = EngineConfig(nfft=1024, channels=1)
+
+        # Create engine without initialization
+        engine = Engine(config=config)
+        # Manually set to uninitialized state
+        engine._initialized = False
+
+        info = engine.device_info
+
+        # Should return safe defaults
+        assert info['device_name'] == 'Not initialized'
+        assert info['cuda_version'] == 'Unknown'
+        assert info['device_memory_mb'] == 0
+        assert info['device_memory_free_mb'] == 0
+
+        # Should NOT have error field (this is expected behavior)
+        assert 'error' not in info
 
 
 # -----------------------------------------------------------------------------

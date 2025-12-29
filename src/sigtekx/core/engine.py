@@ -743,8 +743,18 @@ class Engine:
         """Get CUDA device information.
 
         Returns:
-            Dictionary with device name, memory, CUDA version, etc.
+            Dictionary with device information. If device queries fail,
+            returns partial info with 'error' field explaining the failure.
+
+        Example:
+            >>> engine = Engine(preset='default')
+            >>> info = engine.device_info
+            >>> if 'error' in info:
+            ...     print(f"Device info issue: {info['error']}")
         """
+        # Import here to avoid circular dependencies (matches existing pattern)
+        from sigtekx.utils.logging import logger, _is_running_under_profiler
+
         if not self._initialized or self._cpp_engine is None:
             return {
                 "device_name": "Not initialized",
@@ -753,23 +763,61 @@ class Engine:
                 "device_memory_free_mb": 0,
             }
 
-        # Use device utilities to get runtime info
+        result = {}
+
         try:
             from sigtekx.utils.device import device_info as get_device_info
             info = get_device_info()
-            return {
+            result = {
                 "device_name": str(info.get("name", "Unknown")),
                 "cuda_version": str(info.get("cuda_version", "Unknown")),
                 "device_memory_mb": int(info.get("memory_total_mb", 0)),
                 "device_memory_free_mb": int(info.get("memory_free_mb", 0)),
             }
-        except Exception:
-            return {
+
+        except ImportError as e:
+            # Device utilities module not available
+            if not _is_running_under_profiler():
+                logger.warning(
+                    "Unable to query device info: device utilities not available (%s)", e
+                )
+            result = {
                 "device_name": "Unknown",
                 "cuda_version": "Unknown",
                 "device_memory_mb": 0,
                 "device_memory_free_mb": 0,
+                "error": "Device utilities not available"
             }
+
+        except RuntimeError as e:
+            # CUDA error (driver issue, device not found, etc.)
+            if not _is_running_under_profiler():
+                logger.warning(
+                    "Unable to query CUDA device: %s", e
+                )
+            result = {
+                "device_name": "Unknown",
+                "cuda_version": "Unknown",
+                "device_memory_mb": 0,
+                "device_memory_free_mb": 0,
+                "error": f"CUDA device query failed: {e}"
+            }
+
+        except Exception as e:
+            # Unexpected error (log at debug level)
+            logger.debug(
+                "Unexpected error querying device info: %s: %s",
+                type(e).__name__, e
+            )
+            result = {
+                "device_name": "Unknown",
+                "cuda_version": "Unknown",
+                "device_memory_mb": 0,
+                "device_memory_free_mb": 0,
+                "error": f"Device info unavailable: {type(e).__name__}"
+            }
+
+        return result
 
     # -------------------------------------------------------------------------
     # Context Manager Protocol

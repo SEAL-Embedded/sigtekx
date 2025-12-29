@@ -133,6 +133,23 @@ class TestDeviceInfo:
         # Modern GPUs have CC >= 3.0
         assert cc[0] >= 3
 
+    def test_device_info_includes_cuda_version(self):
+        """Test device_info returns CUDA version."""
+        if gpu_count() == 0:
+            pytest.skip("No CUDA devices available")
+
+        info = device_info(0)
+        assert 'cuda_version' in info
+
+        # CUDA version should be populated if NVML available
+        # Format should be like "12.0" or "11.8"
+        if info['cuda_version'] != 'Unknown':
+            assert '.' in info['cuda_version']
+            # Should be parseable as version
+            parts = info['cuda_version'].split('.')
+            assert len(parts) == 2
+            assert int(parts[0]) >= 10  # CUDA 10.0+
+
     def test_device_info_invalid_device_raises(self):
         """Test device_info raises error for invalid device ID."""
         count = gpu_count()
