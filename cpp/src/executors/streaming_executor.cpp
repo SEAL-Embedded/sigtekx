@@ -148,10 +148,11 @@ class StreamingExecutor::Impl {
     }
 
     // Create CUDA events for synchronization
+    // 3 events per buffer: H2D done, Compute done, D2H done
     {
       SIGTEKX_NVTX_RANGE("Create CUDA Events", profiling::colors::DARK_GRAY);
       events_.clear();
-      for (int i = 0; i < config_.pinned_buffer_count * 2; ++i) {
+      for (int i = 0; i < config_.pinned_buffer_count * 3; ++i) {
         events_.emplace_back(cudaEventDisableTiming);
       }
     }
@@ -609,16 +610,24 @@ class StreamingExecutor::Impl {
     const int compute_stream_idx = (streams_.size() > 1) ? 1 : 0;
     const int d2h_stream_idx = (streams_.size() > 2) ? 2 : compute_stream_idx;
 
-    auto& e_h2d_done = events_[buffer_idx * 2 + 0];
-    auto& e_compute_done = events_[buffer_idx * 2 + 1];
+    auto& e_h2d_done = events_[buffer_idx * 3 + 0];
+    auto& e_compute_done = events_[buffer_idx * 3 + 1];
+    auto& e_d2h_done = events_[buffer_idx * 3 + 2];
 
-    // Guard buffer reuse with synchronization
+    // Guard buffer reuse with event-based synchronization
+    // Wait for previous use of this buffer to complete (D2H transfer done)
     if (frame_counter_ >= static_cast<uint64_t>(config_.pinned_buffer_count)) {
       SIGTEKX_NVTX_RANGE("Wait for Buffer Availability",
                       profiling::colors::YELLOW);
-      SIGTEKX_CUDA_CHECK(
-          cudaStreamSynchronize(streams_[compute_stream_idx].get()));
-      SIGTEKX_CUDA_CHECK(cudaStreamSynchronize(streams_[d2h_stream_idx].get()));
+
+      // Calculate which buffer we're about to reuse
+      const int reuse_buffer_idx =
+          static_cast<int>(frame_counter_ % config_.pinned_buffer_count);
+
+      // Synchronize on D2H completion event for this specific buffer
+      // This implicitly guarantees H2D and compute are done due to stream ordering
+      auto& e_reuse_buffer_done = events_[reuse_buffer_idx * 3 + 2];
+      e_reuse_buffer_done.synchronize();
     }
 
     // H2D Transfer
@@ -709,6 +718,9 @@ class StreamingExecutor::Impl {
                                           e_compute_done.get(), 0));
       d_output.copy_to_host(output, complex_elements,
                             streams_[d2h_stream_idx].get());
+
+      // Record D2H completion for buffer reuse synchronization
+      e_d2h_done.record(streams_[d2h_stream_idx].get());
     }
 
     // Final synchronization

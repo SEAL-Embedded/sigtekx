@@ -13,6 +13,7 @@
 
 #include <gtest/gtest.h>
 
+#include <chrono>
 #include <cmath>
 #include <vector>
 
@@ -481,4 +482,188 @@ TEST_F(StreamingExecutorTest, ConsecutiveSubmitsWithoutSync) {
     }
   }
   EXPECT_TRUE(has_nonzero);
+}
+
+// ============================================================================
+//  Event-Based Buffer Synchronization Tests
+// ============================================================================
+
+/**
+ * @brief Test event-based buffer synchronization with small buffer pool.
+ *
+ * This test verifies that the event-based synchronization works correctly
+ * when buffer reuse is frequent (small pinned_buffer_count).
+ */
+TEST_F(StreamingExecutorTest, EventBasedBufferSync) {
+  config_.nfft = 1024;
+  config_.channels = 2;
+  config_.overlap = 0.5f;
+  config_.pinned_buffer_count = 2;  // Small pool → frequent reuse
+  config_.stream_count = 3;
+
+  // Build executor with standard pipeline
+  StreamingExecutor executor;
+  PipelineBuilder builder;
+  auto stages = builder.with_config(StageConfig{config_.nfft, config_.channels})
+                    .add_window(StageConfig::WindowType::HANN)
+                    .add_fft()
+                    .add_magnitude()
+                    .build();
+  executor.initialize(config_, std::move(stages));
+
+  const size_t input_size = config_.nfft * config_.channels;
+  const size_t output_size = config_.num_output_bins() * config_.channels;
+
+  // Process 10 frames (5x buffer pool size)
+  // Triggers buffer reuse starting at frame 2 (frame_counter_ >= 2)
+  for (int i = 0; i < 10; ++i) {
+    auto input = generate_sinusoid(input_size, 100.0f + i);
+    std::vector<float> output(output_size);
+
+    EXPECT_NO_THROW(executor.submit(input.data(), output.data(), input_size));
+
+    // Verify output is valid (non-zero magnitude)
+    float max_val = *std::max_element(output.begin(), output.end());
+    EXPECT_GT(max_val, 1e-6f) << "Frame " << i << " has zero output";
+  }
+
+  // Verify stats
+  auto stats = executor.get_stats();
+  EXPECT_GE(stats.frames_processed, 10);
+}
+
+/**
+ * @brief Stress test event-based buffer reuse with high throughput.
+ *
+ * This test verifies correct synchronization under high buffer reuse pressure:
+ * - Many consecutive frames (100)
+ * - High overlap (0.875) → more residual data
+ * - Minimal buffer pool (2 buffers) → 50x reuse per buffer
+ */
+TEST_F(StreamingExecutorTest, HighThroughputBufferReuse) {
+  config_.nfft = 2048;
+  config_.channels = 4;
+  config_.overlap = 0.875f;          // High overlap
+  config_.pinned_buffer_count = 2;   // Minimal buffer pool
+  config_.stream_count = 3;
+
+  StreamingExecutor executor;
+  PipelineBuilder builder;
+  auto stages = builder.with_config(StageConfig{config_.nfft, config_.channels})
+                    .add_window(StageConfig::WindowType::HANN)
+                    .add_fft()
+                    .add_magnitude()
+                    .build();
+  executor.initialize(config_, std::move(stages));
+
+  const size_t input_size = config_.nfft * config_.channels;
+  const size_t output_size = config_.num_output_bins() * config_.channels;
+
+  // Process 100 submits rapidly (stress test)
+  // With high overlap (0.875), hop_size=256, so each submit produces ~8 frames
+  auto start = std::chrono::high_resolution_clock::now();
+
+  for (int i = 0; i < 100; ++i) {
+    auto input = generate_sinusoid(input_size, 200.0f + i * 10.0f);
+    std::vector<float> output(output_size);
+
+    EXPECT_NO_THROW(executor.submit(input.data(), output.data(), input_size));
+  }
+
+  auto elapsed = std::chrono::high_resolution_clock::now() - start;
+  auto elapsed_us =
+      std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
+
+  // Verify stats
+  auto stats = executor.get_stats();
+  // With overlap=0.875 (hop_size=256), each submit of 2048 samples produces ~8 frames
+  // 100 submits × ~8 frames/submit ≈ 800 frames (actual: ~793 due to startup)
+  EXPECT_GE(stats.frames_processed, 750);  // At least 750 frames
+  EXPECT_LE(stats.frames_processed, 850);  // At most 850 frames
+
+  // Verify performance (should be <250µs per frame with event sync)
+  float avg_latency_us = static_cast<float>(elapsed_us) /
+                          static_cast<float>(stats.frames_processed);
+  EXPECT_LT(avg_latency_us, 250.0f)
+      << "Average latency per frame too high: " << avg_latency_us << "µs";
+}
+
+/**
+ * @brief Test event synchronization with single stream (edge case).
+ *
+ * This test verifies that event-based synchronization works correctly when
+ * all operations (H2D, compute, D2H) are serialized on a single stream.
+ */
+TEST_F(StreamingExecutorTest, SingleStreamEventSync) {
+  config_.nfft = 512;
+  config_.channels = 1;
+  config_.overlap = 0.5f;
+  config_.pinned_buffer_count = 2;
+  config_.stream_count = 1;  // ← Single stream edge case
+
+  StreamingExecutor executor;
+  PipelineBuilder builder;
+  auto stages = builder.with_config(StageConfig{config_.nfft, config_.channels})
+                    .add_window(StageConfig::WindowType::HANN)
+                    .add_fft()
+                    .add_magnitude()
+                    .build();
+  executor.initialize(config_, std::move(stages));
+
+  const size_t input_size = config_.nfft * config_.channels;
+  const size_t output_size = config_.num_output_bins() * config_.channels;
+
+  // Process 5 frames (triggers buffer reuse)
+  for (int i = 0; i < 5; ++i) {
+    auto input = generate_sinusoid(input_size, 50.0f);
+    std::vector<float> output(output_size);
+
+    EXPECT_NO_THROW(executor.submit(input.data(), output.data(), input_size));
+  }
+
+  auto stats = executor.get_stats();
+  EXPECT_GE(stats.frames_processed, 5);
+}
+
+/**
+ * @brief Test event synchronization with large buffer pool (minimal reuse).
+ *
+ * This test verifies correct event handling when buffer reuse is infrequent:
+ * - Large buffer pool (8 buffers)
+ * - First 8 frames have no reuse
+ * - Remaining 12 frames reuse buffers infrequently
+ */
+TEST_F(StreamingExecutorTest, LargeBufferPoolEventSync) {
+  config_.nfft = 1024;
+  config_.channels = 2;
+  config_.overlap = 0.5f;
+  config_.pinned_buffer_count = 8;  // Large pool
+  config_.stream_count = 3;
+
+  StreamingExecutor executor;
+  PipelineBuilder builder;
+  auto stages = builder.with_config(StageConfig{config_.nfft, config_.channels})
+                    .add_window(StageConfig::WindowType::HANN)
+                    .add_fft()
+                    .add_magnitude()
+                    .build();
+  executor.initialize(config_, std::move(stages));
+
+  const size_t input_size = config_.nfft * config_.channels;
+  const size_t output_size = config_.num_output_bins() * config_.channels;
+
+  // Process 20 submits (with overlap=0.5, produces ~40 frames total)
+  // First 8 frames have no buffer reuse, remaining frames reuse buffers
+  for (int i = 0; i < 20; ++i) {
+    auto input = generate_sinusoid(input_size, 75.0f + i);
+    std::vector<float> output(output_size);
+
+    EXPECT_NO_THROW(executor.submit(input.data(), output.data(), input_size));
+  }
+
+  auto stats = executor.get_stats();
+  // With overlap=0.5 (hop_size=512), each submit of 1024 samples produces ~2 frames
+  // 20 submits × ~2 frames/submit ≈ 40 frames (actual: 39 due to startup)
+  EXPECT_GE(stats.frames_processed, 35);  // At least 35 frames
+  EXPECT_LE(stats.frames_processed, 45);  // At most 45 frames
 }
