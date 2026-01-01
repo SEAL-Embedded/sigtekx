@@ -161,7 +161,7 @@ def device_info(device_id: int | None = None) -> dict[str, Any]:
         except Exception as exc:
             logger.warning("Unexpected NVML error: %s", exc)
 
-    # Fallback to C++ backend if name still 'Unknown'
+    # Fallback to C++ RuntimeInfo if name still 'Unknown'
     if info['name'] == 'Unknown':
         try:
             cpp_module = _import_cpp_engine()
@@ -169,29 +169,13 @@ def device_info(device_id: int | None = None) -> dict[str, Any]:
             raise DllLoadError("_engine", exc) from exc
 
         try:
-            devices = list(cpp_module.get_available_devices())
+            runtime_info = cpp_module.get_runtime_info(device_id)
+            info['name'] = runtime_info.device_name
+            info['cuda_version'] = runtime_info.cuda_version
         except Exception as exc:
-            raise DeviceNotFoundError("Failed to enumerate CUDA devices") from exc
-
-        if not devices:
-            raise DeviceNotFoundError("No CUDA-capable devices detected")
-
-        if device_id >= len(devices) or device_id < 0:
             raise DeviceNotFoundError(
-                f"Requested device index {device_id} outside available device range"
-            )
-
-        device_str = devices[device_id]
-        name_part = device_str.split('] ', 1)[1] if '] ' in device_str else device_str
-        if ' (CC ' in name_part:
-            name, cc_part = name_part.split(' (CC ', 1)
-            info['name'] = name
-            cc_tokens = cc_part.split(')', 1)[0].split('.')
-            if len(cc_tokens) == 2:
-                with contextlib.suppress(ValueError):
-                    info['compute_capability'] = (int(cc_tokens[0]), int(cc_tokens[1]))
-        else:
-            info['name'] = name_part
+                f"Failed to query device {device_id}: {exc}"
+            ) from exc
 
     return info
 
