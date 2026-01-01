@@ -14,8 +14,6 @@ Usage:
     python experiments/scripts/verify_rtf_convention.py
 """
 
-import ast
-import re
 from pathlib import Path
 
 import pandas as pd
@@ -78,7 +76,7 @@ def check_csv_data():
                 all_academic = False
                 old_convention_files.append(csv_file.name)
 
-    print(f"\n3. CSV Data Files (artifacts/data)")
+    print("\n3. CSV Data Files (artifacts/data)")
     print(f"   Total throughput CSV files: {len(throughput_files)}")
     print(f"   All files use academic convention: {all_academic}")
 

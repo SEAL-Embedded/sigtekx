@@ -257,12 +257,15 @@ class TestEngineProperties:
     def test_device_info_logs_cuda_error(self, test_config: EngineConfig, caplog):
         """Test that CUDA errors are logged at WARNING level."""
         from unittest.mock import patch
+
         from sigtekx.utils.logging import _is_running_under_profiler
 
         engine = Engine(config=test_config)
 
-        # Patch after engine initialization to test property error handling
-        with patch('sigtekx.utils.device.device_info') as mock_device_info:
+        # Patch both RuntimeInfo and NVML to simulate complete failure
+        with patch('sigtekx.core._native.get_runtime_info') as mock_runtime_info, \
+             patch('sigtekx.utils.device.device_info') as mock_device_info:
+            mock_runtime_info.side_effect = RuntimeError("CUDA error 999")
             mock_device_info.side_effect = RuntimeError("CUDA error 999")
 
             with caplog.at_level(logging.WARNING):
@@ -270,23 +273,26 @@ class TestEngineProperties:
 
             # Should return dict with error field
             assert 'error' in info
-            assert 'CUDA device query failed' in info['error']
+            assert 'Device query failed' in info['error']
 
             # Should log warning (unless profiler active)
             if not _is_running_under_profiler():
-                assert any('CUDA' in record.message for record in caplog.records)
+                assert any('Unable to query device info' in record.message for record in caplog.records)
 
         engine.close()
 
     def test_device_info_logs_import_error(self, test_config: EngineConfig, caplog):
         """Test that ImportError is logged when device utils unavailable."""
         from unittest.mock import patch
+
         from sigtekx.utils.logging import _is_running_under_profiler
 
         engine = Engine(config=test_config)
 
-        # Patch after engine initialization to test property error handling
-        with patch('sigtekx.utils.device.device_info') as mock_device_info:
+        # Patch both RuntimeInfo and NVML to simulate complete failure
+        with patch('sigtekx.core._native.get_runtime_info') as mock_runtime_info, \
+             patch('sigtekx.utils.device.device_info') as mock_device_info:
+            mock_runtime_info.side_effect = ImportError("No module named '_native'")
             mock_device_info.side_effect = ImportError("No module named 'pynvml'")
 
             with caplog.at_level(logging.WARNING):
@@ -328,9 +334,11 @@ class TestEngineProperties:
 
         engine = Engine(config=test_config)
 
-        # Patch after engine initialization to test property error handling
-        with patch('sigtekx.utils.device.device_info') as mock_device_info:
-            mock_device_info.side_effect = ValueError("Unexpected error")
+        # Patch both RuntimeInfo and NVML to simulate complete failure
+        with patch('sigtekx.core._native.get_runtime_info') as mock_runtime_info, \
+             patch('sigtekx.utils.device.device_info') as mock_device_info:
+            mock_runtime_info.side_effect = ValueError("Unexpected error in RuntimeInfo")
+            mock_device_info.side_effect = ValueError("Unexpected error in NVML")
 
             with caplog.at_level(logging.DEBUG):
                 info = engine.device_info
@@ -339,8 +347,8 @@ class TestEngineProperties:
             assert 'error' in info
             assert 'Device info unavailable' in info['error']
 
-            # Should log at DEBUG level
-            assert any('Unexpected error' in record.message for record in caplog.records if record.levelname == 'DEBUG')
+            # Should log at DEBUG level (RuntimeInfo failure logs at DEBUG)
+            assert any('RuntimeInfo query failed' in record.message for record in caplog.records if record.levelname == 'DEBUG')
 
         engine.close()
 
@@ -630,4 +638,82 @@ class TestEngineIntegration:
 
             assert len(results) == 5
             assert all(r.shape == (1, 129) for r in results)
+
+
+class TestEngineDeviceInfo:
+    """Test Engine.device_info property with RuntimeInfo integration."""
+
+    def test_device_info_uses_runtime_info(self):
+        """Verify device_info uses RuntimeInfo as primary source."""
+        engine = Engine(preset='default')
+        info = engine.device_info
+
+        # Should have all expected fields
+        assert 'device_name' in info
+        assert 'cuda_version' in info
+        assert 'device_memory_mb' in info
+        assert 'device_memory_free_mb' in info
+
+        # Device name should be populated (not "Unknown")
+        assert info['device_name'] != 'Unknown'
+        assert info['device_name'] != 'Not initialized'
+
+        # CUDA version should be valid format
+        if info['cuda_version'] != 'Unknown':
+            assert '.' in info['cuda_version']
+
+        engine.close()
+
+    def test_device_info_before_initialization(self):
+        """Test device_info before engine initialized."""
+        # Create engine without initialization
+        engine = Engine.__new__(Engine)
+        engine._initialized = False
+        engine._cpp_engine = None
+
+        info = engine.device_info
+        assert info['device_name'] == 'Not initialized'
+        assert info['cuda_version'] == 'Unknown'
+
+    def test_device_info_no_error_field_on_success(self):
+        """Verify device_info doesn't have 'error' field on success."""
+        engine = Engine(preset='default')
+        info = engine.device_info
+
+        # Should not have error field if query succeeded
+        if info['device_name'] != 'Unknown':
+            assert 'error' not in info
+
+        engine.close()
+
+    def test_device_info_runtime_info_fallback_to_nvml(self):
+        """Test that NVML provides memory info when RuntimeInfo doesn't."""
+        engine = Engine(preset='default')
+        info = engine.device_info
+
+        # Memory info should be populated (from NVML augmentation)
+        # This may be 0 if NVML not available, but field should exist
+        assert 'device_memory_mb' in info
+        assert 'device_memory_free_mb' in info
+        assert isinstance(info['device_memory_mb'], int)
+        assert isinstance(info['device_memory_free_mb'], int)
+
+        engine.close()
+
+    def test_device_info_consistent_with_native_get_runtime_info(self):
+        """Verify device_info matches native get_runtime_info()."""
+        from sigtekx.core import _native
+
+        engine = Engine(preset='default')
+        engine_info = engine.device_info
+
+        # Query native RuntimeInfo directly
+        native_info = _native.get_runtime_info(0)
+
+        # Device name and CUDA version should match
+        if engine_info['device_name'] != 'Unknown':
+            assert engine_info['device_name'] == native_info.device_name
+            assert engine_info['cuda_version'] == native_info.cuda_version
+
+        engine.close()
 

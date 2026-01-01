@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 """Quick progress checker for running experiments."""
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
 from analysis.cli import load_data
+
 
 def check_progress():
     """Check current experiment coverage."""

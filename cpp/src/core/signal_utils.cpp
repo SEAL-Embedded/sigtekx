@@ -16,6 +16,7 @@
 #include <cufft.h>
 
 #include "sigtekx/core/cuda_wrappers.hpp"
+#include "sigtekx/core/processing_stage.hpp"
 #include "sigtekx/core/signal_config.hpp"
 #include "sigtekx/profiling/nvtx.hpp"
 
@@ -138,6 +139,45 @@ size_t estimate_cufft_workspace_bytes(size_t nfft, size_t channels,
   }
 
   return work_size;
+}
+
+RuntimeInfo get_runtime_info(int device_index) {
+  SIGTEKX_NVTX_RANGE_FUNCTION(profiling::colors::CYAN);
+
+  RuntimeInfo info;
+
+  // Validate device index
+  int device_count = 0;
+  SIGTEKX_CUDA_CHECK(cudaGetDeviceCount(&device_count));
+  if (device_index < 0 || device_index >= device_count) {
+    std::ostringstream oss;
+    oss << "Invalid device index " << device_index
+        << " (available: 0-" << (device_count - 1) << ")";
+    throw std::runtime_error(oss.str());
+  }
+
+  // Query device properties
+  cudaDeviceProp prop{};
+  SIGTEKX_CUDA_CHECK(cudaGetDeviceProperties(&prop, device_index));
+  info.device_name = prop.name;
+
+  // Query runtime version
+  int runtime_version = 0;
+  SIGTEKX_CUDA_CHECK(cudaRuntimeGetVersion(&runtime_version));
+  info.cuda_runtime_version = runtime_version;
+
+  // Query driver version
+  int driver_version = 0;
+  SIGTEKX_CUDA_CHECK(cudaDriverGetVersion(&driver_version));
+  info.cuda_driver_version = driver_version;
+
+  // Format version string (matches benchmark implementation)
+  char version_str[64];
+  snprintf(version_str, sizeof(version_str), "%d.%d",
+           runtime_version / 1000, (runtime_version % 100) / 10);
+  info.cuda_version = version_str;
+
+  return info;
 }
 
 }  // namespace signal_utils

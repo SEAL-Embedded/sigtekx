@@ -1,7 +1,7 @@
 """Configuration validation utilities."""
 
-from typing import Final
 import warnings
+from typing import Final
 
 import numpy as np
 

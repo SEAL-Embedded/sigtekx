@@ -8,7 +8,6 @@ Follows DRY principles by centralizing RTF thresholds and interpretation logic.
 
 import pandas as pd
 
-
 # =============================================================================
 # RTF Thresholds (Academic Convention - Lower is Better)
 # =============================================================================

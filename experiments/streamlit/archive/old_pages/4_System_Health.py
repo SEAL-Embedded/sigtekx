@@ -16,12 +16,9 @@ Key Metrics:
 import sys
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 import streamlit as st
-from plotly.subplots import make_subplots
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -31,15 +28,13 @@ from analysis.metrics import classify_rtf
 from analysis.visualization import PerformancePlotter, VisualizationConfig
 from utils.data_loader import load_benchmark_data
 from utils.rtf_helpers import (
-    RTF_REALTIME_LIMIT,
     RTF_AGGRESSIVE_TARGET,
-    RTF_PRODUCTION_TARGET,
     RTF_HEATMAP_COLORSCALE,
     RTF_HEATMAP_MIDPOINT,
     RTF_HEATMAP_RANGE,
+    RTF_REALTIME_LIMIT,
     calculate_rtf_statistics,
     get_rtf_heatmap_interpretation_text,
-    add_rtf_threshold_lines
 )
 
 # Page configuration

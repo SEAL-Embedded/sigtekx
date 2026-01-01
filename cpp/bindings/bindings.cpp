@@ -292,6 +292,29 @@ PYBIND11_MODULE(_native, m) {
       .def_readonly("frames_processed",
                     &sigtekx::ProcessingStats::frames_processed);
 
+  py::class_<sigtekx::RuntimeInfo>(m, "RuntimeInfo",
+      "CUDA runtime and device information.\n\n"
+      "Contains device name, CUDA runtime/driver versions, and formatted version string.\n"
+      "Use get_runtime_info() module function to query device information.\n\n"
+      "Example:\n"
+      "    >>> info = get_runtime_info(0)\n"
+      "    >>> print(info.device_name)\n"
+      "    'NVIDIA GeForce RTX 3090'\n"
+      "    >>> print(info.cuda_version)\n"
+      "    '12.3'")
+      .def_readonly("device_name", &sigtekx::RuntimeInfo::device_name,
+          "CUDA device name (e.g., 'NVIDIA GeForce RTX 3090')")
+      .def_readonly("cuda_version", &sigtekx::RuntimeInfo::cuda_version,
+          "Pre-formatted CUDA runtime version string (e.g., '12.3')")
+      .def_readonly("cuda_runtime_version", &sigtekx::RuntimeInfo::cuda_runtime_version,
+          "CUDA runtime version as integer (e.g., 12030 for CUDA 12.3)")
+      .def_readonly("cuda_driver_version", &sigtekx::RuntimeInfo::cuda_driver_version,
+          "CUDA driver version as integer (e.g., 12030 for driver 12.3)")
+      .def("__repr__", [](const sigtekx::RuntimeInfo& info) {
+          return "<RuntimeInfo device='" + info.device_name +
+                 "' cuda_version='" + info.cuda_version + "'>";
+      });
+
   // --- Bind Executor Classes ---
   py::class_<sigtekx::PyBatchExecutor>(
       m, "BatchExecutor",
@@ -343,6 +366,22 @@ PYBIND11_MODULE(_native, m) {
         "Gets a list of available CUDA devices.");
   m.def("select_best_device", &sigtekx::signal_utils::select_best_device,
         "Selects the best available CUDA device.");
+
+  m.def("get_runtime_info", &sigtekx::signal_utils::get_runtime_info,
+        py::arg("device_index") = 0,
+        "Query CUDA runtime and device information.\n\n"
+        "Args:\n"
+        "    device_index: GPU device to query (default: 0)\n\n"
+        "Returns:\n"
+        "    RuntimeInfo: Struct with device name, CUDA versions\n\n"
+        "Raises:\n"
+        "    RuntimeError: If device_index invalid or CUDA query fails\n\n"
+        "Example:\n"
+        "    >>> info = get_runtime_info(0)\n"
+        "    >>> print(info.device_name)\n"
+        "    'NVIDIA GeForce RTX 3090'\n"
+        "    >>> print(info.cuda_version)\n"
+        "    '12.3'");
 
   m.def("estimate_cufft_workspace_bytes",
         &sigtekx::signal_utils::estimate_cufft_workspace_bytes,

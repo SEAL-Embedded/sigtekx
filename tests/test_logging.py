@@ -95,6 +95,7 @@ class TestSetupLogging:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 import importlib
+
                 import sigtekx  # noqa: F401
                 importlib.reload(sigtekx)
             captured = capsys.readouterr()

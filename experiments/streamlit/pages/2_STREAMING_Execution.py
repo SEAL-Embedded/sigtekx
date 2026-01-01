@@ -8,15 +8,13 @@ Continuous real-time processing analysis (live monitoring, ring buffer managemen
 import sys
 from pathlib import Path
 
-import streamlit as st
 import plotly.express as px
-import plotly.graph_objects as go
+import streamlit as st
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from analysis.visualization import PerformancePlotter, VisualizationConfig
 from utils.data_loader import load_benchmark_data
 
 # Page configuration
@@ -250,7 +248,7 @@ try:
         high_nfft_data = streaming_data[streaming_data['engine_nfft'] >= 16384] if 'engine_nfft' in streaming_data.columns else streaming_data[0:0]
 
         if len(high_nfft_data) > 0:
-            st.subheader(f"High-Resolution Streaming Performance (NFFT ≥ 16384)")
+            st.subheader("High-Resolution Streaming Performance (NFFT ≥ 16384)")
             st.write(f"Found **{len(high_nfft_data)} high-NFFT streaming configurations**")
 
             if 'rtf' in high_nfft_data.columns:

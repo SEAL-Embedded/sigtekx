@@ -5,13 +5,11 @@ and cleanup behavior under realistic conditions.
 """
 
 import os
-import time
 
 import pytest
 
 from sigtekx import Engine, EngineConfig
 from sigtekx.utils.device import get_gpu_memory_snapshot
-
 
 # -----------------------------------------------------------------------------
 # GPU Integration Tests

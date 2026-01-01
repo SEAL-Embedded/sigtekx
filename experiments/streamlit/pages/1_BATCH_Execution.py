@@ -8,15 +8,14 @@ Discrete frame processing analysis (offline, maximum throughput, no ring buffer 
 import sys
 from pathlib import Path
 
-import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
+import streamlit as st
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from analysis.visualization import PerformancePlotter, VisualizationConfig
 from utils.data_loader import load_benchmark_data
 
 # Page configuration

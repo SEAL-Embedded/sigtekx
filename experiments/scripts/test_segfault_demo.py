@@ -1,7 +1,7 @@
 """Test the ACTUAL segfault scenario from the GitHub issue."""
 import numpy as np
+
 from sigtekx.core import _native  # Direct C++ binding
-from sigtekx import EngineConfig
 
 BatchExecutor = _native.BatchExecutor
 

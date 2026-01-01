@@ -1,6 +1,5 @@
 """Tests for device utility functions and NVML context manager."""
 
-import contextlib
 import pytest
 
 from sigtekx.utils.device import (

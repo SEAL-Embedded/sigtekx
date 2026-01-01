@@ -22,6 +22,9 @@
 
 namespace sigtekx {
 
+// Forward declaration
+struct RuntimeInfo;
+
 /**
  * @struct SignalConfig
  * @brief Core configuration for signal processing parameters.
@@ -85,6 +88,19 @@ size_t estimate_memory_usage(const SignalConfig& config);
 size_t estimate_cufft_workspace_bytes(size_t nfft, size_t channels,
                                        bool is_real_input = true,
                                        bool use_fallback_on_error = true);
+
+/**
+ * @brief Query CUDA runtime and device information.
+ *
+ * Queries CUDA device properties and version information for diagnostics.
+ * Can be called before executor initialization for system checks.
+ *
+ * @param device_index GPU device to query (default: 0)
+ * @return RuntimeInfo struct with device name and CUDA versions
+ * @throws std::runtime_error if CUDA query fails or device invalid
+ */
+RuntimeInfo get_runtime_info(int device_index = 0);
+
 }  // namespace signal_utils
 
 }  // namespace sigtekx

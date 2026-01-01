@@ -14,7 +14,6 @@ The Engine class is the single entry point for all processing modes:
 
 from __future__ import annotations
 
-import contextlib
 import warnings
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, cast
@@ -534,7 +533,7 @@ class Engine:
             return
 
         # Step 1: Determine logging verbosity and memory tracking
-        from sigtekx.utils.logging import logger, _is_running_under_profiler
+        from sigtekx.utils.logging import _is_running_under_profiler, logger
 
         verbose = __debug__ and not _is_running_under_profiler()
         track_memory = self._should_track_cleanup_memory()
@@ -742,19 +741,27 @@ class Engine:
     def device_info(self) -> dict[str, Any]:
         """Get CUDA device information.
 
+        Returns device information using a three-tier fallback strategy:
+        1. Native RuntimeInfo (fast, minimal dependencies)
+        2. NVML device query (comprehensive, optional dependency)
+        3. Error state with diagnostic message
+
         Returns:
-            Dictionary with device information. If device queries fail,
+            Dictionary with device information. If all queries fail,
             returns partial info with 'error' field explaining the failure.
 
         Example:
             >>> engine = Engine(preset='default')
             >>> info = engine.device_info
-            >>> if 'error' in info:
-            ...     print(f"Device info issue: {info['error']}")
+            >>> print(info['device_name'])
+            'NVIDIA GeForce RTX 3090'
+            >>> print(info['cuda_version'])
+            '12.3'
         """
         # Import here to avoid circular dependencies (matches existing pattern)
-        from sigtekx.utils.logging import logger, _is_running_under_profiler
+        from sigtekx.utils.logging import _is_running_under_profiler, logger
 
+        # Case 1: Uninitialized engine
         if not self._initialized or self._cpp_engine is None:
             return {
                 "device_name": "Not initialized",
@@ -763,12 +770,41 @@ class Engine:
                 "device_memory_free_mb": 0,
             }
 
-        result = {}
+        # Case 2: Try RuntimeInfo (primary source - fast and accurate)
+        try:
+            from sigtekx.core import _native
+            runtime_info = _native.get_runtime_info(0)  # Query device 0
 
+            # Success - return RuntimeInfo as primary source
+            result = {
+                "device_name": str(runtime_info.device_name),
+                "cuda_version": str(runtime_info.cuda_version),
+                "device_memory_mb": 0,  # RuntimeInfo doesn't have memory info
+                "device_memory_free_mb": 0,
+            }
+
+            # Try to augment with NVML memory info (best-effort, no error if fails)
+            try:
+                from sigtekx.utils.device import device_info as get_device_info
+                nvml_info = get_device_info()
+                result["device_memory_mb"] = int(nvml_info.get("memory_total_mb", 0))
+                result["device_memory_free_mb"] = int(nvml_info.get("memory_free_mb", 0))
+            except Exception:
+                pass  # Ignore NVML errors when augmenting RuntimeInfo
+
+            return result
+
+        except Exception as e:
+            # RuntimeInfo failed - log at DEBUG (expected in some environments)
+            logger.debug(
+                "RuntimeInfo query failed (falling back to NVML): %s", e
+            )
+
+        # Case 3: Fall back to NVML (secondary source)
         try:
             from sigtekx.utils.device import device_info as get_device_info
             info = get_device_info()
-            result = {
+            return {
                 "device_name": str(info.get("name", "Unknown")),
                 "cuda_version": str(info.get("cuda_version", "Unknown")),
                 "device_memory_mb": int(info.get("memory_total_mb", 0)),
@@ -776,12 +812,12 @@ class Engine:
             }
 
         except ImportError as e:
-            # Device utilities module not available
+            # NVML not available
             if not _is_running_under_profiler():
                 logger.warning(
-                    "Unable to query device info: device utilities not available (%s)", e
+                    "Device info unavailable: RuntimeInfo and NVML both failed (%s)", e
                 )
-            result = {
+            return {
                 "device_name": "Unknown",
                 "cuda_version": "Unknown",
                 "device_memory_mb": 0,
@@ -790,34 +826,32 @@ class Engine:
             }
 
         except RuntimeError as e:
-            # CUDA error (driver issue, device not found, etc.)
+            # CUDA/NVML runtime error
             if not _is_running_under_profiler():
                 logger.warning(
-                    "Unable to query CUDA device: %s", e
+                    "Unable to query device info: %s", e
                 )
-            result = {
+            return {
                 "device_name": "Unknown",
                 "cuda_version": "Unknown",
                 "device_memory_mb": 0,
                 "device_memory_free_mb": 0,
-                "error": f"CUDA device query failed: {e}"
+                "error": f"Device query failed: {e}"
             }
 
         except Exception as e:
-            # Unexpected error (log at debug level)
+            # Unexpected error
             logger.debug(
                 "Unexpected error querying device info: %s: %s",
                 type(e).__name__, e
             )
-            result = {
+            return {
                 "device_name": "Unknown",
                 "cuda_version": "Unknown",
                 "device_memory_mb": 0,
                 "device_memory_free_mb": 0,
                 "error": f"Device info unavailable: {type(e).__name__}"
             }
-
-        return result
 
     # -------------------------------------------------------------------------
     # Context Manager Protocol

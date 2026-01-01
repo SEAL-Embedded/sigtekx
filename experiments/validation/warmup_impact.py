@@ -1,9 +1,9 @@
 """Validate warmup impact on throughput measurements."""
-import subprocess
-import json
 import re
+import subprocess
 import sys
 from pathlib import Path
+
 
 def run_throughput_benchmark(warmup_iterations: int, warmup_duration_s: float, label: str) -> dict:
     """Run throughput benchmark and extract metrics."""
@@ -62,7 +62,7 @@ def run_throughput_benchmark(warmup_iterations: int, warmup_duration_s: float, l
         return metrics
 
     except subprocess.TimeoutExpired:
-        print(f"ERROR: Benchmark timed out after 120s")
+        print("ERROR: Benchmark timed out after 120s")
         return {}
     except Exception as e:
         print(f"ERROR: {e}")

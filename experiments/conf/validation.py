@@ -102,7 +102,7 @@ class ConfigValidator:
 
         # Compatibility checks
         if nfft >= 8192 and channels >= 32:
-            self.warnings.append(f"Large NFFT + many channels may exceed GPU memory")
+            self.warnings.append("Large NFFT + many channels may exceed GPU memory")
 
         # Real-time feasibility
         samples_per_frame = int(nfft * (1.0 - overlap))

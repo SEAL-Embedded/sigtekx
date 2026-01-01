@@ -5,7 +5,6 @@ and __exit__() methods, including GPU memory leak detection, error classificatio
 and build-mode-aware behavior.
 """
 
-import contextlib
 import os
 import warnings
 from unittest import mock
@@ -13,8 +12,7 @@ from unittest import mock
 import pytest
 
 from sigtekx import Engine, EngineConfig
-from sigtekx.exceptions import EngineCleanupError, EngineStateError
-
+from sigtekx.exceptions import EngineCleanupError
 
 # -----------------------------------------------------------------------------
 # Fixtures

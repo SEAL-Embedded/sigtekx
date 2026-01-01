@@ -427,10 +427,10 @@ class BaseBenchmark(abc.ABC):
                     self.setup()
 
                 # Warmup phase
-                setattr(self, "_in_warmup", False)
+                self._in_warmup = False
                 if self.config.warmup_iterations > 0:
                     try:
-                        setattr(self, "_in_warmup", True)
+                        self._in_warmup = True
                         with warmup_range(
                             f"Warmup_{self.config.warmup_iterations}_iterations"
                         ):
@@ -446,7 +446,7 @@ class BaseBenchmark(abc.ABC):
                                 ):
                                     _ = self.execute_iteration()
                     finally:
-                        setattr(self, "_in_warmup", False)
+                        self._in_warmup = False
 
                 # Measurement phase
                 with nvtx_range(
