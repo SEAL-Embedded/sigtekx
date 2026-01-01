@@ -16,6 +16,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include <array>
 #include <sstream>
 
 #include "sigtekx/core/executor_config.hpp"
@@ -54,7 +55,13 @@ class PyExecutor {
     // Initialize executor with config and stages
     executor_->initialize(config, std::move(stages));
     config_ = config;
-    output_buffer_.resize(config.num_output_bins() * config.channels);
+
+    // Allocate all buffers in the pool
+    size_t buffer_size = config.num_output_bins() * config.channels;
+    for (auto& buffer : output_buffers_) {
+      buffer.resize(buffer_size);
+    }
+    current_buffer_idx_ = 0;
   }
 
   /**
@@ -77,15 +84,29 @@ class PyExecutor {
       throw std::runtime_error(oss.str());
     }
 
-    executor_->submit(input.data(), output_buffer_.data(), expected_size);
+    // Get next buffer from pool (round-robin)
+    size_t idx = current_buffer_idx_;
+    current_buffer_idx_ = (current_buffer_idx_ + 1) % BUFFER_POOL_SIZE;
 
-    // Return a copy of the output buffer, reshaped for Python.
-    return py::array(py::buffer_info(
-        output_buffer_.data(), sizeof(float),
-        py::format_descriptor<float>::format(), 2,
-        {static_cast<py::ssize_t>(config_.channels),
-         static_cast<py::ssize_t>(config_.num_output_bins())},
-        {sizeof(float) * config_.num_output_bins(), sizeof(float)}));
+    executor_->submit(input.data(), output_buffers_[idx].data(), expected_size);
+
+    // Return zero-copy view using py::array_t constructor
+    // This creates a view without copying (reference_internal keeps executor alive)
+    std::vector<py::ssize_t> shape = {
+        static_cast<py::ssize_t>(config_.channels),
+        static_cast<py::ssize_t>(config_.num_output_bins())
+    };
+    std::vector<py::ssize_t> strides = {
+        static_cast<py::ssize_t>(config_.num_output_bins() * sizeof(float)),
+        sizeof(float)
+    };
+
+    return py::array_t<float>(
+        shape,                           // Shape
+        strides,                         // Strides (in bytes)
+        output_buffers_[idx].data(),     // Data pointer (zero-copy)
+        py::cast(*this)                  // Base object (keeps this alive)
+    );
   }
 
   /** @brief Resets the executor to an uninitialized state. */
@@ -106,7 +127,11 @@ class PyExecutor {
  private:
   std::unique_ptr<ExecutorType> executor_;
   ExecutorConfig config_;
-  std::vector<float> output_buffer_;
+
+  // Buffer pool for zero-copy returns (4 buffers for round-robin allocation)
+  static constexpr size_t BUFFER_POOL_SIZE = 4;
+  std::array<std::vector<float>, BUFFER_POOL_SIZE> output_buffers_;
+  size_t current_buffer_idx_ = 0;
 };
 
 // Type aliases for Python bindings
@@ -274,8 +299,13 @@ PYBIND11_MODULE(_native, m) {
       .def(py::init<>())
       .def("initialize", &sigtekx::PyBatchExecutor::initialize,
            py::arg("config"), "Initializes the executor with configuration.")
-      .def("process", &sigtekx::PyBatchExecutor::process, py::arg("input"),
-           "Processes a batch of input data.")
+      .def("process", &sigtekx::PyBatchExecutor::process,
+           py::return_value_policy::reference_internal,
+           py::arg("input"),
+           "Processes input and returns zero-copy view into internal buffer.\n\n"
+           "IMPORTANT: Returned array is valid while executor exists.\n"
+           "Up to 4 outputs can be safely stored before buffer reuse.\n"
+           "For independent copy: result.copy()")
       .def("reset", &sigtekx::PyBatchExecutor::reset,
            "Resets the executor to uninitialized state.")
       .def("synchronize", &sigtekx::PyBatchExecutor::synchronize,
@@ -291,8 +321,13 @@ PYBIND11_MODULE(_native, m) {
       .def(py::init<>())
       .def("initialize", &sigtekx::PyStreamingExecutor::initialize,
            py::arg("config"), "Initializes the executor with configuration.")
-      .def("process", &sigtekx::PyStreamingExecutor::process, py::arg("input"),
-           "Processes a batch of input data.")
+      .def("process", &sigtekx::PyStreamingExecutor::process,
+           py::return_value_policy::reference_internal,
+           py::arg("input"),
+           "Processes input and returns zero-copy view into internal buffer.\n\n"
+           "IMPORTANT: Returned array is valid while executor exists.\n"
+           "Up to 4 outputs can be safely stored before buffer reuse.\n"
+           "For independent copy: result.copy()")
       .def("reset", &sigtekx::PyStreamingExecutor::reset,
            "Resets the executor to uninitialized state.")
       .def("synchronize", &sigtekx::PyStreamingExecutor::synchronize,

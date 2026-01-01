@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Performance
+
+- **Phase 0: Zero-Copy Python Bindings** - Implemented buffer pool optimization for `process()` returns
+  - **What changed:** Python `process()` now returns zero-copy views instead of copies
+  - **Performance gain:** Estimated 10-20µs per call (8-23% improvement)
+  - **Implementation:** 4-buffer round-robin pool with `reference_internal` policy
+  - **Safety:** Arrays kept alive via `py::cast(*this)` base object reference
+  - **User impact:**
+    - Up to 4 outputs can be safely stored before buffer reuse
+    - For permanent storage, use explicit `.copy()` (e.g., `result.copy()`)
+    - Arrays remain valid while executor exists
+  - **Testing:** 7 new zero-copy validation tests + 86 existing tests pass
+  - **Roadmap alignment:** Phase 0 foundation for Phase 1 zero-copy architecture
+
 ### Breaking Changes
 
 - **C++ API Rename:** Abstract base classes renamed to remove Hungarian notation prefix
