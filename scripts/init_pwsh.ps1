@@ -564,9 +564,9 @@ function global:sxtc { sxt cpp }          # c++ tests
 function global:sxpc  { sigxc profile @args }   # C++ profiling shortcut
 
 # Recommended native research workflow:
-# python benchmarks/run_latency.py experiment=baseline +benchmark=latency
-# python benchmarks/run_latency.py --multirun experiment=nfft_scaling +benchmark=latency
-# python benchmarks/run_throughput.py --multirun experiment=ionosphere_resolution +benchmark=throughput
+# python benchmarks/run_latency.py experiment=ionosphere_test +benchmark=latency
+# python benchmarks/run_latency.py --multirun experiment=full_parameter_grid_48k +benchmark=latency
+# python benchmarks/run_throughput.py experiment=ionosphere_streaming_throughput +benchmark=throughput
 # snakemake --cores 4 --snakefile experiments/Snakefile
 # mlflow ui --backend-store-uri artifacts/mlruns
 # dvc status && dvc repro

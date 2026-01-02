@@ -549,19 +549,23 @@ function Invoke-Dev {
 
     # Python Single Experiments
     Write-Host "═══ PYTHON SINGLE EXPERIMENTS ═══" -ForegroundColor Green
-    Write-Host "  python benchmarks/run_latency.py experiment=baseline +benchmark=latency" -ForegroundColor Gray
-    Write-Host "  python benchmarks/run_throughput.py experiment=ionosphere_temporal +benchmark=throughput" -ForegroundColor Gray
-    Write-Host "  python benchmarks/run_realtime.py experiment=ionosphere_realtime +benchmark=realtime" -ForegroundColor Gray
-    Write-Host "  python benchmarks/run_accuracy.py experiment=baseline +benchmark=accuracy" -ForegroundColor Gray
+    Write-Host "  python benchmarks/run_latency.py experiment=ionosphere_test +benchmark=latency" -ForegroundColor Gray -NoNewline
+    Write-Host "             # Quick test" -ForegroundColor DarkCyan
+    Write-Host "  python benchmarks/run_latency.py experiment=ionosphere_streaming +benchmark=latency" -ForegroundColor Gray -NoNewline
+    Write-Host "      # Ionosphere VLF/ULF" -ForegroundColor DarkCyan
+    Write-Host "  python benchmarks/run_throughput.py experiment=ionosphere_streaming_throughput +benchmark=throughput" -ForegroundColor Gray
+    Write-Host "  python benchmarks/run_latency.py experiment=baseline_streaming_100k_latency +benchmark=latency" -ForegroundColor Gray -NoNewline
+    Write-Host " # Methods Paper" -ForegroundColor DarkCyan
+    Write-Host "  python benchmarks/run_accuracy.py experiment=accuracy_validation +benchmark=accuracy" -ForegroundColor Gray
     Write-Host ""
 
     # Python Multi-Run Experiments
     Write-Host "═══ PYTHON MULTI-RUN EXPERIMENTS ═══" -ForegroundColor Green
-    Write-Host "  python benchmarks/run_latency.py --multirun experiment=ionosphere_resolution +benchmark=latency" -ForegroundColor Gray
-    Write-Host "  python benchmarks/run_throughput.py --multirun experiment=ionosphere_multiscale +benchmark=throughput" -ForegroundColor Gray
+    Write-Host "  python benchmarks/run_latency.py --multirun experiment=full_parameter_grid_48k +benchmark=latency" -ForegroundColor Gray
+    Write-Host "  python benchmarks/run_throughput.py --multirun experiment=full_parameter_grid_100k +benchmark=throughput" -ForegroundColor Gray
     Write-Host ""
-    Write-Host "  Quick test (lightweight):" -ForegroundColor DarkCyan
-    Write-Host "  python benchmarks/run_throughput.py --multirun experiment=ionosphere_test +benchmark=throughput" -ForegroundColor Gray
+    Write-Host "  Custom parameter sweeps:" -ForegroundColor DarkCyan
+    Write-Host "  python benchmarks/run_latency.py --multirun engine.nfft=1024,2048,4096,8192 +benchmark=latency experiment=ionosphere_streaming" -ForegroundColor Gray
     Write-Host ""
 
     # Snakemake Workflows

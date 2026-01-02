@@ -1,34 +1,88 @@
 # Claude Code Quick Reference - Direct Toolchain Usage
 
-## Native Tool Commands (Recommended)
+## Quick Start (Most Common Commands)
 
-### Ionosphere Research Configurations
 ```bash
-# High-resolution analysis (nfft=4096-32768)
-python benchmarks/run_throughput.py --multirun experiment=ionosphere_resolution +benchmark=throughput
+# Quick testing (fastest way to validate)
+python benchmarks/run_latency.py experiment=ionosphere_test +benchmark=latency
 
-# Temporal characteristics study (overlap optimization)
-python benchmarks/run_throughput.py --multirun experiment=ionosphere_temporal +benchmark=throughput
+# Ionosphere streaming (real-time VLF/ULF monitoring)
+python benchmarks/run_latency.py experiment=ionosphere_streaming +benchmark=latency
+python benchmarks/run_throughput.py experiment=ionosphere_streaming_throughput +benchmark=throughput
 
-# Comprehensive multi-scale analysis
-python benchmarks/run_latency.py experiment=ionosphere_multiscale +benchmark=latency
+# Run full benchmark suite and view dashboard
+snakemake --cores 4 --snakefile experiments/Snakefile
+sigx dashboard
 
-# Single experiment runs
-python benchmarks/run_latency.py experiment=ionosphere_resolution +benchmark=latency
+# 100kHz baseline (Methods Paper data)
+python benchmarks/run_latency.py experiment=baseline_streaming_100k_latency +benchmark=latency
+python benchmarks/run_throughput.py experiment=baseline_batch_100k_throughput +benchmark=throughput
 ```
 
-### Direct Hydra Usage
+## Native Tool Commands (Recommended)
+
+### Ionosphere Research Experiments (48kHz, 2-channel VLF/ULF)
+```bash
+# Quick testing (lightweight config, fast validation)
+python benchmarks/run_latency.py experiment=ionosphere_test +benchmark=latency
+
+# Streaming mode experiments (real-time monitoring)
+python benchmarks/run_latency.py experiment=ionosphere_streaming +benchmark=latency
+python benchmarks/run_latency.py experiment=ionosphere_streaming_hires +benchmark=latency
+python benchmarks/run_latency.py experiment=ionosphere_streaming_latency +benchmark=latency
+python benchmarks/run_throughput.py experiment=ionosphere_streaming_throughput +benchmark=throughput
+
+# Batch mode experiments (offline processing)
+python benchmarks/run_throughput.py experiment=ionosphere_batch_throughput +benchmark=throughput
+
+# Specialized ionosphere configuration
+python benchmarks/run_latency.py experiment=ionosphere_specialized +benchmark=latency
+```
+
+### Baseline Experiments (General Performance Characterization)
+```bash
+# 100kHz baseline (Methods Paper positioning - academic soft real-time)
+python benchmarks/run_latency.py experiment=baseline_batch_100k_latency +benchmark=latency
+python benchmarks/run_throughput.py experiment=baseline_batch_100k_throughput +benchmark=throughput
+python benchmarks/run_latency.py experiment=baseline_streaming_100k_latency +benchmark=latency
+python benchmarks/run_throughput.py experiment=baseline_streaming_100k_throughput +benchmark=throughput
+
+# 48kHz baseline (Ionosphere application data)
+python benchmarks/run_latency.py experiment=baseline_batch_48k_latency +benchmark=latency
+python benchmarks/run_throughput.py experiment=baseline_batch_48k_throughput +benchmark=throughput
+python benchmarks/run_latency.py experiment=baseline_streaming_48k_latency +benchmark=latency
+
+# High NFFT throughput baseline
+python benchmarks/run_throughput.py experiment=baseline_batch_high_nfft_throughput +benchmark=throughput
+```
+
+### Analysis & Validation Experiments
+```bash
+# Execution mode comparison (BATCH vs STREAMING)
+python benchmarks/run_latency.py experiment=execution_mode_comparison +benchmark=latency
+
+# Full parameter grid sweeps (comprehensive analysis)
+python benchmarks/run_latency.py --multirun experiment=full_parameter_grid_100k +benchmark=latency
+python benchmarks/run_latency.py --multirun experiment=full_parameter_grid_48k +benchmark=latency
+
+# Specialized analysis
+python benchmarks/run_latency.py experiment=low_nfft_scaling +benchmark=latency
+python benchmarks/run_latency.py experiment=accuracy_validation +benchmark=accuracy
+python benchmarks/run_throughput.py experiment=stress_test +benchmark=throughput
+```
+
+### Direct Hydra Usage (Custom Parameter Sweeps)
 ```bash
 # Native Hydra multirun syntax (IMPORTANT: specify +benchmark=throughput for throughput tests)
-python benchmarks/run_throughput.py --multirun experiment=ionosphere_resolution +benchmark=throughput
-python benchmarks/run_latency.py --multirun engine.nfft=1024,2048,4096,8192 +benchmark=latency
+python benchmarks/run_latency.py --multirun engine.nfft=1024,2048,4096,8192 +benchmark=latency experiment=ionosphere_streaming
+python benchmarks/run_throughput.py --multirun engine.overlap=0.5,0.75,0.875 +benchmark=throughput experiment=ionosphere_streaming
 
 # Single experiments with parameter overrides
-python benchmarks/run_latency.py experiment=baseline engine.nfft=8192 +benchmark=latency
-python benchmarks/run_throughput.py experiment=ionosphere_temporal +benchmark=throughput
+python benchmarks/run_latency.py experiment=baseline_100k engine.nfft=8192 +benchmark=latency
+python benchmarks/run_throughput.py experiment=ionosphere_streaming engine.nfft=8192 engine.overlap=0.9 +benchmark=throughput
 
 # Quick testing with lightweight config
-python benchmarks/run_throughput.py --multirun experiment=ionosphere_test +benchmark=throughput
+python benchmarks/run_latency.py experiment=ionosphere_test +benchmark=latency
 ```
 
 ### Complete Research Workflow
@@ -157,21 +211,56 @@ snakemake quarto_reports
 
 **Location:** `experiments/quarto/` (placeholder structure ready)
 
-## Available Engine Configurations
+## Available Experiment Configurations (26 total)
 
-| Engine | NFFT | Overlap | Batch | Use Case |
-|--------|------|---------|-------|----------|
-| `ionosphere_realtime` | 2048 | 0.625 | 8 | Real-time processing |
-| `ionosphere_hires` | 8192 | 0.75 | 16 | High-resolution analysis |
-| `ionosphere_longterm` | 4096 | 0.875 | 64 | Long-duration studies |
+**📖 For comprehensive experiment documentation, design principles, and selection guide, see:**
+**[docs/benchmarking/experiment-guide.md](docs/benchmarking/experiment-guide.md)**
 
-## Available Experiment Configurations
+The guide explains:
+- Why experiments are designed this way (mode separation, complementary coverage)
+- When to use each experiment (decision tree, time budget guide)
+- Design rationale (zero redundancy, self-documenting)
+- Complete experiment details with parameter sweeps
 
-| Experiment | Description | Parameter Sweeps |
-|------------|-------------|------------------|
-| `ionosphere_resolution` | NFFT resolution study | nfft: 4096-32768, overlap: 0.5-0.875 |
-| `ionosphere_temporal` | Temporal characteristics | overlap: 0.25-0.9375, batch: 16-128 |
-| `ionosphere_multiscale` | Comprehensive analysis | Multi-engine, cross-scale sweeps |
+**Quick reference below:**
+
+### Ionosphere Experiments (48kHz, 2-channel VLF/ULF)
+| Experiment | Mode | Description | Key Parameters |
+|------------|------|-------------|----------------|
+| `ionosphere_test` | - | Lightweight quick testing | Minimal config for fast validation |
+| `ionosphere_streaming` | STREAMING | Standard streaming config | 48kHz, 2-ch, real-time monitoring |
+| `ionosphere_streaming_hires` | STREAMING | High-resolution streaming | Higher NFFT for better freq resolution |
+| `ionosphere_streaming_latency` | STREAMING | Latency-optimized streaming | Minimal latency configuration |
+| `ionosphere_streaming_throughput` | STREAMING | Throughput-optimized streaming | Max throughput configuration |
+| `ionosphere_batch_throughput` | BATCH | Batch mode throughput | Offline processing optimization |
+| `ionosphere_specialized` | - | Specialized ionosphere config | Custom specialized parameters |
+
+### Baseline Experiments (General Performance)
+| Experiment | Sample Rate | Mode | Description |
+|------------|-------------|------|-------------|
+| `baseline_100k` | 100kHz | Mixed | General 100kHz baseline |
+| `baseline_batch_100k_latency` | 100kHz | BATCH | Batch latency baseline |
+| `baseline_batch_100k_throughput` | 100kHz | BATCH | Batch throughput baseline |
+| `baseline_streaming_100k_latency` | 100kHz | STREAMING | Streaming latency baseline |
+| `baseline_streaming_100k_throughput` | 100kHz | STREAMING | Streaming throughput baseline |
+| `baseline_streaming_100k_realtime` | 100kHz | STREAMING | Real-time factor baseline |
+| `baseline_48k` | 48kHz | Mixed | General 48kHz baseline |
+| `baseline_batch_48k_latency` | 48kHz | BATCH | Batch latency baseline |
+| `baseline_batch_48k_throughput` | 48kHz | BATCH | Batch throughput baseline |
+| `baseline_streaming_48k_latency` | 48kHz | STREAMING | Streaming latency baseline |
+| `baseline_streaming_48k_realtime` | 48kHz | STREAMING | Real-time factor baseline |
+| `baseline_batch_high_nfft_throughput` | - | BATCH | High NFFT throughput study |
+
+### Analysis & Validation Experiments
+| Experiment | Description | Use Case |
+|------------|-------------|----------|
+| `execution_mode_comparison` | BATCH vs STREAMING comparison | Mode selection analysis |
+| `full_parameter_grid_100k` | Exhaustive 100kHz parameter sweep | Comprehensive 100kHz analysis |
+| `full_parameter_grid_48k` | Exhaustive 48kHz parameter sweep | Comprehensive 48kHz analysis |
+| `low_nfft_scaling` | Low NFFT performance study | Low-latency optimization |
+| `accuracy_validation` | Accuracy validation tests | Correctness verification |
+| `stress_test` | Stress testing configuration | Stability and limits testing |
+| `profiling` | GPU profiling configuration | Performance profiling |
 
 ## Essential CLI Commands (Development Only)
 
@@ -510,7 +599,7 @@ sxp nsys latency engine.nfft=4096 engine.overlap=0.875 \
 sxp nsys latency +benchmark=latency benchmark.lock_gpu_clocks=true
 
 # Use custom experiment + benchmark combination
-sxp nsys latency experiment=ionosphere_hires +benchmark=profiling
+sxp nsys latency experiment=ionosphere_streaming_hires +benchmark=profiling
 
 # Production profiling with all custom settings
 sxp nsys latency +benchmark=latency \

@@ -56,9 +56,10 @@ Comprehensive documentation for the sigtekx CUDA-accelerated FFT processing libr
 3. [Benchmark Timing Strategies](performance/benchmark-timing-strategies.md)
 
 ### For Researchers
-1. [Benchmarking Guide](guides/benchmarking.md)
-2. [Stability Improvements](performance/stability-improvements.md)
-3. [Architecture Diagrams](architecture/diagrams/)
+1. **[Experiment Guide](benchmarking/experiment-guide.md)** - Start here!
+2. [Benchmarking Guide](guides/benchmarking.md)
+3. [Stability Improvements](performance/stability-improvements.md)
+4. [Architecture Diagrams](architecture/diagrams/)
 
 ---
 
@@ -102,6 +103,26 @@ System design, structure, and visual documentation.
 - Visual diagrams
 
 **Files**: `architecture/`
+
+---
+
+### Benchmarking & Experiments
+Comprehensive experiment taxonomy and benchmarking methodology.
+
+**Key Topics**:
+- **Experiment design** (26 experiments, zero redundancy)
+- Experiment selection guide (quick vs deep, mode separation)
+- Sample rate strategies (100kHz vs 48kHz)
+- Ionosphere research experiments
+- Baseline performance experiments
+
+**Files**: `benchmarking/`
+
+**Highlights**:
+- ⭐ [experiment-guide.md](benchmarking/experiment-guide.md) - Complete experiment taxonomy and selection guide
+- [warmup-methodology.md](benchmarking/warmup-methodology.md) - Warmup iteration methodology
+- [rtf-convention-mapping.md](benchmarking/rtf-convention-mapping.md) - Real-Time Factor conventions
+- [thermal-degradation-protocol.md](benchmarking/thermal-degradation-protocol.md) - GPU thermal testing
 
 ---
 
@@ -194,6 +215,7 @@ See [Stability Improvements](performance/stability-improvements.md) for full sto
 **By Topic**:
 - **Installation** → `getting-started/install.md`
 - **API Usage** → `guides/api-reference.md`
+- **Experiments** → `benchmarking/experiment-guide.md` (26 experiments explained!)
 - **Benchmarking** → `guides/benchmarking.md` or `performance/`
 - **Performance** → `performance/stability-improvements.md` (start here!)
 - **Executors** → `architecture/executors.md` (BatchExecutor vs StreamingExecutor)
