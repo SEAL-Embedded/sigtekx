@@ -96,7 +96,7 @@ class EngineConfig(BaseModel):
         ...     nfft=8192,
         ...     channels=16,
         ...     overlap=0.9,
-        ...     window=WindowType.BLACKMAN,
+        ...     window_type=WindowType.BLACKMAN,
         ...     window_symmetry=WindowSymmetry.PERIODIC,
         ...     mode=ExecutionMode.BATCH
         ... )
@@ -136,7 +136,7 @@ class EngineConfig(BaseModel):
     # Pipeline Parameters
     # ========================================================================
 
-    window: WindowType = Field(
+    window_type: WindowType = Field(
         default=WindowType.HANN,
         description="Window function type"
     )
@@ -151,12 +151,12 @@ class EngineConfig(BaseModel):
         description="Window normalization scheme"
     )
 
-    scale: ScalePolicy = Field(
+    scale_policy: ScalePolicy = Field(
         default=ScalePolicy.ONE_OVER_N,
         description="FFT output scaling policy"
     )
 
-    output: OutputMode = Field(
+    output_mode: OutputMode = Field(
         default=OutputMode.MAGNITUDE,
         description="Pipeline output format"
     )

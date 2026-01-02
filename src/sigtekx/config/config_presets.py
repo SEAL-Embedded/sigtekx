@@ -42,10 +42,10 @@ _PRESET_VARIANTS = {
             sample_rate_hz=48000,
 
             # Pipeline parameters
-            window=WindowType.HANN,
+            window_type=WindowType.HANN,
             window_symmetry=WindowSymmetry.PERIODIC,
             window_norm=WindowNorm.UNITY,
-            scale=ScalePolicy.ONE_OVER_N,
+            scale_policy=ScalePolicy.ONE_OVER_N,
 
             # Execution parameters
             mode=ExecutionMode.BATCH,
@@ -64,10 +64,10 @@ _PRESET_VARIANTS = {
             sample_rate_hz=48000,
 
             # Pipeline parameters
-            window=WindowType.HANN,
+            window_type=WindowType.HANN,
             window_symmetry=WindowSymmetry.PERIODIC,
             window_norm=WindowNorm.UNITY,
-            scale=ScalePolicy.ONE_OVER_N,
+            scale_policy=ScalePolicy.ONE_OVER_N,
 
             # Execution parameters
             mode=ExecutionMode.STREAMING,
@@ -89,10 +89,10 @@ _PRESET_VARIANTS = {
             sample_rate_hz=48000,
 
             # Pipeline parameters - Optimized for ionosphere
-            window=WindowType.BLACKMAN,  # Better sidelobe suppression
+            window_type=WindowType.BLACKMAN,  # Better sidelobe suppression
             window_symmetry=WindowSymmetry.PERIODIC,
             window_norm=WindowNorm.UNITY,
-            scale=ScalePolicy.ONE_OVER_N,
+            scale_policy=ScalePolicy.ONE_OVER_N,
 
             # Execution parameters
             mode=ExecutionMode.BATCH,
@@ -111,10 +111,10 @@ _PRESET_VARIANTS = {
             sample_rate_hz=48000,
 
             # Pipeline parameters
-            window=WindowType.BLACKMAN,
+            window_type=WindowType.BLACKMAN,
             window_symmetry=WindowSymmetry.PERIODIC,
             window_norm=WindowNorm.UNITY,
-            scale=ScalePolicy.ONE_OVER_N,
+            scale_policy=ScalePolicy.ONE_OVER_N,
 
             # Execution parameters
             mode=ExecutionMode.STREAMING,
@@ -136,10 +136,10 @@ _PRESET_VARIANTS = {
             sample_rate_hz=48000,
 
             # Pipeline parameters - Maximum quality
-            window=WindowType.BLACKMAN,
+            window_type=WindowType.BLACKMAN,
             window_symmetry=WindowSymmetry.PERIODIC,
             window_norm=WindowNorm.UNITY,
-            scale=ScalePolicy.ONE_OVER_N,
+            scale_policy=ScalePolicy.ONE_OVER_N,
 
             # Execution parameters - High throughput
             mode=ExecutionMode.BATCH,
@@ -158,10 +158,10 @@ _PRESET_VARIANTS = {
             sample_rate_hz=48000,
 
             # Pipeline parameters
-            window=WindowType.BLACKMAN,
+            window_type=WindowType.BLACKMAN,
             window_symmetry=WindowSymmetry.PERIODIC,
             window_norm=WindowNorm.UNITY,
-            scale=ScalePolicy.ONE_OVER_N,
+            scale_policy=ScalePolicy.ONE_OVER_N,
 
             # Execution parameters
             mode=ExecutionMode.STREAMING,
@@ -296,7 +296,7 @@ def describe_preset(name: str, executor: str | None = None) -> str:
         config = _PRESET_VARIANTS[name][executor]
         return f"""{title} ({executor}):
   FFT: {config.nfft}, Batch: {config.channels}, Overlap: {config.overlap:.1%}
-  Window: {config.window.value.upper()} ({config.window_symmetry.value.upper()})
+  Window: {config.window_type.value.upper()} ({config.window_symmetry.value.upper()})
   Mode: {config.mode.value.upper()}
   Sample Rate: {config.sample_rate_hz} Hz"""
     else:
@@ -337,7 +337,7 @@ def compare_presets() -> str:
             f"{cfg.nfft:<6} | "
             f"{cfg.channels:<6} | "
             f"{cfg.overlap:<8.1%} | "
-            f"{cfg.window.value:<10}"
+            f"{cfg.window_type.value:<10}"
         )
         lines.append(line)
 

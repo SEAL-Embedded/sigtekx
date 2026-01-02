@@ -50,7 +50,7 @@ class TestPresets:
         assert config.nfft == 1024
         assert config.channels == 2
         assert config.overlap == 0.5
-        assert config.window == WindowType.HANN
+        assert config.window_type == WindowType.HANN
         assert config.mode == ExecutionMode.BATCH
 
     def test_get_preset_iono(self):
@@ -59,7 +59,7 @@ class TestPresets:
         assert config.nfft == 16384  # Batch: higher resolution
         assert config.channels == 32
         assert config.overlap == 0.75
-        assert config.window == WindowType.BLACKMAN
+        assert config.window_type == WindowType.BLACKMAN
         assert config.mode == ExecutionMode.BATCH
 
     def test_get_preset_iono_streaming(self):
@@ -76,7 +76,7 @@ class TestPresets:
         assert config.nfft == 32768  # Batch: maximum resolution
         assert config.channels == 32
         assert config.overlap == 0.9375
-        assert config.window == WindowType.BLACKMAN
+        assert config.window_type == WindowType.BLACKMAN
         assert config.mode == ExecutionMode.BATCH
 
     def test_get_preset_ionox_streaming(self):
@@ -136,11 +136,11 @@ class TestEngineConfig:
         assert config.channels == 2
         assert config.overlap == 0.5
         assert config.sample_rate_hz == 48000
-        assert config.window == WindowType.HANN
+        assert config.window_type == WindowType.HANN
         assert config.window_symmetry == WindowSymmetry.PERIODIC
         assert config.window_norm == WindowNorm.UNITY
-        assert config.scale == ScalePolicy.ONE_OVER_N
-        assert config.output == OutputMode.MAGNITUDE
+        assert config.scale_policy == ScalePolicy.ONE_OVER_N
+        assert config.output_mode == OutputMode.MAGNITUDE
         assert config.mode == ExecutionMode.BATCH
 
     def test_custom_config(self):
@@ -150,16 +150,16 @@ class TestEngineConfig:
             channels=8,
             overlap=0.75,
             sample_rate_hz=96000,
-            window=WindowType.BLACKMAN,
+            window_type=WindowType.BLACKMAN,
             window_symmetry=WindowSymmetry.SYMMETRIC,
             window_norm=WindowNorm.SQRT,
-            scale=ScalePolicy.ONE_OVER_SQRT_N,
+            scale_policy=ScalePolicy.ONE_OVER_SQRT_N,
             mode=ExecutionMode.STREAMING
         )
 
         assert config.nfft == 4096
         assert config.channels == 8
-        assert config.window == WindowType.BLACKMAN
+        assert config.window_type == WindowType.BLACKMAN
         assert config.window_symmetry == WindowSymmetry.SYMMETRIC
         assert config.mode == ExecutionMode.STREAMING
 
@@ -211,17 +211,17 @@ class TestEngineConfig:
     def test_enum_string_conversion(self):
         """Test that string values work for enums."""
         config = EngineConfig(
-            window='blackman',  # type: ignore[arg-type]
+            window_type='blackman',  # type: ignore[arg-type]
             window_symmetry='symmetric',  # type: ignore[arg-type]
             window_norm='sqrt',  # type: ignore[arg-type]
-            scale='1/sqrt(N)',  # type: ignore[arg-type]
+            scale_policy='1/sqrt(N)',  # type: ignore[arg-type]
             mode='streaming'  # type: ignore[arg-type]
         )
 
-        assert config.window == WindowType.BLACKMAN
+        assert config.window_type == WindowType.BLACKMAN
         assert config.window_symmetry == WindowSymmetry.SYMMETRIC
         assert config.window_norm == WindowNorm.SQRT
-        assert config.scale == ScalePolicy.ONE_OVER_SQRT_N
+        assert config.scale_policy == ScalePolicy.ONE_OVER_SQRT_N
         assert config.mode == ExecutionMode.STREAMING
 
     def test_config_repr(self):
@@ -280,7 +280,7 @@ class TestPipelineBuilder:
             .build()
         )
 
-        assert pipeline.config.window == WindowType.BLACKMAN
+        assert pipeline.config.window_type == WindowType.BLACKMAN
         assert pipeline.config.window_symmetry == WindowSymmetry.PERIODIC
         assert pipeline.config.window_norm == WindowNorm.UNITY
 
@@ -420,7 +420,7 @@ class TestEngineInitialization:
         engine = Engine(preset='iono', nfft=8192, channels=16)
         assert engine.config.nfft == 8192  # Overridden
         assert engine.config.channels == 16  # Overridden
-        assert engine.config.window == WindowType.BLACKMAN  # From preset
+        assert engine.config.window_type == WindowType.BLACKMAN  # From preset
         engine.close()
 
     def test_init_with_preset_and_mode_override(self):
@@ -587,7 +587,7 @@ class TestEndToEndIntegration:
         assert engine.config.mode == ExecutionMode.STREAMING
 
         # Verify preset values maintained
-        assert engine.config.window == WindowType.BLACKMAN
+        assert engine.config.window_type == WindowType.BLACKMAN
 
         engine.close()
 
@@ -603,7 +603,7 @@ class TestEndToEndIntegration:
         # Verify
         assert config.nfft == 16384
         assert config.mode == ExecutionMode.STREAMING
-        assert config.window == WindowType.BLACKMAN  # From ionox preset
+        assert config.window_type == WindowType.BLACKMAN  # From ionox preset
 
         # Use config
         engine = Engine(config=config)

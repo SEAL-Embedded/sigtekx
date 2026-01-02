@@ -251,10 +251,10 @@ def load_spectrogram(npz_path: str | Path) -> dict[str, any]:
             'channels': spec_data.config.channels,
             'overlap': spec_data.config.overlap,
             'sample_rate_hz': spec_data.config.sample_rate_hz,
-            'window': spec_data.config.window.value,
+            'window': spec_data.config.window_type.value,
             'window_symmetry': spec_data.config.window_symmetry.value,
             'window_norm': spec_data.config.window_norm.value,
-            'scale': spec_data.config.scale.value
+            'scale': spec_data.config.scale_policy.value
         },
         'channel': spec_data.channel
     }

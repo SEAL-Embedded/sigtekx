@@ -44,10 +44,10 @@ def save_spectrogram_data(data: SpectrogramData, path: str | Path) -> None:
         channels=data.config.channels,
         overlap=data.config.overlap,
         sample_rate_hz=data.config.sample_rate_hz,
-        window=data.config.window.value,
+        window=data.config.window_type.value,
         window_symmetry=data.config.window_symmetry.value,
         window_norm=data.config.window_norm.value,
-        scale=data.config.scale.value,
+        scale=data.config.scale_policy.value,
         channel=data.channel,
     )
 
@@ -64,10 +64,10 @@ def load_spectrogram_data(path: str | Path) -> SpectrogramData:
         channels=int(npz["channels"]),
         overlap=float(npz["overlap"]),
         sample_rate_hz=int(npz["sample_rate_hz"]),
-        window=WindowType(str(npz["window"])),
+        window_type=WindowType(str(npz["window"])),
         window_symmetry=WindowSymmetry(str(npz["window_symmetry"])),
         window_norm=WindowNorm(str(npz["window_norm"])),
-        scale=ScalePolicy(str(npz["scale"])),
+        scale_policy=ScalePolicy(str(npz["scale"])),
     )
     return SpectrogramData(
         spectrogram=npz["spectrogram"],

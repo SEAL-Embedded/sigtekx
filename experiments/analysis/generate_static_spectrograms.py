@@ -93,10 +93,10 @@ def _config_dict(config: EngineConfig) -> dict:
         "channels": config.channels,
         "overlap": config.overlap,
         "sample_rate_hz": config.sample_rate_hz,
-        "window": config.window.value,
+        "window": config.window_type.value,
         "window_symmetry": config.window_symmetry.value,
         "window_norm": config.window_norm.value,
-        "scale": config.scale.value,
+        "scale": config.scale_policy.value,
     }
 
 
@@ -126,10 +126,10 @@ def _numpy_stft(
 def _window_array(config: EngineConfig) -> np.ndarray:
     """Return window samples that mimic EngineConfig settings."""
     n = np.arange(config.nfft, dtype=np.float32)
-    if config.window == WindowType.HANN:
+    if config.window_type == WindowType.HANN:
         denom = config.nfft if config.window_symmetry == WindowSymmetry.PERIODIC else max(config.nfft - 1, 1)
         w = 0.5 - 0.5 * np.cos(2 * np.pi * n / denom)
-    elif config.window == WindowType.BLACKMAN:
+    elif config.window_type == WindowType.BLACKMAN:
         denom = config.nfft if config.window_symmetry == WindowSymmetry.PERIODIC else max(config.nfft - 1, 1)
         w = 0.42 - 0.5 * np.cos(2 * np.pi * n / denom) + 0.08 * np.cos(4 * np.pi * n / denom)
     else:
@@ -152,7 +152,7 @@ def generate_general_spectrogram(output_dir: Path) -> StaticSpectrogramResult:
         channels=1,
         overlap=0.75,
         sample_rate_hz=48_000,
-        window=WindowType.HANN,
+        window_type=WindowType.HANN,
         window_symmetry=WindowSymmetry.PERIODIC,
     )
     signal = synthesize_signal(duration_sec=5.0, sample_rate_hz=config.sample_rate_hz)
@@ -188,7 +188,7 @@ def generate_accuracy_spectrograms(output_dir: Path) -> StaticSpectrogramResult:
         channels=1,
         overlap=0.75,
         sample_rate_hz=48_000,
-        window=WindowType.HANN,
+        window_type=WindowType.HANN,
         window_symmetry=WindowSymmetry.PERIODIC,
     )
     # Slightly longer signal for better averaging

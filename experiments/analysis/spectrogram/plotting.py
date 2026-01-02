@@ -56,7 +56,7 @@ def plot_spectrogram(
     ax.set_ylabel(ylabel)
     ax.set_title(
         f"Spectrogram (NFFT={data.config.nfft}, overlap={data.config.overlap:.2f}, "
-        f"{data.config.window.value} window)"
+        f"{data.config.window_type.value} window)"
     )
     fig.colorbar(im, ax=ax, label=cbar_label)
     fig.tight_layout()

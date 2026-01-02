@@ -223,13 +223,13 @@ class PipelineBuilder:
         for stage in self._stages:
             if stage['type'] == 'window':
                 params = stage['params']
-                config.window = params['window_type']
+                config.window_type = params['window_type']
                 config.window_symmetry = params['symmetry']
                 config.window_norm = params['norm']
             elif stage['type'] == 'fft':
-                config.scale = stage['params']['scale']
+                config.scale_policy = stage['params']['scale']
             elif stage['type'] == 'magnitude':
-                config.output = 'magnitude'
+                config.output_mode = 'magnitude'
 
         # Validate final configuration
         config.model_validate(config)

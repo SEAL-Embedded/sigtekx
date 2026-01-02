@@ -297,13 +297,13 @@ class Engine:
 
             # Map enum fields (convert Python enum to C++ enum objects)
             # WindowType: RECTANGULAR, HANN, BLACKMAN
-            if hasattr(self._config, 'window'):
+            if hasattr(self._config, 'window_type'):
                 window_map = {
                     WindowType.RECTANGULAR: self._cpp_module.WindowType.RECTANGULAR,
                     WindowType.HANN: self._cpp_module.WindowType.HANN,
                     WindowType.BLACKMAN: self._cpp_module.WindowType.BLACKMAN,
                 }
-                cpp_config.window_type = window_map.get(self._config.window, self._cpp_module.WindowType.HANN)
+                cpp_config.window_type = window_map.get(self._config.window_type, self._cpp_module.WindowType.HANN)
 
             # WindowSymmetry: PERIODIC, SYMMETRIC
             if hasattr(self._config, 'window_symmetry'):
@@ -322,21 +322,21 @@ class Engine:
                 cpp_config.window_norm = norm_map.get(self._config.window_norm, self._cpp_module.WindowNorm.UNITY)
 
             # ScalePolicy: NONE, ONE_OVER_N, ONE_OVER_SQRT_N
-            if hasattr(self._config, 'scale'):
+            if hasattr(self._config, 'scale_policy'):
                 scale_map = {
                     ScalePolicy.NONE: self._cpp_module.ScalePolicy.NONE,
                     ScalePolicy.ONE_OVER_N: self._cpp_module.ScalePolicy.ONE_OVER_N,
                     ScalePolicy.ONE_OVER_SQRT_N: self._cpp_module.ScalePolicy.ONE_OVER_SQRT_N,
                 }
-                cpp_config.scale_policy = scale_map.get(self._config.scale, self._cpp_module.ScalePolicy.ONE_OVER_N)
+                cpp_config.scale_policy = scale_map.get(self._config.scale_policy, self._cpp_module.ScalePolicy.ONE_OVER_N)
 
             # OutputMode: MAGNITUDE, COMPLEX (Python) -> COMPLEX_PASSTHROUGH (C++)
-            if hasattr(self._config, 'output'):
+            if hasattr(self._config, 'output_mode'):
                 output_map = {
                     OutputMode.MAGNITUDE: self._cpp_module.OutputMode.MAGNITUDE,
                     OutputMode.COMPLEX: self._cpp_module.OutputMode.COMPLEX_PASSTHROUGH,
                 }
-                cpp_config.output_mode = output_map.get(self._config.output, self._cpp_module.OutputMode.MAGNITUDE)
+                cpp_config.output_mode = output_map.get(self._config.output_mode, self._cpp_module.OutputMode.MAGNITUDE)
 
             # ExecutionMode: BATCH, STREAMING
             if hasattr(self._config, 'mode'):
