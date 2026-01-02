@@ -19,6 +19,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
+import pydantic
 from numpy.typing import ArrayLike, NDArray
 
 from sigtekx.config import (
@@ -34,6 +35,7 @@ from sigtekx.config import (
     validate_input_size,
 )
 from sigtekx.exceptions import (
+    ConfigError,
     DeviceNotFoundError,
     DllLoadError,
     EngineRuntimeError,
@@ -136,10 +138,10 @@ class Engine:
             **overrides: Quick parameter overrides (nfft, channels, overlap, etc.)
 
         Raises:
-            ValueError: If configuration is invalid
-            ConfigError: If parameters are incompatible
+            ConfigError: If configuration overrides are invalid (wrong type, out of range, unknown parameter)
             DeviceNotFoundError: If no CUDA devices available
             DllLoadError: If C++ extension cannot be loaded
+            EngineRuntimeError: If engine initialization fails
 
         Examples:
             >>> engine = Engine()  # Uses 'default' preset
@@ -148,6 +150,12 @@ class Engine:
             >>> engine = Engine(config=my_config)
             >>> engine = Engine(pipeline=my_pipeline)
             >>> engine = Engine(preset='iono', nfft=8192, overlap=0.9)
+
+            # Invalid override raises ConfigError
+            >>> try:
+            ...     engine = Engine(preset='default', nfft="invalid")
+            ... except ConfigError as e:
+            ...     print(f"Error: {e.field} = {e.value}")
         """
         # Import C++ module
         self._cpp_module = _import_cpp_engine()
@@ -161,14 +169,24 @@ class Engine:
 
         # Apply parameter overrides
         if overrides:
-            for key, value in overrides.items():
-                if hasattr(self._config, key):
-                    setattr(self._config, key, value)
-                else:
-                    raise ValueError(f"Unknown parameter: {key}")
-
-        # Validate final configuration
-        self._config.model_validate(self._config)
+            try:
+                # Get current config as dict, update with overrides, and revalidate
+                config_dict = self._config.model_dump()
+                config_dict.update(overrides)
+                self._config = EngineConfig.model_validate(config_dict)
+            except pydantic.ValidationError as e:
+                # Convert Pydantic validation error to ConfigError for consistency
+                errors = e.errors()
+                if errors:
+                    first_error = errors[0]
+                    field = first_error.get('loc', ('unknown',))[0]
+                    msg = first_error.get('msg', 'Validation failed')
+                    raise ConfigError(
+                        f"Invalid configuration override: {msg}",
+                        field=str(field),
+                        value=overrides.get(field)
+                    ) from e
+                raise ConfigError("Configuration validation failed") from e
 
         # Store pipeline if provided
         self._pipeline = pipeline

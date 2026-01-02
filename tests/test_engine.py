@@ -19,6 +19,7 @@ from sigtekx import (
     process_signal,
 )
 from sigtekx.exceptions import (
+    ConfigError,
     EngineStateError,
     ValidationError,
 )
@@ -432,6 +433,14 @@ class TestEngineErrorHandling:
 
         with pytest.raises(EngineStateError, match="closed"):
             engine.reset()
+
+    def test_invalid_override_raises_config_error(self):
+        """Test that invalid overrides raise ConfigError (not ValueError)."""
+        with pytest.raises(ConfigError):
+            Engine(preset='default', nfft="invalid")
+
+        with pytest.raises(ConfigError):
+            Engine(preset='default', unknown_field=123)
 
 
 # -----------------------------------------------------------------------------
