@@ -275,13 +275,93 @@ PYBIND11_MODULE(_native, m) {
                ", channels=" + std::to_string(c.channels) + ">";
       });
 
-  py::class_<sigtekx::StageConfig>(m, "StageConfig")
+  py::class_<sigtekx::StageConfig>(
+      m, "StageConfig",
+      R"pbdoc(
+        Low-level configuration for individual pipeline stages.
+
+        Use this for custom stage development and fine-grained control.
+        For standard pipelines, prefer ExecutorConfig/SignalConfig via EngineConfig.
+
+        Attributes:
+            nfft: FFT size (power of 2)
+            channels: Number of input channels
+            overlap: Overlap factor [0.0, 1.0)
+            sample_rate_hz: Input sample rate
+            window_type: Window function (RECTANGULAR, HANN, BLACKMAN)
+            window_norm: Normalization scheme (UNITY, SQRT)
+            window_symmetry: Symmetry mode (PERIODIC for FFT, SYMMETRIC for filters)
+            preload_window: Precompute window coefficients (optimization)
+            scale_policy: FFT scaling (NONE, ONE_OVER_N, ONE_OVER_SQRT_N)
+            output_mode: Output format (MAGNITUDE, COMPLEX_PASSTHROUGH)
+            inplace: Enable in-place operations hint
+            warmup_iters: Warmup iterations during init
+
+        Example:
+            >>> config = StageConfig()
+            >>> config.nfft = 4096
+            >>> config.window_symmetry = WindowSymmetry.PERIODIC
+            >>> config.scale_policy = ScalePolicy.ONE_OVER_N
+            >>> config.output_mode = OutputMode.MAGNITUDE
+    )pbdoc")
       .def(py::init<>())
-      .def_readwrite("nfft", &sigtekx::StageConfig::nfft)
-      .def_readwrite("window_type", &sigtekx::StageConfig::window_type)
-      // ... Bind other StageConfig members
+
+      // FFT parameters
+      .def_readwrite("nfft", &sigtekx::StageConfig::nfft,
+                     "FFT size (must be power of 2)")
+      .def_readwrite("channels", &sigtekx::StageConfig::channels,
+                     "Number of independent signal channels")
+      .def_readwrite("overlap", &sigtekx::StageConfig::overlap,
+                     "Overlap factor between frames [0.0, 1.0)")
+      .def_readwrite("sample_rate_hz", &sigtekx::StageConfig::sample_rate_hz,
+                     "Input sample rate in Hz")
+
+      // Windowing parameters
+      .def_readwrite("window_type", &sigtekx::StageConfig::window_type,
+                     "Window function type")
+      .def_readwrite("window_norm", &sigtekx::StageConfig::window_norm,
+                     "Window normalization scheme")
+      .def_readwrite("window_symmetry", &sigtekx::StageConfig::window_symmetry,
+                     "Window symmetry mode (PERIODIC or SYMMETRIC)")
+      .def_readwrite("preload_window", &sigtekx::StageConfig::preload_window,
+                     "Precompute window in device memory")
+
+      // Scaling and output
+      .def_readwrite("scale_policy", &sigtekx::StageConfig::scale_policy,
+                     "FFT output scaling policy")
+      .def_readwrite("output_mode", &sigtekx::StageConfig::output_mode,
+                     "Pipeline output format")
+
+      // Execution parameters
+      .def_readwrite("inplace", &sigtekx::StageConfig::inplace,
+                     "Enable in-place operation hint")
+      .def_readwrite("warmup_iters", &sigtekx::StageConfig::warmup_iters,
+                     "Number of warmup iterations")
+
+      // Computed property
+      .def("hop_size", &sigtekx::StageConfig::hop_size,
+           "Calculate hop size: nfft * (1 - overlap)")
+
+      // Enhanced repr showing key fields
       .def("__repr__", [](const sigtekx::StageConfig& c) {
-        return "<StageConfig nfft=" + std::to_string(c.nfft) + ">";
+        std::ostringstream oss;
+        oss << "<StageConfig nfft=" << c.nfft
+            << " channels=" << c.channels
+            << " overlap=" << c.overlap;
+
+        // Show non-default enums
+        if (c.window_type != sigtekx::StageConfig::WindowType::HANN) {
+          oss << " window=" << static_cast<int>(c.window_type);
+        }
+        if (c.window_symmetry != sigtekx::StageConfig::WindowSymmetry::PERIODIC) {
+          oss << " symmetry=SYMMETRIC";
+        }
+        if (c.output_mode != sigtekx::StageConfig::OutputMode::MAGNITUDE) {
+          oss << " output=COMPLEX";
+        }
+
+        oss << ">";
+        return oss.str();
       });
 
   // --- Bind Statistics and Info Structs ---
