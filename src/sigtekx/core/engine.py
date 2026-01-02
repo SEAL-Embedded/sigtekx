@@ -1016,33 +1016,30 @@ def benchmark_latency(
         >>> stats = benchmark_latency(preset='iono', iterations=1000)
         >>> print(f"Mean: {stats['mean']:.2f} µs")
     """
-    engine = Engine(preset=preset, **kwargs)
+    with Engine(preset=preset, **kwargs) as engine:
+        # Prepare test data
+        data_size = engine.config.nfft * engine.config.channels
+        test_data = np.random.randn(data_size).astype(np.float32)
 
-    # Prepare test data
-    data_size = engine.config.nfft * engine.config.channels
-    test_data = np.random.randn(data_size).astype(np.float32)
+        # Warmup
+        for _ in range(10):
+            engine.process(test_data)
 
-    # Warmup
-    for _ in range(10):
-        engine.process(test_data)
+        # Benchmark
+        latencies = []
+        for _ in range(iterations):
+            engine.process(test_data)
+            stats = engine.stats
+            latencies.append(stats["latency_us"])
 
-    # Benchmark
-    latencies = []
-    for _ in range(iterations):
-        engine.process(test_data)
-        stats = engine.stats
-        latencies.append(stats["latency_us"])
-
-    engine.close()
-
-    # Compute statistics
-    latencies_array = np.array(latencies)
-    return {
-        "mean": float(np.mean(latencies_array)),
-        "std": float(np.std(latencies_array)),
-        "min": float(np.min(latencies_array)),
-        "max": float(np.max(latencies_array)),
-        "p50": float(np.percentile(latencies_array, 50)),
-        "p95": float(np.percentile(latencies_array, 95)),
-        "p99": float(np.percentile(latencies_array, 99)),
-    }
+        # Compute statistics
+        latencies_array = np.array(latencies)
+        return {
+            "mean": float(np.mean(latencies_array)),
+            "std": float(np.std(latencies_array)),
+            "min": float(np.min(latencies_array)),
+            "max": float(np.max(latencies_array)),
+            "p50": float(np.percentile(latencies_array, 50)),
+            "p95": float(np.percentile(latencies_array, 95)),
+            "p99": float(np.percentile(latencies_array, 99)),
+        }

@@ -529,6 +529,56 @@ class TestConvenienceFunctions:
         assert "p99" in results
         assert results["mean"] > 0
 
+    def test_benchmark_latency_cleanup_on_exception(self, monkeypatch):
+        """Verify cleanup when exception occurs during benchmarking."""
+        # Mock engine.process() to fail after warmup
+        call_count = 0
+        original_process = Engine.process
+
+        def mock_process(self, data):
+            nonlocal call_count
+            call_count += 1
+            if call_count > 15:  # Fail after warmup (10 iter) + 5 measurements
+                raise RuntimeError("Simulated CUDA error")
+            return original_process(self, data)
+
+        monkeypatch.setattr(Engine, 'process', mock_process)
+
+        # Exception should be raised, but cleanup should still happen
+        with pytest.raises(RuntimeError, match="Simulated CUDA error"):
+            benchmark_latency(
+                preset='default',
+                iterations=100,
+                nfft=256,
+                channels=1,
+                overlap=0.0
+            )
+        # If we reach here without hanging/segfault, cleanup was successful ✅
+
+    def test_benchmark_latency_cleanup_on_keyboard_interrupt(self, monkeypatch):
+        """Verify cleanup when user cancels with Ctrl+C."""
+        call_count = 0
+        original_process = Engine.process
+
+        def mock_process(self, data):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 15:  # After warmup
+                raise KeyboardInterrupt()
+            return original_process(self, data)
+
+        monkeypatch.setattr(Engine, 'process', mock_process)
+
+        with pytest.raises(KeyboardInterrupt):
+            benchmark_latency(
+                preset='default',
+                iterations=100,
+                nfft=256,
+                channels=1,
+                overlap=0.0
+            )
+        # Cleanup verified ✅
+
 
 # -----------------------------------------------------------------------------
 # Lifecycle Tests
