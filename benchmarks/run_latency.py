@@ -139,7 +139,20 @@ def run_latency_benchmark(cfg: DictConfig) -> float:
         }
 
         summary_df = pd.DataFrame([summary])
-        # Include overlap and execution mode in filename to prevent collisions during multirun sweeps
+
+        # === CSV WRITE: UNIQUE FILENAME PATTERN ===
+        # Each configuration writes to unique CSV to prevent race conditions during
+        # parallel multirun sweeps. Filename encodes full config:
+        #   Format: latency_summary_{nfft}_{channels}_{overlap}_{mode}.csv
+        #   Example: latency_summary_4096_2_0p7500_streaming.csv
+        #
+        # Why this works:
+        #   - Different configs → different files → zero collision risk
+        #   - Same config re-run → atomic overwrite (desired behavior)
+        #   - Analysis scripts auto-merge via glob pattern (*_summary_*.csv)
+        #
+        # Verified safe by: tests/test_csv_multirun_safety.py
+        # Design rationale: docs/benchmarking/csv-file-organization.md
         exec_mode = engine_config.mode.value if hasattr(engine_config.mode, 'value') else str(engine_config.mode)
         overlap_str = f"{engine_config.overlap:.4f}".replace('.', 'p')  # 0.75 -> 0p7500
         summary_path = output_dir / f"latency_summary_{engine_config.nfft}_{engine_config.channels}_{overlap_str}_{exec_mode}.csv"

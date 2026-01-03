@@ -160,6 +160,22 @@ def run_realtime_benchmark(cfg: DictConfig) -> float:
         }
 
         summary_df = pd.DataFrame([summary])
+
+        # === CSV WRITE: UNIQUE FILENAME PATTERN ===
+        # Each configuration writes to unique CSV to prevent race conditions during
+        # parallel multirun sweeps. Filename encodes full config:
+        #   Format: realtime_summary_{nfft}_{channels}.csv
+        #   Example: realtime_summary_4096_2.csv
+        #
+        # Note: Realtime benchmarks are always STREAMING mode, so overlap/mode not in filename.
+        #
+        # Why this works:
+        #   - Different configs → different files → zero collision risk
+        #   - Same config re-run → atomic overwrite (desired behavior)
+        #   - Analysis scripts auto-merge via glob pattern (*_summary_*.csv)
+        #
+        # Verified safe by: tests/test_csv_multirun_safety.py
+        # Design rationale: docs/benchmarking/csv-file-organization.md
         summary_path = output_dir / f"realtime_summary_{engine_config.nfft}_{engine_config.channels}.csv"
         summary_df.to_csv(summary_path, index=False)
         mlflow.log_artifact(str(summary_path))

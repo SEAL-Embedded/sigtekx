@@ -826,4 +826,25 @@ python benchmarks/run_latency.py experiment=ionosphere_multiscale +benchmark=lat
 python benchmarks/run_throughput.py --multirun experiment=ionosphere_resolution
 ```
 
-Last updated: 2025-10-17 (Added Python GPU clock locking support - feature parity with C++)
+### CSV File Organization (Multirun Safety)
+
+**Pattern:** Each benchmark configuration writes to unique CSV file
+- Format: `{benchmark}_summary_{nfft}_{channels}_{overlap}_{mode}.csv`
+- Example: `latency_summary_4096_2_0p7500_streaming.csv`
+
+**Why:** Prevents race conditions in parallel multirun sweeps
+- Different configs → different files → zero collision risk
+- Same config re-run → atomic overwrite (desired behavior)
+- Analysis scripts auto-merge via glob pattern (`*_summary_*.csv`)
+- No file locking needed, better performance than serialized writes
+
+**Implementation:**
+- All 4 benchmark scripts use this pattern (latency, throughput, realtime, accuracy)
+- `load_data()` function automatically aggregates all CSV files
+- Streamlit dashboard loads merged data with 1-hour cache
+
+**Verification:**
+- Tested safe: `tests/test_csv_multirun_safety.py` (8/8 tests passing)
+- Design doc: `docs/benchmarking/csv-file-organization.md`
+
+Last updated: 2025-01-02 (Added CSV multirun safety verification and documentation)

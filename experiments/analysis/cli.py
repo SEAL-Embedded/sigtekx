@@ -22,7 +22,44 @@ from .models import BenchmarkType
 
 
 def load_data(data_path: Path) -> pd.DataFrame:
-    """Load benchmark data from CSV or directory of CSVs."""
+    """
+    Load benchmark data from CSV or directory of CSVs.
+
+    Automatically aggregates multiple CSV files using glob pattern (*_summary_*.csv).
+    Each benchmark configuration writes to a unique file during multirun sweeps:
+
+        Pattern: {benchmark}_summary_{nfft}_{channels}_{overlap}_{mode}.csv
+        Example: latency_summary_4096_2_0p7500_streaming.csv
+
+    This function merges all matching files into a single DataFrame for analysis,
+    adding metadata columns and harmonizing schema for backward compatibility.
+
+    Args:
+        data_path: Path to single CSV file or directory containing multiple CSVs.
+                   When directory, glob pattern "*_summary_*.csv" matches all benchmark files.
+
+    Returns:
+        Merged DataFrame with additional columns:
+            - 'source_file': Original CSV filename
+            - 'benchmark_type': Inferred from filename (latency, throughput, realtime, accuracy)
+
+        Schema is harmonized across all files for backward compatibility.
+
+    Raises:
+        ValueError: If path doesn't exist or no CSV files found in directory.
+
+    Examples:
+        >>> # Load all benchmarks from data directory
+        >>> df = load_data(Path("artifacts/data"))
+        >>> print(f"Loaded {len(df)} rows from {df['source_file'].nunique()} files")
+
+        >>> # Load single CSV file
+        >>> df = load_data(Path("artifacts/data/latency_summary_4096_2_0p7500_streaming.csv"))
+
+    See Also:
+        - Multirun safety: tests/test_csv_multirun_safety.py
+        - Design rationale: docs/benchmarking/csv-file-organization.md
+    """
     if data_path.is_file():
         return pd.read_csv(data_path)
     elif data_path.is_dir():
