@@ -173,7 +173,7 @@ class TestCSVHeaderIntegrity:
 
         for csv_file in csv_files:
             # Read raw lines to check for duplicate headers
-            with open(csv_file, 'r') as f:
+            with open(csv_file) as f:
                 lines = f.readlines()
 
             assert len(lines) >= 2, f"{csv_file.name}: File too short (needs header + data)"

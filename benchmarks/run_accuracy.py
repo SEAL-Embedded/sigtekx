@@ -15,6 +15,7 @@ import pandas as pd
 from omegaconf import DictConfig, OmegaConf
 
 from sigtekx.benchmarks import AccuracyBenchmark, AccuracyBenchmarkConfig
+from sigtekx.benchmarks.mlflow_utils import log_benchmark_errors
 from sigtekx.config import EngineConfig
 
 
@@ -68,6 +69,9 @@ def run_accuracy_benchmark(cfg: DictConfig) -> float:
         # Run benchmark
         benchmark = AccuracyBenchmark(benchmark_config)
         result = benchmark.run()
+
+        # Log error metrics to MLflow (using shared utility)
+        log_benchmark_errors(result, Path(cfg.paths.data), result.config)
 
         # Helper function to extract float from potentially nested dict
         def extract_float(value, default=0.0):

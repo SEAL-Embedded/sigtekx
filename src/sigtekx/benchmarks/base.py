@@ -389,7 +389,7 @@ class BaseBenchmark(abc.ABC):
                 )
 
             measurements: list[float | dict[str, Any]] = []
-            errors: list[str] = []
+            errors: list[tuple[str, str]] = []  # (exception_type, message)
             lock_info: dict[str, Any] | None = None
 
             # Initialize GPU clock manager if enabled
@@ -488,14 +488,18 @@ class BaseBenchmark(abc.ABC):
                                 )
 
                         except Exception as e:
+                            error_type = type(e).__name__
+                            error_msg = str(e)
                             logger.warning(f"Iteration {i} failed: {e}")
-                            errors.append(f"Iteration {i}: {str(e)}")
+                            errors.append((error_type, f"Iteration {i}: {error_msg}"))
                             if len(errors) > self.config.iterations * 0.1:
                                 raise RuntimeError("Too many iteration failures") from e
 
             except Exception as e:
+                error_type = type(e).__name__
+                error_msg = str(e)
                 logger.error(f"Benchmark failed: {e}")
-                errors.append(f"Fatal: {str(e)}")
+                errors.append((error_type, f"Fatal: {error_msg}"))
 
             finally:
                 with teardown_range("Benchmark.teardown"):
@@ -544,8 +548,34 @@ class BaseBenchmark(abc.ABC):
 
         # Build metadata
         metadata: dict[str, Any] = {}
+
+        # Calculate error summary metrics with type breakdown
         if errors:
-            metadata['errors'] = errors
+            from collections import Counter
+
+            error_count = len(errors)
+            error_rate = error_count / self.config.iterations if self.config.iterations > 0 else 0.0
+
+            # Error type breakdown for debugging (especially useful for Phase 2 custom stages)
+            error_type_counts = Counter([err[0] for err in errors])
+
+            # Full error list (for programmatic access)
+            metadata['errors'] = errors  # Keep as list of tuples
+
+            # Summary metrics (for MLflow)
+            metadata['error_count'] = error_count
+            metadata['error_rate'] = error_rate
+            metadata['error_type_counts'] = dict(error_type_counts)
+
+            # Preview for artifact (first 10 messages only)
+            metadata['error_messages_preview'] = [
+                f"{err[0]}: {err[1]}" for err in errors[:10]
+            ]
+        else:
+            metadata['error_count'] = 0
+            metadata['error_rate'] = 0.0
+            metadata['error_type_counts'] = {}
+
         if lock_info:
             metadata['gpu_clock_locking'] = lock_info
 

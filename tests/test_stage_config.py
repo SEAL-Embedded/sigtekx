@@ -1,6 +1,5 @@
 """Test complete StageConfig Python bindings (Phase 0 foundation)."""
 
-import pytest
 from sigtekx.core import _native
 
 # Use C++ types from _native module

@@ -16,6 +16,7 @@ import pandas as pd
 from omegaconf import DictConfig, OmegaConf
 
 from sigtekx.benchmarks import ThroughputBenchmark, ThroughputBenchmarkConfig
+from sigtekx.benchmarks.mlflow_utils import log_benchmark_errors
 from sigtekx.config import EngineConfig
 
 # Add experiments directory to path for metrics import
@@ -94,6 +95,9 @@ def run_throughput_benchmark(cfg: DictConfig) -> float:
         # Run benchmark
         benchmark = ThroughputBenchmark(benchmark_config)
         result = benchmark.run()
+
+        # Log error metrics to MLflow (using shared utility)
+        log_benchmark_errors(result, Path(cfg.paths.data), result.config)
 
         # Log metrics
         fps = 0.0

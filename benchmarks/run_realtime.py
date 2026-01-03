@@ -15,6 +15,7 @@ import pandas as pd
 from omegaconf import DictConfig, OmegaConf
 
 from sigtekx.benchmarks import RealtimeBenchmark, RealtimeBenchmarkConfig
+from sigtekx.benchmarks.mlflow_utils import log_benchmark_errors
 from sigtekx.config import EngineConfig
 
 
@@ -72,6 +73,9 @@ def run_realtime_benchmark(cfg: DictConfig) -> float:
         # Run benchmark
         benchmark = RealtimeBenchmark(benchmark_config)
         result = benchmark.run()
+
+        # Log error metrics to MLflow (using shared utility)
+        log_benchmark_errors(result, Path(cfg.paths.data), result.config)
 
         stats = result.statistics if isinstance(result.statistics, dict) else {}
         # Extract scalar metrics from potentially nested statistics dictionaries
