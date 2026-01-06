@@ -333,7 +333,7 @@ function global:sigx {
     }
 
     # Only allow commands that actually exist in simplified CLI
-    $validCommands = @('setup','build','test','coverage','lint','format','clean','doctor','help','profile','typecheck','diagrams','dev')
+    $validCommands = @('setup','build','test','coverage','lint','format','clean','doctor','help','profile','typecheck','diagrams','dev','baseline')
     if ($Args.Count -gt 0 -and $Args[0] -notin $validCommands) {
         Write-Warning "Command '$($Args[0])' not available. Use 'sigx help' for available commands."
         Write-Host "💡 For research workflows, use direct tools:" -ForegroundColor Cyan

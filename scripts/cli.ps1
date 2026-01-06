@@ -575,6 +575,24 @@ function Invoke-Dev {
     Write-Host "  # Preview" -ForegroundColor DarkCyan
     Write-Host ""
 
+    # Methods Paper - Key Experiments
+    Write-Host "═══ METHODS PAPER - KEY EXPERIMENTS ═══" -ForegroundColor Magenta
+    Write-Host ""
+    Write-Host "  100kHz Streaming (CRITICAL for Phase 1):" -ForegroundColor Yellow
+    Write-Host "  python benchmarks/run_latency.py --multirun experiment=baseline_streaming_100k_latency +benchmark=latency_streaming" -ForegroundColor White
+    Write-Host "  python benchmarks/run_throughput.py --multirun experiment=baseline_streaming_100k_throughput +benchmark=throughput_streaming" -ForegroundColor White
+    Write-Host ""
+    Write-Host "  48kHz Streaming (Ionosphere):" -ForegroundColor Yellow
+    Write-Host "  python benchmarks/run_latency.py --multirun experiment=baseline_streaming_48k_latency +benchmark=latency_streaming" -ForegroundColor White
+    Write-Host "  python benchmarks/run_throughput.py --multirun experiment=baseline_streaming_48k_throughput +benchmark=throughput_streaming" -ForegroundColor White
+    Write-Host ""
+    Write-Host "  Quick Baseline Generation (all modes):" -ForegroundColor Yellow
+    Write-Host "  snakemake --cores 4 --snakefile experiments/Snakefile run_baseline_streaming_100k_latency run_baseline_streaming_100k_throughput" -ForegroundColor White
+    Write-Host ""
+    Write-Host "  Save Baseline:" -ForegroundColor Yellow
+    Write-Host "  sigx baseline save pre-phase1 --phase 1 --message ""Before zero-copy optimization""" -ForegroundColor White
+    Write-Host ""
+
     # UI and Analysis Tools
     Write-Host "═══ ANALYSIS & VISUALIZATION ═══" -ForegroundColor Green
     Write-Host "  sigx dashboard" -ForegroundColor Gray -NoNewline
@@ -1034,6 +1052,51 @@ function Invoke-Profile {
     }
 }
 
+function Invoke-Baseline {
+    <#
+    .SYNOPSIS
+        Manage baseline experiment archives for regression tracking
+    .DESCRIPTION
+        Provides baseline archiving for phase-aligned experiment snapshots.
+        Baselines are stored in baselines/ (repo root) and survive `sigx clean`.
+    .PARAMETER Subcommand
+        Baseline operation: save, list, compare, delete, export
+    .PARAMETER SubcommandArgs
+        Arguments for the subcommand
+    .EXAMPLE
+        Invoke-Baseline -Subcommand "save" -SubcommandArgs @("pre-phase1", "--phase", "1")
+    .EXAMPLE
+        Invoke-Baseline -Subcommand "list"
+    #>
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$Subcommand,
+
+        [Parameter(Mandatory=$false)]
+        [string[]]$SubcommandArgs = @()
+    )
+
+    # Path to baseline helper script
+    $baselineHelper = Join-Path $script:ProjectRoot "scripts/baseline_helper.py"
+
+    if (-not (Test-Path $baselineHelper)) {
+        Write-Error "Baseline helper not found: $baselineHelper"
+        exit 1
+    }
+
+    # Build arguments for Python script
+    # Ensure SubcommandArgs is always an array (prevents string splatting issue)
+    $pythonArgs = @($Subcommand) + @($SubcommandArgs)
+
+    # Run baseline command
+    & python $baselineHelper @pythonArgs
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "❌ Baseline operation failed"
+        exit 1
+    }
+}
+
 function Show-Help {
     Write-Host @"
 ╔════════════════════════════════════════════════════════════════════════╗
@@ -1156,6 +1219,51 @@ GPU CLOCK LOCKING (Benchmark Stability)
     sigxc bench --preset latency --full --lock-clocks
 
   See: docs/performance/gpu-clock-locking.md for full details
+
+═══════════════════════════════════════════════════════════════════════════
+BASELINE MANAGEMENT (Phase-Aligned Archiving)
+═══════════════════════════════════════════════════════════════════════════
+
+  baseline save <name> [--phase <n>] [--message <msg>]
+      Save current artifacts as baseline for regression tracking
+      Baselines stored in baselines/ (survives 'sigx clean')
+
+  baseline list [--phase <n>] [--verbose]
+      List all saved baselines, optionally filtered by phase
+
+  baseline compare <name1> <name2>
+      Compare two baselines with statistical analysis
+
+  baseline delete <name> [--force]
+      Delete a saved baseline (prompts for confirmation unless --force)
+
+  baseline export <name> <dest>           (Phase 2 feature - coming soon)
+      Export baseline for publication archival
+
+Examples:
+  # Save baseline before Phase 1 optimizations
+  sigx baseline save pre-phase1 --phase 1 --message "Before zero-copy"
+
+  # List all Phase 1 baselines
+  sigx baseline list --phase 1
+
+  # Compare pre/post optimization
+  sigx baseline compare pre-phase1 post-phase1
+
+  # Delete old baseline
+  sigx baseline delete old-test --force
+
+Workflow:
+  1. Run experiments:     snakemake --cores 4 --snakefile experiments/Snakefile
+  2. Save baseline:       sigx baseline save pre-phase1 --phase 1
+  3. Clean artifacts:     sigx clean  (baselines/ survives)
+  4. Modify code, rebuild, regenerate data
+  5. Save new state:      sigx baseline save post-phase1 --phase 1
+  6. Compare:             sigx baseline compare pre-phase1 post-phase1
+
+Storage: baselines/ (repo root, not gitignored, manually managed)
+
+See: docs/benchmarking/experiment-logging-system.md for full details
 
 ═══════════════════════════════════════════════════════════════════════════
 C++ DEVELOPMENT WORKFLOW (Pre-Python Integration)
@@ -1425,6 +1533,25 @@ try {
             }
 
             Invoke-Dev @params
+        }
+        "baseline" {
+            # Parse subcommand (first positional argument)
+            $nonFlagArgs = $CommandArgs | Where-Object { $_ -and $_ -notlike "-*" }
+            $subcommand = if ($nonFlagArgs.Count -ge 1) { $nonFlagArgs[0] } else { "" }
+
+            if (-not $subcommand) {
+                Write-Error "Missing subcommand. Use: save, list, compare, delete, export"
+                Write-Host "Examples:"
+                Write-Host "  sigx baseline save pre-phase1 --phase 1"
+                Write-Host "  sigx baseline list"
+                exit 1
+            }
+
+            # Get remaining args (skip subcommand)
+            # Wrap in @() to ensure it's always an array, even if empty
+            $remainingArgs = @($CommandArgs | Select-Object -Skip 1)
+
+            Invoke-Baseline -Subcommand $subcommand -SubcommandArgs $remainingArgs
         }
         default {
             Write-Error "Unknown command: $Command"
