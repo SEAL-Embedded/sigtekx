@@ -27,6 +27,7 @@ from __future__ import annotations
 from typing import Any
 
 from sigtekx.config import EngineConfig, ScalePolicy, WindowNorm, WindowSymmetry, WindowType
+from sigtekx.stages.registry import get_global_registry
 
 
 class PipelineBuilder:
@@ -34,6 +35,9 @@ class PipelineBuilder:
 
     Provides a step-by-step interface for constructing signal processing pipelines
     with full control over each stage's configuration.
+
+    Note: The C++ backend still constructs a fixed pipeline; this builder performs
+    Python-side validation only until the registry is bridged in Phase 2.
 
     The builder follows a simple pattern:
     1. Add stages (window, FFT, magnitude) in order
@@ -76,6 +80,7 @@ class PipelineBuilder:
         """Initialize an empty pipeline builder."""
         self._stages = []
         self._config = None
+        self._registry = get_global_registry()
 
     def add_window(
         self,
@@ -97,6 +102,9 @@ class PipelineBuilder:
             >>> builder.add_window('hann')
             >>> builder.add_window('blackman', symmetry='periodic', norm='unity')
         """
+        if not self._registry.validate_stage_exists("window"):
+            raise ValueError("Window stage not available")
+
         # Normalize string inputs to enums
         if isinstance(type, str):
             type = WindowType(type)
@@ -104,6 +112,16 @@ class PipelineBuilder:
             symmetry = WindowSymmetry(symmetry)
         if isinstance(norm, str):
             norm = WindowNorm(norm)
+
+        # Validate declared parameters against registry metadata
+        metadata = self._registry.get_metadata("window")
+        expected_params = set(metadata["parameters"])
+        provided_params = {"window_type", "window_symmetry", "window_norm"}
+        if not provided_params.issubset(expected_params):
+            raise ValueError(
+                f"Invalid parameters for window stage. Expected subset of "
+                f"{sorted(expected_params)}"
+            )
 
         self._stages.append({
             'type': 'window',
@@ -129,9 +147,22 @@ class PipelineBuilder:
             >>> builder.add_fft('1/N')
             >>> builder.add_fft('1/sqrt(N)')
         """
+        if not self._registry.validate_stage_exists("fft"):
+            raise ValueError("FFT stage not available")
+
         # Normalize string input to enum
         if isinstance(scale, str):
             scale = ScalePolicy(scale)
+
+        # Validate against registry metadata
+        metadata = self._registry.get_metadata("fft")
+        expected_params = set(metadata["parameters"])
+        provided_params = {"scale_policy"}
+        if not provided_params.issubset(expected_params):
+            raise ValueError(
+                f"Invalid parameters for fft stage. Expected subset of "
+                f"{sorted(expected_params)}"
+            )
 
         self._stages.append({
             'type': 'fft',
@@ -152,11 +183,20 @@ class PipelineBuilder:
         Examples:
             >>> builder.add_magnitude()
         """
+        if not self._registry.validate_stage_exists("magnitude"):
+            raise ValueError("Magnitude stage not available")
+
         self._stages.append({
             'type': 'magnitude',
             'params': {}
         })
         return self
+
+    def add_custom(self, name: str, factory: Any, **params: Any) -> PipelineBuilder:
+        """Placeholder for Phase 2 custom stage integration."""
+        raise NotImplementedError(
+            "Custom stages require Phase 2 implementation (Numba/PyTorch bridge)."
+        )
 
     def configure(
         self,
@@ -210,6 +250,10 @@ class PipelineBuilder:
         """
         if not self._stages:
             raise ValueError("Pipeline must have at least one stage")
+
+        for stage in self._stages:
+            if not self._registry.validate_stage_exists(stage['type']):
+                raise ValueError(f"Stage '{stage['type']}' not registered")
 
         if self._config is None:
             raise ValueError(

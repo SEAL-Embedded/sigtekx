@@ -1,129 +1,144 @@
-"""A stage registry for pipeline extensibility and custom processing operations.
+"""Unified stage registry for core and custom processing stages.
 
-This module provides a registry system for managing custom processing stages,
-forming the foundation for the v2.0 extensibility framework. It allows developers
-to register custom algorithms while maintaining type safety and documentation
-standards.
+The registry is the single source of truth for stage metadata. It currently
+tracks Python-level stages only; Phase 2 will bridge factories into the C++
+engine (CustomStage, CUfunction adapters).
 """
 
 import warnings
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Literal, Protocol, TypedDict
+
+
+class StageMetadata(TypedDict):
+    """Standardized metadata schema for pipeline stages."""
+
+    description: str
+    implemented: bool
+    parameters: list[str]
+    stage_type: Literal["core", "custom", "experimental"]
+    version_added: str
+
+
+class IStageFactory(Protocol):
+    """Protocol for factory callables that instantiate a stage."""
+
+    def __call__(self, config: dict[str, Any]) -> Any:
+        ...
 
 
 class StageRegistry:
-    """Manages custom processing stages and their metadata.
+    """Unified registry for core + custom stages.
 
-    This class provides a thread-safe registry for dynamically adding, retrieving,
-    and managing custom functions as pluggable stages in a processing pipeline.
-    It handles registration, metadata, and discovery.
-
-    The registry is designed to be thread-safe for concurrent registration
-    during initialization and concurrent retrieval during processing.
+    Phase 0: only metadata is registered for core stages to prepare the extension
+    points needed in Phase 2 (Numba/PyTorch custom kernels). Factory attachment
+    and C++ bridging remain to be implemented.
     """
 
-    def __init__(self):
-        """Initializes a new, empty stage registry."""
-        self._stages: dict[str, Callable] = {}
-        self._metadata: dict[str, dict[str, Any]] = {}
+    def __init__(self) -> None:
+        self._stages: dict[str, IStageFactory] = {}
+        self._metadata: dict[str, StageMetadata] = {}
+        self._core_stages_registered = False
+
+    def ensure_core_stages(self) -> None:
+        """Lazy-load core stage metadata from definitions to avoid import cycles."""
+        if self._core_stages_registered:
+            return
+
+        from sigtekx.stages.definitions import STAGE_METADATA, StageType
+
+        for stage_type, metadata in STAGE_METADATA.items():
+            if metadata.get("implemented", False):
+                self.register_core_stage(
+                    name=stage_type.value,
+                    metadata={
+                        "description": metadata["description"],
+                        "implemented": True,
+                        "parameters": metadata.get("parameters", []),
+                        "stage_type": "core",
+                        "version_added": "0.9.6",
+                    },
+                )
+
+        self._core_stages_registered = True
+
+    def register_core_stage(self, name: str, metadata: StageMetadata) -> None:
+        """Register a core stage metadata entry (factory binding deferred to Phase 2)."""
+        self._metadata[name] = metadata
 
     def register(
         self,
         name: str,
-        stage_fn: Callable,
-        metadata: dict[str, Any] | None = None
+        stage_fn: IStageFactory,
+        metadata: StageMetadata | None = None,
     ) -> None:
-        """Registers a custom processing stage with optional metadata.
-
-        If a stage with the same name already exists, it will be overwritten,
-        and a warning will be issued.
-
-        Args:
-            name: The unique name for the stage.
-            stage_fn: The processing function for the stage.
-            metadata: An optional dictionary of metadata about the stage.
-        """
+        """Register a custom stage factory and optional metadata."""
+        self.ensure_core_stages()
         if name in self._stages:
             warnings.warn(f"Overwriting existing stage: {name}", stacklevel=2)
 
         self._stages[name] = stage_fn
-        self._metadata[name] = metadata or {}
+        if metadata:
+            self._metadata[name] = metadata
 
-    def get(self, name: str) -> Callable | None:
-        """Retrieves a registered stage function by name.
-
-        Args:
-            name: The name of the stage to retrieve.
-
-        Returns:
-            The callable stage function if found, otherwise None.
-        """
+    def get(self, name: str) -> IStageFactory | None:
+        """Retrieve a registered stage factory by name."""
+        self.ensure_core_stages()
         return self._stages.get(name)
 
-    def list_stages(self) -> list:
-        """Returns a list of all registered stage names.
+    def list_stages(self) -> list[str]:
+        """List all known stages (core metadata + registered factories)."""
+        self.ensure_core_stages()
+        return sorted(set(self._metadata.keys()) | set(self._stages.keys()))
 
-        Returns:
-            A list of strings representing the names of all registered stages.
-        """
-        return list(self._stages.keys())
+    def get_metadata(self, name: str) -> StageMetadata:
+        """Return metadata for a stage or raise if not registered."""
+        self.ensure_core_stages()
+        if name not in self._metadata:
+            raise ValueError(f"Stage '{name}' not registered")
+        return self._metadata[name]
 
-    def get_metadata(self, name: str) -> dict[str, Any]:
-        """Retrieves the metadata for a registered stage.
+    def validate_stage_exists(self, name: str) -> bool:
+        """Check whether a stage name is registered."""
+        self.ensure_core_stages()
+        return name in self._metadata or name in self._stages
 
-        Args:
-            name: The name of the stage.
-
-        Returns:
-            A dictionary of metadata, or an empty dictionary if the stage
-            is not found.
-        """
-        return self._metadata.get(name, {})
+    def get_core_pipeline(self) -> list[str]:
+        """Default core pipeline order (Window -> FFT -> Magnitude)."""
+        self.ensure_core_stages()
+        return ["window", "fft", "magnitude"]
 
     def clear(self) -> None:
-        """Clears all registered stages and metadata from the registry."""
+        """Clear all registered stages and metadata (mostly for tests)."""
         self._stages.clear()
         self._metadata.clear()
+        self._core_stages_registered = False
 
 
 # Global registry instance for application-wide stage management
 _global_registry = StageRegistry()
 
 
-def register_stage(name: str, metadata: dict[str, Any] | None = None):
-    """Decorator to register a function as a stage in the global registry.
+def get_global_registry() -> StageRegistry:
+    """Return the singleton StageRegistry instance."""
+    return _global_registry
 
-    Args:
-        name: The unique name for the stage.
-        metadata: An optional dictionary of metadata about the stage.
 
-    Returns:
-        A decorator that registers the function and returns it unchanged.
-    """
+def register_stage(name: str, metadata: StageMetadata | None = None):
+    """Decorator to register a function as a stage in the global registry."""
+
     def decorator(fn: Callable) -> Callable:
-        """Registers the function and returns it."""
         _global_registry.register(name, fn, metadata)
         return fn
 
     return decorator
 
 
-def get_stage(name: str) -> Callable | None:
-    """Gets a registered stage by name from the global registry.
-
-    Args:
-        name: The name of the stage to retrieve.
-
-    Returns:
-        The callable stage function if found, otherwise None.
-    """
+def get_stage(name: str) -> IStageFactory | None:
+    """Retrieve a stage factory from the global registry."""
     return _global_registry.get(name)
 
 
-def list_stages() -> list:
-    """Lists all registered stages in the global registry.
-
-    Returns:
-        A list of the names of all registered stages.
-    """
+def list_stages() -> list[str]:
+    """List stage names known to the global registry."""
     return _global_registry.list_stages()

@@ -1,87 +1,58 @@
-"""Tests for the processing stages and registry."""
+"""Tests for the processing stages registry and builder validation."""
 
 
 import pytest
 
-# Import the global registry instance that the application uses
-from sigtekx.stages.registry import _global_registry
+from sigtekx.core.builder import PipelineBuilder
+from sigtekx.stages.definitions import (
+    STAGE_METADATA,
+    StageType,
+    get_stage_metadata_legacy,
+)
+from sigtekx.stages.registry import get_global_registry
 
 
-# Mock some stages for testing, since the tests depend on them being registered.
-# In a real scenario, you might import the modules where they are defined.
-class MockStage:
-    def __init__(self, name, key, description):
-        self.name = name
-        self.key = key
-        self.description = description
-    def __call__(self, *args, **kwargs):
-        pass
+def test_core_stages_registered():
+    registry = get_global_registry()
 
-# Register mock stages to the global registry for the tests to find
-_global_registry.register("fft", MockStage("FFT", "fft", "Calculates the Fast Fourier Transform"))
-_global_registry.register("magnitude", MockStage("Magnitude", "magnitude", "Computes the magnitude"))
-_global_registry.register("db", MockStage("dB Conversion", "db", "Converts the magnitude spectrum to decibels"))
+    assert registry.validate_stage_exists("window")
+    assert registry.validate_stage_exists("fft")
+    assert registry.validate_stage_exists("magnitude")
 
 
-@pytest.fixture(scope="module")
-def stage_registry():
-    """Provides the singleton instance of the StageRegistry."""
-    return _global_registry
+def test_registry_metadata_matches_definitions():
+    registry = get_global_registry()
+
+    for stage_type, static_metadata in STAGE_METADATA.items():
+        if not static_metadata.get("implemented", False):
+            continue
+
+        registry_metadata = registry.get_metadata(stage_type.value)
+        assert registry_metadata["description"] == static_metadata["description"]
+        assert set(registry_metadata["parameters"]) == set(
+            static_metadata.get("parameters", [])
+        )
 
 
-class TestStageDefinitions:
-    """Test individual processing stage definitions obtained from the registry."""
+def test_pipeline_builder_validates_stages():
+    builder = PipelineBuilder().add_window().add_fft()
+    builder._stages.append({"type": "invalid_stage", "params": {}})
 
-    def test_fft_stage_properties(self, stage_registry):
-        """Test the properties of the FFT stage."""
-        stage = stage_registry.get("fft")
-        assert stage.name == "FFT"
-        assert stage.key == "fft"
-        assert "Calculates the Fast Fourier Transform" in stage.description
-
-    def test_magnitude_stage_properties(self, stage_registry):
-        """Test the properties of the Magnitude stage."""
-        stage = stage_registry.get("magnitude")
-        assert stage.name == "Magnitude"
-        assert stage.key == "magnitude"
-        assert "Computes the magnitude" in stage.description
-
-    def test_converttodb_stage_properties(self, stage_registry):
-        """Test the properties of the ConvertToDB stage."""
-        stage = stage_registry.get("db")
-        assert stage.name == "dB Conversion"
-        assert stage.key == "db"
-        assert "Converts the magnitude spectrum to decibels" in stage.description
+    with pytest.raises(ValueError, match="Stage 'invalid_stage' not registered"):
+        builder.build()
 
 
-class TestStageRegistry:
-    """Test the StageRegistry functionality."""
+def test_add_custom_raises_not_implemented():
+    builder = PipelineBuilder()
 
-    def test_singleton_pattern(self, stage_registry):
-        """Test that the StageRegistry uses a singleton pattern via its global instance."""
-        # Importing the global registry again should yield the same object
-        from sigtekx.stages.registry import _global_registry as registry2
-        assert stage_registry is registry2
+    with pytest.raises(NotImplementedError, match="Phase 2"):
+        builder.add_custom("my_stage", lambda cfg: cfg)
 
-    def test_stage_retrieval(self, stage_registry):
-        """Test retrieving registered stages."""
-        # Check that stages registered at the start of the file are retrievable
-        assert len(stage_registry.list_stages()) >= 3
 
-        fft_stage = stage_registry.get("fft")
-        assert fft_stage.key == "fft"
+def test_legacy_metadata_access_deprecated():
+    with pytest.warns(DeprecationWarning):
+        legacy = get_stage_metadata_legacy()
 
-    def test_get_invalid_stage(self, stage_registry):
-        """Test retrieving a non-existent stage returns None without error."""
-        # The .get() method returns None for a missing key, it does not raise KeyError
-        assert stage_registry.get("non_existent_stage") is None
-
-    def test_list_available_stages(self, stage_registry):
-        """Test that listing available stages returns a list of keys."""
-        available_stages = stage_registry.list_stages()
-
-        assert isinstance(available_stages, list)
-        assert "fft" in available_stages
-        assert "magnitude" in available_stages
-        assert "db" in available_stages
+    assert StageType.WINDOW in legacy
+    assert legacy[StageType.WINDOW]["stage_type"] == "core"
 
