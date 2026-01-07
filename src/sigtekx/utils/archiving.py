@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 
+from filelock import FileLock
 from sigtekx.utils.paths import (
     get_benchmark_result_path,
     get_benchmark_run_dir,
@@ -18,12 +19,13 @@ __all__ = ["DataArchiver"]
 
 
 class DataArchiver:
-    """Archive and manage benchmark data for reproducibility."""
+    """Archive and manage benchmark data for reproducibility with file-locked manifests."""
 
     def __init__(self, base_dir: str | Path | None = None):
         self._custom_base = base_dir is not None
         self.base_dir = Path(base_dir) if base_dir is not None else get_benchmarks_root()
         self.base_dir.mkdir(parents=True, exist_ok=True)
+        self._manifest_lock_timeout: float = 10.0
 
     def archive_results(
         self,
@@ -137,21 +139,20 @@ class DataArchiver:
         }
 
     def _update_manifest(self, experiment_name: str, filename: str, timestamp: datetime) -> None:
+        """Atomically update the manifest to avoid concurrent write loss."""
         manifest_path = self.base_dir / "manifest.json"
-        if manifest_path.exists():
-            with manifest_path.open(encoding="utf-8") as handle:
-                manifest = json.load(handle)
-        else:
-            manifest = {}
+        lock_path = manifest_path.with_suffix(".json.lock")
 
-        entries = manifest.setdefault(experiment_name, [])
-        entries.append({
-            "filename": filename,
-            "timestamp": timestamp.strftime("%Y%m%d_%H%M%S"),
-        })
+        with FileLock(str(lock_path), timeout=self._manifest_lock_timeout):
+            manifest = self._load_manifest(manifest_path)
+            entries = manifest.setdefault(experiment_name, [])
+            entries.append({
+                "filename": filename,
+                "timestamp": timestamp.strftime("%Y%m%d_%H%M%S"),
+            })
 
-        with manifest_path.open("w", encoding="utf-8") as handle:
-            json.dump(manifest, handle, indent=2)
+            with manifest_path.open("w", encoding="utf-8") as handle:
+                json.dump(manifest, handle, indent=2)
 
     def _flatten_dict(self, data: dict[str, Any], parent_key: str = "") -> dict[str, Any]:
         items: dict[str, Any] = {}
@@ -162,3 +163,13 @@ class DataArchiver:
             else:
                 items[new_key] = value
         return items
+
+    def _load_manifest(self, manifest_path: Path | None = None) -> dict[str, list[dict[str, str]]]:
+        """Load manifest content if present; return empty manifest otherwise."""
+        path = manifest_path if manifest_path is not None else self.base_dir / "manifest.json"
+        if not path.exists():
+            return {}
+
+        with path.open(encoding="utf-8") as handle:
+            loaded = json.load(handle)
+        return cast(dict[str, list[dict[str, str]]], loaded)

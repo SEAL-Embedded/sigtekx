@@ -116,6 +116,7 @@ vgcore.*
 .sigtekx/
 benchmark_results/
 results/
+*.json.lock
 
 .dsp_course/
 .claude/
