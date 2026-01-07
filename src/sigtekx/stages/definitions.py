@@ -5,8 +5,11 @@ pipeline, providing structured metadata and type definitions for all current
 and planned processing stages.
 """
 
+import warnings
 from enum import Enum
 from typing import Any
+
+from sigtekx.stages.registry import get_global_registry
 
 
 class StageType(Enum):
@@ -38,17 +41,17 @@ STAGE_METADATA: dict[StageType, dict[str, Any]] = {
     StageType.WINDOW: {
         "description": "Apply window function to reduce spectral leakage.",
         "implemented": True,
-        "parameters": ["window_type", "window_norm"],
+        "parameters": ["window_type", "window_symmetry", "window_norm"],
     },
     StageType.FFT: {
         "description": "Fast Fourier Transform using cuFFT.",
         "implemented": True,
-        "parameters": ["nfft", "batch"],
+        "parameters": ["scale_policy"],
     },
     StageType.MAGNITUDE: {
         "description": "Compute magnitude from complex spectrum.",
         "implemented": True,
-        "parameters": ["scale_policy"],
+        "parameters": [],
     },
     StageType.PHASE: {
         "description": "Compute phase from complex spectrum.",
@@ -107,3 +110,31 @@ def list_future_stages() -> list[StageType]:
         for stage_type, info in STAGE_METADATA.items()
         if not info.get("implemented", False)
     ]
+
+
+def get_stage_metadata_legacy() -> dict[StageType, dict[str, Any]]:
+    """Legacy compatibility for direct STAGE_METADATA access.
+
+    DEPRECATED: Prefer get_global_registry().get_metadata(name) for a unified
+    registry source of truth. This helper mirrors the old structure while
+    emitting a warning to guide migrations.
+    """
+    warnings.warn(
+        "Direct STAGE_METADATA access is deprecated. Use "
+        "get_global_registry().get_metadata(name) instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
+    registry = get_global_registry()
+    registry.ensure_core_stages()
+
+    legacy_metadata: dict[StageType, dict[str, Any]] = {}
+    for stage_type in StageType:
+        try:
+            metadata = registry.get_metadata(stage_type.value)
+        except ValueError:
+            continue
+        legacy_metadata[stage_type] = dict(metadata)
+
+    return legacy_metadata

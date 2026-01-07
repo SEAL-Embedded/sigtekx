@@ -1,7 +1,33 @@
-"""Pipeline stages module (placeholder for v2.0 extensibility)."""
+"""Stage metadata and registry utilities.
 
-from .definitions import StageType, get_stage_info, list_future_stages, list_implemented_stages
-from .registry import StageRegistry, get_stage, list_stages, register_stage
+Core stage metadata is lazily loaded into a global registry; Phase 2 will
+attach factories and bridge custom kernels into the C++ engine.
+"""
 
-# Note: These are kept private as they're not part of the public API yet
-__all__: list[str] = []
+from .definitions import (
+    StageType,
+    get_stage_info,
+    get_stage_metadata_legacy,
+    list_future_stages,
+    list_implemented_stages,
+)
+from .registry import (
+    StageRegistry,
+    get_global_registry,
+    get_stage,
+    list_stages,
+    register_stage,
+)
+
+__all__ = [
+    "StageType",
+    "StageRegistry",
+    "get_global_registry",
+    "get_stage",
+    "list_stages",
+    "register_stage",
+    "get_stage_info",
+    "list_future_stages",
+    "list_implemented_stages",
+    "get_stage_metadata_legacy",
+]
