@@ -215,6 +215,11 @@ class EngineConfig(BaseModel):
         description="Enable internal profiling and metrics collection"
     )
 
+    measure_components: bool = Field(
+        default=False,
+        description="Enable per-stage timing (adds GPU event overhead ~1-2µs/stage)"
+    )
+
     validation_mode: ValidationMode = Field(
         default=ValidationMode.STRICT,
         description="Input validation strictness (strict=full checks, basic=type/shape only, disabled=skip Python validation)"
@@ -256,6 +261,16 @@ class EngineConfig(BaseModel):
                 f"Configuration requires ~{total_bytes / (1024**2):.1f}MB device memory",
                 ResourceWarning,
                 stacklevel=3
+            )
+        return self
+
+    @model_validator(mode='after')
+    def validate_component_timing(self) -> Self:
+        """Component timing only supported in batch mode (latency benchmark)."""
+        if self.measure_components and self.mode != ExecutionMode.BATCH:
+            raise ValueError(
+                "measure_components=True requires mode='batch'. "
+                "Streaming mode component timing not yet implemented."
             )
         return self
 

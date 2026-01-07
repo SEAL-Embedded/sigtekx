@@ -305,7 +305,7 @@ class Engine:
             cpp_fields = {
                 'nfft', 'channels', 'overlap', 'sample_rate_hz',
                 'stream_count', 'pinned_buffer_count', 'warmup_iters',
-                'device_id'
+                'device_id', 'measure_components'
             }
 
             for key in cpp_fields:
@@ -752,6 +752,16 @@ class Engine:
         if self._config.enable_profiling and self._total_frames > 0:
             result["avg_latency_us"] = self._total_latency_us / self._total_frames
             result["total_frames"] = self._total_frames
+
+        # Add stage metrics if enabled
+        if hasattr(stats, 'stage_metrics') and stats.stage_metrics.enabled:
+            result["stage_metrics"] = {
+                "window_us": float(stats.stage_metrics.window_us),
+                "fft_us": float(stats.stage_metrics.fft_us),
+                "magnitude_us": float(stats.stage_metrics.magnitude_us),
+                "overhead_us": float(stats.stage_metrics.overhead_us),
+                "total_measured_us": float(stats.stage_metrics.total_measured_us),
+            }
 
         return result
 

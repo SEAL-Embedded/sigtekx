@@ -12,7 +12,7 @@ warmup_iterations: 500
 confidence_level: 0.95
 outlier_threshold: 3.0
 measure_gpu_time: true
-measure_components: false
+measure_components: false  # Enable per-stage timing (adds GPU event overhead ~1-2µs/stage)
 test_signal_type: sine
 test_frequency: 1000.0
 deadline_us: 200.0

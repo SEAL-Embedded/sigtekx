@@ -119,6 +119,27 @@ struct StageConfig {
 };
 
 /**
+ * @struct StageMetrics
+ * @brief Per-stage timing metrics collected during processing (microseconds).
+ *
+ * Conditionally populated when measure_components=true to enable fine-grained
+ * performance analysis of individual pipeline stages (Window, FFT, Magnitude).
+ * All times are in microseconds.
+ *
+ * The overhead_us field represents pipeline management costs (kernel launch
+ * overhead, synchronization, buffer routing) calculated as:
+ * overhead_us = total_latency - (window_us + fft_us + magnitude_us)
+ */
+struct StageMetrics {
+  float window_us = 0.0f;      ///< Window stage execution time (µs).
+  float fft_us = 0.0f;         ///< FFT stage execution time (µs).
+  float magnitude_us = 0.0f;   ///< Magnitude stage execution time (µs).
+  float overhead_us = 0.0f;    ///< Pipeline overhead (total - sum of stages, µs).
+  float total_measured_us = 0.0f;  ///< Sum of individual stage times (µs).
+  bool enabled = false;  ///< Whether component timing was enabled for this measurement.
+};
+
+/**
  * @struct ProcessingStats
  * @brief Holds performance metrics for a processing operation.
  */
@@ -129,6 +150,7 @@ struct ProcessingStats {
   size_t frames_processed = 0;   ///< Cumulative count of processed frames.
   bool is_warmup =
       true;  ///< Flag indicating if the metric is from a warmup run.
+  StageMetrics stage_metrics{};  ///< Per-stage timing breakdown (optional, only when measure_components=true).
 };
 
 /**

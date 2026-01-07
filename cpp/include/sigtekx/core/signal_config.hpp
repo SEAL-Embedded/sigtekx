@@ -55,6 +55,7 @@ struct SignalConfig {
   // Performance Tuning
   bool use_cuda_graphs = false;
   bool enable_profiling = false;
+  bool measure_components = false;  ///< Enable per-stage timing (adds GPU event overhead ~1-2µs/stage)
 
   int hop_size() const { return static_cast<int>(nfft * (1.0f - overlap)); }
   int num_output_bins() const { return nfft / 2 + 1; }

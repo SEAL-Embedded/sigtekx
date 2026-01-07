@@ -463,3 +463,163 @@ TEST_F(BatchExecutorTest, ConfigValidationSuccess) {
   EXPECT_TRUE(valid_config.validate(error_msg));
   EXPECT_TRUE(error_msg.empty());
 }
+
+// ============================================================================
+//  Component Timing Tests (Per-Stage Metrics)
+// ============================================================================
+
+TEST_F(BatchExecutorTest, ComponentTimingDisabledByDefault) {
+  // Verify stage_metrics.enabled=false when measure_components not set
+  BatchExecutor executor;
+
+  PipelineBuilder builder;
+  auto stages = builder.with_config(StageConfig{config_.nfft, config_.channels})
+                    .add_window(StageConfig::WindowType::HANN)
+                    .add_fft()
+                    .add_magnitude()
+                    .build();
+
+  // Default config (measure_components=false)
+  executor.initialize(config_, std::move(stages));
+
+  auto stats = executor.get_stats();
+  EXPECT_FALSE(stats.stage_metrics.enabled);
+  EXPECT_EQ(stats.stage_metrics.window_us, 0.0f);
+  EXPECT_EQ(stats.stage_metrics.fft_us, 0.0f);
+  EXPECT_EQ(stats.stage_metrics.magnitude_us, 0.0f);
+  EXPECT_EQ(stats.stage_metrics.overhead_us, 0.0f);
+  EXPECT_EQ(stats.stage_metrics.total_measured_us, 0.0f);
+}
+
+TEST_F(BatchExecutorTest, ComponentTimingEnabled) {
+  // Verify stage_metrics populated when measure_components=true
+  BatchExecutor executor;
+
+  PipelineBuilder builder;
+  auto stages = builder.with_config(StageConfig{config_.nfft, config_.channels})
+                    .add_window(StageConfig::WindowType::HANN)
+                    .add_fft()
+                    .add_magnitude()
+                    .build();
+
+  // Enable component timing
+  config_.measure_components = true;
+  executor.initialize(config_, std::move(stages));
+
+  // Generate test signal
+  const size_t input_size = config_.nfft * config_.channels;
+  const size_t output_size = config_.num_output_bins() * config_.channels;
+  auto input = generate_sinusoid(input_size, 1000.0f);
+  std::vector<float> output(output_size);
+
+  // Process frame
+  executor.submit(input.data(), output.data(), input_size);
+
+  // Verify metrics enabled and populated
+  auto stats = executor.get_stats();
+  EXPECT_TRUE(stats.stage_metrics.enabled);
+  EXPECT_GT(stats.stage_metrics.window_us, 0.0f);
+  EXPECT_GT(stats.stage_metrics.fft_us, 0.0f);
+  EXPECT_GT(stats.stage_metrics.magnitude_us, 0.0f);
+  EXPECT_GT(stats.stage_metrics.total_measured_us, 0.0f);
+
+  // Verify total = sum of components
+  float sum = stats.stage_metrics.window_us +
+              stats.stage_metrics.fft_us +
+              stats.stage_metrics.magnitude_us;
+  EXPECT_NEAR(stats.stage_metrics.total_measured_us, sum, 0.1f);
+}
+
+TEST_F(BatchExecutorTest, ComponentTimingAccuracy) {
+  // Verify timing values are reasonable
+  BatchExecutor executor;
+
+  PipelineBuilder builder;
+  auto stages = builder.with_config(StageConfig{config_.nfft, config_.channels})
+                    .add_window(StageConfig::WindowType::HANN)
+                    .add_fft()
+                    .add_magnitude()
+                    .build();
+
+  config_.measure_components = true;
+  executor.initialize(config_, std::move(stages));
+
+  const size_t input_size = config_.nfft * config_.channels;
+  const size_t output_size = config_.num_output_bins() * config_.channels;
+  auto input = generate_sinusoid(input_size, 1000.0f);
+  std::vector<float> output(output_size);
+
+  executor.submit(input.data(), output.data(), input_size);
+
+  auto stats = executor.get_stats();
+
+  // Sanity checks: each stage should be < 1ms for NFFT=512
+  EXPECT_LT(stats.stage_metrics.window_us, 1000.0f);
+  EXPECT_LT(stats.stage_metrics.fft_us, 1000.0f);
+  EXPECT_LT(stats.stage_metrics.magnitude_us, 1000.0f);
+
+  // Total should be less than overall latency (overhead accounts for difference)
+  EXPECT_LT(stats.stage_metrics.total_measured_us, stats.latency_us);
+}
+
+TEST_F(BatchExecutorTest, ComponentTimingOverheadCalculation) {
+  // Verify overhead = total_latency - sum(stages)
+  BatchExecutor executor;
+
+  PipelineBuilder builder;
+  auto stages = builder.with_config(StageConfig{config_.nfft, config_.channels})
+                    .add_window(StageConfig::WindowType::HANN)
+                    .add_fft()
+                    .add_magnitude()
+                    .build();
+
+  config_.measure_components = true;
+  executor.initialize(config_, std::move(stages));
+
+  const size_t input_size = config_.nfft * config_.channels;
+  const size_t output_size = config_.num_output_bins() * config_.channels;
+  auto input = generate_sinusoid(input_size, 1000.0f);
+  std::vector<float> output(output_size);
+
+  executor.submit(input.data(), output.data(), input_size);
+
+  auto stats = executor.get_stats();
+
+  // Verify overhead calculation
+  float expected_overhead = stats.latency_us - stats.stage_metrics.total_measured_us;
+  EXPECT_NEAR(stats.stage_metrics.overhead_us, expected_overhead, 0.1f);
+
+  // Overhead should be positive (timing variance may cause small negatives)
+  EXPECT_GT(stats.stage_metrics.overhead_us, -10.0f);  // Allow -10µs variance
+}
+
+TEST_F(BatchExecutorTest, ComponentTimingConsistency) {
+  // Verify metrics consistent across multiple frames
+  BatchExecutor executor;
+
+  PipelineBuilder builder;
+  auto stages = builder.with_config(StageConfig{config_.nfft, config_.channels})
+                    .add_window(StageConfig::WindowType::HANN)
+                    .add_fft()
+                    .add_magnitude()
+                    .build();
+
+  config_.measure_components = true;
+  executor.initialize(config_, std::move(stages));
+
+  const size_t input_size = config_.nfft * config_.channels;
+  const size_t output_size = config_.num_output_bins() * config_.channels;
+
+  // Process multiple frames and verify metrics update
+  for (int i = 0; i < 10; ++i) {
+    auto input = generate_sinusoid(input_size, 1000.0f + i * 100.0f);
+    std::vector<float> output(output_size);
+    executor.submit(input.data(), output.data(), input_size);
+
+    auto stats = executor.get_stats();
+    EXPECT_TRUE(stats.stage_metrics.enabled);
+    EXPECT_GT(stats.stage_metrics.window_us, 0.0f);
+    EXPECT_GT(stats.stage_metrics.fft_us, 0.0f);
+    EXPECT_GT(stats.stage_metrics.magnitude_us, 0.0f);
+  }
+}

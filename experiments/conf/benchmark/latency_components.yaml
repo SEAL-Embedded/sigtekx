@@ -1,0 +1,31 @@
+# Latency benchmark with per-stage timing enabled
+# Use for diagnostic profiling and pipeline optimization
+# Measures individual stage execution times (Window, FFT, Magnitude)
+engine:
+  mode: batch
+
+# Benchmark parameters (reduced iterations due to timing overhead)
+name: latency_components
+type: latency
+iterations: 1000  # Reduced from 5000 (timing adds overhead)
+warmup_iterations: 100
+confidence_level: 0.95
+outlier_threshold: 3.0
+measure_gpu_time: true
+measure_components: true  # ENABLED - measures window/fft/magnitude stages individually
+test_signal_type: sine
+test_frequency: 1000.0
+deadline_us: 200.0
+analyze_jitter: true
+save_raw_data: true
+
+# Expected stage breakdown (for validation):
+# - window: 5-10µs
+# - fft: 30-40µs
+# - magnitude: 5-10µs
+# - overhead: <20µs (pipeline management cost)
+
+# GPU clock locking for stable benchmarking (reduces CV by 50-75%)
+lock_gpu_clocks: false  # Set to true to enable clock locking
+gpu_index: 0            # GPU index to lock (use with lock_gpu_clocks)
+use_max_clocks: false   # Use max clocks vs recommended (use with lock_gpu_clocks)

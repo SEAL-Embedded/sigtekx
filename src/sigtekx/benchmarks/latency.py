@@ -80,6 +80,11 @@ class LatencyBenchmark(BaseBenchmark):
                 engine_config = get_preset('default')
                 # Default preset already uses BATCH mode
 
+            # Apply measure_components from benchmark config to engine config
+            if self.config.measure_components:
+                engine_config.measure_components = True
+                logger.info("Per-stage timing enabled")
+
             # Initialize engine
             with nvtx_range("InitializeEngine", color=ProfileColor.DARK_GRAY):
                 self.engine = Engine(config=engine_config)
@@ -155,12 +160,16 @@ class LatencyBenchmark(BaseBenchmark):
             'deadline_met': latency_us <= self.config.deadline_us
         }
 
-        # Component timing if available (future enhancement)
-        if self.config.measure_components:
-            # This would require exposing stage-level timing from C++
-            metrics['window_us'] = 0  # Placeholder
-            metrics['fft_us'] = 0     # Placeholder
-            metrics['magnitude_us'] = 0  # Placeholder
+        # Component timing if available
+        if self.config.measure_components and 'stage_metrics' in engine_stats:
+            stage_metrics = engine_stats['stage_metrics']
+            metrics.update({
+                'window_us': stage_metrics['window_us'],
+                'fft_us': stage_metrics['fft_us'],
+                'magnitude_us': stage_metrics['magnitude_us'],
+                'overhead_us': stage_metrics['overhead_us'],
+                'total_measured_us': stage_metrics['total_measured_us'],
+            })
 
         return metrics
 

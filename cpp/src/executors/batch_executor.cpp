@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <iostream>
 #include <stdexcept>
 
 #include "sigtekx/core/cuda_wrappers.hpp"
@@ -132,6 +133,15 @@ class BatchExecutor::Impl {
       }
     }
 
+    // Setup component timing if requested
+    measure_components_ = config_.measure_components;
+    if (measure_components_) {
+      SIGTEKX_NVTX_RANGE("Setup Component Timing", profiling::colors::CYAN);
+      window_timer_ = std::make_unique<StageTimers>();
+      fft_timer_ = std::make_unique<StageTimers>();
+      magnitude_timer_ = std::make_unique<StageTimers>();
+    }
+
     // Allocate device buffers
     const size_t buffer_size =
         static_cast<size_t>(config_.nfft) * config_.channels;
@@ -172,6 +182,12 @@ class BatchExecutor::Impl {
 
     stats_ = ProcessingStats{};
     stats_.is_warmup = false;
+
+    // Restore component timing enabled flag if active (reset above wiped it)
+    if (measure_components_) {
+      stats_.stage_metrics.enabled = true;
+    }
+
     SIGTEKX_NVTX_MARK("Initialization Complete", profiling::colors::CYAN);
   }
 
@@ -291,12 +307,33 @@ class BatchExecutor::Impl {
           current_output = d_intermediate.get();
         }
 
+        // Record start event if measuring components
+        StageTimers* timer = nullptr;
+        if (measure_components_) {
+          if (stage_name == "WindowStage") {
+            timer = window_timer_.get();
+          } else if (stage_name == "FFTStage") {
+            timer = fft_timer_.get();
+          } else if (stage_name == "MagnitudeStage") {
+            timer = magnitude_timer_.get();
+          }
+
+          if (timer) {
+            timer->start.record(streams_[compute_stream_idx].get());
+          }
+        }
+
         // Process this stage with CURRENT input size
         {
           const std::string stage_msg = "Stage: " + stage_name;
           SIGTEKX_NVTX_RANGE(stage_msg.c_str(), profiling::colors::MAGENTA);
           stage->process(current_input, current_output, current_size,
                          streams_[compute_stream_idx].get());
+        }
+
+        // Record end event if measuring components
+        if (timer) {
+          timer->end.record(streams_[compute_stream_idx].get());
         }
 
         // Update size for NEXT stage based on what THIS stage outputs
@@ -348,6 +385,33 @@ class BatchExecutor::Impl {
     stats_.frames_processed++;
     stats_.throughput_gbps =
         calculate_throughput(num_samples, stats_.latency_us);
+
+    // Compute component metrics if enabled
+    StageMetrics component_metrics{};
+    if (measure_components_) {
+      // Synchronize compute stream to ensure events are complete
+      SIGTEKX_CUDA_CHECK(cudaStreamSynchronize(streams_[compute_stream_idx].get()));
+
+      // Calculate elapsed times (elapsed_ms returns milliseconds, convert to microseconds)
+      component_metrics.window_us =
+          window_timer_->end.elapsed_ms(window_timer_->start) * 1000.0f;
+      component_metrics.fft_us =
+          fft_timer_->end.elapsed_ms(fft_timer_->start) * 1000.0f;
+      component_metrics.magnitude_us =
+          magnitude_timer_->end.elapsed_ms(magnitude_timer_->start) * 1000.0f;
+
+      component_metrics.total_measured_us = component_metrics.window_us +
+                                             component_metrics.fft_us +
+                                             component_metrics.magnitude_us;
+
+      // Overhead = end-to-end latency - sum of stages
+      component_metrics.overhead_us =
+          stats_.latency_us - component_metrics.total_measured_us;
+      component_metrics.enabled = true;
+    }
+
+    // Store in stats
+    stats_.stage_metrics = component_metrics;
 
     frame_counter_++;
   }
@@ -446,6 +510,18 @@ class BatchExecutor::Impl {
   bool initialized_ = false;
   uint64_t frame_counter_ = 0;
   ProcessingStats stats_{};
+
+  // Component timing infrastructure (only allocated if measure_components=true)
+  struct StageTimers {
+    CudaEvent start;
+    CudaEvent end;
+    StageTimers() : start(0), end(0) {}  // Flags=0 enables timing
+  };
+
+  std::unique_ptr<StageTimers> window_timer_;
+  std::unique_ptr<StageTimers> fft_timer_;
+  std::unique_ptr<StageTimers> magnitude_timer_;
+  bool measure_components_ = false;
 };
 
 // ============================================================================

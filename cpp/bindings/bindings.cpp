@@ -242,6 +242,9 @@ PYBIND11_MODULE(_native, m) {
       .def_readwrite("pinned_buffer_count",
                      &sigtekx::SignalConfig::pinned_buffer_count)
       .def_readwrite("warmup_iters", &sigtekx::SignalConfig::warmup_iters)
+      .def_readwrite("measure_components",
+                     &sigtekx::SignalConfig::measure_components,
+                     "Enable per-stage timing (adds GPU event overhead ~1-2µs/stage)")
       .def("num_output_bins", &sigtekx::SignalConfig::num_output_bins)
       .def("__repr__", [](const sigtekx::SignalConfig& c) {
         return "<SignalConfig nfft=" + std::to_string(c.nfft) +
@@ -365,12 +368,40 @@ PYBIND11_MODULE(_native, m) {
       });
 
   // --- Bind Statistics and Info Structs ---
+  py::class_<sigtekx::StageMetrics>(m, "StageMetrics",
+      "Per-stage timing breakdown (only populated when measure_components=true)")
+      .def_readonly("window_us", &sigtekx::StageMetrics::window_us,
+          "Window stage execution time (microseconds)")
+      .def_readonly("fft_us", &sigtekx::StageMetrics::fft_us,
+          "FFT stage execution time (microseconds)")
+      .def_readonly("magnitude_us", &sigtekx::StageMetrics::magnitude_us,
+          "Magnitude stage execution time (microseconds)")
+      .def_readonly("overhead_us", &sigtekx::StageMetrics::overhead_us,
+          "Pipeline overhead: total - (window + fft + magnitude)")
+      .def_readonly("total_measured_us", &sigtekx::StageMetrics::total_measured_us,
+          "Sum of individual stage times")
+      .def_readonly("enabled", &sigtekx::StageMetrics::enabled,
+          "Whether component timing was enabled for this measurement")
+      .def("__repr__", [](const sigtekx::StageMetrics& m) {
+        if (!m.enabled) {
+          return std::string("<StageMetrics disabled>");
+        }
+        std::ostringstream oss;
+        oss << "<StageMetrics window=" << m.window_us
+            << "µs fft=" << m.fft_us
+            << "µs magnitude=" << m.magnitude_us
+            << "µs overhead=" << m.overhead_us << "µs>";
+        return oss.str();
+      });
+
   py::class_<sigtekx::ProcessingStats>(m, "ProcessingStats")
       .def_readonly("latency_us", &sigtekx::ProcessingStats::latency_us)
       .def_readonly("throughput_gbps",
                     &sigtekx::ProcessingStats::throughput_gbps)
       .def_readonly("frames_processed",
-                    &sigtekx::ProcessingStats::frames_processed);
+                    &sigtekx::ProcessingStats::frames_processed)
+      .def_readonly("stage_metrics", &sigtekx::ProcessingStats::stage_metrics,
+          "Per-stage timing breakdown (optional)");
 
   py::class_<sigtekx::RuntimeInfo>(m, "RuntimeInfo",
       "CUDA runtime and device information.\n\n"
