@@ -141,7 +141,25 @@ class BenchmarkResult:
     def __post_init__(self):
         """Calculate statistics if not provided."""
         if len(self.measurements) > 0 and not self.statistics:
-            self.statistics = calculate_statistics(self.measurements)
+            # Handle list of dicts (e.g., from component timing)
+            if isinstance(self.measurements, list) and len(self.measurements) > 0 and isinstance(self.measurements[0], dict):
+                # Extract each metric key and calculate statistics separately
+                all_keys = set()
+                for m in self.measurements:
+                    if isinstance(m, dict):
+                        all_keys.update(m.keys())
+
+                self.statistics = {}
+                for key in all_keys:
+                    # Extract values for this key
+                    values = [m.get(key, np.nan) for m in self.measurements if isinstance(m, dict)]
+                    values = [v for v in values if not (isinstance(v, float) and np.isnan(v))]
+
+                    if values:
+                        self.statistics[key] = calculate_statistics(np.array(values))
+            else:
+                # Handle simple numeric array
+                self.statistics = calculate_statistics(self.measurements)
 
     def to_dict(self) -> dict:
         """Convert to dictionary for serialization."""

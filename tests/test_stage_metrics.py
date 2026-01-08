@@ -16,21 +16,22 @@ class TestStageMetricsConfig:
         assert hasattr(config, 'measure_components')
         assert config.measure_components is False  # Default disabled
 
-    def test_measure_components_requires_batch_mode(self):
-        """Verify measure_components=True requires mode='batch'."""
-        # Valid: batch mode + measure_components
-        config = EngineConfig(
+    def test_measure_components_config_accepted(self):
+        """Verify measure_components config is accepted for both modes."""
+        # Batch mode: fully functional
+        config_batch = EngineConfig(
             mode=ExecutionMode.BATCH,
             measure_components=True
         )
-        assert config.measure_components is True
+        assert config_batch.measure_components is True
 
-        # Invalid: streaming mode + measure_components
-        with pytest.raises(ValueError, match="measure_components.*batch"):
-            EngineConfig(
-                mode=ExecutionMode.STREAMING,
-                measure_components=True
-            )
+        # Streaming mode: config accepted but implementation disabled
+        # TODO(Phase 1): StreamingExecutor component timing pending CUDA event fixes
+        config_streaming = EngineConfig(
+            mode=ExecutionMode.STREAMING,
+            measure_components=True
+        )
+        assert config_streaming.measure_components is True  # Config accepted
 
     def test_config_propagation_to_cpp(self):
         """Verify measure_components propagates from Python config to C++ engine."""
@@ -46,6 +47,34 @@ class TestStageMetricsConfig:
             # Check C++ stats immediately after initialization
             stats = engine._cpp_engine.get_stats()
             assert stats.stage_metrics.enabled is True
+
+    def test_streaming_mode_component_timing(self):
+        """Verify streaming mode component timing works (Option 1: last-frame)."""
+        config = EngineConfig(
+            nfft=1024,
+            channels=1,
+            overlap=0.0,
+            mode=ExecutionMode.STREAMING,
+            measure_components=True
+        )
+
+        with Engine(config=config) as engine:
+            signal = np.random.randn(1024).astype(np.float32)
+            _ = engine.process(signal)
+
+            # Streaming mode now returns enabled metrics (Option 1: last-frame timing)
+            stats = engine._cpp_engine.get_stats()
+            assert stats.stage_metrics.enabled is True
+            assert stats.stage_metrics.window_us > 0.0
+            assert stats.stage_metrics.fft_us > 0.0
+            assert stats.stage_metrics.magnitude_us > 0.0
+
+            # Verify total and overhead calculations
+            total = stats.stage_metrics.window_us + stats.stage_metrics.fft_us + stats.stage_metrics.magnitude_us
+            assert abs(stats.stage_metrics.total_measured_us - total) < 0.1
+
+            expected_overhead = stats.latency_us - stats.stage_metrics.total_measured_us
+            assert abs(stats.stage_metrics.overhead_us - expected_overhead) < 0.1
 
 
 class TestStageMetricsInEngineStats:

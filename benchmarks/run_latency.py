@@ -140,6 +140,14 @@ def run_latency_benchmark(cfg: DictConfig) -> float:
             'mean_latency_us': mean_latency,
             'p95_latency_us': result.statistics.get('latency_us', {}).get('p95', 0),
             'p99_latency_us': result.statistics.get('latency_us', {}).get('p99', 0),
+
+            # Stage metrics (per-stage timing breakdown)
+            'stage_window_us': result.statistics.get('window_us', {}).get('mean', 0.0),
+            'stage_fft_us': result.statistics.get('fft_us', {}).get('mean', 0.0),
+            'stage_magnitude_us': result.statistics.get('magnitude_us', {}).get('mean', 0.0),
+            'stage_overhead_us': result.statistics.get('overhead_us', {}).get('mean', 0.0),
+            'stage_total_measured_us': result.statistics.get('total_measured_us', {}).get('mean', 0.0),
+            'stage_metrics_enabled': benchmark_config.measure_components,
         }
 
         summary_df = pd.DataFrame([summary])

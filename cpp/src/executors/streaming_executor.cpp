@@ -210,6 +210,18 @@ class StreamingExecutor::Impl {
       }
     }
 
+    // Initialize component timing if enabled
+    measure_components_ = config_.measure_components;
+    if (measure_components_) {
+      window_start_ = std::make_unique<CudaEvent>(0);
+      window_end_ = std::make_unique<CudaEvent>(0);
+      fft_start_ = std::make_unique<CudaEvent>(0);
+      fft_end_ = std::make_unique<CudaEvent>(0);
+      magnitude_start_ = std::make_unique<CudaEvent>(0);
+      magnitude_end_ = std::make_unique<CudaEvent>(0);
+      pipeline_start_event_ = std::make_unique<CudaEvent>(0);
+    }
+
     initialized_ = true;
 
     // Warmup
@@ -270,6 +282,15 @@ class StreamingExecutor::Impl {
         }
       }
       input_ring_buffers_.clear();
+
+      // Clear timing events
+      window_start_.reset();
+      window_end_.reset();
+      fft_start_.reset();
+      fft_end_.reset();
+      magnitude_start_.reset();
+      magnitude_end_.reset();
+      pipeline_start_event_.reset();
     }
 
     frame_counter_ = 0;
@@ -426,6 +447,13 @@ class StreamingExecutor::Impl {
         stats_.frames_processed += batches_processed;
         stats_.throughput_gbps = calculate_throughput(
             num_samples * batches_processed, duration.count());
+
+        // Calculate overhead now that latency_us is finalized
+        // (overhead was left as-is in process_one_batch(), update it here)
+        if (measure_components_ && stats_.stage_metrics.enabled) {
+          stats_.stage_metrics.overhead_us =
+              stats_.latency_us - stats_.stage_metrics.total_measured_us;
+        }
       }
     }
   }
@@ -647,6 +675,11 @@ class StreamingExecutor::Impl {
     SIGTEKX_CUDA_CHECK(cudaStreamWaitEvent(streams_[compute_stream_idx].get(),
                                         e_h2d_done.get(), 0));
 
+    // Component timing: record pipeline start
+    if (measure_components_) {
+      pipeline_start_event_->record(streams_[compute_stream_idx].get());
+    }
+
     {
       SIGTEKX_NVTX_RANGE("Compute Pipeline", profiling::colors::PURPLE);
 
@@ -686,8 +719,34 @@ class StreamingExecutor::Impl {
         {
           const std::string stage_msg = "Stage: " + stage_name;
           SIGTEKX_NVTX_RANGE(stage_msg.c_str(), profiling::colors::MAGENTA);
+
+          // Component timing: record start event
+          CudaEvent* start_event = nullptr;
+          CudaEvent* end_event = nullptr;
+          if (measure_components_) {
+            if (stage_name == "WindowStage") {
+              start_event = window_start_.get();
+              end_event = window_end_.get();
+            } else if (stage_name == "FFTStage") {
+              start_event = fft_start_.get();
+              end_event = fft_end_.get();
+            } else if (stage_name == "MagnitudeStage") {
+              start_event = magnitude_start_.get();
+              end_event = magnitude_end_.get();
+            }
+
+            if (start_event) {
+              start_event->record(streams_[compute_stream_idx].get());
+            }
+          }
+
           stage->process(current_input, current_output, current_size,
                          streams_[compute_stream_idx].get());
+
+          // Component timing: record end event
+          if (end_event) {
+            end_event->record(streams_[compute_stream_idx].get());
+          }
         }
 
         // Update size for next stage
@@ -727,6 +786,35 @@ class StreamingExecutor::Impl {
     {
       SIGTEKX_NVTX_RANGE("Stream Sync", profiling::colors::YELLOW);
       SIGTEKX_CUDA_CHECK(cudaStreamSynchronize(streams_[d2h_stream_idx].get()));
+    }
+
+    // Component timing: calculate stage metrics
+    // Current implementation (Option 1): Last-frame timing
+    // Reports timing for the most recently processed frame. Simple, zero-overhead,
+    // sufficient for bottleneck identification and dashboard visualization.
+    //
+    // Future enhancement options if needed:
+    // - Option 1.5: Exponential Moving Average (smooth variance, ~20 lines)
+    // - Option 2: Per-frame event pools (full accuracy, research use, ~80 lines)
+    if (measure_components_) {
+      // Synchronize compute stream to ensure events are complete
+      SIGTEKX_CUDA_CHECK(cudaStreamSynchronize(streams_[compute_stream_idx].get()));
+
+      // Query CUDA events for last processed frame
+      // cudaEventElapsedTime returns milliseconds, convert to microseconds
+      float window_ms, fft_ms, magnitude_ms;
+      cudaEventElapsedTime(&window_ms, window_start_->get(), window_end_->get());
+      cudaEventElapsedTime(&fft_ms, fft_start_->get(), fft_end_->get());
+      cudaEventElapsedTime(&magnitude_ms, magnitude_start_->get(), magnitude_end_->get());
+
+      // Populate stage metrics (convert ms → µs)
+      stats_.stage_metrics.enabled = true;
+      stats_.stage_metrics.window_us = window_ms * 1000.0f;
+      stats_.stage_metrics.fft_us = fft_ms * 1000.0f;
+      stats_.stage_metrics.magnitude_us = magnitude_ms * 1000.0f;
+      stats_.stage_metrics.total_measured_us =
+          stats_.stage_metrics.window_us + stats_.stage_metrics.fft_us + stats_.stage_metrics.magnitude_us;
+      // Note: overhead_us will be calculated in submit() after latency_us is finalized
     }
 
     frame_counter_++;
@@ -840,6 +928,16 @@ class StreamingExecutor::Impl {
   bool initialized_ = false;
   uint64_t frame_counter_ = 0;
   ProcessingStats stats_{};
+
+  // Component timing (only allocated if measure_components=true)
+  std::unique_ptr<CudaEvent> window_start_;
+  std::unique_ptr<CudaEvent> window_end_;
+  std::unique_ptr<CudaEvent> fft_start_;
+  std::unique_ptr<CudaEvent> fft_end_;
+  std::unique_ptr<CudaEvent> magnitude_start_;
+  std::unique_ptr<CudaEvent> magnitude_end_;
+  std::unique_ptr<CudaEvent> pipeline_start_event_;  // Pipeline timing event
+  bool measure_components_ = false;
 
   // Async producer-consumer infrastructure (v0.9.5+)
   std::thread consumer_thread_;            // Background processing thread

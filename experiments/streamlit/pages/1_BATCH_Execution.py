@@ -45,13 +45,14 @@ try:
     st.info(f"📊 Analyzing **{len(batch_data)} BATCH mode configurations** (filtered from {len(data)} total)")
 
     # Create tabs
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
         "📊 Executive Summary",
         "🚀 Throughput",
         "⏱️ Latency",
         "📈 Scaling",
         "✓ Accuracy",
-        "💡 Use Cases"
+        "💡 Use Cases",
+        "⚙️ Stage Breakdown"
     ])
 
     with tab1:
@@ -333,6 +334,209 @@ try:
                         f"Channels={row.get('engine_channels', 'N/A')}, "
                         f"Overlap={row.get('engine_overlap', 'N/A'):.3f} "
                         f"→ {row['mean_latency_us']:.1f} μs")
+
+    with tab7:
+        st.header("⚙️ Per-Stage Performance Breakdown")
+
+        # Check if stage metrics are available
+        stage_cols = ['stage_window_us', 'stage_fft_us', 'stage_magnitude_us',
+                      'stage_overhead_us', 'stage_total_measured_us', 'stage_metrics_enabled']
+        has_stage_metrics = all(col in batch_data.columns for col in stage_cols)
+
+        if not has_stage_metrics:
+            st.warning("""
+            **No stage metrics data available.**
+
+            To collect per-stage timing data:
+            1. Run benchmarks with `measure_components=true` in your config
+            2. Example: `python benchmarks/run_latency.py +benchmark=profiling experiment=baseline_batch_48k_latency`
+
+            Note: Stage metrics add ~1-2µs overhead per stage and are only available in BATCH mode.
+            """)
+        else:
+            # Filter to only configs with stage metrics enabled
+            stage_data = batch_data[batch_data['stage_metrics_enabled'] == True].copy()
+
+            if len(stage_data) == 0:
+                st.info("""
+                No configurations found with stage metrics enabled.
+
+                Run benchmarks with `measure_components: true` to collect stage timing data.
+                """)
+            else:
+                st.success(f"📊 Analyzing **{len(stage_data)} configurations** with component timing enabled")
+
+                # Performance insights panel
+                st.subheader("Performance Insights")
+                col1, col2, col3, col4 = st.columns(4)
+
+                avg_window = stage_data['stage_window_us'].mean()
+                avg_fft = stage_data['stage_fft_us'].mean()
+                avg_mag = stage_data['stage_magnitude_us'].mean()
+                avg_overhead = stage_data['stage_overhead_us'].mean()
+
+                with col1:
+                    st.metric("Avg Window Time", f"{avg_window:.1f} μs")
+                with col2:
+                    st.metric("Avg FFT Time", f"{avg_fft:.1f} μs")
+                with col3:
+                    st.metric("Avg Magnitude Time", f"{avg_mag:.1f} μs")
+                with col4:
+                    st.metric("Avg Overhead", f"{avg_overhead:.1f} μs")
+
+                st.divider()
+
+                # Aggregate by NFFT for visualization
+                stage_summary = stage_data.groupby('engine_nfft').agg({
+                    'stage_window_us': 'mean',
+                    'stage_fft_us': 'mean',
+                    'stage_magnitude_us': 'mean',
+                    'stage_overhead_us': 'mean'
+                }).reset_index()
+
+                # Chart 1: Stacked Bar Chart
+                st.subheader("Pipeline Stage Breakdown by NFFT")
+
+                fig = go.Figure()
+                stages = [
+                    ('Window', 'stage_window_us', '#1f77b4'),
+                    ('FFT', 'stage_fft_us', '#ff7f0e'),
+                    ('Magnitude', 'stage_magnitude_us', '#2ca02c'),
+                    ('Overhead', 'stage_overhead_us', '#d62728')
+                ]
+
+                for stage_name, col, color in stages:
+                    fig.add_trace(go.Bar(
+                        name=stage_name,
+                        x=stage_summary['engine_nfft'],
+                        y=stage_summary[col],
+                        marker_color=color,
+                        hovertemplate=f'{stage_name}: %{{y:.2f}} μs<extra></extra>'
+                    ))
+
+                fig.update_layout(
+                    barmode='stack',
+                    title="Mean Execution Time per Stage (Stacked)",
+                    xaxis_title="NFFT Size",
+                    yaxis_title="Execution Time (μs)",
+                    xaxis_type='log',
+                    height=500,
+                    hovermode='x unified'
+                )
+                st.plotly_chart(fig, use_container_width=True)
+
+                # Chart 2: Percentage Contribution
+                st.subheader("Stage Percentage Contribution")
+
+                stage_summary['total'] = (stage_summary['stage_window_us'] +
+                                          stage_summary['stage_fft_us'] +
+                                          stage_summary['stage_magnitude_us'] +
+                                          stage_summary['stage_overhead_us'])
+
+                for stage in ['window', 'fft', 'magnitude', 'overhead']:
+                    stage_summary[f'{stage}_pct'] = (
+                        stage_summary[f'stage_{stage}_us'] / stage_summary['total'] * 100
+                    )
+
+                fig2 = go.Figure()
+
+                pct_stages = [
+                    ('Window %', 'window_pct', '#1f77b4'),
+                    ('FFT %', 'fft_pct', '#ff7f0e'),
+                    ('Magnitude %', 'magnitude_pct', '#2ca02c'),
+                    ('Overhead %', 'overhead_pct', '#d62728')
+                ]
+
+                for stage_name, col, color in pct_stages:
+                    fig2.add_trace(go.Scatter(
+                        name=stage_name,
+                        x=stage_summary['engine_nfft'],
+                        y=stage_summary[col],
+                        mode='lines+markers',
+                        line=dict(color=color, width=2),
+                        marker=dict(size=8),
+                        hovertemplate=f'{stage_name}: %{{y:.1f}}%<extra></extra>'
+                    ))
+
+                fig2.update_layout(
+                    title="Percentage of Total Execution Time by Stage",
+                    xaxis_title="NFFT Size",
+                    yaxis_title="Percentage (%)",
+                    xaxis_type='log',
+                    height=400,
+                    hovermode='x unified'
+                )
+                st.plotly_chart(fig2, use_container_width=True)
+
+                # Chart 3: Bottleneck Analysis
+                st.subheader("Bottleneck Analysis")
+
+                # Identify dominant stage for each NFFT
+                dominant_stage = stage_data.groupby('engine_nfft').apply(
+                    lambda x: x[['stage_window_us', 'stage_fft_us', 'stage_magnitude_us']].mean().idxmax()
+                ).reset_index()
+                dominant_stage.columns = ['engine_nfft', 'dominant_stage']
+                dominant_stage['dominant_stage'] = dominant_stage['dominant_stage'].str.replace('stage_', '').str.replace('_us', '')
+
+                # Count by dominant stage
+                dominant_counts = dominant_stage['dominant_stage'].value_counts()
+
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    st.markdown("**Dominant Stage by NFFT Configuration:**")
+                    for stage, count in dominant_counts.items():
+                        pct = (count / len(dominant_stage)) * 100
+                        st.write(f"- **{stage.capitalize()}**: {count} configs ({pct:.1f}%)")
+
+                with col2:
+                    if 'fft' in dominant_counts.index:
+                        st.info(f"FFT is the performance bottleneck in {dominant_counts['fft']} of {len(dominant_stage)} NFFT configurations.")
+                    else:
+                        st.info("No single stage dominates across all configurations.")
+
+                # Chart 4: Detailed Metrics Table
+                st.subheader("Detailed Stage Metrics")
+
+                display_cols = [
+                    'engine_nfft', 'engine_channels', 'engine_overlap',
+                    'stage_window_us', 'stage_fft_us', 'stage_magnitude_us',
+                    'stage_overhead_us', 'stage_total_measured_us',
+                    'mean_latency_us'
+                ]
+                available_cols = [col for col in display_cols if col in stage_data.columns]
+
+                if len(available_cols) > 0:
+                    top_configs = stage_data.nlargest(20, 'frames_per_second')[available_cols]
+                    st.dataframe(
+                        top_configs.style.format({
+                            col: "{:.2f}" for col in available_cols if '_us' in col or 'overlap' in col
+                        }),
+                        use_container_width=True,
+                        hide_index=True
+                    )
+
+                # Optimization recommendations
+                st.divider()
+                st.subheader("Optimization Recommendations")
+
+                # Identify if any stage is significantly slower
+                avg_total = avg_window + avg_fft + avg_mag
+                window_ratio = (avg_window / avg_total) * 100
+                fft_ratio = (avg_fft / avg_total) * 100
+                mag_ratio = (avg_mag / avg_total) * 100
+
+                if fft_ratio > 50:
+                    st.warning(f"**FFT dominates** ({fft_ratio:.1f}% of stage time). Consider optimizing FFT configuration or using smaller NFFT.")
+                elif mag_ratio > 40:
+                    st.warning(f"**Magnitude calculation is significant** ({mag_ratio:.1f}% of stage time). Verify output mode and data types.")
+                elif window_ratio > 30:
+                    st.info(f"**Window function overhead** ({window_ratio:.1f}% of stage time) is notable. Consider simpler window types if appropriate.")
+
+                if avg_overhead > avg_total * 0.3:
+                    st.warning(f"**High pipeline overhead** ({avg_overhead:.1f}µs avg). This includes stream synchronization and memory transfers.")
+                else:
+                    st.success(f"**Pipeline overhead is reasonable** ({avg_overhead:.1f}µs avg, {(avg_overhead/avg_total)*100:.1f}% of stage time).")
 
 except FileNotFoundError:
     st.error("No benchmark data found. Please run benchmarks first.")

@@ -1,0 +1,43 @@
+# @package _global_
+
+# Streaming Stage Timing Test
+# ============================
+# Lightweight test config for validating StreamingExecutor component timing.
+# Tests Option 1 (last-frame timing) with measure_components=true.
+
+defaults:
+  - override /engine: ionosphere_realtime
+
+experiment:
+  name: streaming_stage_timing_test
+  description: >-
+    Test configuration for StreamingExecutor per-stage timing (Option 1).
+    Lightweight sweep to validate component metrics collection in streaming mode.
+  tags: [test, streaming, stage_timing, component_metrics]
+  experiment_group: profiling
+  sample_rate_category: 48kHz
+
+# Force STREAMING mode (override base config)
+engine:
+  mode: streaming
+
+# Small multirun for quick testing
+# 2 NFFT × 2 overlap = 4 configurations
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      # Minimal NFFT sweep
+      engine.nfft: 1024,2048
+
+      # Fixed channels (2-channel for ionosphere)
+      engine.channels: 2
+
+      # Two overlap values
+      engine.overlap: 0.5,0.75
+
+# Performance expectations for testing
+expectations:
+  test:
+    latency_target: "<50ms"        # Should be very fast
+    stage_metrics: "enabled"        # Component timing must work

@@ -49,14 +49,15 @@ try:
     st.info(f"📊 Analyzing **{len(streaming_data)} STREAMING mode configurations** (filtered from {len(data)} total)")
 
     # Create tabs
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
         "📊 Executive Summary",
         "🚀 Sustained Throughput",
         "✓ Real-Time Compliance",
         "⏱️ Streaming Latency",
         "📈 High-NFFT Streaming",
         "🔒 Reliability",
-        "💡 Use Cases"
+        "💡 Use Cases",
+        "⚙️ Stage Breakdown"
     ])
 
     with tab1:
@@ -380,6 +381,207 @@ try:
                             f"→ RTF={row['rtf']:.3f}")
             else:
                 st.warning("No real-time capable configurations (RTF ≤ 1.0) found")
+
+    with tab8:
+        st.header("⚙️ Stage Breakdown Analysis")
+        st.markdown("""
+        Per-stage timing breakdown for STREAMING mode (Option 1: Last-Frame Timing).
+        Shows time spent in Window → FFT → Magnitude stages for performance optimization.
+
+        **Note**: Streaming mode reports timing for the most recently processed frame.
+        With overlap, one submit() may process multiple frames - metrics reflect the last frame.
+        """)
+
+        # Check if stage metrics are available
+        stage_cols = ['stage_window_us', 'stage_fft_us', 'stage_magnitude_us',
+                     'stage_overhead_us', 'stage_total_measured_us', 'stage_metrics_enabled']
+
+        if not all(col in streaming_data.columns for col in stage_cols):
+            st.warning("⚠️ Stage metrics not available. Run benchmarks with `benchmark.measure_components=true`")
+            st.stop()
+
+        # Filter to only configs with stage metrics enabled
+        stage_data = streaming_data[streaming_data['stage_metrics_enabled'] == True].copy()
+
+        if len(stage_data) == 0:
+            st.warning("⚠️ No configurations with stage metrics found. Re-run with `benchmark.measure_components=true`")
+            st.stop()
+
+        st.info(f"📊 Analyzing **{len(stage_data)}** configurations with stage timing enabled")
+
+        # Performance insights
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            avg_window = stage_data['stage_window_us'].mean()
+            st.metric("Avg Window Time", f"{avg_window:.2f} µs")
+
+        with col2:
+            avg_fft = stage_data['stage_fft_us'].mean()
+            st.metric("Avg FFT Time", f"{avg_fft:.2f} µs")
+
+        with col3:
+            avg_magnitude = stage_data['stage_magnitude_us'].mean()
+            st.metric("Avg Magnitude Time", f"{avg_magnitude:.2f} µs")
+
+        with col4:
+            avg_overhead = stage_data['stage_overhead_us'].mean()
+            st.metric("Avg Overhead", f"{avg_overhead:.2f} µs")
+
+        st.markdown("---")
+
+        # Visualization 1: Stacked bar chart - Stage execution time by NFFT
+        st.subheader("📊 Stage Execution Time by NFFT")
+
+        # Group by NFFT and calculate mean stage times
+        nfft_stage_breakdown = stage_data.groupby('engine_nfft')[
+            ['stage_window_us', 'stage_fft_us', 'stage_magnitude_us', 'stage_overhead_us']
+        ].mean().reset_index()
+
+        # Reshape for plotly
+        import pandas as pd
+        stage_melted = pd.melt(
+            nfft_stage_breakdown,
+            id_vars=['engine_nfft'],
+            value_vars=['stage_window_us', 'stage_fft_us', 'stage_magnitude_us', 'stage_overhead_us'],
+            var_name='Stage',
+            value_name='Time (µs)'
+        )
+
+        # Clean stage names
+        stage_melted['Stage'] = stage_melted['Stage'].str.replace('stage_', '').str.replace('_us', '').str.title()
+
+        fig1 = px.bar(
+            stage_melted,
+            x='engine_nfft',
+            y='Time (µs)',
+            color='Stage',
+            title='Per-Stage Execution Time vs NFFT (STREAMING Mode - Last Frame)',
+            labels={'engine_nfft': 'NFFT Size'},
+            color_discrete_map={
+                'Window': '#1f77b4',
+                'Fft': '#ff7f0e',
+                'Magnitude': '#2ca02c',
+                'Overhead': '#d62728'
+            }
+        )
+        fig1.update_layout(barmode='stack', xaxis={'type': 'category'})
+        st.plotly_chart(fig1, use_container_width=True)
+
+        st.markdown("---")
+
+        # Visualization 2: Percentage contribution
+        st.subheader("📈 Stage Contribution Percentage")
+
+        # Calculate percentage contribution for each config
+        stage_data_pct = stage_data.copy()
+        total_measured = (stage_data_pct['stage_window_us'] +
+                         stage_data_pct['stage_fft_us'] +
+                         stage_data_pct['stage_magnitude_us'])
+
+        stage_data_pct['window_pct'] = (stage_data_pct['stage_window_us'] / total_measured * 100)
+        stage_data_pct['fft_pct'] = (stage_data_pct['stage_fft_us'] / total_measured * 100)
+        stage_data_pct['magnitude_pct'] = (stage_data_pct['stage_magnitude_us'] / total_measured * 100)
+
+        # Group by NFFT
+        pct_by_nfft = stage_data_pct.groupby('engine_nfft')[
+            ['window_pct', 'fft_pct', 'magnitude_pct']
+        ].mean().reset_index()
+
+        pct_melted = pd.melt(
+            pct_by_nfft,
+            id_vars=['engine_nfft'],
+            value_vars=['window_pct', 'fft_pct', 'magnitude_pct'],
+            var_name='Stage',
+            value_name='Percentage'
+        )
+
+        pct_melted['Stage'] = pct_melted['Stage'].str.replace('_pct', '').str.title()
+
+        fig2 = px.line(
+            pct_melted,
+            x='engine_nfft',
+            y='Percentage',
+            color='Stage',
+            title='Stage Contribution (%) vs NFFT',
+            markers=True,
+            labels={'engine_nfft': 'NFFT Size', 'Percentage': 'Percentage of Total (%)'},
+            color_discrete_map={
+                'Window': '#1f77b4',
+                'Fft': '#ff7f0e',
+                'Magnitude': '#2ca02c'
+            }
+        )
+        fig2.update_xaxes(type='category')
+        st.plotly_chart(fig2, use_container_width=True)
+
+        st.markdown("---")
+
+        # Visualization 3: Bottleneck analysis
+        st.subheader("🔍 Bottleneck Analysis")
+
+        # Identify bottleneck stage for each config
+        stage_data_bottleneck = stage_data.copy()
+        stage_data_bottleneck['bottleneck'] = stage_data_bottleneck[
+            ['stage_window_us', 'stage_fft_us', 'stage_magnitude_us']
+        ].idxmax(axis=1).str.replace('stage_', '').str.replace('_us', '').str.title()
+
+        bottleneck_counts = stage_data_bottleneck['bottleneck'].value_counts()
+
+        fig3 = px.pie(
+            values=bottleneck_counts.values,
+            names=bottleneck_counts.index,
+            title='Dominant Bottleneck Stages (STREAMING Mode)',
+            color_discrete_map={
+                'Window': '#1f77b4',
+                'Fft': '#ff7f0e',
+                'Magnitude': '#2ca02c'
+            }
+        )
+        st.plotly_chart(fig3, use_container_width=True)
+
+        st.markdown("---")
+
+        # Detailed metrics table
+        st.subheader("📋 Detailed Stage Metrics")
+
+        stage_detail = stage_data[
+            ['engine_nfft', 'engine_channels', 'engine_overlap', 'engine_mode',
+             'stage_window_us', 'stage_fft_us', 'stage_magnitude_us',
+             'stage_overhead_us', 'stage_total_measured_us', 'mean_latency_us']
+        ].sort_values('mean_latency_us').head(20).copy()
+
+        stage_detail.columns = ['NFFT', 'Channels', 'Overlap', 'Mode',
+                               'Window (µs)', 'FFT (µs)', 'Magnitude (µs)',
+                               'Overhead (µs)', 'Total Measured (µs)', 'Total Latency (µs)']
+
+        st.dataframe(stage_detail, use_container_width=True)
+
+        # Optimization recommendations
+        st.markdown("---")
+        st.subheader("💡 Optimization Recommendations")
+
+        # Find configs where specific stages dominate
+        window_heavy = stage_data[stage_data_pct['window_pct'] > 40]
+        fft_heavy = stage_data[stage_data_pct['fft_pct'] > 40]
+        magnitude_heavy = stage_data[stage_data_pct['magnitude_pct'] > 40]
+
+        if len(window_heavy) > 0:
+            st.info(f"🪟 **Window-bound configs**: {len(window_heavy)} configs spend >40% in Window stage. "
+                   "Consider optimizing window application or reducing overlap.")
+
+        if len(fft_heavy) > 0:
+            st.info(f"📊 **FFT-bound configs**: {len(fft_heavy)} configs spend >40% in FFT stage. "
+                   "This is expected for large NFFT. Consider reducing NFFT if latency is critical.")
+
+        if len(magnitude_heavy) > 0:
+            st.info(f"📐 **Magnitude-bound configs**: {len(magnitude_heavy)} configs spend >40% in Magnitude stage. "
+                   "Consider output mode optimization or kernel fusion.")
+
+        overhead_heavy = stage_data[stage_data['stage_overhead_us'] > stage_data['stage_total_measured_us']]
+        if len(overhead_heavy) > 0:
+            st.warning(f"⚠️ **High overhead**: {len(overhead_heavy)} configs have overhead > stage time. "
+                      "This indicates ring buffer, synchronization, or memory transfer bottlenecks in streaming mode.")
 
 except FileNotFoundError:
     st.error("No benchmark data found. Please run benchmarks first.")

@@ -277,6 +277,41 @@ The guide explains:
 ./scripts/cli.ps1 doctor                  # System health check
 ```
 
+## Stage Timing Profiling (Development)
+
+Convenient shortcuts for running per-stage timing experiments (GitHub Issue #004).
+
+```bash
+# Quick stage timing tests (~30 seconds each)
+sxstb              # BATCH mode stage timing (4 configs)
+sxsts              # STREAMING mode stage timing (4 configs)
+sxst               # Both BATCH + STREAMING (8 configs)
+
+# Full stage timing sweeps (~5-8 minutes each)
+sxstb --full       # Full BATCH sweep (45 configs)
+sxsts --full       # Full STREAMING sweep (45 configs)
+sxst --full        # Both modes full sweep (90 configs)
+
+# Custom NFFT override
+sxstb --nfft 4096  # BATCH with specific NFFT
+sxsts --nfft 8192  # STREAMING with specific NFFT
+
+# View results in dashboard
+sigx dashboard
+# Navigate to: BATCH Execution → ⚙️ Stage Breakdown
+#          OR: STREAMING Execution → ⚙️ Stage Breakdown
+```
+
+**What it does:**
+- Runs experiments with `measure_components=true` to profile Window → FFT → Magnitude stages
+- Generates CSV with per-stage timing breakdown
+- Visualizes bottlenecks in interactive dashboard
+
+**Use when:**
+- Optimizing pipeline stage performance
+- Identifying bottlenecks (window-bound, FFT-bound, magnitude-bound)
+- Validating stage timing implementation changes
+
 ## C++ Development Workflow (Pre-Python Integration)
 
 **Use Case:** Developing and validating new C++ kernels/executors BEFORE Python integration.

@@ -164,6 +164,21 @@ def _harmonize_schema(df: pd.DataFrame, filename: str = '') -> pd.DataFrame:
     if 'p99_latency_ms' in df.columns and 'p99_latency_us' not in df.columns:
         df['p99_latency_us'] = df['p99_latency_ms'] * 1000
 
+    # Add stage metrics columns with defaults (for backward compatibility)
+    # These are only populated when measure_components=true in benchmark config
+    stage_metric_cols = {
+        'stage_window_us': 0.0,
+        'stage_fft_us': 0.0,
+        'stage_magnitude_us': 0.0,
+        'stage_overhead_us': 0.0,
+        'stage_total_measured_us': 0.0,
+        'stage_metrics_enabled': False
+    }
+
+    for col, default_val in stage_metric_cols.items():
+        if col not in df.columns:
+            df[col] = default_val
+
     return df
 
 

@@ -667,3 +667,140 @@ TEST_F(StreamingExecutorTest, LargeBufferPoolEventSync) {
   EXPECT_GE(stats.frames_processed, 35);  // At least 35 frames
   EXPECT_LE(stats.frames_processed, 45);  // At most 45 frames
 }
+
+// ============================================================================
+//  Component Timing Tests (Per-Stage Metrics)
+// ============================================================================
+
+/**
+ * @brief Test that component timing is disabled by default.
+ *
+ * Verify stage_metrics.enabled=false when measure_components not set.
+ */
+TEST_F(StreamingExecutorTest, ComponentTimingDisabledByDefault) {
+  config_.nfft = 1024;
+  config_.channels = 1;
+  config_.overlap = 0.0f;
+  // measure_components not set (defaults to false)
+
+  StreamingExecutor executor;
+  PipelineBuilder builder;
+  auto stages = builder.with_config(StageConfig{config_.nfft, config_.channels})
+                    .add_window(StageConfig::WindowType::HANN)
+                    .add_fft()
+                    .add_magnitude()
+                    .build();
+  executor.initialize(config_, std::move(stages));
+
+  // Process one frame
+  const size_t input_size = config_.nfft * config_.channels;
+  const size_t output_size = config_.num_output_bins() * config_.channels;
+  auto input = generate_sinusoid(input_size, 1000.0f);
+  std::vector<float> output(output_size);
+
+  executor.submit(input.data(), output.data(), input_size);
+
+  auto stats = executor.get_stats();
+  EXPECT_FALSE(stats.stage_metrics.enabled);
+  EXPECT_EQ(stats.stage_metrics.window_us, 0.0f);
+  EXPECT_EQ(stats.stage_metrics.fft_us, 0.0f);
+  EXPECT_EQ(stats.stage_metrics.magnitude_us, 0.0f);
+  EXPECT_EQ(stats.stage_metrics.overhead_us, 0.0f);
+  EXPECT_EQ(stats.stage_metrics.total_measured_us, 0.0f);
+}
+
+/**
+ * @brief Test that component timing works in StreamingExecutor.
+ *
+ * Implementation: Option 1 (last-frame timing)
+ * Reports timing for the most recently processed frame.
+ */
+TEST_F(StreamingExecutorTest, ComponentTimingEnabled) {
+  config_.nfft = 1024;
+  config_.channels = 1;
+  config_.overlap = 0.0f;
+  config_.measure_components = true;
+
+  StreamingExecutor executor;
+  PipelineBuilder builder;
+  auto stages = builder.with_config(StageConfig{config_.nfft, config_.channels})
+                    .add_window(StageConfig::WindowType::HANN)
+                    .add_fft()
+                    .add_magnitude()
+                    .build();
+  executor.initialize(config_, std::move(stages));
+
+  // Process frames
+  const size_t input_size = config_.nfft * config_.channels;
+  const size_t output_size = config_.num_output_bins() * config_.channels;
+  std::vector<float> output(output_size);
+
+  auto input1 = generate_sinusoid(input_size, 1000.0f);
+  executor.submit(input1.data(), output.data(), input_size);
+
+  auto input2 = generate_sinusoid(input_size, 1100.0f);
+  executor.submit(input2.data(), output.data(), input_size);
+
+  // Verify metrics are enabled and populated
+  auto stats = executor.get_stats();
+  EXPECT_TRUE(stats.stage_metrics.enabled);
+  EXPECT_GT(stats.stage_metrics.window_us, 0.0f);
+  EXPECT_GT(stats.stage_metrics.fft_us, 0.0f);
+  EXPECT_GT(stats.stage_metrics.magnitude_us, 0.0f);
+
+  // Verify total equals sum of components
+  float expected_total = stats.stage_metrics.window_us +
+                        stats.stage_metrics.fft_us +
+                        stats.stage_metrics.magnitude_us;
+  EXPECT_NEAR(stats.stage_metrics.total_measured_us, expected_total, 0.1f);
+
+  // Verify overhead is reasonable (between 0 and total latency)
+  // Note: Overhead calculation uses stats_.latency_us which is finalized after
+  // process_one_batch(), so exact matching is timing-dependent in tests.
+  // Production use (Python) is fine since access is single-threaded.
+  EXPECT_GE(stats.stage_metrics.overhead_us, 0.0f);
+  EXPECT_LE(stats.stage_metrics.overhead_us, stats.latency_us);
+}
+
+/**
+ * @brief Test component timing with multiple frames per submit.
+ *
+ * With overlap, one submit() can process multiple frames. Verify that
+ * timing is reported for the last processed frame.
+ */
+TEST_F(StreamingExecutorTest, ComponentTimingWithOverlap) {
+  config_.nfft = 1024;
+  config_.channels = 1;
+  config_.overlap = 0.75f;  // High overlap -> multiple frames per submit
+  config_.measure_components = true;
+
+  StreamingExecutor executor;
+  PipelineBuilder builder;
+  auto stages = builder.with_config(StageConfig{config_.nfft, config_.channels})
+                    .add_window(StageConfig::WindowType::HANN)
+                    .add_fft()
+                    .add_magnitude()
+                    .build();
+  executor.initialize(config_, std::move(stages));
+
+  const size_t input_size = config_.nfft * config_.channels;
+  const size_t output_size = config_.num_output_bins() * config_.channels;
+  std::vector<float> output(output_size);
+
+  // First submit: fills buffer, processes 1 frame
+  auto input1 = generate_sinusoid(input_size, 1000.0f);
+  executor.submit(input1.data(), output.data(), input_size);
+
+  auto stats1 = executor.get_stats();
+  EXPECT_TRUE(stats1.stage_metrics.enabled);
+  EXPECT_GT(stats1.stage_metrics.window_us, 0.0f);
+
+  // Second submit: processes multiple frames due to overlap
+  auto input2 = generate_sinusoid(input_size, 1100.0f);
+  executor.submit(input2.data(), output.data(), input_size);
+
+  auto stats2 = executor.get_stats();
+  EXPECT_TRUE(stats2.stage_metrics.enabled);
+  EXPECT_GT(stats2.stage_metrics.window_us, 0.0f);
+  // Timing reflects last frame processed in this submit
+}

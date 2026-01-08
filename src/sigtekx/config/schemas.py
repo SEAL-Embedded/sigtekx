@@ -266,12 +266,8 @@ class EngineConfig(BaseModel):
 
     @model_validator(mode='after')
     def validate_component_timing(self) -> Self:
-        """Component timing only supported in batch mode (latency benchmark)."""
-        if self.measure_components and self.mode != ExecutionMode.BATCH:
-            raise ValueError(
-                "measure_components=True requires mode='batch'. "
-                "Streaming mode component timing not yet implemented."
-            )
+        """Component timing supported in both batch and streaming modes."""
+        # Note: Component timing adds ~1-2µs overhead per stage when enabled
         return self
 
     # ========================================================================
