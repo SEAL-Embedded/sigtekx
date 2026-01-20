@@ -1,3 +1,10 @@
 {
-  "baselines": []
+  "baselines": [
+    {
+      "name": "pre-phase1",
+      "created": "2026-01-20T21:33:29.634441+00:00",
+      "phase": 1,
+      "scope": "standard"
+    }
+  ]
 }
