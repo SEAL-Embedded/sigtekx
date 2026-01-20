@@ -1,9 +1,76 @@
-"""Baseline management for phase-aligned experiment archiving.
+"""Baseline management for persistent experiment snapshots.
 
-This module provides baseline archiving functionality that preserves important
-experiment states before the ephemeral artifacts/ directory is deleted.
+PERSISTENT BASELINE STORAGE
+────────────────────────────
+Provides snapshot archiving for regression tracking across development phases.
+Baselines survive `sigx clean` and are manually managed in baselines/ directory.
 
-Baselines are stored in baselines/ (repo root) and survive `sigx clean`.
+ARCHITECTURE: TWO-TIER EXPERIMENT TRACKING
+───────────────────────────────────────────
+SigTekX uses different tools for different experiment lifespans:
+
+┌─────────────────────────────────────────────────────────────────┐
+│ Tier 1: EPHEMERAL EXPERIMENTS (artifacts/)                      │
+│ ────────────────────────────────────────────────────────────── │
+│ Purpose:  Day-to-day development, fast iteration               │
+│ Tools:    MLflow + CSV files                                   │
+│ Deleted:  `sigx clean` wipes artifacts/                        │
+│ Lifespan: Days/weeks (regenerated from code)                   │
+│                                                                 │
+│ MLflow provides:                                                │
+│   - Experiment tracking with web UI                            │
+│   - Parameter and metric storage                               │
+│   - Run history and comparison                                 │
+│   - Artifact management                                         │
+│                                                                 │
+│ CSV provides:                                                   │
+│   - Dashboard data (Streamlit)                                 │
+│   - Unique filenames prevent race conditions                   │
+│   - Pandas-friendly analysis                                   │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│ Tier 2: PERSISTENT BASELINES (baselines/)                      │
+│ ────────────────────────────────────────────────────────────── │
+│ Purpose:  Regression tracking, phase milestones                │
+│ Tools:    BaselineManager (this module)                        │
+│ Survives: `sigx clean` does NOT delete baselines/              │
+│ Lifespan: Months/years (manually managed)                      │
+│                                                                 │
+│ BaselineManager provides:                                       │
+│   - Explicit snapshot tagging (pre/post phase)                 │
+│   - Statistical comparison between baselines                   │
+│   - Git commit tracking                                         │
+│   - Phase-aligned organization                                  │
+└─────────────────────────────────────────────────────────────────┘
+
+USAGE EXAMPLE
+─────────────
+    # 1. Run benchmarks
+    python benchmarks/run_latency.py +benchmark=latency
+
+    # 2. Save baseline before Phase 1 work
+    sigx baseline save pre-phase1 --phase 1 --message "Before zero-copy"
+
+    # 3. Clean artifacts (baselines/ survives!)
+    sigx clean
+
+    # 4. Do Phase 1 work, run benchmarks again
+    # ... code changes ...
+    python benchmarks/run_latency.py +benchmark=latency
+
+    # 5. Save new baseline
+    sigx baseline save post-phase1 --phase 1 --message "After zero-copy"
+
+    # 6. Compare (statistical regression analysis)
+    sigx baseline compare pre-phase1 post-phase1
+
+CONCURRENCY SAFETY
+──────────────────
+Manifest operations (_update_manifest, _remove_from_manifest) use file locking
+to prevent race conditions during concurrent baseline operations.
+
+See: docs/benchmarking/experiment-logging-system.md
 """
 
 from __future__ import annotations
@@ -14,6 +81,8 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from filelock import FileLock
 
 __all__ = ["BaselineManager"]
 
@@ -670,53 +739,58 @@ snakemake --cores 4 --snakefile experiments/Snakefile
         return readme
 
     def _update_manifest(self, name: str, metadata: dict[str, Any]) -> None:
-        """Update global baseline manifest.
+        """Atomically update baseline manifest to avoid concurrent write loss.
 
         Args:
             name: Baseline name
             metadata: Baseline metadata
         """
         manifest_path = self.baselines_dir / ".baseline_manifest.json"
+        lock_path = manifest_path.with_suffix(".json.lock")
 
-        # Load existing manifest
-        if manifest_path.exists():
-            with manifest_path.open(encoding="utf-8") as f:
-                manifest = json.load(f)
-        else:
-            manifest = {"baselines": []}
+        with FileLock(str(lock_path), timeout=10.0):
+            # Load existing manifest (inside lock)
+            if manifest_path.exists():
+                with manifest_path.open(encoding="utf-8") as f:
+                    manifest = json.load(f)
+            else:
+                manifest = {"baselines": []}
 
-        # Add new baseline
-        manifest["baselines"].append({
-            "name": name,
-            "created": metadata["created"],
-            "phase": metadata.get("phase"),
-            "scope": metadata.get("scope"),
-        })
+            # Add new baseline (inside lock)
+            manifest["baselines"].append({
+                "name": name,
+                "created": metadata["created"],
+                "phase": metadata.get("phase"),
+                "scope": metadata.get("scope"),
+            })
 
-        # Save manifest
-        with manifest_path.open("w", encoding="utf-8") as f:
-            json.dump(manifest, f, indent=2)
+            # Save manifest (inside lock)
+            with manifest_path.open("w", encoding="utf-8") as f:
+                json.dump(manifest, f, indent=2)
 
     def _remove_from_manifest(self, name: str) -> None:
-        """Remove a baseline from the global manifest.
+        """Atomically remove baseline from manifest to avoid concurrent write loss.
 
         Args:
             name: Baseline name to remove
         """
         manifest_path = self.baselines_dir / ".baseline_manifest.json"
+        lock_path = manifest_path.with_suffix(".json.lock")
 
-        # Load existing manifest
-        if not manifest_path.exists():
-            return  # No manifest to update
+        with FileLock(str(lock_path), timeout=10.0):
+            # Early exit if manifest doesn't exist (inside lock for consistency)
+            if not manifest_path.exists():
+                return  # No manifest to update
 
-        with manifest_path.open(encoding="utf-8") as f:
-            manifest = json.load(f)
+            # Load existing manifest (inside lock)
+            with manifest_path.open(encoding="utf-8") as f:
+                manifest = json.load(f)
 
-        # Remove baseline from list
-        manifest["baselines"] = [
-            b for b in manifest["baselines"] if b["name"] != name
-        ]
+            # Remove baseline from list (inside lock)
+            manifest["baselines"] = [
+                b for b in manifest["baselines"] if b["name"] != name
+            ]
 
-        # Save updated manifest
-        with manifest_path.open("w", encoding="utf-8") as f:
-            json.dump(manifest, f, indent=2)
+            # Save updated manifest (inside lock)
+            with manifest_path.open("w", encoding="utf-8") as f:
+                json.dump(manifest, f, indent=2)

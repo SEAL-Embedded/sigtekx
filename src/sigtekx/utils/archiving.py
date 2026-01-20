@@ -1,4 +1,44 @@
-"""Benchmark data archiving helpers with standardized naming."""
+"""Benchmark data archiving helpers (TEST INFRASTRUCTURE).
+
+⚠️  NOTE: Production experiments use MLflow + CSV, not this module.
+
+ARCHITECTURE: TWO-TIER EXPERIMENT TRACKING
+───────────────────────────────────────────
+SigTekX uses different tools for different experiment lifespans:
+
+┌─────────────────────────────────────────────────────────────────┐
+│ Tier 1: EPHEMERAL EXPERIMENTS (artifacts/)                      │
+│ ────────────────────────────────────────────────────────────── │
+│ Tools:    MLflow + CSV files                                   │
+│ Purpose:  Day-to-day development, fast iteration               │
+│ Status:   ✓ PRODUCTION USE                                     │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│ Tier 2: PERSISTENT BASELINES (baselines/)                      │
+│ ────────────────────────────────────────────────────────────── │
+│ Tools:    BaselineManager (utils/baseline.py)                  │
+│ Purpose:  Regression tracking, phase milestones                │
+│ Status:   ✓ PRODUCTION USE (CLI: sigx baseline save/compare)   │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│ Tier 3: TEST FIXTURES (tests/)                                 │
+│ ────────────────────────────────────────────────────────────── │
+│ Tools:    DataArchiver (this module)                           │
+│ Purpose:  Test infrastructure, isolated archiving              │
+│ Status:   ⚙️  TEST ONLY (fixtures.py)                          │
+└─────────────────────────────────────────────────────────────────┘
+
+This module (DataArchiver) provides:
+- Test fixtures for archiving functionality
+- Reference implementation of file-locked manifest patterns
+- Isolated archiving for unit tests (no MLflow dependency)
+
+For production experiment tracking, see:
+- MLflow: docs/benchmarking/experiment-logging-system.md
+- Baselines: docs/benchmarking/baselines-and-regression-tracking.md
+"""
 
 from __future__ import annotations
 

@@ -883,3 +883,60 @@ python benchmarks/run_throughput.py --multirun experiment=ionosphere_resolution
 - Design doc: `docs/benchmarking/csv-file-organization.md`
 
 Last updated: 2025-01-02 (Added CSV multirun safety verification and documentation)
+
+## Experiment Tracking Architecture
+
+SigTekX uses **two-tier experiment storage** for different lifespans:
+
+### Tier 1: Ephemeral Experiments (MLflow + CSV)
+- **Location:** `artifacts/` (gitignored)
+- **Deleted by:** `sigx clean`
+- **Purpose:** Day-to-day development, fast iteration
+- **Tools:** MLflow (tracking) + CSV (dashboard data)
+- **Lifespan:** Days/weeks (regenerated from code)
+
+### Tier 2: Persistent Baselines (BaselineManager)
+- **Location:** `baselines/` (survives cleanup)
+- **CLI:** `sigx baseline save/list/compare/delete`
+- **Purpose:** Regression tracking across phases
+- **Lifespan:** Months/years (manually managed)
+
+### When to Use Each
+
+**Use MLflow + CSV** (Tier 1) when:
+- Running experiments during development
+- Comparing parameter sweeps
+- Viewing results in dashboard
+- Iterating quickly
+
+**Use BaselineManager** (Tier 2) when:
+- Saving milestone before major refactor
+- Tracking performance across development phases
+- Comparing before/after optimization
+- Documenting regression/improvement
+
+### Example Workflow
+
+```bash
+# 1. Development iteration (ephemeral)
+python benchmarks/run_latency.py +benchmark=latency
+sigx dashboard  # View results
+
+# 2. Save baseline before Phase 1
+sigx baseline save pre-phase1 --phase 1 --message "Before zero-copy"
+
+# 3. Clean up ephemeral experiments
+sigx clean  # baselines/ survives!
+
+# 4. Do Phase 1 work
+# ... code changes ...
+python benchmarks/run_latency.py +benchmark=latency
+
+# 5. Save new baseline
+sigx baseline save post-phase1 --phase 1 --message "After zero-copy"
+
+# 6. Compare (statistical analysis)
+sigx baseline compare pre-phase1 post-phase1
+```
+
+**See:** Module docstrings in `src/sigtekx/utils/baseline.py` and `src/sigtekx/utils/archiving.py` for architectural details

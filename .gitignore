@@ -117,6 +117,7 @@ vgcore.*
 benchmark_results/
 results/
 *.json.lock
+*.lock
 
 .dsp_course/
 .claude/
