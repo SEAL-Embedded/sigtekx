@@ -463,6 +463,88 @@ sigxc profile ncu --kernel-name "fft_kernel" --set roofline
 sxp nsys latency    # Full Python end-to-end workflow
 ```
 
+### C++ Baseline Management
+
+The C++ baseline system provides production-grade benchmark result tracking with collision safety, rich metadata, CSV export, and statistical comparison.
+
+**Full documentation**: `docs/cpp/baseline-system.md`
+
+#### Workflow (Explicit Save)
+
+```powershell
+# 1. Run benchmark (saves to .last_run)
+sigxc bench --preset latency --full
+
+# 2. Save as named baseline with description
+sigxc baseline save pre_optimization --message "Before zero-copy refactor"
+
+# 3. Make code changes, rebuild
+vim cpp/src/executors/batch_executor.cpp
+sigx build
+
+# 4. Run benchmark again
+sigxc bench --preset latency --full
+
+# 5. Save as another baseline
+sigxc baseline save post_optimization --message "After zero-copy refactor"
+
+# 6. Compare for regression detection
+sigxc baseline compare pre_optimization post_optimization
+```
+
+**Note**: Benchmarks always save to `.last_run/` automatically. Use `baseline save` to create named snapshots with meaningful names and messages.
+
+#### Managing Baselines
+
+```powershell
+# Save last run as named baseline
+sigxc baseline save <name> --message "Description"
+
+# List all baselines
+sigxc baseline list
+
+# Filter by preset
+sigxc baseline list --preset latency
+
+# Compare two baselines (regression detection)
+sigxc baseline compare pre_optimization post_optimization
+
+# Delete baseline with confirmation
+sigxc baseline delete old_baseline
+
+# Delete without confirmation
+sigxc baseline delete old_baseline --force
+```
+
+#### Baseline Comparison Output
+
+Comparison shows delta, percent change, and status indicators:
+
+- `=` (gray): No change (`< 1%`)
+- `↑` (green): Improvement
+- `⚠` (yellow): Slight regression (`1-5%`)
+- `↓` (red): Regression (`5-10%`)
+- `🔴` (bright red): Major regression (`> 10%`)
+
+**Exit codes**: `0` = no regression, `1` = regression detected (useful for CI/CD)
+
+#### Baseline Storage
+
+Baselines stored in `baselines/cpp/` (persistent, survives `sigx clean`):
+
+```
+baselines/cpp/
+├── latency_iono_full/
+│   ├── metadata.json     # Config + hardware + git + metrics
+│   ├── results.json      # Detailed benchmark results
+│   └── results.csv       # CSV export for analysis
+└── .baseline_manifest.json  # Global manifest (file-locked)
+```
+
+**Metadata includes**: GPU (name, memory, CUDA versions), CPU (model, cores), system (OS, RAM), git (commit, branch, dirty flag), configuration, metrics summary
+
+**Collision safety**: File-locked manifest prevents data loss during concurrent benchmark saves
+
 ### When to Use Each Tool
 
 | Tool | Purpose | Duration | Use When |

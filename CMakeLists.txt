@@ -331,4 +331,22 @@ if(SIGTEKX_WITH_TESTS AND SIGTEKX_WITH_CUDA)
     if(SIGTEKX_WITH_NVTX)
         target_compile_definitions(sigtekx_benchmark PRIVATE SIGTEKX_ENABLE_PROFILING)
     endif()
+
+    # ========================================================================
+    # C++ Baseline Management CLI
+    # ========================================================================
+    # Standalone CLI for baseline operations: save, list, compare, delete
+    # Integrates with PowerShell CLI via JSON I/O for clean separation
+    add_executable(sigtekx_baseline_cli
+        cpp/benchmarks/baseline_cli.cpp
+    )
+    set_target_properties(sigtekx_baseline_cli PROPERTIES CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+
+    target_include_directories(sigtekx_baseline_cli PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/cpp/include)
+
+    target_link_libraries(sigtekx_baseline_cli PRIVATE
+        "$<TARGET_OBJECTS:sigtekx_core>"
+        CUDA::cudart_static
+        CUDA::cufft
+    )
 endif()

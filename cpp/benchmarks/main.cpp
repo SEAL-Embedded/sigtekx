@@ -93,12 +93,10 @@ static void run_benchmarks_with_executor(ExecutorT& executor,
       auto results = run_latency_benchmark(executor, config);
       print_latency_results(config, results, runtime_info);
 
-      // Save baseline if requested
-      if (config.save_baseline) {
-        save_latency_baseline(config, results);
-        if (!config.quiet) {
-          std::cout << "Baseline saved to: " << get_baseline_path(config) << "\n";
-        }
+      // Always save to .last_run for potential baseline creation
+      save_latency_last_run(config, results);
+      if (!config.quiet) {
+        std::cout << "\nResults saved to .last_run (use 'sigxc baseline save <name>' to create baseline)\n";
       }
       break;
     }
@@ -107,12 +105,10 @@ static void run_benchmarks_with_executor(ExecutorT& executor,
       auto results = run_throughput_benchmark(executor, config);
       print_throughput_results(config, results, runtime_info);
 
-      // Save baseline if requested
-      if (config.save_baseline) {
-        save_throughput_baseline(config, results);
-        if (!config.quiet) {
-          std::cout << "Baseline saved to: " << get_baseline_path(config) << "\n";
-        }
+      // Always save to .last_run for potential baseline creation
+      save_throughput_last_run(config, results);
+      if (!config.quiet) {
+        std::cout << "\nResults saved to .last_run (use 'sigxc baseline save <name>' to create baseline)\n";
       }
       break;
     }
@@ -121,12 +117,10 @@ static void run_benchmarks_with_executor(ExecutorT& executor,
       auto results = run_realtime_benchmark(executor, config);
       print_realtime_results(config, results, runtime_info);
 
-      // Save baseline if requested
-      if (config.save_baseline) {
-        save_realtime_baseline(config, results);
-        if (!config.quiet) {
-          std::cout << "Baseline saved to: " << get_baseline_path(config) << "\n";
-        }
+      // Always save to .last_run for potential baseline creation
+      save_realtime_last_run(config, results);
+      if (!config.quiet) {
+        std::cout << "\nResults saved to .last_run (use 'sigxc baseline save <name>' to create baseline)\n";
       }
       break;
     }
@@ -135,12 +129,10 @@ static void run_benchmarks_with_executor(ExecutorT& executor,
       auto results = run_accuracy_benchmark(executor, config);
       print_accuracy_results(config, results, runtime_info);
 
-      // Save baseline if requested
-      if (config.save_baseline) {
-        save_accuracy_baseline(config, results);
-        if (!config.quiet) {
-          std::cout << "Baseline saved to: " << get_baseline_path(config) << "\n";
-        }
+      // Always save to .last_run for potential baseline creation
+      save_accuracy_last_run(config, results);
+      if (!config.quiet) {
+        std::cout << "\nResults saved to .last_run (use 'sigxc baseline save <name>' to create baseline)\n";
       }
       break;
     }

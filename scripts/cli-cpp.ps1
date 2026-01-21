@@ -20,6 +20,7 @@ $script:BuildDir = Join-Path $ProjectRoot "build"
 $script:BuildPreset = if ($env:BUILD_PRESET) { $env:BUILD_PRESET } else { "windows-rel" }
 $script:ProfilingDir = Join-Path $ProjectRoot "artifacts\profiling"
 $script:BenchmarkExe = Join-Path $BuildDir "$script:BuildPreset\sigtekx_benchmark.exe"
+$script:BaselineCLI = Join-Path $BuildDir "$script:BuildPreset\sigtekx_baseline_cli.exe"
 
 # --- Utility Functions -------------------------------------------------------
 function Write-Status {
@@ -356,6 +357,23 @@ function Invoke-Clean {
     }
 }
 
+function Invoke-Baseline {
+    param([string[]]$BaselineArgs = @())
+
+    if (-not (Test-Path $script:BaselineCLI)) {
+        Write-Error "C++ baseline CLI not found at: $script:BaselineCLI"
+        Write-Host "Run 'sigx build' to build the baseline CLI executable." -ForegroundColor Yellow
+        exit 1
+    }
+
+    # Forward all arguments to baseline CLI
+    & $script:BaselineCLI @BaselineArgs
+
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+}
+
 function Show-Help {
     Write-Host @"
 ╔════════════════════════════════════════════════════════════════════════╗
@@ -367,6 +385,7 @@ USAGE: sigxc <command> [options]
 
 COMMANDS:
   bench [options]               Run C++ benchmark with presets
+  baseline <subcommand>         Manage C++ baselines (list, compare, delete)
   profile nsys [options]        Profile with Nsight Systems
   profile ncu [options]         Profile with Nsight Compute
   compare <before> <after>      Compare benchmark results
@@ -476,6 +495,37 @@ FOR PRODUCTION PROFILING:
 
 ═══════════════════════════════════════════════════════════════════════════
 
+BASELINE MANAGEMENT:
+  sigxc baseline <subcommand> [options]
+
+  Subcommands:
+    save <name> [--message <msg>]   Save last benchmark run as named baseline
+    list [--preset <name>]          List all baselines (optionally filtered)
+    compare <name1> <name2>         Compare two baselines
+    delete <name> [--force]         Delete a baseline
+
+  Workflow:
+    1. Run benchmark:      sigxc bench --preset latency
+    2. Save as baseline:   sigxc baseline save pre_opt --message "Before optimization"
+    3. Make code changes
+    4. Run benchmark:      sigxc bench --preset latency
+    5. Save as baseline:   sigxc baseline save post_opt --message "After optimization"
+    6. Compare:            sigxc baseline compare pre_opt post_opt
+
+  Examples:
+    sigxc baseline save my_baseline --message "Description"
+    sigxc baseline list
+    sigxc baseline list --preset latency
+    sigxc baseline compare pre_opt post_opt
+    sigxc baseline delete old_baseline --force
+
+  Storage:
+    Baselines are stored in: baselines/cpp/
+    Last run is cached in:   baselines/cpp/.last_run/
+    Each baseline contains:  results.json, metadata.json, results.csv
+
+═══════════════════════════════════════════════════════════════════════════
+
 ARTIFACTS LOCATION:
   All profiling results are saved to: artifacts\profiling\
 
@@ -519,6 +569,9 @@ try {
                     exit 1
                 }
             }
+        }
+        "baseline" {
+            Invoke-Baseline -BaselineArgs $CommandArgs
         }
         "compare" {
             Invoke-Compare -Args $CommandArgs
