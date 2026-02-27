@@ -129,15 +129,6 @@ class StreamingExecutor::Impl {
       }
     }
 
-    // Allocate pinned staging buffer for batch extraction
-    {
-      const std::string staging_msg = profiling::format_memory_range(
-          "Allocate Staging Buffer", buffer_size * sizeof(float));
-      SIGTEKX_NVTX_RANGE(staging_msg.c_str(), profiling::colors::CYAN);
-      h_batch_staging_.resize(buffer_size);
-      h_batch_staging_.memset(0);
-    }
-
     // Create CUDA streams
     {
       SIGTEKX_NVTX_RANGE("Create CUDA Streams", profiling::colors::DARK_GRAY);
@@ -273,7 +264,6 @@ class StreamingExecutor::Impl {
       d_input_buffers_.clear();
       d_intermediate_buffers_.clear();
       d_output_buffers_.clear();
-      h_batch_staging_.resize(0);
 
       // Reset all per-channel ring buffers
       for (auto& ring_buffer : input_ring_buffers_) {
@@ -541,9 +531,6 @@ class StreamingExecutor::Impl {
       total += ring_buffer->capacity() * sizeof(float);
     }
 
-    // Staging buffer
-    total += h_batch_staging_.bytes();
-
     // Device buffers
     for (const auto& buf : d_input_buffers_) {
       total += buf.size() * sizeof(float);
@@ -601,31 +588,6 @@ class StreamingExecutor::Impl {
   void process_one_batch(float* output) {
     SIGTEKX_NVTX_RANGE("Process One Batch", profiling::colors::PURPLE);
 
-    // Extract one frame per channel independently to staging buffer
-    // Output layout: channel-major [ch0[0..nfft-1], ch1[0..nfft-1], ...]
-    {
-      SIGTEKX_NVTX_RANGE("Extract Per-Channel Frames", profiling::colors::GREEN);
-      for (int ch = 0; ch < config_.channels; ++ch) {
-        float* channel_staging = h_batch_staging_.get() + ch * config_.nfft;
-
-        // Extract nfft samples from this channel's ring buffer
-        // Simple non-overlapping extraction (ring buffer handles the read
-        // position)
-        input_ring_buffers_[ch]->extract_frame(channel_staging, config_.nfft);
-      }
-    }
-
-    // Advance each channel's ring buffer read pointer by hop_size
-    // This implements the sliding window for STFT overlap independently per
-    // channel
-    {
-      SIGTEKX_NVTX_RANGE("Advance Per-Channel Ring Buffers",
-                      profiling::colors::GREEN);
-      for (int ch = 0; ch < config_.channels; ++ch) {
-        input_ring_buffers_[ch]->advance(hop_size_);
-      }
-    }
-
     // Round-robin buffer selection
     const int buffer_idx =
         static_cast<int>(frame_counter_ % config_.pinned_buffer_count);
@@ -658,16 +620,25 @@ class StreamingExecutor::Impl {
       e_reuse_buffer_done.synchronize();
     }
 
-    // H2D Transfer
+    // Zero-copy H2D: peek into ring buffers, DMA directly to device
+    // Ring buffers use CUDA pinned memory, so we can DMA without staging
     {
-      const size_t num_samples =
-          static_cast<size_t>(config_.nfft) * config_.channels;
-      const size_t bytes = num_samples * sizeof(float);
-      const std::string h2d_msg =
-          profiling::format_memory_range("H2D Transfer", bytes);
-      SIGTEKX_NVTX_RANGE(h2d_msg.c_str(), profiling::colors::GREEN);
-      d_input.copy_from_host(h_batch_staging_.get(), num_samples,
-                             streams_[h2d_stream_idx].get());
+      SIGTEKX_NVTX_RANGE("H2D Transfer (Zero-Copy)", profiling::colors::GREEN);
+      for (int ch = 0; ch < config_.channels; ++ch) {
+        auto view = input_ring_buffers_[ch]->peek_frame(config_.nfft);
+        float* d_dst = d_input.get() + ch * config_.nfft;
+
+        SIGTEKX_CUDA_CHECK(cudaMemcpyAsync(d_dst, view.first.data,
+            view.first.count * sizeof(float),
+            cudaMemcpyHostToDevice, streams_[h2d_stream_idx].get()));
+
+        if (!view.is_contiguous()) {
+          SIGTEKX_CUDA_CHECK(cudaMemcpyAsync(
+              d_dst + view.first.count, view.second.data,
+              view.second.count * sizeof(float),
+              cudaMemcpyHostToDevice, streams_[h2d_stream_idx].get()));
+        }
+      }
       e_h2d_done.record(streams_[h2d_stream_idx].get());
     }
 
@@ -786,6 +757,15 @@ class StreamingExecutor::Impl {
     {
       SIGTEKX_NVTX_RANGE("Stream Sync", profiling::colors::YELLOW);
       SIGTEKX_CUDA_CHECK(cudaStreamSynchronize(streams_[d2h_stream_idx].get()));
+    }
+
+    // Advance ring buffers (safe: D2H sync guarantees H2D DMA complete
+    // via event chain H2D → Compute → D2H)
+    {
+      SIGTEKX_NVTX_RANGE("Advance Ring Buffers", profiling::colors::GREEN);
+      for (int ch = 0; ch < config_.channels; ++ch) {
+        input_ring_buffers_[ch]->advance(hop_size_);
+      }
     }
 
     // Component timing: calculate stage metrics
@@ -912,9 +892,6 @@ class StreamingExecutor::Impl {
   // Per-channel ring buffers for true multi-channel streaming (v0.9.4+)
   // Each channel maintains independent sample stream with overlap
   std::vector<std::unique_ptr<RingBuffer<float>>> input_ring_buffers_;
-
-  // Pinned staging buffer for batch extraction
-  PinnedHostBuffer<float> h_batch_staging_;
 
   // Pipeline and resources
   std::vector<std::unique_ptr<ProcessingStage>> stages_;

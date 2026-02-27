@@ -44,6 +44,17 @@ namespace sigtekx {
  * }
  * ```
  *
+ * **Zero-Copy Usage (DMA directly from pinned memory):**
+ * ```cpp
+ * auto view = buffer.peek_frame(nfft);
+ * cudaMemcpyAsync(d_dst, view.first.data, view.first.count * sizeof(T), ...);
+ * if (!view.is_contiguous()) {
+ *   cudaMemcpyAsync(d_dst + view.first.count, view.second.data, ...);
+ * }
+ * // After DMA completion:
+ * buffer.advance(hop_size);
+ * ```
+ *
  * **Thread Safety:**
  * Lock-free thread-safe for concurrent single-producer/single-consumer access
  * using atomic operations with memory_order_acquire/release semantics.
@@ -57,6 +68,25 @@ namespace sigtekx {
 template <typename T>
 class RingBuffer {
  public:
+  /**
+   * @brief A contiguous span of elements within the ring buffer.
+   */
+  struct ReadSpan {
+    const T* data;  ///< Pointer into pinned buffer
+    size_t count;   ///< Element count
+  };
+
+  /**
+   * @brief Zero-copy view into a frame within the ring buffer.
+   *
+   * If the frame wraps around the buffer boundary, two spans are returned.
+   * Pointers remain valid until advance() is called.
+   */
+  struct FrameView {
+    ReadSpan first;   ///< First (or only) contiguous span
+    ReadSpan second;  ///< Second span if wraparound, else {nullptr, 0}
+    bool is_contiguous() const noexcept { return second.data == nullptr; }
+  };
   /**
    * @brief Constructs a ring buffer with specified capacity using pinned
    * memory.
@@ -226,6 +256,47 @@ class RingBuffer {
         std::memcpy(frame_output + first_part, buffer_.get(),
                     (nfft - first_part) * sizeof(T));
       }
+    }
+  }
+
+  /**
+   * @brief Returns a zero-copy view into the ring buffer's pinned memory.
+   * @param frame_size Number of samples in one frame (e.g., nfft).
+   * @return FrameView with one or two spans pointing into pinned memory.
+   * @throws std::underflow_error if insufficient samples available.
+   *
+   * Unlike extract_frame(), this does NOT copy data. The returned pointers
+   * point directly into the ring buffer's CUDA pinned memory, enabling
+   * DMA transfers (cudaMemcpyAsync) without an intermediate staging buffer.
+   *
+   * If the frame spans the buffer wraparound boundary, two spans are returned.
+   * Both point into pinned memory and can be DMA'd separately.
+   *
+   * Returned pointers are valid until advance() is called.
+   * Does not modify the read position or available count.
+   */
+  FrameView peek_frame(size_t frame_size) const {
+    size_t current_available = available_.load(std::memory_order_acquire);
+
+    if (current_available < frame_size) {
+      throw std::underflow_error(
+          "Ring buffer underflow: insufficient samples for frame");
+    }
+
+    size_t current_read = read_pos_.load(std::memory_order_relaxed);
+
+    size_t read_end = current_read + frame_size;
+    if (read_end <= capacity_) {
+      // Contiguous: single span
+      return FrameView{
+          {buffer_.get() + current_read, frame_size},
+          {nullptr, 0}};
+    } else {
+      // Wraparound: two spans
+      size_t first_part = capacity_ - current_read;
+      return FrameView{
+          {buffer_.get() + current_read, first_part},
+          {buffer_.get(), frame_size - first_part}};
     }
   }
 

@@ -472,3 +472,105 @@ TEST_F(RingBufferTest, MultipleExtractionsWithoutAdvance) {
     EXPECT_FLOAT_EQ(output1[i], output2[i]);
   }
 }
+
+// ============================================================================
+//  peek_frame() Zero-Copy Tests
+// ============================================================================
+
+TEST_F(RingBufferTest, PeekFrameContiguous) {
+  RingBuffer<float> buffer(1024);
+  auto input = generate_ramp(512, 1.0f);  // 1, 2, ..., 512
+
+  buffer.push(input.data(), 512);
+
+  auto view = buffer.peek_frame(256);
+
+  // Should be a single contiguous span
+  EXPECT_TRUE(view.is_contiguous());
+  EXPECT_NE(view.first.data, nullptr);
+  EXPECT_EQ(view.first.count, 256);
+  EXPECT_EQ(view.second.data, nullptr);
+  EXPECT_EQ(view.second.count, 0);
+
+  // Verify data via pointers
+  for (size_t i = 0; i < 256; ++i) {
+    EXPECT_FLOAT_EQ(view.first.data[i], static_cast<float>(i + 1));
+  }
+
+  // Available should be unchanged (peek doesn't consume)
+  EXPECT_EQ(buffer.available(), 512);
+}
+
+TEST_F(RingBufferTest, PeekFrameWraparound) {
+  RingBuffer<float> buffer(512);
+
+  // Fill near end of buffer
+  auto data1 = generate_ramp(450, 1.0f);  // 1..450
+  buffer.push(data1.data(), 450);
+  buffer.advance(400);  // Leave 50 samples near end, read_pos=400
+
+  // Push more to wrap
+  auto data2 = generate_ramp(400, 451.0f);  // 451..850
+  buffer.push(data2.data(), 400);
+  EXPECT_EQ(buffer.available(), 450);
+
+  // Peek frame that spans wraparound boundary
+  auto view = buffer.peek_frame(200);
+
+  // Should be two spans (wraparound)
+  EXPECT_FALSE(view.is_contiguous());
+
+  // First span: 50 samples from positions [400..449] = values 401..450
+  // (capacity=512, so first_part = 512 - 400 = 112, but we only have 50 samples
+  //  at the end from the original push. Actually: buffer stores at positions,
+  //  read_pos=400, capacity=512 → first_part = min(200, 512-400) = 112)
+  EXPECT_EQ(view.first.count + view.second.count, 200);
+  EXPECT_EQ(view.first.count, 112);  // 512 - 400 = 112
+  EXPECT_EQ(view.second.count, 88); // 200 - 112 = 88
+
+  // Verify first span data: positions [400..511] = values 401..512
+  // Original data1 had values 1..450 at positions [0..449]
+  // So positions [400..449] have values 401..450
+  // data2 values 451..850 wrap: positions [450..511] get values 451..512
+  for (size_t i = 0; i < 50; ++i) {
+    EXPECT_FLOAT_EQ(view.first.data[i], static_cast<float>(401 + i));
+  }
+  for (size_t i = 50; i < 112; ++i) {
+    EXPECT_FLOAT_EQ(view.first.data[i], static_cast<float>(451 + (i - 50)));
+  }
+
+  // Verify second span data: positions [0..87] = values 513..600
+  // data2 continues wrapping: positions [0..337] get values 513..850
+  for (size_t i = 0; i < 88; ++i) {
+    EXPECT_FLOAT_EQ(view.second.data[i], static_cast<float>(513 + i));
+  }
+}
+
+TEST_F(RingBufferTest, PeekFrameUnderflowThrows) {
+  RingBuffer<float> buffer(1024);
+  auto input = generate_ramp(256);
+
+  buffer.push(input.data(), 256);
+
+  // Try to peek more than available
+  EXPECT_THROW(buffer.peek_frame(512), std::underflow_error);
+}
+
+TEST_F(RingBufferTest, PeekFrameIdempotent) {
+  RingBuffer<float> buffer(1024);
+  auto input = generate_ramp(512, 1.0f);
+
+  buffer.push(input.data(), 512);
+
+  // Multiple peeks should return same pointers
+  auto view1 = buffer.peek_frame(256);
+  auto view2 = buffer.peek_frame(256);
+
+  EXPECT_EQ(view1.first.data, view2.first.data);
+  EXPECT_EQ(view1.first.count, view2.first.count);
+  EXPECT_EQ(view1.second.data, view2.second.data);
+  EXPECT_EQ(view1.second.count, view2.second.count);
+
+  // Available unchanged after multiple peeks
+  EXPECT_EQ(buffer.available(), 512);
+}

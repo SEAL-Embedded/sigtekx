@@ -768,6 +768,63 @@ TEST_F(StreamingExecutorTest, ComponentTimingEnabled) {
  * With overlap, one submit() can process multiple frames. Verify that
  * timing is reported for the last processed frame.
  */
+// ============================================================================
+//  Zero-Copy Ring Buffer Tests
+// ============================================================================
+
+/**
+ * @brief Test zero-copy H2D with high overlap that forces ring buffer wraparound.
+ *
+ * With overlap=0.875, hop_size = nfft/8 = 128 (for nfft=1024).
+ * Ring buffer capacity = 3*nfft = 3072.
+ * Wraparound occurs roughly every 3*nfft/hop_size = 24 frames.
+ * Processing 30 frames ensures at least one wraparound cycle completes,
+ * exercising the two-span DMA path in the zero-copy H2D transfer.
+ */
+TEST_F(StreamingExecutorTest, ZeroCopyWraparoundCorrectness) {
+  config_.nfft = 1024;
+  config_.channels = 2;
+  config_.overlap = 0.875f;  // High overlap → hop_size=128, frequent wraparound
+  config_.pinned_buffer_count = 2;
+  config_.stream_count = 3;
+
+  StreamingExecutor executor;
+  PipelineBuilder builder;
+  auto stages = builder.with_config(StageConfig{config_.nfft, config_.channels})
+                    .add_window(StageConfig::WindowType::HANN)
+                    .add_fft()
+                    .add_magnitude()
+                    .build();
+  executor.initialize(config_, std::move(stages));
+
+  const size_t input_size = config_.nfft * config_.channels;
+  const size_t output_size = config_.num_output_bins() * config_.channels;
+
+  // Process 30 submits — each submit produces ~8 frames (nfft/hop_size)
+  // Total ~240 frames, multiple wraparound cycles
+  for (int i = 0; i < 30; ++i) {
+    auto input = generate_sinusoid(input_size, 100.0f + i * 5.0f);
+    std::vector<float> output(output_size);
+
+    EXPECT_NO_THROW(executor.submit(input.data(), output.data(), input_size));
+
+    // Verify every frame produces non-zero output (no DMA corruption)
+    bool has_nonzero = false;
+    for (size_t j = 0; j < output_size; ++j) {
+      if (output[j] > 1e-6f) {
+        has_nonzero = true;
+        break;
+      }
+    }
+    EXPECT_TRUE(has_nonzero) << "Frame " << i << " has zero output (possible DMA corruption)";
+  }
+
+  auto stats = executor.get_stats();
+  // With overlap=0.875 (hop_size=128), each submit of 1024 samples produces ~8 frames
+  // 30 submits × ~8 frames/submit ≈ 240 frames
+  EXPECT_GE(stats.frames_processed, 200);
+}
+
 TEST_F(StreamingExecutorTest, ComponentTimingWithOverlap) {
   config_.nfft = 1024;
   config_.channels = 1;
