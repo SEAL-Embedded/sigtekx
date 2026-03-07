@@ -32,7 +32,7 @@ This guide is for developers contributing to sigtekx. It covers the CLI-based de
 
 ```bash
 # Clone the repository with submodules
-git clone --recursive https://github.com/your-org/sigtekx.git
+git clone --recursive https://github.com/SEAL-Embedded/sigtekx.git
 cd sigtekx
 
 # One-command setup using CLI
@@ -46,17 +46,17 @@ cd sigtekx
 
 ```powershell
 # Clone the repository
-git clone --recursive https://github.com/your-org/sigtekx.git
+git clone --recursive https://github.com/SEAL-Embedded/sigtekx.git
 cd sigtekx
 
 # Start enhanced development shell
-.\scripts\open_dev_pwsh.ps1
+.\scripts\init_pwsh.ps1
 
 # One-command setup using alias
-sigxsetup
+sigx setup
 
 # Verify environment
-sigxdoctor
+sigx doctor
 ```
 
 ## CLI Development Workflow
@@ -102,7 +102,7 @@ python -m sigtekx.benchmarks.accuracy                   # Numerical validation s
 
 ### Windows Development Shell
 
-The enhanced development shell (`.\scripts\open_dev_pwsh.ps1`) provides:
+The enhanced development shell (`.\scripts\init_pwsh.ps1`) provides:
 
 - **Automatic MSVC Setup**: Configures 64-bit Visual Studio tools
 - **Conda Integration**: Activates sigtekx environment
@@ -111,22 +111,22 @@ The enhanced development shell (`.\scripts\open_dev_pwsh.ps1`) provides:
 
 ```powershell
 # Start development shell (one-time per session)
-.\scripts\open_dev_pwsh.ps1
+.\scripts\init_pwsh.ps1
 
 # Available aliases for essential CLI commands:
 sigx<command>        # Main CLI alias
-ib                    # Build (sigxbuild)
+ib                    # Build (sigx build)
 ir                    # Rebuild (sigxrebuild)
 
 # Code quality shortcuts
-ifmt                  # Format code (sigxformat)
-ilint                 # Lint code (sigxlint)
+ifmt                  # Format code (sigx format)
+ilint                 # Lint code (sigx lint)
 
 # Development utilities
 iprof nsys latency    # Profile with Nsight
 imon                  # Monitor GPU (sigxmonitor)
 iinfo                 # System info (sigxinfo)
-iclean                # Clean (sigxclean)
+iclean                # Clean (sigx clean)
 ilearn                # Learning guides (sigxlearn)
 
 # For research workflows, use direct tools:
@@ -141,32 +141,32 @@ ilearn                # Learning guides (sigxlearn)
 ```bash
 # Start development session
 cd sigtekx
-sigxdoctor                      # Check environment health
+sigx doctor                      # Check environment health
 
 # Make changes to code...
 
 # Verify changes with essential CLI tools
-sigxformat && sigxlint         # Format and lint code
-sigxtypecheck                   # Type check Python code
-sigxbuild                       # Build with changes
+sigx format && sigx lint         # Format and lint code
+sigx typecheck                   # Type check Python code
+sigx build                       # Build with changes
 pytest tests/ -v                 # Run tests
 
 # Performance validation with direct tools
 python benchmarks/run_latency.py experiment=baseline  # Performance validation
-sigxprofile nsys latency        # Detailed profiling
+sxp nsys latency        # Detailed profiling
 ```
 
 **Windows Enhanced Shell (Optional):**
 ```powershell
 # Start development session with enhanced aliases
-.\scripts\open_dev_pwsh.ps1     # Enhanced shell with aliases
-sigxdoctor                     # Check environment health
+.\scripts\init_pwsh.ps1     # Enhanced shell with aliases
+sigx doctor                     # Check environment health
 
 # Make changes to code...
 
 # Verify changes (using aliases)
 ifmt && ilint                  # Format and lint code
-sigxtypecheck                 # Type check Python code
+sigx typecheck                 # Type check Python code
 ib                             # Build with changes
 pytest tests/ -v               # Run tests
 
@@ -178,34 +178,26 @@ iprof nsys latency            # Detailed profiling (alias)
 ## Project Structure
 
 ```
-sigtekx-lib/
-├── bindings/                   # C++/Python binding configurations
-│   └── bindings.cpp              # pybind11 entrypoint
-├── include/                    # C++ public headers
-│   └── sigtekx/                # Main library header directory
-│       ├── cuda_wrappers.hpp     # RAII wrappers for CUDA/cuFFT resources
-│       ├── processing_stage.hpp  # Abstract interface for processing stages
-│       └── research_engine.hpp   # Public C++ API for the research engine
-├── src/                        # C++ source code implementations
-│   ├── ops_fft.cu                # CUDA kernels for windowing and magnitude calculations
-│   ├── processing_stage.cpp      # Implementations for concrete processing stages
-│   └── research_engine.cpp       # ResearchEngine implementation details
-├── tests/                      # C++ unit tests
-├── python/                     # Python package source and tests
-│   ├── src/                    # Source code for the Python package
-│   │   └── sigtekx/        # The main Python package
-│   │       ├── benchmarks/       # Performance benchmarking tools
-│   │       ├── config/           # Configuration management
-│   │       ├── core/             # Core Python logic wrapping the C++ library
-│   │       ├── stages/           # Python representations of processing stages
-│   │       ├── testing/          # Utilities for testing the Python code
-│   │       └── utils/            # Utility functions
-│   └── tests/                  # Python unit and integration tests
-├── scripts/                    # Command-line interface and utility scripts
-│   ├── cli.ps1                   # PowerShell CLI script for Windows
-│   ├── cli.sh                    # Bash CLI script for Linux/macOS
-│   └── open_dev_pwsh.ps1         # Enhanced Windows development shell
-└── docs/                       # Project documentation
+sigtekx/
+├── cpp/                        # C++ backend
+│   ├── include/sigtekx/          # Public C++ headers
+│   ├── src/                      # C++ source and CUDA kernels
+│   ├── bindings/                 # pybind11 bindings
+│   └── tests/                    # C++ unit tests (Google Test)
+├── src/sigtekx/                # Python package
+│   ├── core/                     # Engine API and bindings
+│   ├── config/                   # Pydantic configuration models
+│   ├── benchmarks/               # Benchmark framework
+│   └── utils/                    # Utilities (signals, device, logging)
+├── tests/                      # Python tests (pytest)
+├── benchmarks/                 # Benchmark entry-point scripts
+├── experiments/                # Research experiments and Hydra configs
+├── scripts/                    # Development tooling
+│   ├── cli.ps1                   # PowerShell CLI (Windows)
+│   ├── cli.sh                    # Bash CLI (Linux/macOS)
+│   └── init_pwsh.ps1             # Enhanced Windows development shell
+├── docs/                       # Documentation
+└── environments/               # Conda environment specs
 ```
 
 ## Architecture Overview
@@ -241,33 +233,33 @@ sigtekx-lib/
 **All Platforms:**
 ```bash
 # Clean build
-sigxclean
-sigxbuild
+sigx clean
+sigx build
 
 # Debug build
-sigxbuild -Debug
+sigx build -Debug
 
 # Release build (default)
-sigxbuild -Release
+sigx build -Release
 
 # Verbose build with all output
-sigxbuild -Verbose
+sigx build -Verbose
 
 # Build without NVTX profiling
-sigxbuild -NoNvtx
+sigx build -NoNvtx
 ```
 
 **Windows Enhanced Shell (Optional Aliases):**
 ```powershell
 # Start enhanced shell for aliases
-.\scripts\open_dev_pwsh.ps1
+.\scripts\init_pwsh.ps1
 
 # Clean build using aliases
 iclean
-ib                    # or 'sigxbuild'
+ib                    # or 'sigx build'
 
 # Debug build
-sigxbuild -Debug
+sigx build -Debug
 
 # Verbose build
 ib -Verbose
@@ -455,7 +447,7 @@ class TestEngine:
 **Environment Debugging:**
 ```bash
 # All platforms
-sigxdoctor                       # Comprehensive environment check
+sigx doctor                       # Comprehensive environment check
 $env:SIGX_LOG_LEVEL="DEBUG"      # Enable debug logging (Windows)
 export SIGX_LOG_LEVEL=DEBUG      # Enable debug logging (Linux/WSL)
 ```
@@ -463,11 +455,11 @@ export SIGX_LOG_LEVEL=DEBUG      # Enable debug logging (Linux/WSL)
 **Build Debugging:**
 ```bash
 # All platforms
-sigxbuild -Debug                 # Debug build
-sigxbuild -Verbose               # Verbose build output
+sigx build -Debug                 # Debug build
+sigx build -Verbose               # Verbose build output
 
 # Windows enhanced shell (optional aliases)
-sigxbuild -Debug         # Debug build
+sigx build -Debug         # Debug build
 ib -Verbose              # Verbose build output
 ```
 
@@ -481,7 +473,7 @@ export CUDA_LAUNCH_BLOCKING=1
 cuda-memcheck python your_script.py
 
 # Profile with Nsight (both platforms)
-sigxprofile nsys latency                   # Essential CLI
+sxp nsys latency                   # Essential CLI
 iprof nsys latency                           # Windows alias (optional)
 ```
 
@@ -489,15 +481,15 @@ iprof nsys latency                           # Windows alias (optional)
 
 1. **CLI Not Found**
    - Linux: `chmod +x scripts/cli.sh`
-   - Windows: Use `.\scripts\open_dev_pwsh.ps1` for enhanced shell
+   - Windows: Use `.\scripts\init_pwsh.ps1` for enhanced shell
 
 2. **Build Failures**
-   - Run `sigxdoctor` first
+   - Run `sigx doctor` first
    - Check CUDA toolkit installation
    - Verify conda environment activation
 
 3. **Import Errors**
-   - Rebuild: `sigxclean` then `sigxbuild`
+   - Rebuild: `sigx clean` then `sigx build`
    - Check Python path in conda environment
 
 ## Contributing
@@ -507,13 +499,13 @@ iprof nsys latency                           # Windows alias (optional)
 1. **Setup Development Environment**
    ```bash
    # All platforms
-   git clone --recursive https://github.com/your-org/sigtekx.git
+   git clone --recursive https://github.com/SEAL-Embedded/sigtekx.git
    cd sigtekx
-   sigxsetup
+   sigx setup
 
    # Optional: Windows enhanced shell with aliases
-   .\scripts\open_dev_pwsh.ps1
-   sigxsetup
+   .\scripts\init_pwsh.ps1
+   sigx setup
    ```
 
 2. **Create Feature Branch**
@@ -524,14 +516,14 @@ iprof nsys latency                           # Windows alias (optional)
 3. **Development Loop**
    ```bash
    # All platforms - Essential CLI
-   sigxformat && sigxlint        # Format and lint code
-   sigxtypecheck                  # Type check Python code
-   sigxbuild                      # Build changes
+   sigx format && sigx lint        # Format and lint code
+   sigx typecheck                  # Type check Python code
+   sigx build                      # Build changes
    pytest tests/ -v               # Run tests
 
    # Windows enhanced shell (optional aliases)
    ifmt && ilint                  # Format and lint code
-   sigxtypecheck                 # Type check Python code
+   sigx typecheck                 # Type check Python code
    ib                            # Build changes
    pytest tests/ -v              # Run tests
    ```
@@ -551,14 +543,14 @@ The CLI provides aggregated checks for code quality:
 
 ```bash
 # All platforms - Essential CLI
-sigxformat -Check                # Verify C++ formatting
-sigxlint                         # Lint Python and C++ code
-sigxtypecheck                    # Type check Python code
+sigx format -Check                # Verify C++ formatting
+sigx lint                         # Lint Python and C++ code
+sigx typecheck                    # Type check Python code
 
 # Windows enhanced shell (optional aliases)
 ifmt -Check                      # Verify C++ formatting
 ilint                            # Lint code
-sigxtypecheck                   # Type check
+sigx typecheck                   # Type check
 ```
 
 This runs:
@@ -588,8 +580,8 @@ python benchmarks/run_latency.py experiment=baseline  # Performance regression c
 
 ```bash
 # All platforms - Essential CLI
-sigxclean -All                  # Clean everything
-sigxbuild                       # Fresh release build
+sigx clean -All                  # Clean everything
+sigx build                       # Fresh release build
 pytest tests/ -v                 # Verify build
 
 # Windows enhanced shell (optional aliases)
@@ -618,10 +610,10 @@ Override them in CI or custom setups if you need different paths.
 ## Resources
 
 ### Essential CLI Commands
-- **CLI Help**: `sigxhelp`
-- **Environment Check**: `sigxdoctor`
-- **C++ Benchmarking**: `ionoc help`
-- **Python Profiling**: `iprof --help`
+- **CLI Help**: `sigx help`
+- **Environment Check**: `sigx doctor`
+- **C++ Benchmarking**: `sigxc help`
+- **Python Profiling**: `sxp --help`
 
 ### Direct Tools Documentation
 - [Hydra Configuration](https://hydra.cc/) - Experiment configuration management

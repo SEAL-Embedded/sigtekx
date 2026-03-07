@@ -1,6 +1,6 @@
 # Complete Ionosphere Experiment Workflow Guide
 
-This guide walks through the supported path for running end-to-end ionosphere studies. The workflow relies on direct Python entry points for experimentation and Snakemake for orchestration. Use the `iono` CLI only for environment setup, formatting, linting, builds, profiling, and other maintenance tasks.
+This guide walks through the supported path for running end-to-end ionosphere studies. The workflow relies on direct Python entry points for experimentation and Snakemake for orchestration. Use the `sigx` CLI only for environment setup, formatting, linting, builds, profiling, and other maintenance tasks.
 
 **Note:** This guide uses the unified API (v0.9.3+). All experiment configurations use Hydra YAML files which are fully compatible with the new `EngineConfig`. For direct Python API usage, see `docs/guides/api-reference.md`.
 
@@ -63,7 +63,7 @@ python experiments/scripts/generate_report.py \
     --output artifacts/reports/final_report.html
 ```
 
-These commands respect the configuration defined in `experiments/conf/` and write all outputs under `artifacts/` (or the directory pointed to by `IONO_OUTPUT_ROOT`).
+These commands respect the configuration defined in `experiments/conf/` and write all outputs under `artifacts/` (or the directory pointed to by `SIGX_OUTPUT_ROOT`).
 
 ## Experiment Presets
 
@@ -153,4 +153,4 @@ Outputs are organised as follows:
 3. Iterate with targeted benchmark commands to explore alternative presets or overrides.
 4. Capture adjustments to experiment configs under version control for reproducibility.
 
-Need help? Review the output logs produced in `artifacts/logs/`, consult `docs/DEVELOPMENT.md` for debugging tips, or open an issue with the exact command and configuration details.
+Need help? Review the output logs produced in `artifacts/logs/`, consult `docs/guides/development.md` for debugging tips, or open an issue with the exact command and configuration details.

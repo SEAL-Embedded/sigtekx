@@ -6,7 +6,7 @@ This module reads the installed distribution metadata to avoid duplication.
 
 from importlib.metadata import PackageNotFoundError, version
 
-_NAME = "ionosense-hpc"
+_NAME = "sigtekx"
 
 # Start with a safe, default fallback version.
 __version__ = "0.0.0+local"

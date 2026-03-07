@@ -110,11 +110,11 @@ std::thread t2([&]{ exec.submit(data2, output2, size); });  // ❌ Undefined beh
 
 ### 2.1 Design Philosophy
 
-Ionosense HPC follows the **thread-compatible** design pattern, similar to industry-standard high-performance libraries:
+SigTekX follows the **thread-compatible** design pattern, similar to industry-standard high-performance libraries:
 
 | Library | Thread Safety Model |
 |---------|---------------------|
-| **Ionosense HPC** | Thread-compatible |
+| **SigTekX** | Thread-compatible |
 | `std::vector` | Thread-compatible |
 | Eigen | Thread-compatible |
 | cuBLAS | Thread-compatible (per-handle) |

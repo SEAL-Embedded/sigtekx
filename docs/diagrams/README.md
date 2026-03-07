@@ -32,7 +32,7 @@ Diagrams use a numbered naming scheme for logical ordering:
 
 | File | Layout | Type | Description |
 |------|--------|------|-------------|
-| `01_system_overview.d2` | elk | Overview | Platform overview with CLI tools (ionoc, iprof, iono dashboard), Streamlit, and system integrations |
+| `01_system_overview.d2` | elk | Overview | Platform overview with CLI tools (sigxc, sxp, sigx dashboard), Streamlit, and system integrations |
 
 ### Python Layer
 
@@ -40,7 +40,7 @@ Diagrams use a numbered naming scheme for logical ordering:
 |------|--------|------|-------------|
 | `02_py_structure.d2` | dagre | Package | Python package structure with executor bindings, benchmarks, config, utils, and GPU clock management |
 | `04_py_analysis.d2` | dagre | Component | Experiment and analysis architecture with Streamlit (PRIMARY) and Quarto (FUTURE) reporting layers |
-| `05_workflow_full.d2` | elk | Sequence | Complete experimental workflow including ionoc, iprof, Streamlit dashboard, and GPU clock locking |
+| `05_workflow_full.d2` | elk | Sequence | Complete experimental workflow including sigxc, sxp, Streamlit dashboard, and GPU clock locking |
 
 ### C++ Architecture
 

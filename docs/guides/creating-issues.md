@@ -1,4 +1,4 @@
-# Creating Issues for Ionosense-HPC
+# Creating Issues for SigTekX
 
 This guide helps you create high-quality, actionable GitHub issues for the sigtekx project. Whether you're reporting bugs, requesting features, or proposing improvements, following these guidelines ensures your issue is clear, implementable, and properly categorized.
 
@@ -20,9 +20,9 @@ This guide helps you create high-quality, actionable GitHub issues for the sigte
 
 ## Project Context
 
-**Ionosense-HPC** is a high-performance CUDA FFT signal processing library with:
+**SigTekX** is a high-performance CUDA FFT signal processing library with:
 - C++17/CUDA backend (`cpp/`)
-- Python interface (`python/src/sigtekx/`)
+- Python interface (`src/sigtekx/`)
 - Research-grade benchmarking infrastructure
 - Focus on reproducible engineering and RSE standards
 
@@ -164,8 +164,8 @@ Break down the work into specific, actionable tasks.
 
 - [ ] Open `scripts/cli.ps1` and locate `Invoke-Test` function (~line 109)
 - [ ] Remove line 117: `Write-Status "Running tests..."`
-- [ ] Test `iono test python` - should show ONLY "Running Python tests..."
-- [ ] Test `iono test cpp` - should show ONLY "Running C++ tests..."
+- [ ] Test `sigx test python` - should show ONLY "Running Python tests..."
+- [ ] Test `sigx test cpp` - should show ONLY "Running C++ tests..."
 - [ ] Test `iono test` - should show ONLY "Running all tests..."
 - [ ] Verify success/error messages still appear correctly
 - [ ] Commit with message: `fix(cli): remove redundant test output message`
@@ -456,15 +456,6 @@ Please create an issue following docs/CREATING_ISSUES.md with:
 - Appropriate labels
 ```
 
-## Where to Put This File
-
-This file should be located at: **`docs/CREATING_ISSUES.md`**
-
-Referenced from:
-- `CONTRIBUTING.md` - "See [Creating Issues Guide](docs/CREATING_ISSUES.md)"
-- `README.md` - Link in "Contributing" section
-- `.github/ISSUE_TEMPLATE/config.yml` - Add link to guidelines
-
 ## Examples from the Project
 
 ### Good Issue Example 1: Bug Fix
@@ -580,7 +571,7 @@ Remove line 117...
 ```
 - [ ] Open scripts/cli.ps1, locate Invoke-Test function
 - [ ] Remove line 117: Write-Status "Running tests..."
-- [ ] Test with: iono test python
+- [ ] Test with: sigx test python
 - [ ] Verify output shows only "Running Python tests..."
 ```
 

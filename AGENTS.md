@@ -8,8 +8,8 @@
 ## Repository Snapshot
 - Domain: CUDA accelerated FFT and benchmarking suite exposed to Python for ionospheric research.
 - Primary languages: C++17 and CUDA in `cpp/`, Python 3.11+ package under `src/`.
-- Command interface: cross platform CLI wrappers in `scripts/cli.sh` and `scripts/cli.ps1`, plus enhanced PowerShell shell `scripts/open_dev_pwsh.ps1`.
-- Key docs: `README.md`, `PROJECT_STRUCTURE.md`, `docs/DEVELOPMENT.md`, `CONTRIBUTING.md`.
+- Command interface: cross platform CLI wrappers in `scripts/cli.sh` and `scripts/cli.ps1`, plus enhanced PowerShell shell `scripts/init_pwsh.ps1`.
+- Key docs: `README.md`, `docs/architecture/project-structure.md`, `docs/guides/development.md`, `CONTRIBUTING.md`.
 
 ## Standards and Guardrails
 ### RSE and Requirements Engineering
@@ -33,7 +33,7 @@
 ### Code Quality Gates
 - Python: `ruff` linting (see `pyproject.toml`), `mypy` strict type checks, pytest with coverage at least 85 percent.
 - C++ and CUDA: `clang-format` (Google style), `clang-tidy` via CLI, CTest presets managed by CMake.
-- Use `./scripts/cli.sh check` or `iono check` (Windows shell) to run the default convergence of format, lint, typecheck, and quick tests.
+- Use `./scripts/cli.sh check` or `sigx check` (Windows shell) to run the default convergence of format, lint, typecheck, and quick tests.
 - Never commit failing lint, format, or typecheck results; sync with CI expectations defined in `.github/` workflows.
 
 ## Operational Playbook
@@ -86,10 +86,10 @@
 - When introducing new public APIs, update stubs, type hints, and documentation simultaneously.
 
 ## Pending Knowledge and TODOs
-- Local development shell recipe: use the non-interactive bootstrap above when automation is needed; interactive shell remains `.\\scripts\\open_dev_pwsh.ps1` for manual sessions.
+- Local development shell recipe: use the non-interactive bootstrap above when automation is needed; interactive shell remains `.\\scripts\\init_pwsh.ps1` for manual sessions.
 - Track further agent specific friction points and document mitigation strategies here.
 
 ## References
-- Internal docs: `docs/DEVELOPMENT.md`, `docs/BENCHMARKS.md`.
+- Internal docs: `docs/guides/development.md`, `docs/benchmarking/experiment-guide.md`.
 - Standards primers: RSE UK guidelines, IEEE Std 1074 2006, IEEE Std 754 2019.
 - External tooling docs: CUDA Programming Guide, CUDA Best Practices Guide, pybind11 docs, pytest, ruff, mypy.
