@@ -5,9 +5,17 @@ All notable changes to the SigTekX project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.9.5] - 2026-03-03
 
 ### Performance
+
+- **Phase 1.1: Zero-Copy H2D Ring Buffer** - Eliminated staging extraction in `StreamingExecutor`
+  - **What changed:** H2D transfers now go directly from pinned ring buffer memory via `peek_frame()` — no intermediate `h_staging` copy on the hot path
+  - **Implementation:** Added `RingBuffer::peek_frame()` returning `FrameView` with zero-copy contiguous/wraparound span access; `advance()` deferred until after D2H sync to keep peeked pointers valid during DMA; removed `h_batch_staging_` buffer entirely
+  - **Performance gain:** Eliminates ~10-20µs per-frame staging extraction overhead (1× memcpy × channels removed from critical path)
+  - **Correctness:** Wraparound frames handled via contiguous memory guarantee at ring buffer push time; `peek_frame()` is idempotent
+  - **Testing:** 7 new `peek_frame` unit tests (contiguous, wraparound, underflow, idempotent) + executor wraparound correctness test; 199 C++ and 392 Python tests pass
+  - **Roadmap alignment:** Phase 1 zero-copy foundation for further pipeline work
 
 - **Phase 0: Zero-Copy Python Bindings** - Implemented buffer pool optimization for `process()` returns
   - **What changed:** Python `process()` now returns zero-copy views instead of copies

@@ -135,7 +135,7 @@ Host Memory                    Device Memory (per buffer)
 
 ### 2.4 Performance Characteristics
 
-**Latency Benchmark Results (NFFT=2048, channels=2, RTX 3090 Ti):**
+**Latency Benchmark Results (NFFT=2048, channels=2, RTX 3090 Ti — pre-Phase 1.1 baseline):**
 ```
 Mean Latency:    86.79 µs
 P50 Latency:     89.38 µs
@@ -248,19 +248,19 @@ This enables:
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│ StreamingExecutor Data Flow                                                  │
+│ StreamingExecutor Data Flow (Phase 1.1 zero-copy)                            │
 └──────────────────────────────────────────────────────────────────────────────┘
 
-┌────────────┐   Per-Channel   ┌──────────────┐   Extract    ┌──────────────┐
-│   input    │     Push         │ ring_buffer  │   Frames     │ h_staging    │
-│  (host)    │─────────────────>│ [per channel]│─────────────>│ [nfft × ch]  │
-└────────────┘   memcpy × ch    └──────────────┘   memcpy×ch  └──────────────┘
+┌────────────┐   Per-Channel   ┌──────────────┐  peek_frame()  ┌──────────────┐
+│   input    │     Push         │ ring_buffer  │  zero-copy     │  d_input     │
+│  (host)    │─────────────────>│ [per channel]│───────────────>│  (device)    │
+└────────────┘   memcpy × ch    └──────────────┘  direct DMA    └──────────────┘
                                        │                              │
-                                       │ advance(hop_size)            │ H2D
-                                       ▼                              ▼
-┌────────────┐      D2H         ┌──────────────┐   Compute    ┌──────────────┐
-│   output   │<─────────────────│ d_pipeline   │<─────────────│  d_input     │
-│  (host)    │   cudaMemcpy     │  (device)    │ FFT/Window   │  (device)    │
+                                       │ advance(hop_size)            │ Compute
+                                       │ after D2H sync               ▼
+┌────────────┐      D2H         ┌──────────────┐   FFT/Window  ┌──────────────┐
+│   output   │<─────────────────│ d_output     │<─────────────│  d_pipeline  │
+│  (host)    │   cudaMemcpy     │  (device)    │              │  (device)    │
 └────────────┘                  └──────────────┘              └──────────────┘
      ▲
      │
@@ -270,20 +270,20 @@ This enables:
 **Flow Steps:**
 1. **submit()** receives `input` with arbitrary size
 2. **Per-Channel Push:** Split input by channel, push to ring_buffers (memcpy × channels)
-3. **Frame Extraction Loop (WHILE):**
+3. **Frame Check Loop (WHILE):**
    - Check if all channels have ≥ NFFT samples
-   - Extract NFFT samples per channel → `h_staging` (memcpy × channels)
-   - Advance ring buffer read pointers by hop_size
-4. **H2D Transfer:** Copy `h_staging → d_input` (single memcpy)
+   - **peek_frame():** zero-copy span into ring buffer pinned memory (no copy)
+4. **H2D Transfer:** `cudaMemcpyAsync` directly from ring buffer span → `d_input` (no staging hop)
 5. **Compute Pipeline:** Window → FFT → Magnitude
 6. **D2H Transfer:** Copy `d_output → output` (overwrites if multiple frames)
-7. **Repeat** step 3 until insufficient samples remain
-8. **Return** to caller with LAST frame's result
+7. **Advance** ring buffer read pointers by hop_size (after D2H sync)
+8. **Repeat** step 3 until insufficient samples remain
+9. **Return** to caller with LAST frame's result
 
 **Key Characteristics:**
-- Intermediate ring buffer storage (3× NFFT per channel overhead)
+- Ring buffers use pinned host memory; `peek_frame()` provides zero-copy views for direct GPU DMA
+- No staging buffer — H2D transfers go directly from ring buffer without an intermediate copy
 - **Multiple frames may be processed per `submit()` call** (drain ring buffers)
-- Each frame incurs ring buffer extraction overhead
 - Only the LAST frame's output is returned (others discarded)
 
 ### 3.4 Memory Layout
@@ -383,7 +383,7 @@ submit() called with 2048 new samples:
 
 ### 3.6 Performance Characteristics
 
-**Latency Benchmark Results (NFFT=2048, channels=2, RTX 3090 Ti):**
+**Latency Benchmark Results (NFFT=2048, channels=2, RTX 3090 Ti — pre-Phase 1.1 baseline):**
 ```
 Mean Latency:    122.25 µs  (+40% vs Batch)
 P50 Latency:     118.78 µs
@@ -396,7 +396,8 @@ CV:              14.26%
 ```
 
 **Performance Factors:**
-- ❌ **Ring buffer overhead:** 2× memcpy per frame per channel (~20-30 µs)
+- ❌ **Ring buffer push:** 1× memcpy per channel to write input into ring buffer (~8-12 µs)
+- ✅ **Zero-copy H2D:** `peek_frame()` DMA directly from pinned ring buffer — no staging extraction (Phase 1.1)
 - ❌ **Multiple frame processing:** While loop adds ~10-15 µs during warmup
 - ❌ **Per-channel loops:** Loop overhead × channels (~5 µs)
 - ❌ **Wraparound logic:** Conditional branches for circular buffer
@@ -409,16 +410,18 @@ BatchExecutor:      86.79 µs total
   Overhead:         ~6 µs (buffer selection, sync checks)
 
 StreamingExecutor:  122.25 µs total
-  CPU operations:   ~30 µs (ring push + extract + advance × channels)
+  CPU operations:   ~20 µs (ring push + zero-copy peek + advance × channels)
   GPU processing:   ~70 µs (H2D + compute + D2H - same as Batch!)
   Overhead:         ~15 µs (ring logic, while loop, multi-frame)
   Multiple frames:  +7 µs (if 2 frames processed per submit)
+  Note: Phase 1.1 eliminated staging extraction (~10 µs saved in CPU ops);
+        overall latency is equivalent to pre-Phase 1.1 baseline above.
 
 Performance gap:   +35.46 µs (40% slower)
-  Ring buffer ops:  +20 µs (57%)
+  Ring buffer push: +10 µs (28%)
   Multi-frame:      +7 µs (20%)
   Per-channel:      +5 µs (14%)
-  Misc overhead:    +3 µs (9%)
+  Misc overhead:    +13 µs (37%)
 ```
 
 ### 3.7 Ideal Use Cases

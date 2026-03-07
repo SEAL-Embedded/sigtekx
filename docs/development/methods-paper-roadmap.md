@@ -1,7 +1,7 @@
 # SigTekX Methods Paper Development Roadmap
 
-**Last Updated**: 2025-12-07
-**Status**: Architecture Planning Phase
+**Last Updated**: 2026-03-03
+**Status**: Phase 1 In Progress (Task 1.1 complete)
 **Target**: Novel, custom, and fast real-time signal processing in Python
 
 ---
@@ -111,11 +111,11 @@
 
 ### Critical Gaps ❌
 
-1. **Memory Architecture (28% performance overhead)**
-   - `h_batch_staging_` buffer is unnecessary technical debt
-   - Adds 10µs memcpy (H2H) before H2D transfer
-   - StreamingExecutor: 122µs vs BatchExecutor: 87µs (+35µs gap)
-   - **Impact**: Wastes 28% of performance budget
+1. ~~**Memory Architecture (28% performance overhead)**~~ ✅ **Resolved in Phase 1.1**
+   - ~~`h_batch_staging_` buffer is unnecessary technical debt~~
+   - ~~Adds 10µs memcpy (H2H) before H2D transfer~~
+   - ~~StreamingExecutor: 122µs vs BatchExecutor: 87µs (+35µs gap)~~
+   - **Resolution**: `peek_frame()` zero-copy H2D eliminates staging extraction overhead (v0.9.5)
 
 2. **Custom Stage Support (MISSING - Core Novelty)**
    - No `CustomStage` C++ class
@@ -231,27 +231,22 @@ Some operations straddle both planes:
 
 **Ordering Principle**: Build foundation → add functionality → optimize → validate
 
-### Phase 1: Foundation (Memory Architecture) - v0.9.6
+### Phase 1: Foundation (Memory Architecture) - v0.9.5
 
 **Goal**: Eliminate performance overhead before adding custom stages
-**Duration**: 1-2 weeks
 **Prevents regression**: If we add custom stages before fixing memory, we'll optimize the wrong bottleneck
 
-#### Task 1.1: Zero-Copy Ring Buffer Extraction
+#### Task 1.1: Zero-Copy Ring Buffer Extraction ✅ COMPLETE (v0.9.5)
 **File**: `cpp/src/executors/streaming_executor.cpp`
-**Action**:
-1. Remove `h_batch_staging_` buffer (line 137-139)
-2. Implement direct H2D from ring buffer memory
-3. Add `cudaStreamSynchronize()` before `advance()` (prevent DMA race)
+**Implemented**:
+- Removed `h_batch_staging_` buffer entirely
+- Added `RingBuffer::peek_frame()` returning `FrameView` with zero-copy span access
+- `advance()` deferred until after D2H sync to keep peeked pointers valid during DMA
+- Wraparound frames handled via contiguous memory guarantee at push time
 
-**Expected improvement**: 122µs → 114µs (-7%)
+**Result**: ~10-20µs staging extraction eliminated from hot path
 
-**Validation**:
-- Run `python benchmarks/run_latency.py +benchmark=profiling` before/after
-- Confirm <10µs improvement
-- Verify no accuracy regression (`run_accuracy.py`)
-
-**Risk**: Medium - requires careful sync management, wraparound edge case
+**Tests**: 7 new `peek_frame` unit tests + wraparound correctness test; 199 C++ / 392 Python tests pass
 
 #### Task 1.2: Per-Stage Timing Infrastructure
 **Files**:
@@ -919,7 +914,7 @@ RTF = Sample Rate / (FPS × Hop Size)
 
 | Venue | Focus | Deadline / Cadence | Gate Deliverables |
 |-------|-------|--------------------|-------------------|
-| [IEEE HPEC](https://ieee-hpec.org/call-for-papers/) | High-performance + embedded architectures | 14 Jul 2025 (extended “midnight AoE”) | Phase 1-4 benchmarks, split-plane diagrams, PCIe saturation metrics |
+| [IEEE HPEC](https://ieee-hpec.org/call-for-papers/) | High-performance + embedded architectures | Jul 2027 (target) | Phase 1-4 benchmarks, split-plane diagrams, PCIe saturation metrics |
 | [SC Workshops - PyHPC](https://sc24.supercomputing.org/program/workshops/) | Python in production HPC workflows | Align with SC camera-ready (~Sep) | Demo notebooks + control-plane decoupling story |
 | [JOSS](https://github.com/openjournals/joss) | Open-source software quality (docs, CI, tests, DOI) | Rolling review (2–4 weeks typical) | Tagged v1.0 release, CLI walkthroughs, reproducible config snapshots |
 | [Radio Science](https://en.wikipedia.org/wiki/Radio_Science) / [IEEE GRSL](https://www.ieeegrss.org/publications/geoscience-remote-sensing-letters/) | Applied geophysics / remote sensing letters | Rolling, but expect 8–12 week review loops | Ionosphere case study, anomaly catalog, field validation logs |
@@ -936,7 +931,7 @@ RTF = Sample Rate / (FPS × Hop Size)
 - PyHPC is the natural overflow channel if HPEC slots fill; the workshop focuses on taming Python overhead in HPC pipelines, which is exactly what the split-plane + Numba bridge demonstrates.
 - Because SC workshops often request concise 4-page write-ups plus live demos, emphasize the control-plane snapshots, Streamlit dashboards, and CLI ergonomics.
 - Prep actions:
-  1. Record a short screencast of the pipeline builder + `iono check` CLI to play during the live demo.
+  1. Record a short screencast of the pipeline builder + `sigx check` CLI to play during the live demo.
   2. Trim the HPEC manuscript into a workshop version that foregrounds developer experience (Numba, PyTorch, callbacks).
   3. Packaged conda environment + `scripts/cli.ps1 demo` target to ensure on-site reproducibility.
 
@@ -945,7 +940,7 @@ RTF = Sample Rate / (FPS × Hop Size)
 - Submission sequencing: cut a v1.0.0 release right after HPEC acceptance notifications, when Phase 4 benchmarks and documentation are frozen.
 - Prep actions:
   1. Assemble the lightweight `paper.md` with problem statement, statement of need, architecture overview, and example code blocks referencing the CLI workflow.
-  2. Ensure CI mirrors the “iono check” target (ruff, mypy, pytest, clang-tidy presets) so JOSS reviewers can reproduce the green badge without manual steps.
+  2. Ensure CI mirrors the “sigx check” target (ruff, mypy, pytest, clang-tidy presets) so JOSS reviewers can reproduce the green badge without manual steps.
   3. Link the documentation set (`README`, `PROJECT_STRUCTURE`, `docs/architecture/*`) inside the submission to satisfy JOSS’s documentation checklist.
 
 ### Domain validation — Radio Science or IEEE GRSL

@@ -32,7 +32,7 @@ Before contributing, ensure you have the development environment set up properly
 
 ```powershell
 # Clone the repository with submodules
-git clone --recursive https://github.com/your-org/sigtekx.git
+git clone --recursive https://github.com/SEAL-Embedded/sigtekx.git
 cd sigtekx
 
 # Start development shell (handles MSVC, conda activation, etc.)
@@ -110,52 +110,34 @@ sigx run <script.py>            # Run Python script with proper environment
 The development shell provides short aliases for common commands:
 
 ```powershell
-ib                              # iono build
-it                              # iono test
-itp                             # iono test python
-itc                             # iono test cpp
-ifmt                            # iono format
-ilint                           # iono lint
-iclean                          # iono clean
-iprof                           # iono profile
-ihelp                           # iono help
-ireload                         # Reload shell functions
+sb                              # sigx build
+st                              # sigx test
+sfmt                            # sigx format
+slint                           # sigx lint
+sxp nsys latency                # GPU profiling (Nsight Systems)
 ```
 
-## Team Structure
+## Project Areas
 
-The project is organized into **two primary development boards**:
+SigTekX spans four development areas:
 
-### Board 1: Platform & Core Systems
-**Teams:** Core Systems (Team 1) + MLOps (Team 2)
-
-- **Team 1**: C++/CUDA backend, processing pipeline, performance optimization
-- **Team 2**: Build systems, CI/CD, development tooling, environment management
-
-**Focus:** Infrastructure that enables research
-
-### Board 2: User Interface & Research
-**Teams:** Python Ecosystem (Team 3) + Research & Data Science (Team 4)
-
-- **Team 3**: Python API, configuration, benchmarks, testing
-- **Team 4**: Research experiments, analysis pipelines, data science
-
-**Focus:** User-facing capabilities and scientific workflows
-
-See the [Project Boards](https://github.com/your-org/sigtekx/projects) for active work items.
+- **C++/CUDA Core**: Backend processing pipeline, CUDA kernels, performance optimization
+- **Infrastructure**: Build system (CMake), development CLI, environment management
+- **Python API**: Engine interface, Pydantic configuration, benchmarks, testing
+- **Research**: Experiment configurations (Hydra), analysis pipelines, visualization
 
 ## How to Contribute
 
 ### Types of Contributions
 
-#### 1. Bug Reports (All Teams)
+#### 1. Bug Reports
 - Use the GitHub issue tracker
 - Check if the issue already exists
-- Run diagnostics: `iono doctor`
+- Run diagnostics: `sigx doctor`
 - Provide minimal reproducible example
 - Include full error output
 
-#### 2. Bug Fixes (All Teams)
+#### 2. Bug Fixes
 - Reference the issue number in your PR
 - Include tests that verify the fix
 - Update documentation if needed
@@ -163,37 +145,36 @@ See the [Project Boards](https://github.com/your-org/sigtekx/projects) for activ
 
 #### 3. New Features
 
-**Team 1 (C++/CUDA):**
+**C++/CUDA:**
 - Discuss major architecture changes first
 - Follow RAII patterns for resource management
 - Include performance benchmarks
 - Update Python bindings if needed
 
-**Team 2 (Infrastructure):**
+**Infrastructure:**
 - Test on clean environment
 - Update documentation for new workflows
 - Consider cross-platform implications
-- Verify CI/CD integration
 
-**Team 3 (Python API):**
+**Python API:**
 - Include comprehensive tests
 - Add type hints for all public APIs
 - Update documentation and examples
 - Follow Pydantic patterns for configuration
 
-**Team 4 (Research):**
+**Research:**
 - Document experiment configurations
 - Include analysis scripts
 - Ensure reproducibility (seeds, versioning)
 - Share results in MLflow
 
-#### 4. Performance Improvements (Teams 1, 3)
+#### 4. Performance Improvements
 - Profile before and after changes
-- Use `iono profile` for GPU profiling
+- Use `sxp` for GPU profiling
 - Document optimization techniques
 - Ensure no accuracy regressions
 
-#### 5. Documentation (All Teams)
+#### 5. Documentation
 - Keep code examples up to date
 - Test all command-line examples
 - Update architecture diagrams if needed
@@ -207,7 +188,7 @@ See the [Project Boards](https://github.com/your-org/sigtekx/projects) for activ
 # Fork the repository on GitHub, then:
 git clone https://github.com/YOUR_USERNAME/sigtekx.git
 cd sigtekx
-git remote add upstream https://github.com/original/sigtekx.git
+git remote add upstream https://github.com/SEAL-Embedded/sigtekx.git
 
 # Setup development environment
 .\scripts\init_pwsh.ps1 -Interactive
@@ -223,11 +204,9 @@ git fetch upstream
 git merge upstream/main
 
 # Create feature branch following conventions:
-git checkout -b feat/team-X/your-feature-name      # For features
-git checkout -b fix/team-X/issue-number-description  # For bugs
-git checkout -b docs/team-X/documentation-update    # For docs
-
-# Team prefixes: team-1 (C++), team-2 (infra), team-3 (python), team-4 (research)
+git checkout -b feat/your-feature-name      # For features
+git checkout -b fix/issue-number-description  # For bugs
+git checkout -b docs/documentation-update    # For docs
 ```
 
 ### 3. Development Loop
@@ -239,17 +218,17 @@ git checkout -b docs/team-X/documentation-update    # For docs
 sb                              # Quick build
 st                              # Run all tests
 
-# For C++ work (Team 1):
+# For C++ work:
 sigx build --debug              # Debug build for development
 st cpp                          # C++ tests only
 sxp nsys latency                # Profile performance
 
-# For Python work (Team 3):
+# For Python work:
 st python                       # Python tests only
 slint --fix                     # Fix lint issues
 sigx test --coverage            # Check coverage
 
-# For Research work (Team 4):
+# For research work:
 python benchmarks/run_latency.py experiment=baseline +benchmark=latency
 sigx ui                         # View results in MLflow
 ```
@@ -296,11 +275,11 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 - `ci`: CI/CD
 - `chore`: Maintenance
 
-**Scopes:** `team-1`, `team-2`, `team-3`, `team-4`, `core`, `api`, `benchmarks`, `cli`, `docs`
+**Scopes:** `core`, `api`, `benchmarks`, `cli`, `docs`, `build`, `tests`
 
 **Example:**
 ```bash
-git commit -m "feat(team-3): add real-time latency benchmark
+git commit -m "feat(benchmarks): add real-time latency benchmark
 
 - Implements sub-millisecond latency measurement
 - Adds deadline miss tracking
@@ -312,19 +291,19 @@ Closes #123"
 ### 6. Push and Create PR
 
 ```powershell
-git push origin feat/team-X/your-feature-name
+git push origin feat/your-feature-name
 ```
 
 Then create a Pull Request on GitHub.
 
 ## Style Guidelines
 
-### Python Style (Teams 3, 4)
+### Python Style
 
 - **PEP 8** with 100-character line limit
 - **Type hints** required for all public APIs
 - **Docstrings** (Google style) for all public functions/classes
-- **Formatting**: Enforced by `ruff` (run `iono lint --fix`)
+- **Formatting**: Enforced by `ruff` (run `sigx lint --fix`)
 
 ```python
 def process_signal(
@@ -349,10 +328,10 @@ def process_signal(
     # Implementation
 ```
 
-### C++ Style (Team 1)
+### C++ Style
 
 - **Google C++ Style Guide**
-- **Formatting**: Enforced by `clang-format` (run `iono format`)
+- **Formatting**: Enforced by `clang-format` (run `sigx format`)
 - **Naming**: `snake_case` for functions/variables, `CamelCase` for classes
 - **RAII**: Use smart pointers, avoid manual memory management
 - **Move semantics**: Delete copy, default move for resource-owning classes
@@ -374,7 +353,7 @@ output = executor.process(input_data)
 stats = executor.get_stats()
 ```
 
-### Configuration Style (Team 4)
+### Configuration Style
 
 Use Hydra YAML for experiment configurations:
 
@@ -405,15 +384,15 @@ benchmark:
 ### Running Tests
 
 ```powershell
-iono test                       # All tests
-iono test python                # Python only
-iono test cpp                   # C++ only
-iono test --coverage            # With coverage report
-iono test --verbose             # Verbose output
-iono test -Pattern "test_name"  # Specific test pattern
+sigx test                       # All tests
+sigx test python                # Python only
+sigx test cpp                   # C++ only
+sigx test --coverage            # With coverage report
+sigx test --verbose             # Verbose output
+sigx test -Pattern "test_name"  # Specific test pattern
 ```
 
-### Test Structure (Teams 3, 4)
+### Test Structure
 
 ```python
 import pytest
@@ -456,7 +435,7 @@ class TestEngine:
         assert output.shape == (1, nfft // 2 + 1)
 ```
 
-### Performance Tests (Teams 1, 3)
+### Performance Tests
 
 ```python
 def test_latency_requirement():
@@ -480,9 +459,9 @@ def test_latency_requirement():
     assert p99_latency < 200, f"P99 latency {p99_latency:.1f}μs exceeds 200μs"
 ```
 
-### C++ Tests (Team 1)
+### C++ Tests
 
-Use Google Test framework. Tests are run automatically with `iono test cpp`.
+Use Google Test framework. Tests are run automatically with `sigx test cpp`.
 
 ## Pull Request Process
 
@@ -506,7 +485,7 @@ Use Google Test framework. Tests are run automatically with `iono test cpp`.
    - Add entry to CHANGELOG.md (Unreleased section)
    - Update architecture diagrams if applicable
 
-4. **Verify on Clean Environment** (Team 2)
+4. **Verify on Clean Environment**
    ```powershell
    sigx clean --all
    sigx setup
@@ -527,12 +506,6 @@ Use Google Test framework. Tests are run automatically with `iono test cpp`.
 - [ ] Documentation update
 - [ ] Performance improvement
 - [ ] Infrastructure/tooling
-
-## Team
-- [ ] Team 1 (C++/CUDA)
-- [ ] Team 2 (MLOps/Infrastructure)
-- [ ] Team 3 (Python API)
-- [ ] Team 4 (Research/Data Science)
 
 ## Validation
 - [ ] `sigx format` applied
@@ -570,7 +543,6 @@ Closes #[issue number]
 
 2. **Peer Review**
    - At least one maintainer approval required
-   - Team lead review for team-specific changes
    - Address all review feedback
 
 3. **Merge Criteria**
@@ -582,7 +554,7 @@ Closes #[issue number]
 
 ## Reporting Issues
 
-For detailed guidance on creating high-quality issues, see **[Creating Issues Guide](docs/CREATING_ISSUES.md)**.
+For detailed guidance on creating high-quality issues, see **[Creating Issues Guide](docs/guides/creating-issues.md)**.
 
 ### Quick Issue Guidelines
 
@@ -590,7 +562,7 @@ For detailed guidance on creating high-quality issues, see **[Creating Issues Gu
 
 **Required Labels:**
 - **Type**: `bug`, `feature`, or `task`
-- **Team**: `team-1-cpp`, `team-2-mlops`, `team-3-python`, `team-4-research`
+- **Area**: `c++`, `python`, `cuda`, `infrastructure`, `research`
 - **Categories**: `python`, `c++`, `cuda`, `performance`, `documentation`, etc.
 
 ### Bug Reports
@@ -601,8 +573,8 @@ For detailed guidance on creating high-quality issues, see **[Creating Issues Gu
 
 ## To Reproduce
 Steps to reproduce (include exact commands):
-1. `iono setup`
-2. `iono build`
+1. `sigx setup`
+2. `sigx build`
 3. Run: `python script.py`
 4. See error
 
@@ -635,7 +607,7 @@ sigx doctor
 
 ### Feature Requests
 
-For detailed guidance on proposing features, see **[Creating Issues Guide](docs/CREATING_ISSUES.md)**.
+For detailed guidance on proposing features, see **[Creating Issues Guide](docs/guides/creating-issues.md)**.
 
 ```markdown
 ## Feature Description
@@ -647,12 +619,8 @@ Why is this feature needed? What problem does it solve?
 ## Proposed Implementation
 [High-level description of how it could be implemented]
 
-## Team Assignment
-Which team(s) would this affect?
-- [ ] Team 1 (C++/CUDA Core)
-- [ ] Team 2 (Infrastructure)
-- [ ] Team 3 (Python API)
-- [ ] Team 4 (Research)
+## Affected Areas
+Which area(s) of the codebase would this touch? (C++/CUDA, Python API, Infrastructure, Research)
 
 ## Alternatives Considered
 [Other approaches you've considered]
@@ -661,7 +629,7 @@ Which team(s) would this affect?
 [Any other relevant information, examples, or mockups]
 ```
 
-## Research Contributions (Team 4)
+## Research Contributions
 
 ### Experiment Contributions
 
@@ -690,7 +658,7 @@ Which team(s) would this affect?
 
 3. **Document Results**
    - Save outputs to `artifacts/`
-   - Track in MLflow (`iono ui`)
+   - Track in MLflow (`sigx ui`)
    - Create analysis notebook in `experiments/notebooks/`
    - Add figures to `artifacts/figures/`
 
@@ -707,15 +675,14 @@ Which team(s) would this affect?
 - **CLI Help**: `sigx help`
 - **Environment Check**: `sigx doctor`
 - **Documentation**: Check `docs/` directory
-- **Issues**: Search [existing issues](https://github.com/sigtekx/issues)
-- **Discussions**: Join [GitHub Discussions](https://github.com/sigtekx/discussions)
+- **Issues**: Search [existing issues](https://github.com/SEAL-Embedded/sigtekx/issues)
+- **Discussions**: Join [GitHub Discussions](https://github.com/SEAL-Embedded/sigtekx/discussions)
 
 ### Communication
 
 - **GitHub Issues**: Bug reports and feature requests
 - **GitHub Discussions**: Questions and design discussions
 - **Pull Requests**: Code contributions
-- **Project Boards**: Track active work
 
 ### Code of Conduct
 
@@ -747,16 +714,16 @@ sigx ui                                 # MLflow UI
 python benchmarks/run_*.py              # Run benchmarks
 ```
 
-### Team-Specific Workflows
+### Area-Specific Workflows
 
-**Team 1 (C++/CUDA):**
+**C++/CUDA:**
 ```powershell
 sigx build --debug
 st cpp
 sxp ncu throughput
 ```
 
-**Team 2 (Infrastructure):**
+**Infrastructure:**
 ```powershell
 sigx clean --all
 sigx setup
@@ -764,14 +731,14 @@ sigx build --clean
 sigx test
 ```
 
-**Team 3 (Python):**
+**Python:**
 ```powershell
 st python
 slint --fix
 sigx test --coverage
 ```
 
-**Team 4 (Research):**
+**Research:**
 ```powershell
 python benchmarks/run_latency.py experiment=my_exp +benchmark=latency
 sigx ui
@@ -785,8 +752,8 @@ By contributing, you agree that your contributions will be licensed under the MI
 ## Questions?
 
 If you have questions:
-1. Check `iono help` for CLI documentation
-2. Run `iono doctor` for environment issues
+1. Check `sigx help` for CLI documentation
+2. Run `sigx doctor` for environment issues
 3. Search existing issues and discussions
 4. Open a discussion for general questions
 5. Contact maintainers for specific concerns

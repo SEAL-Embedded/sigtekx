@@ -1,4 +1,4 @@
-"""Version information for ionosense-hpc package.
+"""Version information for sigtekx package.
 
 The canonical version is defined in pyproject.toml under [project.version].
 This module reads the installed distribution metadata to avoid duplication.

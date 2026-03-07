@@ -62,14 +62,14 @@ cd sigtekx
 # Start enhanced development shell (includes MSVC setup)
 .\scripts\init_pwsh.ps1
 
-# One-command setup using alias
-iono setup
+# One-command setup
+sigx setup
 
 # Build the project
-ib               # Short for 'iono build'
+sb               # Short for 'sigx build'
 
-# Verify installation  
-it               # Short for 'iono test'
+# Verify installation
+st               # Short for 'sigx test'
 ```
 
 ## Platform-Specific Instructions
@@ -390,34 +390,28 @@ The enhanced development shell (`init_pwsh.ps1`) provides:
 .\scripts\init_pwsh.ps1
 
 # Available aliases:
-iono <command>      # Main CLI alias
-ib                  # Build (iono build)
-ir                  # Rebuild (iono rebuild)
-it                  # Test all (iono test)
-itp                 # Test Python (iono test py)
-itc                 # Test C++ (iono test cpp)
-ifmt                # Format code (iono format)
-ilint               # Lint code (iono lint)
-ibench              # Benchmark suite
-iprof               # Profile code
-ival                # Validate installation
-imon                # Monitor GPU
-iinfo               # System info
-iclean              # Clean artifacts
+sigx <command>      # Main CLI
+sb                  # Build (sigx build)
+st                  # Test all (sigx test)
+sfmt                # Format code (sigx format)
+slint               # Lint code (sigx lint)
+sxp nsys latency    # Profile with Nsight Systems
 ```
 
-### Advanced CLI Features
+### Research Workflows
 
 ```bash
-# Benchmarking workflows
-./scripts/cli.sh bench suite              # Complete benchmark suite
-./scripts/cli.sh profile nsys latency     # Profile with Nsight Systems
-./scripts/cli.sh sweep experiment.yaml    # Parameter sweep experiments
+# Quick validation benchmark
+python benchmarks/run_latency.py experiment=ionosphere_test +benchmark=latency
 
-# Research workflows  
-./scripts/cli.sh report results/          # Generate research reports
-./scripts/cli.sh validate                 # Numerical validation
-./scripts/cli.sh monitor                  # Real-time GPU monitoring
+# GPU profiling with Nsight Systems
+sxp nsys latency
+
+# Full benchmark suite (takes 30+ minutes)
+snakemake --cores 4 --snakefile experiments/Snakefile
+
+# View results dashboard
+sigx dashboard
 ```
 
 ## Verification
@@ -429,7 +423,7 @@ iclean              # Clean artifacts
 ./scripts/cli.sh doctor
 
 # Windows (in dev shell)
-iono doctor
+sigx doctor
 ```
 
 Expected output should show all components as "OK" with minimal warnings.
@@ -440,8 +434,8 @@ Expected output should show all components as "OK" with minimal warnings.
 # Linux/WSL2
 ./scripts/cli.sh test
 
-# Windows (in dev shell)  
-it                 # or 'iono test'
+# Windows (in dev shell)
+st                 # or 'sigx test'
 ```
 
 Expected: All C++ and Python tests passing.
@@ -449,28 +443,27 @@ Expected: All C++ and Python tests passing.
 ### 3. Quick Performance Check
 
 ```bash
-# Linux/WSL2
-./scripts/cli.sh bench latency
-
-# Windows (in dev shell)
-ibench latency     # or 'iono bench latency'
+# All platforms (run after activating the sigtekx environment)
+python benchmarks/run_latency.py experiment=ionosphere_test +benchmark=latency
 ```
 
 ### 4. Python Import Test
 
-```python
+```bash
 # Quick validation
-python -c "import sigtekx; print('✓ Import successful')"
+python -c "import sigtekx; print('Import successful')"
+```
 
-# Interactive test
 ```python
->>> from sigtekx import Engine, Presets, generate_test_signal
->>> engine = Engine(Presets.throughput())
->>> signals = generate_test_signal(sample_rate=100_000, duration=0.1)
->>> frame = signals['ch1'][: engine.config.nfft * engine.config.channels]
->>> output = engine.process(frame)
->>> print(f"Output shape: {output.shape}")
->>> engine.close()
+# Interactive test
+from sigtekx import Engine, Presets, generate_test_signal
+
+engine = Engine(Presets.throughput())
+signals = generate_test_signal(sample_rate=100_000, duration=0.1)
+frame = signals['ch1'][: engine.config.nfft * engine.config.channels]
+output = engine.process(frame)
+print(f"Output shape: {output.shape}")
+engine.close()
 ```
 
 ### Common Issues
@@ -519,7 +512,7 @@ chmod +x scripts/cli.sh
 ./scripts/cli.sh rebuild
 
 # Windows (in dev shell)
-ir                 # or 'iono rebuild'
+sigx rebuild
 ```
 
 #### 5. Conda Environment Issues
@@ -533,8 +526,8 @@ ir                 # or 'iono rebuild'
 ./scripts/cli.sh setup
 
 # Windows (in dev shell)
-iono clean -All
-iono setup
+sigx clean -All
+sigx setup
 ```
 
 ### Debug Mode
@@ -542,5 +535,12 @@ iono setup
 Enable verbose logging:
 ```bash
 # Linux/WSL2
-export IONO_LOG_LEVEL=DEBUG
-./scripts/cli.sh 
+export SIGX_LOG_LEVEL=DEBUG
+./scripts/cli.sh doctor
+```
+
+```powershell
+# Windows (in dev shell)
+$env:SIGX_LOG_LEVEL = "DEBUG"
+sigx doctor
+```

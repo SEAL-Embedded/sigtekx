@@ -1,8 +1,8 @@
-# Ionosense HPC - Architecture Documentation
+# SigTekX - Architecture Documentation
 
-**Version:** 0.9.3
+**Version:** 0.9.5
 **Status:** Research Ready
-**Last Updated:** October 2025
+**Last Updated:** March 2026
 
 ---
 
@@ -26,7 +26,7 @@
 
 ### 1.1 Platform Purpose
 
-Ionosense HPC is a high-performance research platform designed for GPU-accelerated signal processing with a focus on ionospheric scintillation analysis. The platform provides:
+SigTekX is a high-performance research platform designed for GPU-accelerated signal processing with a focus on ionospheric scintillation analysis. The platform provides:
 
 - **100-1000× acceleration** over CPU implementations
 - **Real-time processing** capabilities (<100μs latency)
@@ -81,7 +81,7 @@ The system is organized into distinct architectural layers:
 - `pybind11 Module`: Zero-copy interface between Python and C++
 - Direct executor bindings: `BatchExecutor`, `StreamingExecutor`
 
-#### **C++ Executor API (v0.9.3)**
+#### **C++ Executor API**
 - `BatchExecutor`: High-throughput batch processing executor
 - `StreamingExecutor`: Low-latency streaming executor
 - `ExecutorConfig`: Unified configuration management
@@ -396,12 +396,14 @@ def process_batch(data):
 ### 4.3 Exception Hierarchy
 
 ```python
-IonosenseError (base)
+SigTekXError (base)
 ├── ConfigError           # Invalid configuration
 ├── ValidationError       # Data validation failure
 ├── EngineStateError      # Invalid engine state
+├── EngineRuntimeError    # CUDA runtime errors
 ├── DeviceNotFoundError   # No compatible GPU
-└── BenchmarkError        # Benchmark execution failure
+├── BenchmarkError        # Benchmark execution failure
+└── ExperimentError       # Research workflow errors
 ```
 
 All exceptions include:
@@ -873,17 +875,17 @@ dvc push
 
 **Command-Line Interface:**
 ```bash
-# Check status
-iono status
+# Check environment health
+sigx doctor
 
 # Run full analysis pipeline
-iono analysis
+snakemake --cores 4 --snakefile experiments/Snakefile
+
+# Launch interactive dashboard
+sigx dashboard
 
 # Launch MLflow UI
-iono ui
-
-# Quick plotting for debugging
-python analysis/quick_plot.py --latest
+sigx ui
 ```
 
 ---
@@ -1010,7 +1012,7 @@ public:
 
 ### 9.1 Measured Performance
 
-Based on validation benchmarks (RTX 4070, nfft=1024, channels=2):
+Based on validation benchmarks (RTX 3090 Ti, nfft=1024, channels=2, pre-Phase 1.1 baseline):
 
 | Metric | Value | Comparison |
 |--------|-------|------------|
@@ -1063,8 +1065,8 @@ For typical configurations (nfft=1024-2048):
 ### 9.4 Real-Time Capability
 
 **Real-time requirements (example: 48 kHz audio, nfft=1024, overlap=0.5):**
-- Frame duration: 10.67 ms
-- Processing latency: 65.4 μs
+- Frame duration: 10.67 ms (hop interval = 512 / 48000 Hz)
+- Processing latency: 65.4 μs (pre-Phase 1.1 baseline, RTX 3090 Ti)
 - **Margin: 163× real-time**
 
 The system can process >160 frames before the next frame arrives.
@@ -1092,8 +1094,8 @@ The system can process >160 frames before the next frame arrives.
 #### **Conda Environment**
 ```bash
 # Create environment
-conda create -n ionosense python=3.11
-conda activate ionosense
+conda create -n sigtekx python=3.11
+conda activate sigtekx
 
 # Install CUDA toolkit
 conda install cuda -c nvidia/label/cuda-13.0.0
@@ -1105,7 +1107,7 @@ pip install sigtekx
 #### **Build from Source**
 ```bash
 # Clone repository
-git clone https://github.com/username/sigtekx.git
+git clone https://github.com/SEAL-Embedded/sigtekx.git
 cd sigtekx
 
 # Build C++ extension
@@ -1296,11 +1298,11 @@ Future plugin system will support:
 from sigtekx.plugins import discover_plugins
 
 # Install plugin
-pip install ionosense-filter-plugin
+pip install sigtekx-filter-plugin
 
 # Use plugin
 from sigtekx import Engine
-from ionosense_filter_plugin import BandpassStage
+from sigtekx_filter_plugin import BandpassStage
 
 engine = Engine(config)
 engine.add_stage(BandpassStage(low=1000, high=5000))
@@ -1351,6 +1353,6 @@ engine.add_stage(BandpassStage(low=1000, high=5000))
 
 ---
 
-**Document Version:** 0.9  
-**Last Updated:** September 30, 2025  
-**Maintained By:** Ionosense HPC Development Team
+**Document Version:** 1.0
+**Last Updated:** March 2026
+**Maintained By:** Kevin Rahsaz
