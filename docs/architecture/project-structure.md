@@ -7,66 +7,71 @@ Complete layout of the sigtekx codebase with documentation links tailored to the
 ```
 sigtekx/
 |-- .github/                # CI workflows, composite actions, issue templates
-|-- .guide/                 # Reference PDFs and legacy CUDA samples for context
-|-- .sigtekx/             # Tooling state (ruff reports, session logs)
+|-- baselines/              # Persistent C++ benchmark baselines for regression tracking
 |-- benchmarks/             # Standalone benchmarking utilities and scenarios
 |-- build/                  # Generated artefacts (benchmarks, reports, build presets)
 |-- cpp/                    # C++17/CUDA sources, bindings, and tests
+|   |-- benchmarks/         # C++ standalone benchmark harness
 |   |-- bindings/           # pybind11 bridge exposing the research engine
-|   |-- include/sigtekx/  # Public headers and CUDA resource wrappers
+|   |-- include/sigtekx/   # Public headers and CUDA resource wrappers
 |   |-- src/                # Engine implementation, CUDA kernels, helpers
 |   `-- tests/              # C++ test suite (gtest/CTest presets)
 |-- docs/                   # Project documentation (API, development, benchmarking)
 |-- environments/           # Conda environment definitions per workflow
-|-- experiments/            # Snakemake rules and analysis scripts
-|-- notebooks/              # Exploratory analysis (Jupyter)
+|-- experiments/            # Snakemake rules, analysis scripts, Streamlit dashboard
 |-- scripts/                # PowerShell helpers, profiling utilities, GPU management
 |-- src/                    # Python package source tree
-|   `-- sigtekx/      # User facing package (benchmarks, config, core, utils)
+|   `-- sigtekx/            # User facing package (benchmarks, config, core, utils)
 |-- tests/                  # Pytest suite (unit, integration, GPU markers)
 |-- AGENTS.md               # Agent operations guide
-|-- accuracy_debug_plan.md  # Investigation notes for current performance work
+|-- CHANGELOG.md            # Version history and release notes
 |-- CMakeLists.txt          # Top level CMake configuration
 |-- CMakePresets.json       # Preset builds for host toolchains
 |-- CONTRIBUTING.md         # Contribution workflow and review expectations
 |-- Dockerfile              # Container recipe for CI/local parity
-|-- PROJECT_STRUCTURE.md    # This document
+|-- LICENSE                 # Project license
 |-- README.md               # High level introduction and quick start
+|-- dvc.yaml                # DVC pipeline definition
 |-- pyproject.toml          # Python packaging, lint, and test configuration
 ```
 
-### C++ Library (cpp/) - v0.9.3 Architecture
+### C++ Library (cpp/) - v0.9.5 Architecture
 ```
 cpp/
-|-- benchmarks/             # C++ standalone benchmarks
-|   |-- core/              # Config, results, persistence
+|-- benchmarks/             # C++ standalone benchmark harness
+|   |-- core/              # Config, results, persistence, baseline CLI
 |   |-- formatters/        # Output formatters
-|   |-- runners/           # Benchmark runners (latency, throughput, etc.)
+|   |-- runners/           # Benchmark runners (latency, throughput, realtime, accuracy)
 |   |-- utils/             # Signal generator, reference compute
+|   |-- baseline_cli.cpp   # Baseline management CLI
 |   `-- main.cpp           # Entry point
 |-- bindings/
 |   `-- bindings.cpp        # pybind11 BatchExecutor/StreamingExecutor bindings
 |-- include/sigtekx/
-|   |-- core/              # Core abstractions
+|   |-- core/              # Core abstractions and CUDA resource wrappers
+|   |   |-- cuda_wrappers.hpp
 |   |   |-- executor_config.hpp
-|   |   |-- pipeline_executor.hpp
 |   |   |-- pipeline_builder.hpp
-|   |   `-- processing_stage.hpp
+|   |   |-- pipeline_executor.hpp
+|   |   |-- processing_stage.hpp
+|   |   |-- ring_buffer.hpp
+|   |   |-- signal_config.hpp
+|   |   `-- window_functions.hpp
 |   |-- executors/         # Executor implementations
 |   |   |-- batch_executor.hpp
 |   |   `-- streaming_executor.hpp
-|   |-- kernels/           # CUDA kernel headers
 |   `-- profiling/         # NVTX profiling utilities
 |       `-- nvtx.hpp
 |-- src/                   # Implementation files
-|   |-- core/              # Pipeline, stages, utils
+|   |-- core/              # Pipeline, stages, window functions, ring buffer
 |   |-- executors/         # Batch & streaming executors
 |   |-- kernels/           # STFT pipeline kernels (windowing, FFT wrapper, magnitude)
 |   `-- profiling/         # NVTX profiling
-|`-- tests/                # C++ tests (organized by component)
+`-- tests/                 # C++ tests (organized by component)
     |-- core/              # Pipeline and stage tests
     |-- executors/         # Executor tests
     |-- integration/       # Integration tests
+    |-- kernels/           # Kernel unit tests
     `-- profiling/         # Profiling tests
 ```
 
@@ -104,23 +109,29 @@ experiments/
 |-- conf/
 |   |-- config.yaml         # Global Hydra configuration
 |   |-- engine/             # Engine presets
-|   |-- experiment/         # Experiment definitions (ionosphere_*)
+|   |-- experiment/         # Experiment definitions (ionosphere_*, baseline_*)
 |   `-- benchmark/          # Benchmark parameter grids
-`-- scripts/                # Analysis, figure generation, report assembly
+|-- analysis/               # Shared analysis modules (loaded by Streamlit and Quarto)
+|-- scripts/                # Analysis, figure generation, report assembly
+|-- streamlit/              # Interactive Streamlit dashboard (sigx dashboard)
+|   |-- app.py              # Dashboard entry point
+|   |-- components/         # Reusable UI components
+|   `-- pages/              # Dashboard pages (general, ionosphere, config explorer)
+|-- quarto/                 # Static publication-quality report templates
+`-- validation/             # Experiment validation utilities
 ```
 
 Snakemake coordinates benchmark execution, analysis, and report generation using these assets.
+The Streamlit dashboard (`sigx dashboard`) provides interactive exploration of results.
 
 ### Artifacts (artifacts/)
 
 ```
 artifacts/
-|-- cpp/                    # C++ benchmark outputs (baselines for regression detection)
-|   `-- baselines/          # JSON baselines: <preset>_<variant>_<mode>.json
 |-- benchmark_results/      # Python standalone benchmark API outputs (fallback location)
-|-- data/                   # Hydra Python experiment outputs (CSV/Parquet) - PRIMARY for analysis
+|-- cpp/                    # C++ benchmark outputs (ephemeral, gitignored)
+|-- data/                   # Hydra Python experiment outputs (CSV) - PRIMARY for analysis
 |-- experiments/            # Hydra run directories for single runs and multirun sweeps
-|-- logs/                   # Research CLI JSONL logs for traceability
 |-- mlruns/                 # MLflow tracking store (local file backend)
 |-- profiling/
 |   |-- ncu_reports/        # Nsight Compute traces (.ncu-rep)
@@ -128,13 +139,24 @@ artifacts/
 `-- reports/                # Generated analysis reports and summaries
 ```
 
-**Benchmark Output Locations (Three Separate Systems):**
+### Persistent Baselines (baselines/)
+
+```
+baselines/
+|-- cpp/                    # Named C++ benchmark snapshots for regression tracking
+|   |-- latency_full/       # Example: latency preset full run
+|   |-- throughput_full/    # Example: throughput preset full run
+|   `-- <name>/             # metadata.json + results.json + results.csv
+`-- README.md
+```
+
+**Benchmark Output Locations:**
 
 | System | Directory | Purpose | Created By |
 |--------|-----------|---------|------------|
 | **Hydra Experiments** | `artifacts/data/` | Primary experiment outputs for analysis pipeline | `run_latency.py`, `run_throughput.py`, etc. |
 | **Python Standalone API** | `artifacts/benchmark_results/` | Fallback for direct benchmark class usage | Benchmark classes when `output_dir=None` |
-| **C++ Baseline Storage** | `artifacts/cpp/baselines/` | Performance regression detection for C++ dev | `ionoc bench --save-baseline` |
+| **C++ Persistent Baselines** | `baselines/cpp/` | Regression tracking across dev phases (survives `sigx clean`) | `sigxc baseline save <name>` |
 
 These are intentionally separate to keep C++ development workflows independent from Python experiment orchestration.
 
@@ -195,21 +217,22 @@ Shared objects produced by builds land in `src/sigtekx/core/`. Expect `_engine.p
 - ruff>=0.4
 - mypy>=1.10
 
-## Performance Targets (Current)
+## Measured Performance (v0.9.5, RTX 3090 Ti)
 
-| Metric | Target | Notes |
-|--------|--------|-------|
-| Dual FFT latency | < 110 us | Measured with research preset on RTX 6000 Ada |
-| 4K FFT throughput | > 1.0 M FFT/s | Bench suite `throughput` scenario |
-| Memory transfer ratio | < 40% total time | Maintain overlap with compute |
-| RMS error | < 1e-5 | Compared against double precision reference |
+| Metric | Measured | Configuration |
+|--------|----------|---------------|
+| StreamingExecutor latency (mean) | 160.1 µs | nfft=4096, 2ch, overlap=0.5, 100 kHz |
+| StreamingExecutor latency (P95) | 191.5 µs | same |
+| StreamingExecutor throughput | 4,549 FPS | same |
+| Real-time compliance | 100% | 48 kHz ionosphere streaming |
+| SNR | >123 dB | vs double-precision reference |
 
 ## Output Artefacts
 - Generated content persists under `artifacts/` (configurable via `SIGX_OUTPUT_ROOT`).
 - Benchmark outputs: See three separate systems documented in Artifacts section above
   - Hydra experiments: `artifacts/data/` (primary)
   - Python standalone: `artifacts/benchmark_results/`
-  - C++ baselines: `artifacts/cpp/baselines/`
+  - C++ baselines: `baselines/cpp/`
 - Experiment dumps: `artifacts/experiments/`
 - QA reports (lint, coverage, validation): `artifacts/reports/`
 - Profiling traces: `artifacts/profiling/nsys_reports/` & `artifacts/profiling/ncu_reports/`
@@ -229,5 +252,6 @@ Shared objects produced by builds land in `src/sigtekx/core/`. Expect `_engine.p
 - IEEE 754 considerations documented in benchmarking + validation routines; avoid precision regressions without review.
 
 ## Update History
+- 2026-03-07: Aligned with v0.9.5: updated cpp/ headers, experiments/ layout, baselines/ location, performance table uses real measured numbers (RTX 3090 Ti).
 - 2025-10-15: Removed deprecated CLI wrapper references, refreshed documentation index, and aligned directory descriptions with current tooling.
 - 2025-09-15: Synchronized structure with `cpp/`, refreshed dependency constraints, and aligned workflow commands with CLI scripts.

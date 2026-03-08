@@ -1,9 +1,9 @@
-# Ionosense HPC - StreamingExecutor Pipeline Sequence
+# SigTekX - StreamingExecutor Pipeline Sequence
 # Layout: elk - complex sequence diagram with multiple actors and parallel flows
 # Render: See docs/diagrams/README.md for rendering instructions
 #
 # This diagram shows the complete execution flow for StreamingExecutor (low-latency streaming mode).
-# The sequence illustrates ring buffer accumulation, frame extraction loop, and 3-stream asynchronous execution.
+# The sequence illustrates ring buffer accumulation, zero-copy peek_frame DMA, and 3-stream asynchronous execution.
 
 # Import shared styles
 ...@common/styles
@@ -34,11 +34,7 @@ streaming_mode: Streaming Executor Pipeline {
   }
   RingBuffer: {
     shape: rectangle
-    label: "RingBuffer[ch]"
-  }
-  Staging: {
-    shape: rectangle
-    label: "h_batch_staging"
+    label: "RingBuffer[ch]\n(pinned)"
   }
   Stream0: {
     shape: rectangle
@@ -66,51 +62,50 @@ streaming_mode: Streaming Executor Pipeline {
   RingBuffer -> Impl: "5: push complete"
 
   # Frame Extraction Loop (while can_extract_frame(nfft))
-  Impl -> RingBuffer: "6: extract_batch(staging, nfft, 1, hop_size)"
-  RingBuffer -> RingBuffer: "7: Extract overlapping frame\nfor all channels"
-  RingBuffer -> Staging: "8: frame data in staging"
+  Impl -> RingBuffer: "6: peek_frame(nfft)\n(Zero-copy: returns FrameView spans)"
+  RingBuffer -> RingBuffer: "7: Returns FrameView{first, second}\n(ptrs into pinned ring buf memory)"
 
-  # Host to Device Transfer
-  Staging -> Stream0: "9: copy_from_host(staging)\n(Shape: [channels, nfft])"
-  Stream0 -> Stream0: "10: record event_h2d_done"
+  # Host to Device Transfer (direct DMA from pinned ring buffer — no staging copy)
+  RingBuffer -> Stream0: "8: cudaMemcpyAsync(d_input, view.first)\n(Direct DMA from pinned memory)"
+  Stream0 -> Stream0: "9: [if wraparound] cudaMemcpyAsync(view.second)\nthen record event_h2d_done"
 
   # Compute Pipeline
-  Stream1 -> Stream0: "11: wait(event_h2d_done)"
-  Stream1 -> WindowStage: "12: process(d_input, d_input)"
-  WindowStage -> WindowStage: "13: apply_window_kernel<<<>>>\n(Shape: [channels, nfft])"
+  Stream1 -> Stream0: "10: wait(event_h2d_done)"
+  Stream1 -> WindowStage: "11: process(d_input, d_input)"
+  WindowStage -> WindowStage: "12: apply_window_kernel<<<>>>\n(Shape: [channels, nfft])"
 
-  Stream1 -> FFTStage: "14: process(d_input, d_intermediate)"
-  FFTStage -> FFTStage: "15: cufftExecR2C()\n(Output: [channels, nfft/2+1])"
+  Stream1 -> FFTStage: "13: process(d_input, d_intermediate)"
+  FFTStage -> FFTStage: "14: cufftExecR2C()\n(Output: [channels, nfft/2+1])"
 
-  Stream1 -> MagnitudeStage: "16: process(d_intermediate, d_output)"
-  MagnitudeStage -> MagnitudeStage: "17: magnitude_kernel<<<>>>\n(Shape: [channels, bins])"
+  Stream1 -> MagnitudeStage: "15: process(d_intermediate, d_output)"
+  MagnitudeStage -> MagnitudeStage: "16: magnitude_kernel<<<>>>\n(Shape: [channels, bins])"
 
-  Stream1 -> Stream1: "18: record event_compute_done"
+  Stream1 -> Stream1: "17: record event_compute_done"
 
   # Device to Host Transfer
-  Stream2 -> Stream1: "19: wait(event_compute_done)"
-  Stream2 -> Stream2: "20: copy_to_host(output_frame)\n(Transfer one frame result)"
+  Stream2 -> Stream1: "18: wait(event_compute_done)"
+  Stream2 -> Stream2: "19: copy_to_host(output_frame)\n(Transfer one frame result)"
 
-  # Advance Ring Buffer
-  Impl -> RingBuffer: "21: advance(hop_size)\n(Move read pointer for overlap)"
-  Impl -> Impl: "22: frames_processed++"
+  Impl -> Impl: "20: frames_processed++"
 
-  # End Frame Extraction Loop - Synchronization
-  Impl -> Stream2: "23: synchronize()\n(Wait for last frame D2H)"
-  Stream2 -> Impl: "24: last frame complete"
+  # End Frame Extraction Loop - Synchronization then advance
+  Impl -> Stream2: "21: synchronize()\n(Wait for D2H — keeps peek ptrs valid)"
+  Stream2 -> Impl: "22: D2H complete"
 
-  Impl -> Impl: "25: update_stats(event_start, event_end)\n(Update latency, throughput, frames_processed)"
+  # Advance AFTER sync so peek pointers remain valid during DMA
+  Impl -> RingBuffer: "23: advance(hop_size)\n(Move read pointer — safe after sync)"
 
-  Impl -> StreamingExecutor: "26: submit complete"
-  StreamingExecutor -> Client: "27: return (last frame in output)"
+  Impl -> Impl: "24: update_stats(event_start, event_end)\n(Update latency, throughput, frames_processed)"
+
+  Impl -> StreamingExecutor: "25: submit complete"
+  StreamingExecutor -> Client: "26: return (last frame in output)"
 
   performance_stream_note: {
     class: note-gold
     label: |md
-      **Performance**: Mean latency 122.25 µs (+40% vs batch)
-      **Ring Buffer Overhead**:
-      - Memory: +80% (3× NFFT × channels + staging)
-      - Latency: +40% (buffer management overhead)
+      **Performance**: Mean latency ~122 µs (+40% vs batch, pre-Phase 1.1 baseline)
+      **Zero-copy DMA**: peek_frame() eliminates staging buffer memcpy
+      **Ring buffer overhead**: push memcpy + per-channel loop (~20 µs)
 
       Tradeoff: Flexibility for arbitrary chunk sizes
       Ideal for real-time continuous streaming
@@ -133,9 +128,9 @@ comparison: |md
 
   ## Streaming Executor (Low-Latency Real-Time - THIS DIAGRAM)
   - **Ring buffer accumulation**: Flexible chunk sizes
-  - **Frame extraction**: Overlapping frame extraction on demand
-  - **Higher latency**: 122.25 µs (+40%)
-  - **Higher memory**: 295 KB (+80%)
+  - **Zero-copy H2D**: peek_frame() DMA directly from pinned ring buffer (Phase 1.1)
+  - **Higher latency**: ~122 µs (+40%)
+  - **Higher memory**: ~262 KB (+60%)
   - **Use case**: Real-time streaming, continuous monitoring
 
   Both modes use the same 3-stream asynchronous pipeline for parallel H2D/Compute/D2H.

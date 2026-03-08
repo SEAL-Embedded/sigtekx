@@ -6,7 +6,7 @@ Deliver an ordered walkthrough that links to concrete files, explains why each s
 ---
 
 ## 1. Orientation Docs
-- [README.md](README.md), [PROJECT_STRUCTURE.md](../PROJECT_STRUCTURE.md), [pyproject.toml](../pyproject.toml)  
+- [README.md](../../README.md), [docs/architecture/project-structure.md](project-structure.md), [pyproject.toml](../../pyproject.toml)
   Skim these first to anchor terminology, CLI workflows, and dependency expectations before diving into modules.
 
 ---
@@ -26,7 +26,7 @@ These helpers provide crucial early checks and context—make sure to run them w
 ## 3. Error Surface
 - [src/sigtekx/exceptions.py](src/sigtekx/exceptions.py)  
   Establishes a rich hierarchy of domain-specific exceptions that surface errors consistently across the stack:
-  - **Base class**: `IonosenseError` unifies all error types with optional `hint` and structured context.
+  - **Base class**: `SigTekXError` unifies all error types with optional `hint` and structured context.
   - **Configuration & validation**: `ConfigError`, `ValidationError` guide misconfigurations or schema mismatches.
   - **Hardware & runtime**: `DeviceNotFoundError`, `DllLoadError`, `EngineStateError`, `EngineRuntimeError` cover GPU, DLL, and CUDA execution failures.
   - **Research-oriented**: `BenchmarkError`, `BenchmarkTimeoutError`, `ExperimentError`, `ReproducibilityError` map to benchmarking and reproducibility standards.
@@ -45,9 +45,9 @@ Reading this taxonomy early helps you quickly interpret validation failures, run
   **What it enforces:** NumPy-first checks to catch config/data issues before CUDA does.  
   **Read in this order & why:** (1) `validate_config_device_compatibility` (headroom/compute-capability), (2) `estimate_memory_usage_mb` (buffer/workspace model), (3) `validate_input_array` (dtype/shape/contiguity/NaN-Inf), (4) `validate_input_size` (input == `channels*nfft`).
 
-- [src/sigtekx/config/presets.py](src/sigtekx/config/presets.py)  
-  **Why it matters:** Shared mental model for benchmark modes.  
-  **Presets:** `realtime()` (tight deadlines, profiling off), `throughput()` (big `nfft`/`batch`), `validation()` (deterministic, profiling on), `profiling()` (balanced to expose compute/memory).  
+- [src/sigtekx/config/config_presets.py](src/sigtekx/config/config_presets.py)
+  **Why it matters:** Shared mental model for benchmark modes.
+  **Presets:** `realtime()` (tight deadlines, profiling off), `throughput()` (big `nfft`/`batch`), `validation()` (deterministic, profiling on), `profiling()` (balanced to expose compute/memory).
   **Tip:** `Presets.custom(**overrides)` for PR-specific experiments without drifting defaults.
 
 - [src/sigtekx/config/__init__.py](src/sigtekx/config/__init__.py)  
@@ -165,17 +165,8 @@ Reading this taxonomy early helps you quickly interpret validation failures, run
 - Validates GPU output vs reference (SciPy/Numpy) and checks fundamentals (Parseval, linearity, window accuracy) with configurable tolerances and SNR thresholds.  
 - Produces pass/fail summary plus mean/max error and SNR stats.
 
-**Parameter sweeps —** [benchmarks/sweep.py](src/sigtekx/benchmarks/sweep.py)  
-- `ParameterSpec` supports explicit `values` or generated ranges (int/float, lin/log spacing); optional Latin Hypercube via SciPy with graceful fallback.  
-- Nested param paths (e.g., `engine_config.nfft`) let you mutate deep configs; saves full experiment config + context to disk under a centralized experiments root.
-
-**Suite orchestration —** [benchmarks/suite.py](src/sigtekx/benchmarks/suite.py)  
-- `SuiteConfig` selects/excludes benchmarks, sets global iterations/warmup, and configures output/reporting.  
-- `BenchmarkSuite.run()` wires NVTX spans, resolves presets per benchmark type, saves suite config + environment, and streams results to an output directory under the benchmarks root.  
-- Registry includes: `latency`, `latency_streaming`, `throughput`, `scaling`, `realtime`, `accuracy`.
-
-**Research workflows —** [benchmarks/research_workflow.py](src/sigtekx/benchmarks/research_workflow.py)  
-- Chains setups, individual benchmarks, sweeps, analyses, and report generation under a single `workflow_id`, with robust config and environment capture for reproducibility.
+**Experiment orchestration** — handled by Hydra + Snakemake (v0.9.1+)
+Suite/sweep/research-workflow primitives were removed in v0.9.1. Parameter sweeps and multi-run experiments are now declared in `experiments/conf/` (Hydra configs) and executed via `run_latency.py --multirun` or Snakemake. See `CLAUDE.md` for the command reference.
 
 **Public API —** [benchmarks/__init__.py](src/sigtekx/benchmarks/__init__.py)
 
@@ -185,7 +176,7 @@ Reading this taxonomy early helps you quickly interpret validation failures, run
 - If deadlines are asserted (latency/realtime), are violations analyzed (%>deadline, worst margin, p99)?  
 - For throughput claims, do metrics include frames/s **and** GB/s (with context where possible)?  
 - For accuracy claims, are tolerances + reference impl documented, and do results report mean/max error + SNR?  
-- Are suite/sweep outputs saving configs + environment snapshots under the proper root dirs?
+- Are Hydra experiment configs placed in `experiments/conf/` and run via the standard entry points?
 
 ---
 
@@ -225,6 +216,6 @@ Reading this taxonomy early helps you quickly interpret validation failures, run
 ---
 
 ## 10. Usage Examples
-- Explore [tests/](tests/) and referenced notebooks in [~/docs/DEVELOPMENT.md](../docs/DEVELOPMENT.md)  
+- Explore [tests/](../../tests/) and [docs/guides/development.md](../guides/development.md)
   These provide idiomatic usage, parameter combinations, and expected behaviours once the library is understood.
 

@@ -1,4 +1,4 @@
-# Ionosense HPC - BatchExecutor Memory Layout
+# SigTekX - BatchExecutor Memory Layout
 # Layout: elk - supports self-loops for ring buffer advance operations
 # Render: See docs/diagrams/README.md for rendering instructions
 #
@@ -198,7 +198,7 @@ batch_memory: BatchExecutor Memory Layout {
     - Double buffering for input/output
     - No ring buffers (streaming-only feature)
 
-    **Terminology (v0.9.4)**:
+    **Terminology (v0.9.5)**:
     - **channels** = spatial dimension (independent signal sources)
     - **frames** = temporal dimension (FFT windows over time)
     - **bins** = spectral dimension (frequency components)
@@ -219,11 +219,11 @@ comparison: |md
   - **No ring buffers**: Direct pipeline flow
   - **Use case**: High-throughput batch processing
 
-  ## StreamingExecutor (+80% Memory - see 09_cpp_mem_stream.d2)
-  - **Total Memory**: 295 KB (+131 KB)
-  - **Host**: Input/output buffers + 2 pinned staging buffers + **ring buffers (98 KB)** + **batch staging (33 KB)**
+  ## StreamingExecutor (+60% Memory - see 09_cpp_mem_stream.d2)
+  - **Total Memory**: ~262 KB (+98 KB)
+  - **Host**: Input/output buffers + **pinned ring buffers (98 KB)** — zero-copy DMA via peek_frame() (Phase 1.1)
   - **Device**: Same as BatchExecutor (164 KB)
-  - **Ring buffers**: Per-channel accumulation (3× NFFT capacity)
+  - **Ring buffers**: Per-channel pinned memory, 3× NFFT capacity
   - **Use case**: Real-time streaming with arbitrary chunk sizes
 
   Both modes use the same device memory layout and processing pipeline.

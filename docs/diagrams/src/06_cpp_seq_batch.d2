@@ -1,4 +1,4 @@
-# Ionosense HPC - BatchExecutor Pipeline Sequence
+# SigTekX - BatchExecutor Pipeline Sequence
 # Layout: elk - complex sequence diagram with multiple actors and parallel flows
 # Render: See docs/diagrams/README.md for rendering instructions
 #
@@ -106,9 +106,8 @@ comparison: |md
 
   ## Streaming Executor (Low-Latency Real-Time - see 07_cpp_seq_stream.d2)
   - **Ring buffer accumulation**: Flexible chunk sizes
-  - **Frame extraction**: Overlapping frame extraction on demand
-  - **Higher latency**: 122.25 µs (+40%)
-  - **Higher memory**: 295 KB (+80%)
+  - **Zero-copy H2D**: peek_frame() DMA directly from pinned ring buffer (Phase 1.1)
+  - **Higher memory**: ~262 KB (+60%)
   - **Use case**: Real-time streaming, continuous monitoring
 
   Both modes use the same 3-stream asynchronous pipeline for parallel H2D/Compute/D2H.

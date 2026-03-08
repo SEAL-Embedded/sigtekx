@@ -1,7 +1,7 @@
 # Thread Safety - v0.9.5
 
 **Version:** 0.9.5
-**Last Updated:** December 2025
+**Last Updated:** March 2026
 **Status:** Production Ready
 
 ---
@@ -15,7 +15,7 @@
 5. [Python Multi-Threading](#5-python-multi-threading)
 6. [Usage Examples](#6-usage-examples)
 7. [Known Issues & Limitations](#7-known-issues--limitations)
-8. [Future Plans](#8-future-plans-v094)
+8. [Future Plans](#8-future-plans)
 
 ---
 
@@ -197,9 +197,8 @@ std::thread t2([&]{ shared_exec.submit(data2, out2, size); });  // ❌ Race!
 | `StreamingExecutor` | ❌ | ✅ | ❌ | Single-producer; background thread is single consumer |
 | **Engines** ||||
 | `Engine` (Python) | ❌ | ✅ | ❌ | Wraps executor |
-| `AntennaEngine` | ❌ | ✅ | ❌ | Wraps executor |
 | **Python Bindings** ||||
-| `BatchExecutor` (_native) | ❌ | ✅ | ❌ | No GIL release in v0.9.3 |
+| `BatchExecutor` (_native) | ❌ | ✅ | ❌ | No GIL release in v0.9.5 |
 
 ### 3.2 Detailed Class Analysis
 
@@ -377,7 +376,7 @@ std::thread t2(worker_thread);
 
 Python's GIL serializes Python bytecode execution, but **C++ extensions can release it** during long-running operations.
 
-**Current Status (v0.9.3)**: ❌ GIL is **NOT released** during processing
+**Current Status (v0.9.5)**: ❌ GIL is **NOT released** during processing
 
 **Impact**:
 ```python
@@ -398,7 +397,7 @@ t2.start()
 # Threads execute SEQUENTIALLY despite threading
 ```
 
-### 5.2 Recommended Python Multi-Threading Pattern (v0.9.3)
+### 5.2 Recommended Python Multi-Threading Pattern (v0.9.5)
 
 **Option 1: Per-Thread Engines** (✅ Recommended)
 
@@ -445,7 +444,7 @@ processes = [Process(target=worker_process, args=(data_q, result_q))
              for _ in range(num_cpus)]
 ```
 
-### 5.3 Future GIL Release (v0.9.4+)
+### 5.3 Future GIL Release
 
 Planned enhancement:
 ```cpp
@@ -492,7 +491,7 @@ int main() {
 ```cpp
 #include <thread>
 #include <vector>
-#include "ionosense/executors/batch_executor.hpp"
+#include "sigtekx/executors/batch_executor.hpp"
 
 void process_chunk(int thread_id,
                    const std::vector<float>& data,
@@ -546,7 +545,7 @@ int main() {
 
 ```cpp
 #include <thread>
-#include "ionosense/executors/batch_executor.hpp"
+#include "sigtekx/executors/batch_executor.hpp"
 
 void process_on_gpu(int gpu_id, const std::vector<float>& data) {
     // ✅ Bind thread to specific GPU
@@ -620,12 +619,11 @@ if __name__ == '__main__':
 
 ## 7. Known Issues & Limitations
 
-### 7.1 Current Limitations (v0.9.3)
+### 7.1 Current Limitations (v0.9.5)
 
 | Issue | Severity | Workaround | Planned Fix |
 |-------|----------|------------|-------------|
-| No GIL release in Python bindings | Low | Use multiprocessing instead of threading | v0.9.4 |
-| `rand()` in test code | Low | Test-only, doesn't affect production | v0.9.4 |
+| No GIL release in Python bindings | Low | Use multiprocessing instead of threading | Future |
 | No thread-safe executor variant | Info | Use per-thread instances | Future (if needed) |
 | No atomic frame counter | Low | Don't query stats during submit() | Future (if needed) |
 
@@ -663,26 +661,11 @@ std::thread t2([&]{ exec.submit_async(data2, size2, callback); });  // ? Race
 
 ### 7.3 Testing Considerations
 
-**Test Code Issue** (cpp/tests/test_research_engine.cpp:86):
-```cpp
-// ⚠️ Thread-hostile function in test fixture
-std::vector<float> generate_noise(int size) {
-    srand(0);  // Global state - not thread-safe
-    for (int i = 0; i < size; ++i) {
-        signal[i] = (static_cast<float>(rand()) / RAND_MAX) * 2.0f - 1.0f;
-    }
-    return signal;
-}
-```
-
-**Impact**:
-- Only affects test code (not production)
-- Tests are single-threaded (safe in current usage)
-- Will be fixed in v0.9.4 with `std::mt19937`
+Test signal generators use seeded `std::mt19937` for reproducibility. All tests are single-threaded; the thread safety guarantees above apply to production usage only.
 
 ---
 
-## 8. Future Plans (v0.9.4+)
+## 8. Future Plans
 
 ### 8.1 Planned Enhancements
 
@@ -691,20 +674,17 @@ std::vector<float> generate_noise(int size) {
    - Add `py::gil_scoped_release` in `process()` and `process_async()`
    - Enable true Python multi-threading
 
-2. **Thread-Safe Test Utilities**
-   - Replace `rand()` with `std::mt19937` in test fixtures
-
 **Medium Priority**:
-3. **Atomic Statistics** (Optional)
+2. **Atomic Statistics** (Optional)
    - Use `std::atomic<uint64_t>` for `frame_counter_`
    - Enable safe stats querying during processing
 
-4. **Thread Safety Documentation in Headers**
+3. **Thread Safety Documentation in Headers**
    - Add Doxygen `@threadsafety` tags
    - Document expected usage patterns
 
 **Low Priority (Future Consideration)**:
-5. **Thread-Safe Executor Variant** (If needed)
+4. **Thread-Safe Executor Variant** (If needed)
    ```cpp
    class ThreadSafeExecutor {
        std::mutex submit_mutex_;
@@ -725,14 +705,14 @@ std::vector<float> generate_noise(int size) {
 
 ### Thread Safety Checklist
 
-When using Ionosense HPC in multi-threaded contexts:
+When using SigTekX in multi-threaded contexts:
 
 - [ ] ✅ Create separate executor instances per thread
 - [ ] ✅ Use `cudaSetDevice()` if distributing across GPUs
 - [ ] ❌ Do NOT share executor instances between threads
 - [ ] ❌ Do NOT call `submit()` concurrently on same instance
 - [ ] ❌ Do NOT destroy executor while another thread uses it
-- [ ] ✅ Use Python multiprocessing (not threading) for parallelism in v0.9.3
+- [ ] ✅ Use Python multiprocessing (not threading) for parallelism until GIL release is implemented
 
 ### Common Patterns
 
