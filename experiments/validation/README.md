@@ -19,7 +19,7 @@ python experiments/validation/warmup_impact.py
 
 All validation scripts should be run from the project root directory:
 ```bash
-# From C:\Users\kevin\Documents\GitHub\sigtekx\
+# From the project root (C:\dev\sigtekx\)
 python experiments/validation/warmup_impact.py
 ```
 

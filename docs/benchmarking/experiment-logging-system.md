@@ -608,7 +608,7 @@ sigx clean  # Deletes artifacts/ but baselines/ survives
 
 **5. Rebuild and regenerate data**
 ```bash
-sigx build --release
+./scripts/cli.ps1 build
 snakemake --cores 4 --snakefile experiments/Snakefile
 ```
 

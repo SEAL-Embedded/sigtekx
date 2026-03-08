@@ -597,8 +597,8 @@ function Invoke-Dev {
     Write-Host "═══ ANALYSIS & VISUALIZATION ═══" -ForegroundColor Green
     Write-Host "  sigx dashboard" -ForegroundColor Gray -NoNewline
     Write-Host "                                   # Streamlit (recommended)" -ForegroundColor DarkCyan
-    Write-Host "  streamlit run experiments/streamlit/app.py" -ForegroundColor DarkGray -NoNewline
-    Write-Host "      # Alternative" -ForegroundColor DarkCyan
+    Write-Host "  sigx dashboard --port 8501" -ForegroundColor DarkGray -NoNewline
+    Write-Host "       # With custom port" -ForegroundColor DarkCyan
     Write-Host "  mlflow ui --backend-store-uri file://./artifacts/mlruns" -ForegroundColor Gray -NoNewline
     Write-Host "  # Experiment tracking" -ForegroundColor DarkCyan
     Write-Host ""
@@ -1116,6 +1116,7 @@ CORE DEVELOPMENT COMMANDS
                           Configure and build C++ project with CMake
   test [all|python|cpp] [-Pattern] [-Coverage] [--verbose]
                           Run Python and/or C++ test suites
+  dashboard [-Port <n>]   Launch Streamlit interactive dashboard
   coverage [-NoOpen]      Run C++ tests with code coverage report (OpenCppCoverage)
   clean [-All]            Remove artifacts/ (use -All to also remove build/)
   doctor                  Check development environment health
@@ -1429,6 +1430,21 @@ try {
             Invoke-Clean @params
         }
         "doctor"   { Invoke-Doctor }
+        "dashboard" {
+            $params = @{}
+            $port = 8501
+            for ($i = 0; $i -lt $CommandArgs.Count; $i++) {
+                if ($CommandArgs[$i] -in @("-Port", "--port") -and $i+1 -lt $CommandArgs.Count) {
+                    $port = $CommandArgs[$i+1]
+                }
+            }
+            
+            Write-Status "Launching Streamlit dashboard on port $port..."
+            Write-Host "URL: http://localhost:$port" -ForegroundColor Cyan
+            
+            # Run streamlit from project root to ensure relative paths resolve correctly
+            & streamlit run experiments/streamlit/app.py --server.port $port
+        }
         "coverage" {
             $params = @{}
             if ($normalizedArgs -contains "-noopen" -or $normalizedArgs -contains "--no-open") { $params.OpenReport = $false }

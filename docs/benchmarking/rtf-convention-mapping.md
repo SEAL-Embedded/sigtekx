@@ -56,7 +56,7 @@ Where:
 
 ---
 
-### Convention 2: Throughput-Based (SigTekX Standard)
+### Convention 2: Throughput-Based (GPU benchmarking context)
 
 **Formula**:
 ```
@@ -121,17 +121,17 @@ Relationship:
 
 ## Conversion Table
 
-| Academic RTF | SigTekX RTF | Performance Level | Interpretation |
-|--------------|-------------|-------------------|----------------|
-| **0.10** | **10.0** | Exceptional | 10× real-time, 10 concurrent streams |
-| **0.20** | **5.0** | Excellent | **SigTekX current** (Phase 0 baseline) |
-| **0.33** | **3.0** | Very Good | 3× safety margin, ASR aggressive target |
-| **0.40** | **2.5** | Good | **Production target**, ASR industry standard |
-| **0.50** | **2.0** | Acceptable | Minimum for soft real-time |
-| **0.70** | **1.43** | Marginal | CPU-level performance (no GPU benefit) |
-| **0.90** | **1.11** | Poor | Minimal headroom, recovery impossible |
-| **1.00** | **1.00** | Failure | Theoretical limit (both conventions) |
-| **>1.00** | **<1.00** | Failure | Cannot maintain real-time |
+| Academic RTF (SigTekX) | Throughput RTF | Performance Level | Interpretation |
+|------------------------|----------------|-------------------|----------------|
+| **0.10** | 10.0 | Exceptional | 10× real-time, 10 concurrent streams |
+| **0.20** | 5.0 | Excellent | **SigTekX measured** (Phase 0 baseline) |
+| **0.33** | 3.0 | Very Good | 3× safety margin, ASR aggressive target |
+| **0.40** | 2.5 | Good | **Production target**, ASR industry standard |
+| **0.50** | 2.0 | Acceptable | Minimum for soft real-time |
+| **0.70** | 1.43 | Marginal | CPU-level performance (no GPU benefit) |
+| **0.90** | 1.11 | Poor | Minimal headroom, recovery impossible |
+| **1.00** | 1.00 | Failure | Theoretical limit (both conventions) |
+| **>1.00** | <1.00 | Failure | Cannot maintain real-time |
 
 ---
 
@@ -217,9 +217,9 @@ When claiming specific achievements, show both:
 ### 4. Justify the Choice
 Include a brief justification in the methodology:
 
-> "We adopt the throughput-based RTF convention (higher = better) to align with
-> GPU profiling tools (NVIDIA Nsight, CUDA events) and provide intuitive
-> interpretation of multi-stream processing capability."
+> "We adopt the academic (latency-based) RTF convention (lower = better) to align
+> with ionosphere research, ASR, and SDR literature, where RTF < 1.0 directly
+> indicates faster-than-real-time operation."
 
 ### 5. Consistent Usage
 Pick ONE convention for figures, tables, and analysis. Use SigTekX convention internally, provide Academic conversion in text where necessary.
@@ -234,9 +234,9 @@ Pick ONE convention for figures, tables, and analysis. Use SigTekX convention in
 ```python
 def calculate_rtf(fps: float, hop_size: int, sample_rate_hz: int) -> float:
     """
-    Calculate Real-Time Factor (RTF) using throughput-based convention.
+    Calculate Real-Time Factor (RTF) using academic convention.
 
-    RTF = (Processing Speed) / (Required Speed) = (FPS × Hop Size) / Sample Rate
+    RTF = (signal duration) / (processing time) = sample_rate_hz / (fps * hop_size)
 
     Args:
         fps: Frames per second (measured processing rate)
@@ -245,17 +245,17 @@ def calculate_rtf(fps: float, hop_size: int, sample_rate_hz: int) -> float:
 
     Returns:
         RTF where:
-        - RTF > 1.0 = faster than real-time (good)
+        - RTF < 1.0 = faster than real-time (good) ✅
         - RTF = 1.0 = exactly real-time
-        - RTF < 1.0 = slower than real-time (falling behind)
+        - RTF > 1.0 = slower than real-time (falling behind) ❌
 
     Example:
         >>> calculate_rtf(fps=250, hop_size=1024, sample_rate_hz=100000)
-        2.56  # Can process 2.56 real-time streams simultaneously
+        0.39  # Uses 39% of available time (target ≤ 0.40)
     """
     if fps <= 0:
-        return 0.0
-    return (fps * hop_size) / sample_rate_hz
+        return float('inf')
+    return sample_rate_hz / (fps * hop_size)
 ```
 
 ### Conversion Function for Papers
@@ -323,14 +323,14 @@ metrics['rtf_academic'] = calculate_academic_rtf(fps, hop_size, sample_rate_hz)
 
 ### SigTekX Equivalent Targets
 
-| Application Domain | Academic Target | SigTekX Equivalent | SigTekX Status |
-|-------------------|----------------|-------------------|----------------|
-| **ASR State-of-Art** | RTF ≤ 0.35 | RTF ≥ 2.86 | Phase 1 target |
-| **ASR Industry** | RTF ≤ 0.40 | **RTF ≥ 2.5** | **Production target** |
-| **VLF Ionosphere** | RTF ≤ 0.40 | **RTF ≥ 2.5** | **Baseline achieved** |
-| **Soft Real-Time** | RTF ≤ 0.50 | RTF ≥ 2.0 | Minimum acceptable |
-| **SigTekX Phase 0** | **RTF ≤ 0.20** | **RTF ≥ 5.0** | **Achieved (2× better!)** |
-| **Multi-Stream Goal** | RTF ≤ 0.10 | RTF ≥ 10.0 | Stretch goal |
+| Application Domain | Academic RTF Target | Throughput Equivalent | SigTekX Status |
+|-------------------|--------------------|-----------------------|----------------|
+| **ASR State-of-Art** | RTF ≤ 0.35 | FPS × hop / sr ≥ 2.86 | Phase 1 target |
+| **ASR Industry** | **RTF ≤ 0.40** | ≥ 2.5× real-time | **Production target** |
+| **VLF Ionosphere** | **RTF ≤ 0.40** | ≥ 2.5× real-time | **Baseline achieved** |
+| **Soft Real-Time** | RTF ≤ 0.50 | ≥ 2.0× real-time | Minimum acceptable |
+| **SigTekX Phase 0** | **RTF ≤ 0.20** | ≥ 5.0× real-time | **Achieved (2× better than target)** |
+| **Multi-Stream Goal** | RTF ≤ 0.10 | ≥ 10.0× real-time | Stretch goal |
 
 ---
 
@@ -415,4 +415,4 @@ Where:
 
 **Validation Needed**: Cold vs warm thermal degradation testing to prove RTF ≤ 0.40 holds under sustained load (expect RTF ≤ 0.28 after 40% degradation, still beats target).
 
-**For Papers**: SigTekX convention matches academic standard, so no conversion needed. Simply state "RTF = sample_rate / (fps × hop_size), lower is better" once in methodology.
+**For Papers**: SigTekX uses academic convention directly — no conversion needed. State "RTF = sample_rate / (fps × hop_size), lower is better" once in methodology.

@@ -333,7 +333,7 @@ function global:sigx {
     }
 
     # Only allow commands that actually exist in simplified CLI
-    $validCommands = @('setup','build','test','coverage','lint','format','clean','doctor','help','profile','typecheck','diagrams','dev','baseline')
+    $validCommands = @('setup','build','test','coverage','lint','format','clean','doctor','help','profile','typecheck','diagrams','dev','baseline','dashboard')
     if ($Args.Count -gt 0 -and $Args[0] -notin $validCommands) {
         Write-Warning "Command '$($Args[0])' not available. Use 'sigx help' for available commands."
         Write-Host "💡 For research workflows, use direct tools:" -ForegroundColor Cyan
@@ -599,6 +599,24 @@ function global:sxd {
     }
 }
 
+function global:sxdash {
+    [CmdletBinding()]
+    param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Args)
+
+    $common = @{}
+    foreach ($name in @('Debug','Verbose')) {
+        if ($PSBoundParameters.ContainsKey($name)) {
+            $common[$name] = $PSBoundParameters[$name]
+        }
+    }
+
+    if ($common.Count -gt 0) {
+        sigx @common dashboard @Args
+    } else {
+        sigx dashboard @Args
+    }
+}
+
 # Reload sigx functions (useful when init_pwsh.ps1 is updated)
 function global:sxreload {
     Write-Host "Reloading sigx functions..." -ForegroundColor Cyan
@@ -607,14 +625,14 @@ function global:sxreload {
 }
 
 # Tab-completion (only for commands that actually exist)
-$global:IonoVerbs   = @('setup','build','test','coverage','lint','format','clean','doctor','help','profile','typecheck','diagrams','dev')
+$global:IonoVerbs   = @('setup','build','test','coverage','lint','format','clean','doctor','help','profile','typecheck','diagrams','dev','baseline','dashboard')
 $global:IonoTargets = @('python','cpp','all','py','sys','-Clean','--clean','-Verbose','--verbose','--debug','--release','-Fix','-Check','-Coverage','-Pattern','-All','nsys','ncu','latency','throughput','accuracy','realtime','custom','-Full','-NoOpen','-Mode','-Script','-Kernel','-Duration','--format','--force','svg','png','pdf','cpp_class_hierarchy','cpp_components_pipeline','cpp_sequence_execution','cpp_memory_layout','py_package_architecture','py_analysis_workflow','py_workflow_sequence','sys_architecture_overview')
 
 # sigxc tab-completion
 $global:SigxcVerbs   = @('bench','profile','compare','clean','help')
 $global:SigxcTargets = @('quick','profile','full','nsys','ncu','--mode','--output','--stats','--trace','--set','--kernel-name')
 
-Register-ArgumentCompleter -CommandName sigx,sxb,sxt,sxl,sxf,sxc,sxtp,sxtc,sxh,sxp,sxd -ScriptBlock {
+Register-ArgumentCompleter -CommandName sigx,sxb,sxt,sxl,sxf,sxc,sxtp,sxtc,sxh,sxp,sxd,sxdash -ScriptBlock {
     param($commandName,$parameterName,$wordToComplete,$commandAst,$fakeBoundParameters)
     $tokens = @()
     foreach ($e in $commandAst.CommandElements) {
