@@ -78,11 +78,7 @@ hpc_workspace/
 
 # --- IDE / Editor ---
 # VS Code
-.vscode/*
-!/.vscode/settings.json
-!/.vscode/tasks.json
-!/.vscode/launch.json
-!/.vscode/extensions.json
+.vscode/
 
 # Visual Studio (keep project files out of this repo)
 .vs/
@@ -124,5 +120,5 @@ results/
 .claude/
 
 
-.png
-.pdf
+*.png
+*.pdf

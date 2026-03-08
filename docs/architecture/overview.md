@@ -28,10 +28,10 @@
 
 SigTekX is a high-performance research platform designed for GPU-accelerated signal processing with a focus on ionospheric scintillation analysis. The platform provides:
 
-- **100-1000× acceleration** over CPU implementations
-- **Real-time processing** capabilities (<100μs latency)
-- **High throughput** (>10,000 frames per second)
-- **Reproducible research** workflows with experiment tracking
+- **GPU-accelerated spectral analysis** via CUDA/cuFFT with sub-millisecond end-to-end latency
+- **Dual execution modes**: high-throughput batch processing and zero-copy lock-free streaming
+- **Real-time compliance**: 100% deadline hit rate measured at 48 kHz and 100 kHz sample rates
+- **Reproducible research** workflows with experiment tracking and baseline management
 - **Publication-ready** analysis and visualization
 
 ### 1.2 High-Level Platform Overview
@@ -41,20 +41,19 @@ SigTekX is a high-performance research platform designed for GPU-accelerated sig
 The platform serves three primary research applications:
 
 1. **Ionospheric Scintillation Analysis**
-   - Equatorial plasma bubbles
-   - Polar cap patches
-   - TEC variations
-   - Multi-scale phenomena
+   - VLF/ULF signal monitoring (48 kHz, 2-channel)
+   - Equatorial plasma bubbles, polar cap patches
+   - TEC variations and multi-scale phenomena
 
 2. **Real-Time Signal Monitoring**
-   - <100μs latency capability
-   - Continuous streaming
-   - Live anomaly detection
+   - Sub-millisecond processing latency (RTX 3090 Ti, nfft=4096)
+   - Continuous streaming via zero-copy ring buffer DMA
+   - 100% real-time compliance at standard sample rates
 
-3. **High-Throughput Processing**
-   - >10,000 FPS processing
-   - 25 GB/s data throughput
-   - Batch optimization
+3. **High-Throughput Offline Processing**
+   - Thousands of frames per second (configuration-dependent)
+   - Batch mode with multi-stream CUDA pipeline overlap
+   - 26 experiment configurations for systematic parameter sweeps
 
 ### 1.3 Technology Stack
 
@@ -64,8 +63,8 @@ The platform serves three primary research applications:
 | **Core Engine** | C++17, pybind11, CMake |
 | **Python API** | Python 3.11, NumPy, SciPy, Pydantic |
 | **Experiment Management** | Hydra, MLflow, Snakemake, DVC |
+| **Analysis & Dashboard** | Streamlit, pandas, matplotlib |
 | **Testing** | pytest, Google Test, doctest |
-| **Documentation** | Sphinx, PlantUML |
 
 ---
 
@@ -201,6 +200,26 @@ Benefits:
 - No manual cleanup required
 - Prevents resource leaks
 - Move-only semantics prevent accidental copies
+
+#### **Zero-Copy Ring Buffer (StreamingExecutor)**
+The `StreamingExecutor` uses a lock-free SPSC ring buffer with a `peek_frame()` API for direct DMA from pinned host memory:
+
+```cpp
+// Zero-copy peek: returns contiguous or wraparound span directly in ring buffer
+auto span = ring_buffer.peek_frame(frame_size);
+cudaMemcpyAsync(d_input, span.ptr, span.bytes, cudaMemcpyHostToDevice, stream);
+ring_buffer.advance(frame_size);  // after pipeline sync
+```
+
+This eliminates intermediate staging buffer copies on the H2D path. The design handles both contiguous and wraparound frame cases, and pointers remain valid between `peek_frame()` and `advance()` while the DMA is in flight.
+
+#### **Window Symmetry Modes**
+All window functions support two symmetry modes:
+
+| Mode | Denominator | Use Case |
+|------|-------------|----------|
+| **PERIODIC** (default) | N | FFT-based spectral analysis, STFT |
+| **SYMMETRIC** | N-1 | FIR filter design, time-domain tapering |
 
 #### **Strategy Pattern**
 Processing stages implement the `ProcessingStage` interface:
@@ -1012,64 +1031,36 @@ public:
 
 ### 9.1 Measured Performance
 
-Based on validation benchmarks (RTX 3090 Ti, nfft=1024, channels=2, pre-Phase 1.1 baseline):
+Benchmarked on RTX 3090 Ti (Ampere SM 8.6), AMD Ryzen 9 5950X, CUDA 13.0. Configuration: nfft=4096, channels=2, overlap=0.5, streaming mode, 100 kHz sample rate. These are pre-Phase 1.1 C++ baselines — current performance is equivalent.
 
-| Metric | Value | Comparison |
-|--------|-------|------------|
-| **Latency** | 65.4 μs | 100× faster than CPU |
-| **Throughput** | 15,312 FPS | 1000× faster than CPU |
-| **Accuracy** | 99.99% | Reference quality |
-| **Memory** | 8-10 MB | Minimal footprint |
+| Metric | Measured Value | Notes |
+|--------|---------------|-------|
+| **Mean latency** | 160.1 μs | P95: 191.5 μs, P99: 205.0 μs |
+| **Throughput** | 4,549 FPS | 37.3M samples/sec |
+| **Real-time compliance** | 100% | 0 deadline misses |
+| **Real-time mean latency** | 0.22 ms | 10.7× margin at 100 kHz |
+| **Accuracy (SNR)** | >123 dB | Across all tested NFFT sizes |
+| **Accuracy pass rate** | 100% | Sine, multitone, chirp signals |
 
-### 9.2 Scaling Characteristics
+### 9.2 Real-Time Capability
 
-#### **FFT Size Scaling**
-```
-NFFT    Latency (μs)   Throughput (FPS)
-256     12.3           ~81,000
-512     21.7           ~46,000
-1024    65.4           ~15,300
-2048    187.2          ~5,300
-4096    532.1          ~1,800
-8192    1,421.5        ~700
-```
+**Example: ionosphere monitoring at 48 kHz, nfft=4096, overlap=0.75**
+- Hop interval: 21.3 ms (1024 samples / 48000 Hz)
+- Processing latency: <1 ms (streaming mode, RTX 3090 Ti)
+- **Margin: >21× real-time**
 
-**Observation:** Latency scales approximately O(n log n) as expected for FFT.
-
-#### **Batch Size Scaling**
-```
-Batch   Latency (μs)   Throughput (FPS)
-1       34.2           ~29,200
-2       65.4           ~15,300
-4       125.1          ~8,000
-8       242.3          ~4,100
-16      478.9          ~2,100
-```
-
-**Observation:** Near-linear scaling up to channels=8, then efficiency decreases due to memory bandwidth saturation.
+The Python-layer real-time benchmark at 48 kHz confirms 100% deadline compliance with zero misses across the full benchmark run.
 
 ### 9.3 Bottleneck Analysis
 
-For typical configurations (nfft=1024-2048):
+For typical configurations profiled with per-stage CUDA event timing:
 
-1. **FFT Computation**: 60-70% of total time
-2. **PCIe Transfers**: 20-25% of total time
-3. **Windowing/Magnitude**: 5-10% of total time
-4. **Synchronization**: <5% of total time
+1. **FFT Computation** (cuFFT): dominant stage at larger NFFT
+2. **PCIe H2D/D2H Transfers**: amortized by 3-stream pipeline overlap
+3. **Windowing / Magnitude**: O(n) kernels, typically <5 μs each
+4. **Synchronization overhead**: minimal with event-based scheduling
 
-**Optimization Strategies:**
-- Increase channel count to amortize transfer overhead
-- Use CUDA streams to overlap compute and transfer
-- Consider CUDA Graphs for very low latency (future work)
-
-### 9.4 Real-Time Capability
-
-**Real-time requirements (example: 48 kHz audio, nfft=1024, overlap=0.5):**
-- Frame duration: 10.67 ms (hop interval = 512 / 48000 Hz)
-- Processing latency: 65.4 μs (pre-Phase 1.1 baseline, RTX 3090 Ti)
-- **Margin: 163× real-time**
-
-The system can process >160 frames before the next frame arrives.
+Detailed stage timing is available via `measure_components=true` in the benchmark config, visualized in the Streamlit dashboard under "Stage Breakdown".
 
 ---
 
@@ -1091,34 +1082,25 @@ The system can process >160 frames before the next frame arrives.
 
 ### 10.2 Installation
 
-#### **Conda Environment**
-```bash
-# Create environment
-conda create -n sigtekx python=3.11
-conda activate sigtekx
-
-# Install CUDA toolkit
-conda install cuda -c nvidia/label/cuda-13.0.0
-
-# Install package
-pip install sigtekx
-```
-
 #### **Build from Source**
 ```bash
 # Clone repository
 git clone https://github.com/SEAL-Embedded/sigtekx.git
 cd sigtekx
 
-# Build C++ extension
-mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-cmake --build . --config Release
+# Create and activate conda environment
+conda create -n sigtekx python=3.11
+conda activate sigtekx
 
-# Install Python package
-cd ..
+# Install CUDA toolkit
+conda install cuda -c nvidia/label/cuda-13.0.0
+
+# Build C++ extension and install Python package
+./scripts/cli.ps1 build
 pip install -e .
 ```
+
+> **Note:** PyPI distribution is planned for a future release. Install from source for now.
 
 ### 10.3 Integration Examples
 
@@ -1209,61 +1191,27 @@ CMD ["pytest", "tests/"]
 
 ## 11. Future Extensibility
 
-### 11.1 Planned Features (v2.0)
+### 11.1 Planned Features
 
-#### **CUDA Graphs Support**
-- **Benefit**: Reduce kernel launch overhead by ~10-20 μs
-- **Use case**: Ultra-low latency applications (<50 μs)
-- **Implementation**: Graph capture and replay API
+#### **Pluggable Processing Stages (Phase 2)**
+- **Goal**: User-defined custom processing stages in Python or C++
+- **Use case**: Domain-specific filtering, normalization, detection algorithms
+- **Design**: Stage registry with `ProcessingStage` interface hooks
 
-```python
-# Future API
-config = EngineConfig(..., use_cuda_graphs=True)
-engine = Engine(config)
-engine.warmup()  # Capture graph
-engine.process(data)  # Use captured graph (faster)
-```
-
-#### **Pluggable Processing Stages**
-- **Benefit**: User-defined custom processing stages
-- **Use case**: Domain-specific preprocessing/postprocessing
-- **Implementation**: Stage registry with Python/C++ hooks
-
-```python
-# Future API
-from sigtekx import Engine, StageRegistry
-
-# Register custom stage
-@StageRegistry.register("my_filter")
-def custom_filter(data: np.ndarray) -> np.ndarray:
-    return scipy.signal.butter_filter(data, ...)
-
-# Use in pipeline
-config = EngineConfig(..., stages=["window", "my_filter", "fft", "magnitude"])
-```
+#### **CUDA Graphs Execution**
+- **Goal**: Reduce per-frame kernel launch overhead
+- **Use case**: Ultra-low latency applications
+- **Status**: Config flag (`use_cuda_graphs`) reserved; execution path not yet implemented
 
 #### **Multi-GPU Support**
-- **Benefit**: Process multiple data streams in parallel
-- **Use case**: Large-scale ionospheric monitoring networks
-- **Implementation**: Engine per GPU with data distribution
+- **Goal**: Process multiple independent data streams across GPUs
+- **Use case**: Multi-antenna ionospheric monitoring arrays
+- **Design**: One engine per GPU with data distribution at the Python layer
 
-```python
-# Future API
-engines = MultiGPUEngine(num_gpus=4, config=config)
-results = engines.process_batch(data_streams)  # Parallel processing
-```
-
-#### **Advanced Windowing Functions**
-- Tukey (tapered cosine)
-- Gaussian
-- Kaiser-Bessel
-- Custom window arrays
-
-#### **Output Modes**
+#### **Additional Output Modes**
+- Power spectral density (PSD)
 - Phase spectrum
-- Power spectral density
-- dB scale
-- Log scale
+- dB / log-magnitude scale
 
 ### 11.2 Extensibility Points
 
@@ -1345,10 +1293,13 @@ engine.add_stage(BandpassStage(low=1000, high=5000))
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 0.9.2 | Sept 2025 | Production release with full workflow |
-| 0.9.0 | Aug 2025 | Beta release with benchmarking framework |
-| 0.8.0 | July 2025 | Alpha release with Python bindings |
-| 0.5.0 | June 2025 | Realtime C++/CUDA engine |
+| 0.9.5 | Mar 2026 | Public release cleanup; license, docs, naming |
+| 0.9.4 | Feb 2026 | Zero-copy ring buffer DMA (`peek_frame()`), per-stage timing profiling |
+| 0.9.3 | Jan 2026 | Baseline management system, C++ benchmark CLI (`sigxc`) |
+| 0.9.2 | Sept 2025 | Streaming executor, Streamlit dashboard, 26 experiment configs |
+| 0.9.0 | Aug 2025 | Full Python benchmarking framework, MLflow/Snakemake integration |
+| 0.8.0 | July 2025 | Python bindings (pybind11), Pydantic config, GPU fallback |
+| 0.5.0 | June 2025 | Real-time C++/CUDA streaming engine |
 | 0.1.0 | May 2025 | Initial C++/CUDA prototype |
 
 ---

@@ -6,11 +6,11 @@
 
 ### Docs & Links
 
-- **Programming Guide (PG):** [PDF](./CUDA_C_Programming_Guide.pdf) • [Web](https://docs.nvidia.com/cuda/cuda-c-programming-guide/)
-- **Best Practices (BP):** [PDF](./CUDA_C_Best_Practices_Guide.pdf) • [Web](https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/)
-- **cuFFT Guide (FFT):** [PDF](./CUFFT_Library.pdf) • [Web](https://docs.nvidia.com/cuda/cufft/index.html)
+- **Programming Guide (PG):** [Web](https://docs.nvidia.com/cuda/cuda-c-programming-guide/)
+- **Best Practices (BP):** [Web](https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/)
+- **cuFFT Guide (FFT):** [Web](https://docs.nvidia.com/cuda/cufft/index.html)
 
-> Section numbers are from Toolkit 13.0 PDFs; website headings may shift slightly between minor versions.
+> Section numbers reference Toolkit 13.0; website headings may shift slightly between minor versions.
 
 ---
 
