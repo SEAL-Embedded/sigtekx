@@ -6,7 +6,7 @@
 
 ## Executive Summary
 
-This document presents comprehensive performance analysis of ring buffer optimizations in the Ionosense HPC library's streaming executor. Three implementations were tested:
+This document presents comprehensive performance analysis of ring buffer optimizations in the SigTekX streaming executor. Three implementations were tested:
 
 1. **Baseline (v0.9.4):** Pageable memory, no synchronization
 2. **Pinned + Mutex:** CUDA pinned memory with mutex-based thread safety (regression)
@@ -190,9 +190,11 @@ python benchmarks/run_latency.py engine=streaming_async +benchmark=latency
 
 ---
 
-## Future Optimizations
+## Phase 1.1 Completions
 
-### 1. Async Producer-Consumer (v0.9.5+)
+The following items from the original future work plan were completed in Phase 1.1 (v0.9.5):
+
+### 1. Async Producer-Consumer ✅ Completed
 
 **Architecture:**
 ```
@@ -207,23 +209,23 @@ Main Thread (Producer)          Background Thread (Consumer)
      └─► Return immediately          (continuous loop)
 ```
 
-**Expected benefit:** 20-40% latency reduction from CPU/GPU overlap
+**Achieved benefit:** Proper condition-variable based async mode with `enable_background_thread=true`
 
-**Implementation status:** Runtime flag `enable_background_thread` added, implementation in progress.
+**Implementation status:** ✅ Complete. Bug in temporary CV fixed; `StreamingExecutor` now uses member CV (`cv_data_ready_`) with predicate-based wait and graceful shutdown. See `docs/technical-notes/streaming-executor-async-wait-optimization-issue55.md`.
 
-### 2. Direct Device Extraction
+### 2. Direct Device Extraction (Zero-Copy) ✅ Completed
 
-**Current flow:**
+**Previous flow:**
 ```
 Ring buffer → Staging buffer → Device buffer
 ```
 
-**Optimized flow:**
+**Current flow (Phase 1.1):**
 ```
-Ring buffer → Device buffer (direct cudaMemcpyAsync)
+Ring buffer → Device buffer (direct cudaMemcpyAsync via peek_frame())
 ```
 
-**Expected benefit:** 50-100 µs savings (eliminate staging buffer copy)
+**Achieved benefit:** Staging buffer eliminated; memory reduced 295KB→262KB; H2D overhead reduced +80%→+60%
 
 ### 3. Per-Channel Parallel Processing
 
@@ -261,7 +263,7 @@ Performance data saved in `artifacts/data/`:
 # Run complete execution mode comparison
 python benchmarks/run_latency.py \
     experiment=execution_mode_comparison \
-    +benchmark=latency_mode_comparison
+    +benchmark=latency
 
 # Results saved to artifacts/data/latency_summary_*_2.csv
 ```
@@ -299,7 +301,7 @@ python benchmarks/run_latency.py \
 
 ## References
 
-- **Ring buffer implementation:** `cpp/include/ionosense/core/ring_buffer.hpp` (v0.9.5)
+- **Ring buffer implementation:** `cpp/include/sigtekx/core/ring_buffer.hpp` (v0.9.5)
 - **Executor configuration:** `cpp/include/ionosense/core/executor_config.hpp` (v0.9.5)
 - **Streaming executor:** `cpp/src/executors/streaming_executor.cpp`
 - **Benchmark configs:** `experiments/conf/benchmark/latency_mode_comparison.yaml`

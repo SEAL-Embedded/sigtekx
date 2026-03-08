@@ -105,7 +105,7 @@ cudaSetDeviceFlags(cudaDeviceScheduleBlockingSync);
 
 **Command**:
 ```powershell
-ionoc bench --preset latency --full --ionosphere --lock-clocks
+sigxc bench --preset latency --full --iono --lock-clocks
 ```
 
 **Impact**:
@@ -183,28 +183,28 @@ ionoc bench --preset latency --full --ionosphere --lock-clocks
 ### For Development
 ```powershell
 # Quick validation (no clock locking needed)
-ionoc bench
+sigxc bench
 
 # Consistent results for debugging
-ionoc bench --preset latency --full --lock-clocks
+sigxc bench --preset latency --full --lock-clocks
 ```
 
 ### For Production/Research
 ```powershell
 # Always lock clocks for publication-quality benchmarks
-ionoc bench --preset latency --full --ionosphere --lock-clocks
+sigxc bench --preset latency --full --iono --lock-clocks
 
 # Save baseline with locked clocks
-ionoc bench --preset latency --full --lock-clocks --save-baseline
+sigxc bench --preset latency --full --lock-clocks --save-baseline
 
 # Compare against baseline
-ionoc bench --preset latency --full --lock-clocks
+sigxc bench --preset latency --full --lock-clocks
 ```
 
 ### For Realtime Applications
 ```powershell
 # Focus on compliance rate, not CV
-ionoc bench --preset realtime --full --ionosphere --lock-clocks
+sigxc bench --preset realtime --full --iono --lock-clocks
 
 # Expected: CV 40-60% (accepted), Compliance 100% (excellent)
 ```

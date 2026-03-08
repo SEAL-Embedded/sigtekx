@@ -238,7 +238,7 @@ cat artifacts/data/summary_statistics.csv
 - [ ] Design ring buffer architecture for StreamingExecutor
 - [ ] Implement circular buffer with producer/consumer pattern
 - [ ] Add CUDA stream synchronization for ring rotation
-- [ ] Profile with C++ benchmarks (`ionoc bench`)
+- [ ] Profile with C++ benchmarks (`sigxc bench`)
 
 ### 2. Performance Validation
 - [ ] Run C++ benchmarks before/after

@@ -11,7 +11,7 @@
 
 **Overall Verdict**: ✅ **EXCELLENT THREAD SAFETY HYGIENE**
 
-The Ionosense HPC C++ codebase demonstrates strong thread safety practices with only minor issues in test code. The production codebase is **clean, thread-compatible, and ready for concurrent usage** following the instance-per-thread pattern.
+The SigTekX C++ codebase demonstrates strong thread safety practices with only minor issues in test code. The production codebase is **clean, thread-compatible, and ready for concurrent usage** following the instance-per-thread pattern.
 
 ### Key Findings
 
@@ -344,7 +344,7 @@ cudaStreamWaitEvent(streams_[compute_stream_idx].get(), e_h2d_done.get(), 0);
 | `std::vector` | Thread-compatible | No |
 | Eigen | Thread-compatible | No |
 | cuBLAS | Thread-compatible | No |
-| **Ionosense HPC** | Thread-compatible | No ✅ |
+| **SigTekX** | Thread-compatible | No ✅ |
 
 **Intended Usage**:
 - ✅ Per-thread instances (no locking needed)
@@ -590,7 +590,7 @@ __global__ void apply_window_kernel(
 
 ## 11. Conclusion
 
-The Ionosense HPC C++ codebase demonstrates **excellent thread safety hygiene**:
+The SigTekX C++ codebase demonstrates **excellent thread safety hygiene**:
 
 ✅ **Strengths**:
 - No thread-hostile functions in production code

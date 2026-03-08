@@ -1,7 +1,6 @@
 # Benchmark Timing Strategy Analysis
 
 **Date**: 2025-10-15
-**Author**: Claude (AI Assistant)
 **Context**: Investigation into benchmark stability (Coefficient of Variation) improvements
 
 ## Executive Summary
@@ -346,7 +345,7 @@ Background OS activity (DWM, antivirus, etc.) competes for PCIe bandwidth.
 
 **Priority 1 - GPU Clock Locking** ⭐ **IMPLEMENTED** (see `docs/gpu-clock-locking.md`)
 ```bash
-ionoc bench --preset latency --full --ionosphere --lock-clocks
+sigxc bench --preset latency --full --iono --lock-clocks
 ```
 **Expected Impact**: CV reduction from 22% to **10-15%**
 - Eliminates GPU Boost variability

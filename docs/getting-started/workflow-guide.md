@@ -1,92 +1,116 @@
-# Complete Ionosphere Experiment Workflow Guide
+# Experiment Workflow Guide
 
-This guide walks through the supported path for running end-to-end ionosphere studies. The workflow relies on direct Python entry points for experimentation and Snakemake for orchestration. Use the `sigx` CLI only for environment setup, formatting, linting, builds, profiling, and other maintenance tasks.
+This guide covers the supported paths for running end-to-end benchmark studies. The workflow uses direct Python entry points for individual experiments and Snakemake for full pipeline orchestration.
 
-**Note:** This guide uses the unified API (v0.9.3+). All experiment configurations use Hydra YAML files which are fully compatible with the new `EngineConfig`. For direct Python API usage, see `docs/guides/api-reference.md`.
+**Version:** v0.9.5+
+**See also:** `docs/benchmarking/experiment-guide.md` for the complete experiment taxonomy, `CLAUDE.md` for the full command reference.
 
-## Quick Start (Recommended)
+---
 
-Run the full benchmark -> analysis -> reporting pipeline with Snakemake:
+## Quick Start
+
+### Full Pipeline (Snakemake)
+
+Run all benchmark experiments and generate data for the dashboard:
 
 ```bash
 snakemake --cores 4 --snakefile experiments/Snakefile
 ```
 
-- Adjust `--cores` to match available CPU resources.
-- Snakemake will execute all benchmark sweeps, derive summary statistics, generate figures (PNG and SVG), and build the final HTML report under `artifacts/`.
-- Use `snakemake --cores 4 --snakefile experiments/Snakefile --dry-run` to preview the steps without executing them.
+- Executes all configured benchmark sweeps and writes CSVs to `artifacts/data/`
+- Preview steps without executing: `snakemake --dry-run --snakefile experiments/Snakefile`
+- View results interactively: `sigx dashboard`
 
-![Experiment and Analysis Workflow Overview](../diagrams/figures/exp-analysis-workflow.svg)
-
-### Useful Snakemake targets
+### Single Experiment (Direct)
 
 ```bash
-# Minimal smoke test of the pipeline
-snakemake --cores 1 --snakefile experiments/Snakefile test
+# Quick validation (~5 min)
+python benchmarks/run_latency.py experiment=ionosphere_test +benchmark=latency
 
-# Clean generated artifacts (uses the Snakefile rule, not the iono CLI)
-snakemake --cores 1 --snakefile experiments/Snakefile clean
+# Standard streaming latency study
+python benchmarks/run_latency.py experiment=ionosphere_streaming +benchmark=latency
+
+# Streaming throughput
+python benchmarks/run_throughput.py experiment=ionosphere_streaming_throughput +benchmark=throughput
 ```
 
-## Benchmarks and Analysis (Direct Commands)
+**Critical:** Always specify `+benchmark=latency` or `+benchmark=throughput` — no default is set.
 
-Each benchmark script is a Hydra application that accepts configuration overrides. The Snakemake rules call these same commands under the hood. You can run them manually for iterative development:
+---
 
-![Manual Workflow Sequence](../diagrams/figures/exp-workflow-sequence.svg)
+## Experiment Reference
+
+Experiment configs live in `experiments/conf/experiment/`. Select one with `experiment=<name>`:
+
+### Ionosphere Research (48 kHz, 2-channel)
+
+| Experiment | Mode | Purpose | Command |
+|------------|------|---------|---------|
+| `ionosphere_test` | Mixed | Quick sanity check | `run_latency.py experiment=ionosphere_test +benchmark=latency` |
+| `ionosphere_streaming` | STREAMING | Standard real-time VLF/ULF | `run_latency.py experiment=ionosphere_streaming +benchmark=latency` |
+| `ionosphere_streaming_hires` | STREAMING | High frequency resolution | `run_latency.py experiment=ionosphere_streaming_hires +benchmark=latency` |
+| `ionosphere_streaming_latency` | STREAMING | Latency-optimised | `run_latency.py experiment=ionosphere_streaming_latency +benchmark=latency` |
+| `ionosphere_streaming_throughput` | STREAMING | Max throughput | `run_throughput.py experiment=ionosphere_streaming_throughput +benchmark=throughput` |
+| `ionosphere_batch_throughput` | BATCH | Offline max throughput | `run_throughput.py experiment=ionosphere_batch_throughput +benchmark=throughput` |
+
+### Baseline Performance (General)
+
+| Experiment | Mode | Purpose |
+|------------|------|---------|
+| `baseline_100k` | Mixed | Quick 100 kHz coverage |
+| `baseline_batch_100k_latency` | BATCH | Detailed batch latency (45 configs) |
+| `baseline_streaming_100k_latency` | STREAMING | Detailed streaming latency (45 configs) |
+| `baseline_streaming_100k_realtime` | STREAMING | Real-time factor validation |
+| `baseline_48k` | Mixed | Quick 48 kHz coverage |
+
+### Analysis & Validation
+
+| Experiment | Purpose |
+|------------|---------|
+| `execution_mode_comparison` | BATCH vs STREAMING comparison |
+| `full_parameter_grid_100k` | Exhaustive 100 kHz sweep (~60 min) |
+| `accuracy_validation` | Correctness vs SciPy reference |
+| `low_nfft_scaling` | Low-latency NFFT study |
+
+For the complete list and selection guide, see `docs/benchmarking/experiment-guide.md`.
+
+---
+
+## Direct Benchmark Commands
+
+Each benchmark script is a Hydra application. The Snakemake rules call these same commands under the hood.
 
 ```bash
-# Throughput sweep
-python benchmarks/run_throughput.py --multirun \
-    experiment=baseline \
-    +benchmark=throughput \
-    "engine.channels=1,2,4,8,16,32,64"
-
-# Latency sweep
+# Latency sweep across NFFT values
 python benchmarks/run_latency.py --multirun \
-    experiment=baseline \
+    experiment=baseline_streaming_100k_latency \
     +benchmark=latency \
-    "engine.nfft=256,512,1024,2048,4096,8192"
+    "engine.nfft=1024,2048,4096,8192"
 
-# Accuracy sweep
-python benchmarks/run_accuracy.py --multirun \
-    experiment=baseline \
-    +benchmark=accuracy \
-    "engine.nfft=1024,2048,4096" \
-    "benchmark.iterations=100"
+# Throughput sweep across channel counts
+python benchmarks/run_throughput.py --multirun \
+    experiment=baseline_batch_100k_throughput \
+    +benchmark=throughput \
+    "engine.channels=1,2,4,8"
 
-# Analysis pipeline steps
-python experiments/scripts/analyze.py
-python experiments/scripts/generate_figures.py
-python experiments/scripts/generate_report.py \
-    --input artifacts/data/summary_statistics.csv \
-    --figures-dir artifacts/figures \
-    --output artifacts/reports/final_report.html
+# Accuracy validation
+python benchmarks/run_accuracy.py \
+    experiment=accuracy_validation \
+    +benchmark=accuracy
 ```
 
-These commands respect the configuration defined in `experiments/conf/` and write all outputs under `artifacts/` (or the directory pointed to by `SIGX_OUTPUT_ROOT`).
+Outputs land in `artifacts/data/` as unique per-configuration CSVs and `artifacts/mlruns/` for MLflow tracking.
 
-## Experiment Presets
-
-Hydra experiment presets live in `experiments/conf/experiment/`. Select a preset by overriding the `experiment=` parameter:
-
-| Preset | Purpose | Runtime | Command Snippet |
-|--------|---------|---------|-----------------|
-| `ionosphere_resolution` | High-resolution frequency analysis | 20-30 min | `python benchmarks/run_throughput.py --multirun experiment=ionosphere_resolution +benchmark=throughput` |
-| `ionosphere_temporal` | Temporal characteristics optimisation | 30-45 min | `python benchmarks/run_latency.py --multirun experiment=ionosphere_temporal +benchmark=latency` |
-| `ionosphere_multiscale` | Comprehensive multi-scale analysis | 60+ min | `python benchmarks/run_accuracy.py --multirun experiment=ionosphere_multiscale +benchmark=accuracy` |
-| `quick_test` | Fast validation sweep | 5-10 min | `python benchmarks/run_latency.py experiment=quick_test +benchmark=latency benchmark.iterations=10` |
-| `baseline` | Standard comparison point | 15-25 min | `python benchmarks/run_throughput.py --multirun experiment=baseline +benchmark=throughput` |
-
-Combine presets with additional Hydra overrides (e.g., `engine.nfft=2048,4096` or `benchmark.iterations=50`) to explore parameter space.
+---
 
 ## Custom Experiments
 
-1. Create a new experiment config in `experiments/conf/experiment/my_custom.yaml`:
+1. Create `experiments/conf/experiment/my_study.yaml`:
 
     ```yaml
     # @package _global_
     defaults:
-      - override /engine: ionosphere_hires
+      - override /engine: ionosphere_streaming
 
     experiment:
       name: my_custom_study
@@ -99,58 +123,82 @@ Combine presets with additional Hydra overrides (e.g., `engine.nfft=2048,4096` o
         params:
           engine.nfft: 2048,4096,8192
           engine.overlap: 0.5,0.75
-          engine.channels: 8,16,32
     ```
 
-2. Run the desired benchmark directly with Hydra overrides:
+2. Run directly:
 
     ```bash
-    python benchmarks/run_throughput.py --multirun \
-        experiment=my_custom_study \
-        +benchmark=throughput
-
+    python benchmarks/run_latency.py --multirun \
+        experiment=my_study \
+        +benchmark=latency
     ```
 
-   To fold the preset into the Snakemake pipeline, update the Hydra overrides inside `experiments/Snakefile` so the `experiment=` argument references `my_custom_study`.
+3. To include in Snakemake, add a rule to `experiments/Snakefile` following the existing pattern.
+
+---
 
 ## Viewing Results
 
-```bash
-# Launch the MLflow tracking UI to compare runs
-mlflow ui --backend-store-uri file://./artifacts/mlruns
+### Streamlit Dashboard (Recommended)
 
-# Open the generated HTML report (Windows / macOS examples)
-start artifacts/reports/final_report.html
-open artifacts/reports/final_report.html
+```bash
+sigx dashboard        # Opens at http://localhost:8501
 ```
 
-Outputs are organised as follows:
+The dashboard automatically loads all CSV files from `artifacts/data/` and provides interactive filtering, comparison, and export.
 
-- `artifacts/mlruns/` - MLflow tracking data for every Hydra sweep.
-- `artifacts/data/` - Raw measurements and derived summary statistics.
-- `artifacts/figures/` - PNG and SVG figures produced by the analysis scripts.
-- `artifacts/reports/` - Human-readable HTML report summarising each study.
+### MLflow UI (Run History)
+
+```bash
+mlflow ui --backend-store-uri file://./artifacts/mlruns --port 5000
+# Opens at http://localhost:5000
+```
+
+Useful for querying specific runs by parameter, comparing metrics across runs, and downloading artifacts.
+
+### Targeted Snakemake Runs
+
+```bash
+# Run a single specific experiment
+snakemake --cores 4 --snakefile experiments/Snakefile run_baseline_streaming_100k_latency
+
+# Run all streaming baseline experiments
+snakemake --cores 4 --snakefile experiments/Snakefile \
+  run_baseline_streaming_100k_latency \
+  run_baseline_streaming_100k_throughput \
+  run_baseline_streaming_100k_realtime
+```
+
+---
 
 ## Troubleshooting
 
-- **Environment validation**: run `python benchmarks/run_latency.py --help` to confirm dependencies resolve and Hydra loads correctly.
-- **Dry-run the pipeline**: `snakemake --cores 1 --snakefile experiments/Snakefile --dry-run` shows the planned steps without executing them.
-- **Configuration validation**: `python experiments/conf/validation.py experiments/conf/experiment/ionosphere_resolution.yaml`.
-- **MLflow port conflicts**: `mlflow ui --backend-store-uri file://./artifacts/mlruns --port 5000`.
-- **Missing Python packages**: `pip install hydra-core mlflow snakemake pandas matplotlib seaborn plotly`.
+- **Hydra config not found**: confirm you're in the repo root, and the experiment YAML exists in `experiments/conf/experiment/`.
+- **Missing `+benchmark=` error**: always specify `+benchmark=latency` or `+benchmark=throughput` — there is no default.
+- **Dry-run to preview**: `snakemake --dry-run --snakefile experiments/Snakefile`
+- **Config validation**: `python experiments/conf/validation.py experiments/conf/experiment/<name>.yaml`
+- **MLflow port conflict**: `mlflow ui --backend-store-uri file://./artifacts/mlruns --port 5001`
+- **Environment issues**: run `./scripts/cli.ps1 doctor` to check system health.
+
+---
 
 ## Typical Journeys
 
-- **Quick smoke test**: `snakemake --cores 1 --snakefile experiments/Snakefile test`.
-- **Frequency resolution comparison**: `python benchmarks/run_throughput.py --multirun experiment=ionosphere_resolution +benchmark=throughput`.
-- **Temporal optimisation**: `python benchmarks/run_latency.py --multirun experiment=ionosphere_temporal +benchmark=latency`.
-- **Comprehensive study**: `snakemake --cores 8 --snakefile experiments/Snakefile` (ensure the Snakefile rules target `experiment=ionosphere_multiscale`).
+| Goal | Command |
+|------|---------|
+| Quick sanity check | `python benchmarks/run_latency.py experiment=ionosphere_test +benchmark=latency` |
+| Full pipeline + dashboard | `snakemake --cores 4 --snakefile experiments/Snakefile && sigx dashboard` |
+| Streaming real-time study | `python benchmarks/run_latency.py experiment=ionosphere_streaming +benchmark=latency` |
+| Comprehensive sweep | `snakemake --cores 8 --snakefile experiments/Snakefile run_full_parameter_grid_100k` |
+| Accuracy verification | `python benchmarks/run_accuracy.py experiment=accuracy_validation +benchmark=accuracy` |
+
+---
 
 ## Next Steps
 
-1. Execute the Snakemake quick start to generate baseline figures and reports.
-2. Inspect the HTML report and MLflow UI for initial insights.
-3. Iterate with targeted benchmark commands to explore alternative presets or overrides.
-4. Capture adjustments to experiment configs under version control for reproducibility.
+1. Run `ionosphere_test` to confirm the environment is healthy.
+2. Run `sigx dashboard` to explore results.
+3. Use targeted experiment commands to study specific parameters.
+4. Commit your experiment configs to version control for reproducibility.
 
-Need help? Review the output logs produced in `artifacts/logs/`, consult `docs/guides/development.md` for debugging tips, or open an issue with the exact command and configuration details.
+For debugging, check `artifacts/logs/` for run logs, or open an issue with the exact command and config details.

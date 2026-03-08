@@ -94,7 +94,7 @@ Created `experiments/analysis/` package with 7 modules:
 
 ### **Phase 5: Workflow Integration**
 - ✅ Updated `experiments/Snakefile`
-  - Uses ionosphere experiment configs (`ionosphere_resolution`, `ionosphere_temporal`, `ionosphere_test`)
+  - Uses ionosphere experiment configs (`ionosphere_streaming`, `ionosphere_streaming_hires`, `ionosphere_test`)
   - Calls new CLI: `python -m experiments.analysis.cli`
   - Generates dual reports + interactive plots
   - Fixed output paths: `artifacts/reports/plots/`
@@ -145,11 +145,11 @@ Created `experiments/analysis/` package with 7 modules:
 ```bash
 # High-resolution analysis
 python benchmarks/run_throughput.py --multirun \
-    experiment=ionosphere_resolution +benchmark=throughput
+    experiment=ionosphere_streaming_hires +benchmark=throughput
 
 # Latency analysis
 python benchmarks/run_latency.py --multirun \
-    experiment=ionosphere_resolution +benchmark=latency
+    experiment=ionosphere_streaming +benchmark=latency
 ```
 
 ### **2. Generate Reports**
@@ -212,9 +212,8 @@ Scaling Analysis:
 snakemake --cores 4 --snakefile experiments/Snakefile
 
 # Individual steps
-snakemake run_ionosphere_resolution  # Experiments
-snakemake analyze_results            # Analysis
-snakemake generate_reports           # Reports + plots
+snakemake run_ionosphere_streaming      # Experiments
+snakemake run_ionosphere_streaming_hires
 ```
 
 ---
@@ -458,7 +457,6 @@ The system is ready for production use with ionosphere research workflows.
 
 ---
 
-**Author**: Claude Code
 **Date**: 2025-10-30
-**Ionosense HPC Version**: 0.9.4
+**SigTekX Version**: 0.9.5
 **Status**: ✅ COMPLETE

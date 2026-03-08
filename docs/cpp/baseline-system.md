@@ -66,7 +66,7 @@ Each baseline includes comprehensive metadata in `metadata.json`:
       "cuda_driver": "561.09"
     },
     "cpu": {
-      "model": "AMD Ryzen 9 7950X",
+      "model": "AMD Ryzen 9 5950X",
       "cores": 16,
       "threads": 32
     },
@@ -433,7 +433,7 @@ EXPECT_EQ(manifest.baselines.size(), 10);
 
 | Feature                  | Python Baseline System | C++ Baseline System |
 |--------------------------|------------------------|---------------------|
-| **Storage Location**     | `baselines/python/`    | `baselines/cpp/`    |
+| **Storage Location**     | `baselines/`           | `baselines/cpp/`    |
 | **Primary Use Case**     | Production experiment tracking | C++ kernel development iteration |
 | **Phase Support**        | Yes (Phase 1, Phase 2, etc.) | No (simpler model) |
 | **Scope Management**     | Yes (minimal, standard, full) | No (single scope) |
@@ -566,5 +566,5 @@ git branch --show-current
 
 - **Python Baseline System**: `src/sigtekx/utils/baseline.py`
 - **GPU Clock Locking**: `docs/performance/gpu-clock-locking.md`
-- **C++ Benchmarking Guide**: `docs/cpp/benchmarking-guide.md` (future)
+- **CLAUDE.md C++ Development Workflow**: Quick reference for `sigxc` commands
 - **CLAUDE.md**: Quick reference for CLI commands

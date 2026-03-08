@@ -4,7 +4,7 @@
 
 **Status**: ✅ Implemented and Validated (C++: 2025-10-15, Python: 2025-10-17)
 
-**Platforms**: C++ (`ionoc bench --lock-clocks`) | Python (`benchmark.lock_gpu_clocks=true`)
+**Platforms**: C++ (`sigxc bench --lock-clocks`) | Python (`benchmark.lock_gpu_clocks=true`)
 
 ---
 
@@ -14,7 +14,7 @@
 
 ```powershell
 # Lock GPU clocks for stable C++ benchmarking (requires UAC prompt)
-ionoc bench --preset latency --full --ionosphere --lock-clocks
+sigxc bench --preset latency --full --iono --lock-clocks
 ```
 
 ### Python Benchmarks
@@ -24,7 +24,7 @@ ionoc bench --preset latency --full --ionosphere --lock-clocks
 python benchmarks/run_latency.py +benchmark=latency benchmark.lock_gpu_clocks=true
 
 # Or via iono profile command
-iprof nsys latency  # With lock_gpu_clocks=true in YAML
+sxp nsys latency  # With lock_gpu_clocks=true in YAML
 ```
 
 That's it! The system will:
@@ -114,24 +114,24 @@ nvidia-smi -lmc 10251
 
 ## Usage
 
-### C++ Benchmarks (ionoc)
+### C++ Benchmarks (sigxc)
 
 **Basic Usage:**
 ```powershell
 # Use recommended clocks (default)
-ionoc bench --preset latency --full --lock-clocks
+sigxc bench --preset latency --full --lock-clocks
 
 # Use max clocks for peak performance
-ionoc bench --preset latency --full --lock-clocks --max-clocks
+sigxc bench --preset latency --full --lock-clocks --max-clocks
 ```
 
 **Multi-GPU Systems:**
 ```powershell
 # Lock GPU 0 (default)
-ionoc bench --preset latency --full --lock-clocks
+sigxc bench --preset latency --full --lock-clocks
 
 # Lock GPU 1
-ionoc bench --preset latency --full --lock-clocks --gpu-index 1
+sigxc bench --preset latency --full --lock-clocks --gpu-index 1
 ```
 
 ### Python Benchmarks (Hydra)
@@ -173,7 +173,7 @@ use_max_clocks: false   # Use max clocks vs recommended
 Then run normally:
 ```bash
 python benchmarks/run_latency.py +benchmark=latency
-iprof nsys latency
+sxp nsys latency
 ```
 
 ### Manual Control (Advanced)
@@ -186,7 +186,7 @@ pwsh scripts/gpu-manager.ps1 -Action Query
 pwsh scripts/gpu-manager.ps1 -Action Lock -GpuIndex 0
 
 # Run benchmarks (clocks stay locked)
-ionoc bench --preset latency --full
+sigxc bench --preset latency --full
 
 # Unlock when done
 pwsh scripts/gpu-manager.ps1 -Action Unlock -GpuIndex 0
@@ -272,7 +272,7 @@ Both C++ and Python implementations handle UAC elevation **automatically**:
 **From Non-Admin PowerShell:**
 ```powershell
 # You run this in regular PowerShell (NOT admin)
-ionoc bench --preset latency --full --lock-clocks
+sigxc bench --preset latency --full --lock-clocks
 
 # What happens:
 # 1. Script detects you're not admin
@@ -286,7 +286,7 @@ ionoc bench --preset latency --full --lock-clocks
 **From Admin PowerShell:**
 ```powershell
 # You opened PowerShell as administrator
-ionoc bench --preset latency --full --lock-clocks
+sigxc bench --preset latency --full --lock-clocks
 
 # What happens:
 # 1. Script detects you're already admin
@@ -401,7 +401,7 @@ If you click "No" or cancel the UAC prompt:
 
 **C++ Benchmarks:**
 ```powershell
-ionoc bench --preset latency --full --lock-clocks
+sigxc bench --preset latency --full --lock-clocks
 # UAC appears, you click "No"
 # Result: Benchmark aborts with error message
 ```
@@ -445,8 +445,8 @@ python benchmarks/run_latency.py +benchmark=latency benchmark.lock_gpu_clocks=tr
 pwsh scripts/gpu-manager.ps1 -Action Lock
 
 # Run multiple benchmarks (clocks stay locked)
-ionoc bench --preset latency --full
-ionoc bench --preset realtime --full
+sigxc bench --preset latency --full
+sigxc bench --preset realtime --full
 
 # Unlock when done
 pwsh scripts/gpu-manager.ps1 -Action Unlock
@@ -490,10 +490,10 @@ pwsh scripts/gpu-manager.ps1 -Action Unlock
 
 ```powershell
 # Quick dev iteration (no clock locking needed)
-ionoc bench
+sigxc bench
 
 # When you need consistent results
-ionoc bench --preset latency --full --lock-clocks
+sigxc bench --preset latency --full --lock-clocks
 ```
 
 ### For Python Research/Production
@@ -508,7 +508,7 @@ python benchmarks/run_latency.py +benchmark=latency \
 
 # Run experiment sweeps with locked clocks
 python benchmarks/run_throughput.py --multirun \
-  experiment=ionosphere_resolution \
+  experiment=ionosphere_streaming \
   +benchmark=throughput \
   benchmark.lock_gpu_clocks=true
 ```
@@ -518,10 +518,10 @@ python benchmarks/run_throughput.py --multirun \
 **C++ Profiling:**
 ```powershell
 # Lock clocks for stable profiling
-ionoc bench --preset latency --profile --lock-clocks
+sigxc bench --preset latency --profile --lock-clocks
 
 # Then profile with locked clocks still active
-ionoc profile nsys --stats
+sigxc profile nsys --stats
 ```
 
 **Python Profiling:**
@@ -530,8 +530,8 @@ ionoc profile nsys --stats
 # lock_gpu_clocks: true
 
 # Then run profiling
-iprof nsys latency
-iprof ncu latency
+sxp nsys latency
+sxp ncu latency
 ```
 
 ---
@@ -677,7 +677,7 @@ Clock locking **does not** slow down your GPU! It:
 
 **Always use clock locking for production benchmarks**:
 ```powershell
-ionoc bench --preset latency --full --ionosphere --lock-clocks
+sigxc bench --preset latency --full --iono --lock-clocks
 ```
 
 **Why it works**:

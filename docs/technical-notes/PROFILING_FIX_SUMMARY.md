@@ -194,7 +194,7 @@ Run `python scripts/prof_helper.py --help` to see comprehensive documentation.
 ## Documentation Updates
 
 - **prof_helper.py --help**: Comprehensive argument order explanation + examples
-- **iono help**: Quick reference with common override patterns
+- **sigx help**: Quick reference with common override patterns
 - **CLAUDE.md**: Full profiling workflow documentation
 
 ---
