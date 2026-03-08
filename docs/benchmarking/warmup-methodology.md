@@ -540,7 +540,6 @@ if kernel_cache.is_compiled('cuFFT_forward_1024'):
 - HPC Challenge Benchmark Specification: http://icl.cs.utk.edu/hpcc/
 - IEEE HPEC Call for Papers: https://ieee-hpec.org/call-for-papers/
 - SigTekX GPU Clock Locking Guide: `docs/performance/gpu-clock-locking.md`
-- SigTekX Methods Paper Roadmap: `docs/development/methods-paper-roadmap.md`
 
 ---
 

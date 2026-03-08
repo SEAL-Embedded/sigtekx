@@ -4,17 +4,16 @@ Comprehensive documentation for the sigtekx CUDA-accelerated FFT processing libr
 
 ---
 
-## 📚 Quick Navigation
+## Quick Navigation
 
 ### Getting Started
 - [Installation Guide](getting-started/install.md) - Environment setup for Windows and Linux
 - [Workflow Guide](getting-started/workflow-guide.md) - Development workflow and CLI usage
 
-### User Guides
-- [API Reference](guides/api-reference.md) - Complete Python API documentation
-- [Benchmarking Guide](guides/benchmarking.md) - Performance testing and profiling
-- [Development Guide](guides/development.md) - Contributing and development workflow
-- [Contributing Guidelines](guides/contributing.md) - How to create issues and pull requests
+### Reference
+- [API Reference](reference/api-reference.md) - Complete Python API documentation
+- [Configuration Guide](reference/configuration.md) - EngineConfig and StageConfig reference
+- [Benchmarking Guide](benchmarking/) - Performance testing and profiling
 
 ### Architecture & Design
 - [Architecture Overview](architecture/overview.md) - System design and components
@@ -22,10 +21,10 @@ Comprehensive documentation for the sigtekx CUDA-accelerated FFT processing libr
 - [Project Structure](architecture/project-structure.md) - Codebase organization
 - [Python Package Structure](architecture/python-package-structure.md) - Python package reading order
 - **[Thread Safety](architecture/thread-safety.md)** - Multi-threading guide and thread safety guarantees
-- [Architecture Diagrams](architecture/diagrams/) - Visual system documentation
+- [Architecture Diagrams](diagrams/) - Visual system documentation
 
 ### Performance & Optimization
-- **[Stability Improvements](performance/stability-improvements.md)** - ⭐ Executive summary of CV reduction journey
+- **[Stability Improvements](performance/stability-improvements.md)** - Executive summary of CV reduction journey
 - [GPU Clock Locking](performance/gpu-clock-locking.md) - Benchmark stability guide (CV: 40% → 18.72%)
 - [Benchmark Timing Strategies](performance/benchmark-timing-strategies.md) - Technical deep-dive into timing optimization
 
@@ -33,37 +32,37 @@ Comprehensive documentation for the sigtekx CUDA-accelerated FFT processing libr
 - [IEEE754 Compliance](technical-notes/ieee754-compliance.md) - Floating-point accuracy validation
 - [Buffer Synchronization Fix](technical-notes/buffer-synchronization-fix.md) - Multi-buffer pipeline synchronization
 - [Thread Safety Audit v0.9.3](technical-notes/thread-safety-audit-v0.9.3.md) - Comprehensive thread safety analysis
+- [Spectrogram Pipeline Guide](technical-notes/spectrogram-pipeline-guide.md) - STFT pipeline walkthrough
 
 ---
 
-## 🚀 Recommended Reading Order
+## Recommended Reading Order
 
-### For New Users
-1. [Installation Guide](getting-started/install.md)
-2. [API Reference](guides/api-reference.md)
-3. [Benchmarking Guide](guides/benchmarking.md)
+### For Users / Researchers
+1. [Installation](getting-started/install.md)
+2. [Workflow Guide](getting-started/workflow-guide.md)
+3. [API Reference](reference/api-reference.md)
+4. [Benchmarking](benchmarking/)
+
+### For Technical Recruiters / Hiring Managers
+1. [Architecture Overview](architecture/overview.md)
+2. [Project Structure](architecture/project-structure.md)
+3. [Executor Architecture](architecture/executors.md)
+4. [Ring Buffer Optimization](performance/ring-buffer-optimization-results.md)
+
+### For JOSS Reviewers / Academic Evaluators
+1. [Architecture Overview](architecture/overview.md)
+2. [Executor Architecture](architecture/executors.md)
+3. [IEEE754 Compliance](technical-notes/ieee754-compliance.md)
+4. [Experiment Guide](benchmarking/experiment-guide.md)
+5. [Stability Improvements](performance/stability-improvements.md)
 
 ### For Contributors
-1. [Development Guide](guides/development.md)
-2. [Architecture Overview](architecture/overview.md)
-3. [Executor Architecture](architecture/executors.md)
-4. [Thread Safety](architecture/thread-safety.md)
-5. [Contributing Guidelines](guides/contributing.md)
-
-### For Performance Optimization
-1. **[Stability Improvements](performance/stability-improvements.md)** - Start here!
-2. [GPU Clock Locking](performance/gpu-clock-locking.md)
-3. [Benchmark Timing Strategies](performance/benchmark-timing-strategies.md)
-
-### For Researchers
-1. **[Experiment Guide](benchmarking/experiment-guide.md)** - Start here!
-2. [Benchmarking Guide](guides/benchmarking.md)
-3. [Stability Improvements](performance/stability-improvements.md)
-4. [Architecture Diagrams](architecture/diagrams/)
+See [CONTRIBUTING.md](../CONTRIBUTING.md) at repo root.
 
 ---
 
-## 📖 Documentation Categories
+## Documentation Categories
 
 ### Getting Started
 Everything needed to install and start using the library.
@@ -78,16 +77,15 @@ Everything needed to install and start using the library.
 
 ---
 
-### User Guides
+### Reference
 Comprehensive guides for using the library effectively.
 
 **Key Topics**:
 - Python API reference
 - Benchmarking and profiling
-- Development practices
-- Contributing guidelines
+- Configuration reference
 
-**Files**: `guides/`
+**Files**: `reference/`
 
 ---
 
@@ -119,7 +117,7 @@ Comprehensive experiment taxonomy and benchmarking methodology.
 **Files**: `benchmarking/`
 
 **Highlights**:
-- ⭐ [experiment-guide.md](benchmarking/experiment-guide.md) - Complete experiment taxonomy and selection guide
+- [experiment-guide.md](benchmarking/experiment-guide.md) - Complete experiment taxonomy and selection guide
 - [warmup-methodology.md](benchmarking/warmup-methodology.md) - Warmup iteration methodology
 - [rtf-convention-mapping.md](benchmarking/rtf-convention-mapping.md) - Real-Time Factor conventions
 - [thermal-degradation-protocol.md](benchmarking/thermal-degradation-protocol.md) - GPU thermal testing
@@ -138,7 +136,7 @@ Detailed performance analysis and optimization strategies.
 **Files**: `performance/`
 
 **Highlights**:
-- ⭐ [stability-improvements.md](performance/stability-improvements.md) - Executive summary of 4-phase optimization
+- [stability-improvements.md](performance/stability-improvements.md) - Executive summary of 4-phase optimization
 - [gpu-clock-locking.md](performance/gpu-clock-locking.md) - Production-ready guide with validated results
 - [benchmark-timing-strategies.md](performance/benchmark-timing-strategies.md) - Technical deep-dive
 
@@ -158,100 +156,82 @@ Detailed technical documentation on specific features and fixes.
 
 ---
 
-## 🎯 Quick Links
+## Quick Links
 
 ### Common Tasks
 
 **Run a Benchmark**:
 ```powershell
 # Quick test
-ionoc bench
+sigxc bench
 
 # Production latency benchmark with clock locking
-ionoc bench --preset latency --full --ionosphere --lock-clocks
+sigxc bench --preset latency --full --ionosphere --lock-clocks
 ```
 
 **Profile Performance**:
 ```powershell
 # Nsight Systems profiling
-iprof nsys latency --stats
+sxp nsys latency --stats
 
 # Nsight Compute kernel analysis
-iprof ncu latency --set roofline
+sxp ncu latency --set roofline
 ```
 
 **Save Baseline**:
 ```powershell
-ionoc bench --preset latency --full --lock-clocks --save-baseline
+sigxc bench --preset latency --full --lock-clocks --save-baseline
 ```
 
 **View Documentation**:
 - Start with: [Stability Improvements](performance/stability-improvements.md)
 - For setup: [Installation Guide](getting-started/install.md)
-- For API: [API Reference](guides/api-reference.md)
+- For API: [API Reference](reference/api-reference.md)
 
 ---
 
-## 📊 Key Achievements
+## Key Achievements
 
 ### Benchmark Stability
 **Final CV: 18.72%** (down from 40% - 53% improvement)
 
 | Phase | Implementation | Result |
 |-------|----------------|--------|
-| Phase 1 | Blocking sync | ✅ 26% better |
-| Phase 2 | Hybrid timing | ✅ 33% better |
-| Phase 3 | Warmup + outliers | ✅ 31% better |
-| Phase 4 | GPU clock locking | ✅ 24% better |
+| Phase 1 | Blocking sync | 26% better |
+| Phase 2 | Hybrid timing | 33% better |
+| Phase 3 | Warmup + outliers | 31% better |
+| Phase 4 | GPU clock locking | 24% better |
 
-**Total**: 40% CV → **18.72%** = Production-ready! 🎉
+**Total**: 40% CV → **18.72%** = Production-ready!
 
 See [Stability Improvements](performance/stability-improvements.md) for full story.
 
 ---
 
-## 🔍 Search & Navigation Tips
+## Search & Navigation Tips
 
 **By Topic**:
 - **Installation** → `getting-started/install.md`
-- **API Usage** → `guides/api-reference.md`
+- **API Usage** → `reference/api-reference.md`
 - **Experiments** → `benchmarking/experiment-guide.md` (26 experiments explained!)
-- **Benchmarking** → `guides/benchmarking.md` or `performance/`
+- **Benchmarking** → `benchmarking/` or `performance/`
 - **Performance** → `performance/stability-improvements.md` (start here!)
 - **Executors** → `architecture/executors.md` (BatchExecutor vs StreamingExecutor)
 - **Thread Safety** → `architecture/thread-safety.md`
 - **Architecture** → `architecture/overview.md`
-- **Contributing** → `guides/contributing.md`
+- **Contributing** → `../CONTRIBUTING.md`
 
 **By File Type**:
-- **Guides**: `guides/`
+- **Reference**: `reference/`
 - **Technical Details**: `technical-notes/`
 - **Performance**: `performance/`
-- **Diagrams**: `architecture/diagrams/`
+- **Diagrams**: `diagrams/`
 
 **By Audience**:
 - **Users**: Start in `getting-started/`
-- **Contributors**: Read `guides/development.md`
+- **Contributors**: See `../CONTRIBUTING.md`
 - **Researchers**: Check `performance/` folder
 - **Architects**: See `architecture/`
-
----
-
-## 📝 Documentation Maintenance
-
-**Last Updated**: 2025-10-17
-
-**Recent Changes**:
-- ✅ Added comprehensive thread safety documentation (v0.9.3)
-- ✅ Added thread safety audit report with Google terminology
-- ✅ Reorganized into category-based structure
-- ✅ Added stability-improvements.md executive summary
-- ✅ Updated gpu-clock-locking.md with validated results (CV=18.72%)
-- ✅ Documented realtime timing instability (accepted)
-- ✅ Renamed files to lowercase-with-hyphens for consistency
-
-**Contributing to Docs**:
-See [Contributing Guidelines](guides/contributing.md) for documentation standards and workflow.
 
 ---
 
@@ -266,5 +246,5 @@ See [Contributing Guidelines](guides/contributing.md) for documentation standard
 
 **Need Help?**
 - Check the [Installation Guide](getting-started/install.md) first
-- Read the [API Reference](guides/api-reference.md) for usage examples
-- See [Contributing Guidelines](guides/contributing.md) for issue reporting
+- Read the [API Reference](reference/api-reference.md) for usage examples
+- See [CONTRIBUTING.md](../CONTRIBUTING.md) for contribution guidelines and issue reporting

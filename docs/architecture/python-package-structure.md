@@ -216,6 +216,6 @@ Suite/sweep/research-workflow primitives were removed in v0.9.1. Parameter sweep
 ---
 
 ## 10. Usage Examples
-- Explore [tests/](../../tests/) and [docs/guides/development.md](../guides/development.md)
+- Explore [tests/](../../tests/) and [CONTRIBUTING.md](../../CONTRIBUTING.md)
   These provide idiomatic usage, parameter combinations, and expected behaviours once the library is understood.
 

@@ -1308,4 +1308,4 @@ if (frame_counter >= 2) {
 
 ---
 
-**Questions or need clarification?** See [Architecture Overview](overview.md) or [Contributing Guidelines](../guides/contributing.md).
+**Questions or need clarification?** See [Architecture Overview](overview.md) or [Contributing Guidelines](../../CONTRIBUTING.md).

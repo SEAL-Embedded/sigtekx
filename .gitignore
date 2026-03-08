@@ -24,6 +24,9 @@ compile_commands.json    # Generated; re-create as needed
 data archive/
 baselines/
 
+# Personal / local developer notes
+docs/_personal/
+
 # --- Compiled Binaries & Objects (C/C++/CUDA) ---
 *.o
 *.obj

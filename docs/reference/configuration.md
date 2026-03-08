@@ -554,8 +554,8 @@ With `StageConfig`, validation happens at execution time (less safe).
 ## See Also
 
 - **CLAUDE.md** - Development workflow and CLI usage
-- **docs/guides/api-reference.md** - Complete API documentation
-- **docs/guides/benchmarking.md** - Running experiments with Hydra
+- **docs/reference/api-reference.md** - Complete API documentation
+- **docs/benchmarking/** - Running experiments with Hydra
 - **experiments/conf/** - Example Hydra configuration files
 - **Window Symmetry Modes** - CLAUDE.md section for mathematical details
 

@@ -144,7 +144,7 @@ Target: complete before the next release that advertises deterministic multi-str
 - `cpp/src/research_engine.cpp`
 - `docs/technical-notes/ieee754-compliance.md`
 - CUDA Best Practices Guide: Multi-Stream Programming
-- Nsight Systems Profiling Workflow (see `docs/guides/development.md`)
+- Nsight Systems Profiling Workflow (see `CONTRIBUTING.md`)
 
 ---
 

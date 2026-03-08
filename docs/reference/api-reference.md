@@ -488,5 +488,5 @@ engine = Engine(config=config)
 
 * `docs/migration/v0.9.3-api-migration.md` - Detailed migration guide from v0.9.2
 * `docs/getting-started/workflow-guide.md` - Research experiment workflows
-* `docs/guides/development.md` - Contribution workflow and debugging tips
+* `CONTRIBUTING.md` - Contribution workflow and debugging tips
 * `docs/getting-started/install.md` - Environment setup

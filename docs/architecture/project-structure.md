@@ -182,10 +182,9 @@ Shared objects produced by builds land in `src/sigtekx/core/`. Expect `_engine.p
 | [docs/README.md](docs/README.md) | Everyone | Documentation entry point and navigation |
 | [docs/getting-started/install.md](docs/getting-started/install.md) | Contributors | Environment provisioning on Windows and Ubuntu |
 | [docs/getting-started/workflow-guide.md](docs/getting-started/workflow-guide.md) | Researchers | Snakemake-driven experiment workflow |
-| [docs/guides/development.md](docs/guides/development.md) | Contributors | Day-to-day development practices and checklists |
-| [docs/guides/benchmarking.md](docs/guides/benchmarking.md) | Researchers | Benchmark methodology, datasets, and KPIs |
-| [docs/guides/api-reference.md](docs/guides/api-reference.md) | Integrators | Python package surface and binding details |
-| [docs/guides/creating-issues.md](docs/guides/creating-issues.md) | Maintainers | Requirements capture templates and review cues |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Contributors | Day-to-day development practices and checklists |
+| [docs/benchmarking/README.md](docs/benchmarking/README.md) | Researchers | Benchmark methodology, datasets, and KPIs |
+| [docs/reference/api-reference.md](docs/reference/api-reference.md) | Integrators | Python package surface and binding details |
 | [docs/architecture/overview.md](docs/architecture/overview.md) | Contributors | System architecture diagrams and rationale |
 | [docs/performance/gpu-clock-locking.md](docs/performance/gpu-clock-locking.md) | Performance engineers | GPU clock management for reproducible runs |
 | [docs/technical-notes/ieee754-compliance.md](docs/technical-notes/ieee754-compliance.md) | Numerics team | IEEE 754 compliance expectations |
