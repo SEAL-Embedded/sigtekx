@@ -63,12 +63,12 @@ config = EngineConfig(
     nfft=4096,
     channels=8,
     overlap=0.75,
-    window='blackman',
+    window_type='blackman',
     window_symmetry='periodic',
     window_norm='unity',
-    scale='1/N',
-    output='magnitude',
-    mode='channels'
+    scale_policy='1/N',
+    output_mode='magnitude',
+    mode='batch'
 )
 engine = Engine(config=config)
 
@@ -119,16 +119,16 @@ Presets adapt their parameters based on execution mode for optimal performance:
 
 **Batch Mode (default)** - Optimized for high throughput:
 
-| Preset | NFFT | Batch | Overlap | Window | Description |
-|--------|------|-------|---------|--------|-------------|
+| Preset | NFFT | Channels | Overlap | Window | Description |
+|--------|------|----------|---------|--------|-------------|
 | `default` | 1024 | 2 | 0.5 | Hann | General-purpose signal processing |
 | `iono` | 16384 | 32 | 0.75 | Blackman | Ionosphere scintillation research (high resolution) |
 | `ionox` | 32768 | 32 | 0.9375 | Blackman | Extreme ionosphere (ULF/VLF, missile detection) |
 
 **Streaming Mode** - Optimized for low latency:
 
-| Preset | NFFT | Batch | Overlap | Window | Description |
-|--------|------|-------|---------|--------|-------------|
+| Preset | NFFT | Channels | Overlap | Window | Description |
+|--------|------|----------|---------|--------|-------------|
 | `default` | 1024 | 2 | 0.5 | Hann | General-purpose signal processing |
 | `iono` | 4096 | 2 | 0.75 | Blackman | Ionosphere scintillation research (low latency) |
 | `ionox` | 8192 | 2 | 0.9 | Blackman | Extreme ionosphere (balanced quality/latency) |
@@ -151,7 +151,7 @@ presets = list_presets()  # Returns ['default', 'iono', 'ionox']
 info = describe_preset('iono')
 
 # Compare multiple presets
-comparison = compare_presets(['default', 'iono', 'ionox'])
+comparison = compare_presets()
 ```
 
 #### Lifecycle
@@ -176,7 +176,7 @@ finally:
 
 #### Processing API
 
-* **`process(data: ArrayLike) -> np.ndarray`** - Window, FFT, and magnitude for a single frame (`nfft * batch` samples). Returns shape `(batch, nfft // 2 + 1)`.
+* **`process(data: ArrayLike) -> np.ndarray`** - Window, FFT, and magnitude for a single frame (`nfft * channels` samples). Returns shape `(channels, nfft // 2 + 1)`.
 * **`synchronize() -> None`** - Flush CUDA work queues (normally only needed when integrating with other GPU libraries).
 * **`stats -> dict[str, Any]`** - Latest runtime statistics (`latency_us`, `throughput_gbps`, `frames_processed`).
 
@@ -248,13 +248,13 @@ Error codes appear in `repr()` (for logging) but not `str()` (backward compatibl
 #### Signal Parameters
 
 * `nfft: int` - FFT size (must be power of 2, default: 1024)
-* `batch: int` - Number of parallel signals to process (default: 2)
+* `channels: int` - Number of independent signal channels (default: 2)
 * `overlap: float` - Frame overlap factor [0.0, 1.0) (default: 0.5)
 * `sample_rate_hz: int` - Input signal sample rate in Hz (default: 48000)
 
 #### Pipeline Parameters
 
-* `window: WindowType` - Window function type (default: `WindowType.HANN`)
+* `window_type: WindowType` - Window function type (default: `WindowType.HANN`)
   - Options: `RECTANGULAR`, `HANN`, `BLACKMAN`
 * `window_symmetry: WindowSymmetry` - Window symmetry mode (default: `WindowSymmetry.PERIODIC`)
   - `PERIODIC` - For FFT processing (denominator N)
@@ -262,9 +262,9 @@ Error codes appear in `repr()` (for logging) but not `str()` (backward compatibl
 * `window_norm: WindowNorm` - Window normalization scheme (default: `WindowNorm.UNITY`)
   - `UNITY` - Normalize to unity power/energy gain
   - `SQRT` - Apply square root normalization
-* `scale: ScalePolicy` - FFT output scaling policy (default: `ScalePolicy.ONE_OVER_N`)
+* `scale_policy: ScalePolicy` - FFT output scaling policy (default: `ScalePolicy.ONE_OVER_N`)
   - Options: `NONE`, `ONE_OVER_N`, `ONE_OVER_SQRT_N`
-* `output: OutputMode` - Pipeline output format (default: `OutputMode.MAGNITUDE`)
+* `output_mode: OutputMode` - Pipeline output format (default: `OutputMode.MAGNITUDE`)
   - Options: `MAGNITUDE`, `COMPLEX`
 
 #### Execution Parameters
@@ -386,22 +386,22 @@ from sigtekx import (
 
 # Use in configuration
 config = EngineConfig(
-    window=WindowType.BLACKMAN,
+    window_type=WindowType.BLACKMAN,
     window_symmetry=WindowSymmetry.PERIODIC,
     window_norm=WindowNorm.UNITY,
-    scale=ScalePolicy.ONE_OVER_N,
-    output=OutputMode.MAGNITUDE,
+    scale_policy=ScalePolicy.ONE_OVER_N,
+    output_mode=OutputMode.MAGNITUDE,
     mode=ExecutionMode.BATCH
 )
 
 # Or use string values (automatically converted)
 config = EngineConfig(
-    window='blackman',
+    window_type='blackman',
     window_symmetry='periodic',
     window_norm='unity',
-    scale='1/N',
-    output='magnitude',
-    mode='channels'
+    scale_policy='1/N',
+    output_mode='magnitude',
+    mode='batch'
 )
 ```
 
@@ -461,7 +461,7 @@ For streaming workloads prefer long-lived engines instead of recreating them for
 
 ## Migration from v0.9.2
 
-The v0.9.3 unified API replaces the old `Presets` class. See `docs/migration/v0.9.3-api-migration.md` for detailed migration guide.
+The v0.9.3 unified API replaces the old `Presets` class.
 
 **Quick migration:**
 
@@ -486,7 +486,6 @@ engine = Engine(config=config)
 
 ## Further Reading
 
-* `docs/migration/v0.9.3-api-migration.md` - Detailed migration guide from v0.9.2
 * `docs/getting-started/workflow-guide.md` - Research experiment workflows
 * `CONTRIBUTING.md` - Contribution workflow and debugging tips
 * `docs/getting-started/install.md` - Environment setup

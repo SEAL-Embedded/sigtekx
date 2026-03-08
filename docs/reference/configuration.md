@@ -88,7 +88,7 @@ config.preload_window = True  # Precompute window coefficients
 config.inplace = True          # Enable in-place operations
 
 # Computed properties
-hop = config.hop_size()  # Returns nfft * (1 - overlap)
+hop = config.hop_size  # Returns nfft * (1 - overlap)
 
 # Use for custom stage construction (Phase 1/2)
 # stage = custom_stage_factory.create(config)
@@ -119,7 +119,7 @@ hop = config.hop_size()  # Returns nfft * (1 - overlap)
 | Window symmetry | `window_symmetry` ✅ | `window_symmetry` ✅ | PERIODIC (FFT) vs SYMMETRIC (time-domain) |
 | Window normalization | `window_norm` ✅ | `window_norm` ✅ | UNITY or SQRT normalization |
 | FFT scaling | `scale_policy` ✅ | `scale_policy` ✅ | NONE, ONE_OVER_N, ONE_OVER_SQRT_N |
-| Output format | `output_mode` ✅ | `output_mode` ✅ | MAGNITUDE or COMPLEX_PASSTHROUGH |
+| Output format | `output_mode` ✅ | `output_mode` ✅ | MAGNITUDE or COMPLEX |
 | Warmup iterations | `warmup_iters` ✅ | `warmup_iters` ✅ | Warmup iterations for stable performance |
 
 **Notes:**
@@ -383,13 +383,13 @@ ScalePolicy.ONE_OVER_SQRT_N # Divide by sqrt(N) (unitary transform)
 ```python
 from sigtekx import OutputMode
 
-OutputMode.MAGNITUDE         # Output sqrt(re^2 + im^2) (default)
-OutputMode.COMPLEX_PASSTHROUGH # Output complex FFT [re, im]
+OutputMode.MAGNITUDE  # Output sqrt(re^2 + im^2) (default)
+OutputMode.COMPLEX    # Output complex FFT [re, im]
 ```
 
 **Use case:**
 - Use `MAGNITUDE` for spectrograms and amplitude spectra
-- Use `COMPLEX_PASSTHROUGH` when you need phase information
+- Use `COMPLEX` when you need phase information
 
 ### ExecutionMode (EngineConfig only)
 
