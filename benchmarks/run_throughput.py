@@ -16,7 +16,7 @@ import pandas as pd
 from omegaconf import DictConfig, OmegaConf
 
 from sigtekx.benchmarks import ThroughputBenchmark, ThroughputBenchmarkConfig
-from sigtekx.benchmarks.mlflow_utils import log_benchmark_errors
+from sigtekx.benchmarks.mlflow_utils import log_benchmark_errors, setup_mlflow
 from sigtekx.config import EngineConfig
 
 # Add experiments directory to path for metrics import
@@ -79,9 +79,7 @@ def run_throughput_benchmark(cfg: DictConfig) -> float:
         raise
 
     # Setup MLflow
-
-    mlflow.set_tracking_uri(cfg.mlflow.tracking_uri)
-    mlflow.set_experiment(cfg.mlflow.experiment_name)
+    setup_mlflow(cfg)
 
     with mlflow.start_run(run_name=f"throughput_{engine_config.nfft}x{engine_config.channels}"):
         # Log configuration

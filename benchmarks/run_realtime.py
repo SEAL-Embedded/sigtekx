@@ -15,7 +15,7 @@ import pandas as pd
 from omegaconf import DictConfig, OmegaConf
 
 from sigtekx.benchmarks import RealtimeBenchmark, RealtimeBenchmarkConfig
-from sigtekx.benchmarks.mlflow_utils import log_benchmark_errors
+from sigtekx.benchmarks.mlflow_utils import log_benchmark_errors, setup_mlflow
 from sigtekx.config import EngineConfig
 
 
@@ -52,8 +52,7 @@ def run_realtime_benchmark(cfg: DictConfig) -> float:
     benchmark_config = RealtimeBenchmarkConfig(**cfg.benchmark, engine_config=engine_config.model_dump())
 
     # Setup MLflow
-    mlflow.set_tracking_uri(cfg.mlflow.tracking_uri)
-    mlflow.set_experiment(cfg.mlflow.experiment_name)
+    setup_mlflow(cfg)
 
     run_name = f"realtime_{engine_config.nfft}x{engine_config.channels}"
     with mlflow.start_run(run_name=run_name):

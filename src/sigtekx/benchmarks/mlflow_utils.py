@@ -5,12 +5,69 @@ eliminating code duplication across benchmark runner scripts.
 """
 
 import logging
+import random
+import time
 from pathlib import Path
 from typing import Any
 
+import hydra
 import mlflow
+from omegaconf import DictConfig
 
 logger = logging.getLogger(__name__)
+
+
+def setup_mlflow(cfg: DictConfig, max_retries: int = 5) -> None:
+    """Configure MLflow tracking URI and experiment.
+
+    Resolves relative paths to absolute using the original working directory
+    (required because Hydra multirun changes CWD per job). Retries on
+    transient SQLite errors (``database is locked``) that can occur when
+    multiple parallel Hydra jobs access the DB concurrently.
+
+    Note:
+        The Snakefile ``onstart`` handler pre-initializes the SQLite DB
+        before any rules execute, preventing Alembic migration races.
+        This retry logic is a safety net for remaining lock contention.
+
+    Args:
+        cfg: Hydra DictConfig containing cfg.mlflow.tracking_uri and
+             cfg.mlflow.experiment_name.
+        max_retries: Maximum number of attempts before giving up.
+    """
+    tracking_uri = cfg.mlflow.tracking_uri
+    original_cwd = hydra.utils.get_original_cwd()
+
+    # Resolve relative paths to absolute so the URI stays stable across
+    # Hydra multirun jobs that each run in a different CWD.
+    if tracking_uri.startswith("sqlite:///"):
+        rel = tracking_uri[len("sqlite:///"):]
+        if not Path(rel).is_absolute():
+            tracking_uri = "sqlite:///" + str(Path(original_cwd) / rel)
+    elif tracking_uri.startswith("file:"):
+        rel = tracking_uri[len("file:"):]
+        if not Path(rel).is_absolute():
+            tracking_uri = "file:" + str(Path(original_cwd) / rel)
+
+    last_exc: Exception | None = None
+    for attempt in range(max_retries):
+        try:
+            mlflow.set_tracking_uri(tracking_uri)
+            mlflow.set_experiment(cfg.mlflow.experiment_name)
+            return
+        except Exception as exc:  # noqa: BLE001
+            # Only retry on transient SQLite errors (locked / migration race).
+            err_msg = str(exc).lower()
+            is_transient = "database is locked" in err_msg or "already exists" in err_msg
+            if not is_transient or attempt >= max_retries - 1:
+                raise
+            last_exc = exc
+            wait = min(0.5 * (2 ** attempt) + random.uniform(0, 0.3), 5.0)
+            logger.warning(
+                "MLflow init attempt %d/%d hit transient error, retrying in %.1fs: %s",
+                attempt + 1, max_retries, wait, exc,
+            )
+            time.sleep(wait)
 
 
 def log_benchmark_errors(

@@ -12,6 +12,21 @@
 
 configfile: "experiments/conf/config.yaml"
 
+# Pre-initialize MLflow SQLite database before any parallel rules execute.
+# Without this, concurrent Snakemake jobs all try to run Alembic migrations
+# simultaneously, causing "table _alembic_tmp_* already exists" race conditions.
+# Once the DB schema exists, parallel processes skip migration and only do DML
+# (INSERT/UPDATE), which SQLite handles with its built-in busy timeout.
+onstart:
+    import subprocess, sys
+    subprocess.run([
+        sys.executable, "-c",
+        "import mlflow, os; "
+        "os.makedirs('artifacts', exist_ok=True); "
+        "mlflow.set_tracking_uri('sqlite:///artifacts/mlruns.db'); "
+        "mlflow.set_experiment('_init')"
+    ], check=True)
+
 # Default target: benchmark data generation only
 # For reporting:
 #   - Interactive: sigx dashboard (Streamlit)

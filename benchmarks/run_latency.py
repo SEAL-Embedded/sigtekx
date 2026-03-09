@@ -15,7 +15,7 @@ import pandas as pd
 from omegaconf import DictConfig, OmegaConf
 
 from sigtekx.benchmarks import LatencyBenchmark, LatencyBenchmarkConfig
-from sigtekx.benchmarks.mlflow_utils import log_benchmark_errors
+from sigtekx.benchmarks.mlflow_utils import log_benchmark_errors, setup_mlflow
 from sigtekx.config import EngineConfig
 
 
@@ -52,8 +52,7 @@ def run_latency_benchmark(cfg: DictConfig) -> float:
     benchmark_config = LatencyBenchmarkConfig(**cfg.benchmark, engine_config=engine_config.model_dump())
 
     # Setup MLflow
-    mlflow.set_tracking_uri(cfg.mlflow.tracking_uri)
-    mlflow.set_experiment(cfg.mlflow.experiment_name)
+    setup_mlflow(cfg)
 
     with mlflow.start_run(run_name=f"latency_{engine_config.nfft}x{engine_config.channels}"):
         # Log configuration

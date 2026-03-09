@@ -25,7 +25,7 @@ paths:
 
 # MLflow configuration (tracking only)
 mlflow:
-  tracking_uri: file:${paths.artifacts_root}/mlruns
+  tracking_uri: sqlite:///${paths.artifacts_root}/mlruns.db
   experiment_name: ${experiment.name}
 
 # Reproducibility
