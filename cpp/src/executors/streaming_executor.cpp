@@ -17,16 +17,34 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <condition_variable>
 #include <iostream>
 #include <mutex>
 #include <queue>
 #include <stdexcept>
 #include <thread>
+#include <unordered_map>
 
 #include "sigtekx/core/cuda_wrappers.hpp"
+#include "sigtekx/core/processing_stage.hpp"
 #include "sigtekx/core/ring_buffer.hpp"
 #include "sigtekx/profiling/nvtx.hpp"
+
+// --- External Kernel Launch Function Declarations (from fft_wrapper.cu) ---
+namespace sigtekx {
+namespace kernels {
+
+extern void launch_apply_window(const float* input, float* output,
+                                const float* window, int nfft, int channels,
+                                int stride, cudaStream_t stream);
+
+extern void launch_magnitude(const float2* input, float* output, int num_bins,
+                             int channels, int input_stride, float scale,
+                             cudaStream_t stream);
+
+}  // namespace kernels
+}  // namespace sigtekx
 
 namespace sigtekx {
 
@@ -95,10 +113,22 @@ class StreamingExecutor::Impl {
 
     // Calculate buffer sizes
     hop_size_ = config_.hop_size();
+
+    // Compute max frames per submit for batched processing (Optimization 3.1)
+    if (hop_size_ > 0) {
+      max_frames_per_submit_ = static_cast<int>(
+          std::ceil(static_cast<double>(config_.nfft) / hop_size_)) + 1;
+    } else {
+      max_frames_per_submit_ = 1;
+    }
+
+    // Buffer sizes scaled by max_frames_per_submit_ for batched path
     const size_t buffer_size =
-        static_cast<size_t>(config_.nfft) * config_.channels;
+        static_cast<size_t>(config_.nfft) * config_.channels *
+        max_frames_per_submit_;
     const size_t output_buffer_size =
-        static_cast<size_t>(config_.num_output_bins()) * config_.channels;
+        static_cast<size_t>(config_.num_output_bins()) * config_.channels *
+        max_frames_per_submit_;
     const size_t complex_buffer_size = output_buffer_size;
 
     // Allocate per-channel ring buffers for true multi-channel streaming
@@ -213,6 +243,54 @@ class StreamingExecutor::Impl {
       pipeline_start_event_ = std::make_unique<CudaEvent>(0);
     }
 
+    // Batched frame processing setup (Optimization 3.1)
+    // Generate window coefficients for direct kernel launch path
+    {
+      SIGTEKX_NVTX_RANGE("Generate Batched Window", profiling::colors::DARK_GRAY);
+      std::vector<float> host_window(config_.nfft);
+      bool sqrt_norm = (config_.window_norm ==
+                        static_cast<int>(StageConfig::WindowNorm::SQRT));
+      window_utils::generate_window(
+          host_window.data(), config_.nfft,
+          static_cast<StageConfig::WindowType>(config_.window_type), sqrt_norm,
+          static_cast<StageConfig::WindowSymmetry>(config_.window_symmetry));
+      if (config_.window_norm ==
+          static_cast<int>(StageConfig::WindowNorm::UNITY)) {
+        window_utils::normalize_window(
+            host_window.data(), config_.nfft,
+            static_cast<StageConfig::WindowNorm>(config_.window_norm));
+      }
+      d_window_.resize(config_.nfft);
+      d_window_.copy_from_host(host_window.data(), config_.nfft,
+                               streams_[0].get());
+      SIGTEKX_CUDA_CHECK(cudaStreamSynchronize(streams_[0].get()));
+    }
+
+    // Compute magnitude scale factor
+    {
+      auto policy =
+          static_cast<StageConfig::ScalePolicy>(config_.scale_policy);
+      switch (policy) {
+        case StageConfig::ScalePolicy::ONE_OVER_N:
+          mag_scale_ = 1.0f / static_cast<float>(config_.nfft);
+          break;
+        case StageConfig::ScalePolicy::ONE_OVER_SQRT_N:
+          mag_scale_ = 1.0f / std::sqrt(static_cast<float>(config_.nfft));
+          break;
+        case StageConfig::ScalePolicy::NONE:
+        default:
+          mag_scale_ = 1.0f;
+          break;
+      }
+    }
+
+    // Warmup batched FFT plan for most common batch size
+    if (max_frames_per_submit_ > 1) {
+      const int compute_stream_idx = (streams_.size() > 1) ? 1 : 0;
+      get_or_create_batched_plan(max_frames_per_submit_,
+                                 streams_[compute_stream_idx].get());
+    }
+
     initialized_ = true;
 
     // Warmup
@@ -264,6 +342,10 @@ class StreamingExecutor::Impl {
       d_input_buffers_.clear();
       d_intermediate_buffers_.clear();
       d_output_buffers_.clear();
+
+      // Clean up batched processing resources
+      d_window_ = DeviceBuffer<float>();
+      batched_fft_plans_.clear();
 
       // Reset all per-channel ring buffers
       for (auto& ring_buffer : input_ring_buffers_) {
@@ -394,37 +476,23 @@ class StreamingExecutor::Impl {
       }
 
     } else {
-      // ===== SYNC MODE: Process inline (current behavior) =====
-      // Process ALL available frames to drain ring buffer (prevent ring buffer
-      // overflow) Each frame overwrites the output buffer, so only the LAST
-      // frame's result is returned to the caller (maintains API contract: one
-      // output per call)
-      //
-      // This prevents ring buffer overflow during warmup when many consecutive
-      // submit() calls accumulate samples faster than they're drained (due to
-      // overlap). Without this, after N warmup iterations:
-      // ring_buffer.available() ≈ N × hop_size, which quickly exceeds ring
-      // buffer capacity.
+      // ===== SYNC MODE: Batched frame processing (Optimization 3.1) =====
+      // Count all available frames and process them in a single GPU
+      // submission. For N=1, falls back to existing process_one_batch().
+      // For N>=2, uses process_batched_frames() with 1 sync instead of N.
       size_t batches_processed = 0;
+      int num_frames = count_available_frames();
 
-      while (true) {
-        // Check if all channels have enough samples for one frame
-        bool all_channels_ready = true;
-        for (int ch = 0; ch < config_.channels; ++ch) {
-          if (input_ring_buffers_[ch]->available() <
-              samples_needed_per_channel) {
-            all_channels_ready = false;
-            break;
-          }
-        }
-
-        if (!all_channels_ready) {
-          break;
-        }
-
-        // Process one frame (overwrites output buffer)
+      if (num_frames == 0) {
+        // No complete frames available
+      } else if (num_frames == 1) {
+        // Single frame: use existing per-frame path (zero overhead)
         process_one_batch(output);
-        batches_processed++;
+        batches_processed = 1;
+      } else {
+        // Multiple frames: batched GPU submission (1 sync instead of N)
+        process_batched_frames(output, num_frames);
+        batches_processed = static_cast<size_t>(num_frames);
       }
 
       // Update statistics (for last processed batch)
@@ -547,6 +615,12 @@ class StreamingExecutor::Impl {
       total += stage->get_workspace_size();
     }
 
+    // Batched processing resources
+    total += d_window_.size() * sizeof(float);
+    for (const auto& [batch_count, plan] : batched_fft_plans_) {
+      total += plan.work_size();
+    }
+
     return total;
   }
 
@@ -583,6 +657,248 @@ class StreamingExecutor::Impl {
     for (auto& ring_buffer : input_ring_buffers_) {
       ring_buffer->reset();
     }
+  }
+
+  /**
+   * @brief Counts how many complete frames are available across all channels.
+   * @return Number of frames that can be processed (clamped to
+   * max_frames_per_submit_).
+   */
+  int count_available_frames() const {
+    size_t min_available = SIZE_MAX;
+    for (int ch = 0; ch < config_.channels; ++ch) {
+      min_available =
+          std::min(min_available, input_ring_buffers_[ch]->available());
+    }
+    if (min_available < static_cast<size_t>(config_.nfft)) return 0;
+    int num_frames = 1;
+    size_t consumed = static_cast<size_t>(config_.nfft);
+    while (consumed + hop_size_ <= min_available &&
+           num_frames < max_frames_per_submit_) {
+      num_frames++;
+      consumed += hop_size_;
+    }
+    return num_frames;
+  }
+
+  /**
+   * @brief Gets or creates a batched cuFFT plan for the given frame count.
+   * @param num_frames Number of frames to batch.
+   * @param stream CUDA stream to associate with new plans.
+   * @return Reference to the cached CufftPlan.
+   */
+  CufftPlan& get_or_create_batched_plan(int num_frames, cudaStream_t stream) {
+    int total_batch = num_frames * config_.channels;
+    auto it = batched_fft_plans_.find(total_batch);
+    if (it != batched_fft_plans_.end()) return it->second;
+
+    auto [ins_it, inserted] =
+        batched_fft_plans_.try_emplace(total_batch);
+    int n[] = {config_.nfft};
+    ins_it->second.create_plan_many(
+        1, n, nullptr, 1, config_.nfft, nullptr, 1, config_.nfft / 2 + 1,
+        CUFFT_R2C, total_batch, stream);
+    return ins_it->second;
+  }
+
+  /**
+   * @brief Processes N frames in a single batched GPU submission.
+   *
+   * Replaces N sequential process_one_batch() calls with one batched
+   * submission: 1 H2D (all frames), 3 kernel launches (window, FFT,
+   * magnitude), 1 D2H (last frame only), 1 cudaStreamSynchronize.
+   *
+   * @param output Host output buffer for the last frame's magnitude result.
+   * @param num_frames Number of frames to process (must be >= 2).
+   */
+  void process_batched_frames(float* output, int num_frames) {
+    SIGTEKX_NVTX_RANGE("Process Batched Frames", profiling::colors::PURPLE);
+
+    const int total_batch = num_frames * config_.channels;
+    const int output_bins = config_.num_output_bins();
+
+    // Round-robin buffer selection (same as process_one_batch)
+    const int buffer_idx =
+        static_cast<int>(frame_counter_ % config_.pinned_buffer_count);
+    auto& d_input = d_input_buffers_[buffer_idx];
+    auto& d_output_buf = d_output_buffers_[buffer_idx];
+    auto& d_intermediate = d_intermediate_buffers_[buffer_idx];
+
+    // Stream assignment
+    const int h2d_stream_idx = 0;
+    const int compute_stream_idx = (streams_.size() > 1) ? 1 : 0;
+    const int d2h_stream_idx =
+        (streams_.size() > 2) ? 2 : compute_stream_idx;
+
+    auto& e_h2d_done = events_[buffer_idx * 3 + 0];
+    auto& e_compute_done = events_[buffer_idx * 3 + 1];
+    auto& e_d2h_done = events_[buffer_idx * 3 + 2];
+
+    // Guard buffer reuse with event-based synchronization
+    if (frame_counter_ >=
+        static_cast<uint64_t>(config_.pinned_buffer_count)) {
+      SIGTEKX_NVTX_RANGE("Wait for Buffer Availability",
+                          profiling::colors::YELLOW);
+      auto& e_reuse_buffer_done = events_[buffer_idx * 3 + 2];
+      e_reuse_buffer_done.synchronize();
+    }
+
+    // Zero-copy H2D: peek N frames from ring buffers, DMA all to device
+    // Layout: [ch0_f0 | ch1_f0 | ch0_f1 | ch1_f1 | ... ]
+    {
+      SIGTEKX_NVTX_RANGE("H2D Transfer (Batched)", profiling::colors::GREEN);
+      for (int frame_i = 0; frame_i < num_frames; ++frame_i) {
+        const size_t offset = static_cast<size_t>(frame_i) * hop_size_;
+        for (int ch = 0; ch < config_.channels; ++ch) {
+          auto view = input_ring_buffers_[ch]->peek_frame_at_offset(
+              config_.nfft, offset);
+          float* d_dst =
+              d_input.get() +
+              (frame_i * config_.channels + ch) * config_.nfft;
+
+          SIGTEKX_CUDA_CHECK(cudaMemcpyAsync(
+              d_dst, view.first.data, view.first.count * sizeof(float),
+              cudaMemcpyHostToDevice, streams_[h2d_stream_idx].get()));
+
+          if (!view.is_contiguous()) {
+            SIGTEKX_CUDA_CHECK(cudaMemcpyAsync(
+                d_dst + view.first.count, view.second.data,
+                view.second.count * sizeof(float), cudaMemcpyHostToDevice,
+                streams_[h2d_stream_idx].get()));
+          }
+        }
+      }
+      e_h2d_done.record(streams_[h2d_stream_idx].get());
+    }
+
+    // Processing Pipeline (3 kernel launches for all N frames)
+    SIGTEKX_CUDA_CHECK(cudaStreamWaitEvent(
+        streams_[compute_stream_idx].get(), e_h2d_done.get(), 0));
+
+    if (measure_components_) {
+      pipeline_start_event_->record(streams_[compute_stream_idx].get());
+    }
+
+    {
+      SIGTEKX_NVTX_RANGE("Compute Pipeline (Batched)",
+                          profiling::colors::PURPLE);
+
+      // 1. Window (in-place, batch = N * channels)
+      {
+        SIGTEKX_NVTX_RANGE("Stage: WindowStage", profiling::colors::MAGENTA);
+        if (measure_components_) {
+          window_start_->record(streams_[compute_stream_idx].get());
+        }
+        kernels::launch_apply_window(
+            d_input.get(), d_input.get(), d_window_.get(), config_.nfft,
+            total_batch, config_.nfft,
+            streams_[compute_stream_idx].get());
+        if (measure_components_) {
+          window_end_->record(streams_[compute_stream_idx].get());
+        }
+      }
+
+      // 2. FFT (batched R2C, batch = N * channels)
+      {
+        SIGTEKX_NVTX_RANGE("Stage: FFTStage", profiling::colors::MAGENTA);
+        if (measure_components_) {
+          fft_start_->record(streams_[compute_stream_idx].get());
+        }
+        auto& plan = get_or_create_batched_plan(
+            num_frames, streams_[compute_stream_idx].get());
+        plan.exec_r2c(
+            d_input.get(),
+            reinterpret_cast<cufftComplex*>(d_intermediate.get()));
+        if (measure_components_) {
+          fft_end_->record(streams_[compute_stream_idx].get());
+        }
+      }
+
+      // 3. Magnitude (batch = N * channels)
+      {
+        SIGTEKX_NVTX_RANGE("Stage: MagnitudeStage",
+                            profiling::colors::MAGENTA);
+        if (measure_components_) {
+          magnitude_start_->record(streams_[compute_stream_idx].get());
+        }
+        kernels::launch_magnitude(
+            reinterpret_cast<const float2*>(d_intermediate.get()),
+            d_output_buf.get(), output_bins, total_batch, output_bins,
+            mag_scale_, streams_[compute_stream_idx].get());
+        if (measure_components_) {
+          magnitude_end_->record(streams_[compute_stream_idx].get());
+        }
+      }
+
+      e_compute_done.record(streams_[compute_stream_idx].get());
+    }
+
+    // D2H Transfer (last frame only)
+    {
+      const size_t last_frame_offset =
+          static_cast<size_t>(num_frames - 1) * config_.channels *
+          output_bins;
+      const size_t output_elements =
+          static_cast<size_t>(config_.channels) * output_bins;
+      const size_t bytes = output_elements * sizeof(float);
+      const std::string d2h_msg =
+          profiling::format_memory_range("D2H Transfer (Last Frame)", bytes);
+      SIGTEKX_NVTX_RANGE(d2h_msg.c_str(), profiling::colors::ORANGE);
+
+      SIGTEKX_CUDA_CHECK(cudaStreamWaitEvent(
+          streams_[d2h_stream_idx].get(), e_compute_done.get(), 0));
+
+      SIGTEKX_CUDA_CHECK(cudaMemcpyAsync(
+          output, d_output_buf.get() + last_frame_offset,
+          bytes, cudaMemcpyDeviceToHost, streams_[d2h_stream_idx].get()));
+
+      e_d2h_done.record(streams_[d2h_stream_idx].get());
+    }
+
+    // Single synchronization point (1 sync instead of N)
+    {
+      SIGTEKX_NVTX_RANGE("Stream Sync", profiling::colors::YELLOW);
+      SIGTEKX_CUDA_CHECK(
+          cudaStreamSynchronize(streams_[d2h_stream_idx].get()));
+    }
+
+    // Advance ring buffers by total consumed samples
+    {
+      SIGTEKX_NVTX_RANGE("Advance Ring Buffers", profiling::colors::GREEN);
+      const size_t total_advance =
+          static_cast<size_t>(num_frames - 1) * hop_size_ + config_.nfft;
+      // Advance by (num_frames-1)*hop + nfft would over-advance.
+      // We want to consume exactly: nfft + (num_frames-1)*hop_size samples
+      // But we only advance by (num_frames)*hop_size to leave the overlap
+      // residual for the next batch (same as N sequential advances).
+      const size_t advance_amount =
+          static_cast<size_t>(num_frames) * hop_size_;
+      for (int ch = 0; ch < config_.channels; ++ch) {
+        input_ring_buffers_[ch]->advance(advance_amount);
+      }
+    }
+
+    // Component timing: calculate stage metrics
+    if (measure_components_) {
+      SIGTEKX_CUDA_CHECK(
+          cudaStreamSynchronize(streams_[compute_stream_idx].get()));
+      float window_ms, fft_ms, magnitude_ms;
+      cudaEventElapsedTime(&window_ms, window_start_->get(),
+                           window_end_->get());
+      cudaEventElapsedTime(&fft_ms, fft_start_->get(), fft_end_->get());
+      cudaEventElapsedTime(&magnitude_ms, magnitude_start_->get(),
+                           magnitude_end_->get());
+
+      stats_.stage_metrics.enabled = true;
+      stats_.stage_metrics.window_us = window_ms * 1000.0f;
+      stats_.stage_metrics.fft_us = fft_ms * 1000.0f;
+      stats_.stage_metrics.magnitude_us = magnitude_ms * 1000.0f;
+      stats_.stage_metrics.total_measured_us =
+          stats_.stage_metrics.window_us + stats_.stage_metrics.fft_us +
+          stats_.stage_metrics.magnitude_us;
+    }
+
+    frame_counter_++;
   }
 
   void process_one_batch(float* output) {
@@ -851,34 +1167,28 @@ class StreamingExecutor::Impl {
         }
       }
 
-      // Process all available frames
+      // Process all available frames (batched when possible)
       while (!stop_flag_.load(std::memory_order_acquire)) {
-        // Check if all channels have enough samples
-        bool all_ready = true;
-        for (int ch = 0; ch < config_.channels; ++ch) {
-          if (input_ring_buffers_[ch]->available() <
-              samples_needed_per_channel) {
-            all_ready = false;
-            break;
-          }
-        }
-
-        if (!all_ready) {
+        int num_frames = count_available_frames();
+        if (num_frames == 0) {
           break;  // No more complete frames, go back to waiting
         }
 
         // Allocate result buffer
         std::vector<float> result(output_size);
 
-        // Process one batch (this calls process_one_batch internally)
-        process_one_batch(result.data());
+        if (num_frames == 1) {
+          process_one_batch(result.data());
+        } else {
+          process_batched_frames(result.data(), num_frames);
+        }
 
         // Store result in queue and notify waiting producer
         {
           std::lock_guard<std::mutex> lock(result_mutex_);
           result_queue_.push(std::move(result));
         }
-        cv_data_ready_.notify_one();  // Wake producer (outside lock for efficiency)
+        cv_data_ready_.notify_one();
       }
     }
   }
@@ -905,6 +1215,12 @@ class StreamingExecutor::Impl {
   bool initialized_ = false;
   uint64_t frame_counter_ = 0;
   ProcessingStats stats_{};
+
+  // Batched frame processing (Optimization 3.1)
+  int max_frames_per_submit_ = 1;
+  DeviceBuffer<float> d_window_;     // Window coefficients for batched path
+  float mag_scale_ = 1.0f;          // Magnitude scale factor
+  std::unordered_map<int, CufftPlan> batched_fft_plans_;  // batch_count -> plan
 
   // Component timing (only allocated if measure_components=true)
   std::unique_ptr<CudaEvent> window_start_;

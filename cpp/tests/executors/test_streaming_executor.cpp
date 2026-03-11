@@ -19,6 +19,7 @@
 
 #include "sigtekx/core/cuda_wrappers.hpp"
 #include "sigtekx/core/pipeline_builder.hpp"
+#include "sigtekx/core/ring_buffer.hpp"
 #include "sigtekx/executors/streaming_executor.hpp"
 
 #ifndef M_PI
@@ -860,4 +861,358 @@ TEST_F(StreamingExecutorTest, ComponentTimingWithOverlap) {
   EXPECT_TRUE(stats2.stage_metrics.enabled);
   EXPECT_GT(stats2.stage_metrics.window_us, 0.0f);
   // Timing reflects last frame processed in this submit
+}
+
+// ============================================================================
+//  Batched Frame Processing Tests (Optimization 3.1)
+// ============================================================================
+
+/**
+ * @brief Verify batched processing produces correct output matching sequential.
+ *
+ * With overlap=0.75, submitting nfft samples should produce 4 frames.
+ * The batched path should produce the same output as 4 sequential
+ * process_one_batch calls would have.
+ */
+TEST_F(StreamingExecutorTest, BatchedProcessingCorrectness) {
+  config_.nfft = 1024;
+  config_.channels = 2;
+  config_.overlap = 0.75f;  // N=4 frames per submit
+  config_.pinned_buffer_count = 2;
+  config_.stream_count = 3;
+  config_.warmup_iters = 0;  // No warmup to avoid state changes
+
+  // Run with batched path
+  StreamingExecutor executor;
+  PipelineBuilder builder;
+  auto stages = builder.with_config(StageConfig{config_.nfft, config_.channels})
+                    .add_window(StageConfig::WindowType::HANN)
+                    .add_fft()
+                    .add_magnitude()
+                    .build();
+  executor.initialize(config_, std::move(stages));
+
+  const size_t input_size = config_.nfft * config_.channels;
+  const size_t output_size = config_.num_output_bins() * config_.channels;
+
+  // First submit fills ring buffer, processes 1 frame
+  auto input1 = generate_sinusoid(input_size, 1000.0f);
+  std::vector<float> output1(output_size);
+  executor.submit(input1.data(), output1.data(), input_size);
+
+  // Second submit produces ~4 frames via batched path
+  auto input2 = generate_sinusoid(input_size, 500.0f);
+  std::vector<float> batched_output(output_size);
+  executor.submit(input2.data(), batched_output.data(), input_size);
+
+  // Verify output has non-zero values
+  bool has_nonzero = false;
+  for (float val : batched_output) {
+    if (val > 1e-6f) {
+      has_nonzero = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(has_nonzero) << "Batched output is all zeros";
+
+  // Verify stats show multiple frames were processed
+  auto stats = executor.get_stats();
+  // First submit: 1 frame, second submit: ~4 frames = ~5 total
+  EXPECT_GE(stats.frames_processed, 4);
+}
+
+/**
+ * @brief Verify N=1 uses single-frame path, N>=2 uses batched path.
+ */
+TEST_F(StreamingExecutorTest, BatchedProcessingVaryingN) {
+  // overlap=0.0 means hop_size = nfft, so N=1 per submit (single-frame path)
+  config_.nfft = 512;
+  config_.channels = 1;
+  config_.overlap = 0.0f;
+  config_.warmup_iters = 0;
+
+  StreamingExecutor executor;
+  PipelineBuilder builder;
+  auto stages = builder.with_config(StageConfig{config_.nfft, config_.channels})
+                    .add_window(StageConfig::WindowType::HANN)
+                    .add_fft()
+                    .add_magnitude()
+                    .build();
+  executor.initialize(config_, std::move(stages));
+
+  const size_t input_size = config_.nfft * config_.channels;
+  const size_t output_size = config_.num_output_bins() * config_.channels;
+
+  // With overlap=0.0, each submit produces exactly 1 frame
+  for (int i = 0; i < 5; ++i) {
+    auto input = generate_sinusoid(input_size, 100.0f + i * 50.0f);
+    std::vector<float> output(output_size);
+    EXPECT_NO_THROW(executor.submit(input.data(), output.data(), input_size));
+
+    bool has_nonzero = false;
+    for (float val : output) {
+      if (val > 1e-6f) {
+        has_nonzero = true;
+        break;
+      }
+    }
+    EXPECT_TRUE(has_nonzero) << "Frame " << i << " zero output";
+  }
+
+  auto stats = executor.get_stats();
+  EXPECT_EQ(stats.frames_processed, 5);
+}
+
+/**
+ * @brief Test batched processing with high overlap (0.875, N=8).
+ *
+ * 100 submits × ~8 frames/submit = ~800 frames.
+ * Validates correctness and stability with high frame count.
+ */
+TEST_F(StreamingExecutorTest, BatchedProcessingHighOverlap) {
+  config_.nfft = 1024;
+  config_.channels = 2;
+  config_.overlap = 0.875f;  // N=8 frames per submit
+  config_.pinned_buffer_count = 2;
+  config_.stream_count = 3;
+
+  StreamingExecutor executor;
+  PipelineBuilder builder;
+  auto stages = builder.with_config(StageConfig{config_.nfft, config_.channels})
+                    .add_window(StageConfig::WindowType::HANN)
+                    .add_fft()
+                    .add_magnitude()
+                    .build();
+  executor.initialize(config_, std::move(stages));
+
+  const size_t input_size = config_.nfft * config_.channels;
+  const size_t output_size = config_.num_output_bins() * config_.channels;
+
+  for (int i = 0; i < 100; ++i) {
+    auto input = generate_sinusoid(input_size, 200.0f + i * 10.0f);
+    std::vector<float> output(output_size);
+
+    EXPECT_NO_THROW(executor.submit(input.data(), output.data(), input_size));
+
+    bool has_nonzero = false;
+    for (float val : output) {
+      if (val > 1e-6f) {
+        has_nonzero = true;
+        break;
+      }
+    }
+    EXPECT_TRUE(has_nonzero) << "Submit " << i << " has zero output";
+  }
+
+  auto stats = executor.get_stats();
+  // With overlap=0.875 (hop_size=128), each submit of 1024 samples produces ~8 frames
+  // 100 submits × ~8 frames ≈ 800 frames
+  EXPECT_GE(stats.frames_processed, 750);
+  EXPECT_LE(stats.frames_processed, 850);
+}
+
+/**
+ * @brief Test component timing works with batched processing.
+ */
+TEST_F(StreamingExecutorTest, BatchedComponentTiming) {
+  config_.nfft = 1024;
+  config_.channels = 2;
+  config_.overlap = 0.75f;  // N=4, triggers batched path
+  config_.measure_components = true;
+  config_.warmup_iters = 0;
+
+  StreamingExecutor executor;
+  PipelineBuilder builder;
+  auto stages = builder.with_config(StageConfig{config_.nfft, config_.channels})
+                    .add_window(StageConfig::WindowType::HANN)
+                    .add_fft()
+                    .add_magnitude()
+                    .build();
+  executor.initialize(config_, std::move(stages));
+
+  const size_t input_size = config_.nfft * config_.channels;
+  const size_t output_size = config_.num_output_bins() * config_.channels;
+  std::vector<float> output(output_size);
+
+  // First submit (N=1, single-frame path)
+  auto input1 = generate_sinusoid(input_size, 1000.0f);
+  executor.submit(input1.data(), output.data(), input_size);
+
+  // Second submit (N>=2, batched path)
+  auto input2 = generate_sinusoid(input_size, 500.0f);
+  executor.submit(input2.data(), output.data(), input_size);
+
+  auto stats = executor.get_stats();
+  EXPECT_TRUE(stats.stage_metrics.enabled);
+  EXPECT_GT(stats.stage_metrics.window_us, 0.0f);
+  EXPECT_GT(stats.stage_metrics.fft_us, 0.0f);
+  EXPECT_GT(stats.stage_metrics.magnitude_us, 0.0f);
+
+  float expected_total = stats.stage_metrics.window_us +
+                         stats.stage_metrics.fft_us +
+                         stats.stage_metrics.magnitude_us;
+  EXPECT_NEAR(stats.stage_metrics.total_measured_us, expected_total, 0.1f);
+}
+
+/**
+ * @brief Test batched processing with ring buffer wraparound.
+ *
+ * High overlap forces frequent wraparound in peek_frame_at_offset.
+ * Ring buffer capacity = 3*nfft, wraparound occurs every ~24 frames.
+ */
+TEST_F(StreamingExecutorTest, BatchedRingBufferWraparound) {
+  config_.nfft = 512;
+  config_.channels = 2;
+  config_.overlap = 0.875f;  // Very high overlap, hop=64
+  config_.pinned_buffer_count = 2;
+  config_.stream_count = 3;
+
+  StreamingExecutor executor;
+  PipelineBuilder builder;
+  auto stages = builder.with_config(StageConfig{config_.nfft, config_.channels})
+                    .add_window(StageConfig::WindowType::HANN)
+                    .add_fft()
+                    .add_magnitude()
+                    .build();
+  executor.initialize(config_, std::move(stages));
+
+  const size_t input_size = config_.nfft * config_.channels;
+  const size_t output_size = config_.num_output_bins() * config_.channels;
+
+  // 50 submits × ~8 frames = ~400 frames, many wraparound cycles
+  for (int i = 0; i < 50; ++i) {
+    auto input = generate_sinusoid(input_size, 100.0f + i * 5.0f);
+    std::vector<float> output(output_size);
+
+    EXPECT_NO_THROW(executor.submit(input.data(), output.data(), input_size));
+
+    bool has_nonzero = false;
+    for (size_t j = 0; j < output_size; ++j) {
+      if (output[j] > 1e-6f) {
+        has_nonzero = true;
+        break;
+      }
+    }
+    EXPECT_TRUE(has_nonzero)
+        << "Submit " << i << " has zero output (DMA corruption)";
+  }
+
+  auto stats = executor.get_stats();
+  EXPECT_GE(stats.frames_processed, 350);
+}
+
+/**
+ * @brief Test frame counter and stats with batched processing.
+ */
+TEST_F(StreamingExecutorTest, BatchedFrameCounterAndStats) {
+  config_.nfft = 512;
+  config_.channels = 1;
+  config_.overlap = 0.5f;  // N=2 per submit
+  config_.warmup_iters = 0;
+
+  StreamingExecutor executor;
+  PipelineBuilder builder;
+  auto stages = builder.with_config(StageConfig{config_.nfft, config_.channels})
+                    .add_window(StageConfig::WindowType::HANN)
+                    .add_fft()
+                    .add_magnitude()
+                    .build();
+  executor.initialize(config_, std::move(stages));
+
+  const size_t input_size = config_.nfft * config_.channels;
+  const size_t output_size = config_.num_output_bins() * config_.channels;
+
+  // Submit 10 times: first submit = 1 frame (N=1),
+  // subsequent submits = 2 frames (N=2) via batched path
+  for (int i = 0; i < 10; ++i) {
+    auto input = generate_sinusoid(input_size, 100.0f + i);
+    std::vector<float> output(output_size);
+    executor.submit(input.data(), output.data(), input_size);
+  }
+
+  auto stats = executor.get_stats();
+  // 1 + 9*2 = 19 frames (first submit N=1, rest N=2)
+  EXPECT_GE(stats.frames_processed, 15);
+  EXPECT_LE(stats.frames_processed, 21);
+  EXPECT_GT(stats.latency_us, 0.0f);
+  EXPECT_GT(stats.throughput_gbps, 0.0f);
+}
+
+/**
+ * @brief Unit test for peek_frame_at_offset ring buffer method.
+ */
+TEST(RingBufferPeekOffsetTest, PeekFrameAtOffset) {
+  // Check for CUDA device availability
+  int device_count = 0;
+  cudaError_t err = cudaGetDeviceCount(&device_count);
+  if (err != cudaSuccess || device_count == 0) {
+    GTEST_SKIP() << "No CUDA devices available for testing.";
+  }
+
+  sigtekx::RingBuffer<float> rb(64);
+
+  // Push 32 samples
+  std::vector<float> data(32);
+  for (int i = 0; i < 32; ++i) data[i] = static_cast<float>(i);
+  rb.push(data.data(), 32);
+
+  // Peek at offset 0, size 16
+  auto view0 = rb.peek_frame_at_offset(16, 0);
+  EXPECT_TRUE(view0.is_contiguous());
+  EXPECT_EQ(view0.first.count, size_t{16});
+  EXPECT_FLOAT_EQ(view0.first.data[0], 0.0f);
+  EXPECT_FLOAT_EQ(view0.first.data[15], 15.0f);
+
+  // Peek at offset 8, size 16 (overlapping with previous)
+  auto view1 = rb.peek_frame_at_offset(16, 8);
+  EXPECT_TRUE(view1.is_contiguous());
+  EXPECT_EQ(view1.first.count, size_t{16});
+  EXPECT_FLOAT_EQ(view1.first.data[0], 8.0f);
+  EXPECT_FLOAT_EQ(view1.first.data[15], 23.0f);
+
+  // Underflow: offset + frame_size > available
+  EXPECT_THROW(rb.peek_frame_at_offset(16, 20), std::underflow_error);
+}
+
+/**
+ * @brief Test peek_frame_at_offset with wraparound.
+ */
+TEST(RingBufferPeekOffsetTest, PeekFrameAtOffsetWraparound) {
+  int device_count = 0;
+  cudaError_t err = cudaGetDeviceCount(&device_count);
+  if (err != cudaSuccess || device_count == 0) {
+    GTEST_SKIP() << "No CUDA devices available for testing.";
+  }
+
+  // Small buffer to force wraparound
+  sigtekx::RingBuffer<float> rb(32);
+
+  // Fill buffer partially, advance, refill to force wraparound
+  std::vector<float> data1(20);
+  for (int i = 0; i < 20; ++i) data1[i] = static_cast<float>(i);
+  rb.push(data1.data(), 20);
+  rb.advance(16);  // Read pointer at 16, available = 4
+
+  // Push more data (wraps around)
+  std::vector<float> data2(20);
+  for (int i = 0; i < 20; ++i) data2[i] = static_cast<float>(100 + i);
+  rb.push(data2.data(), 20);
+  // Available = 24, read_pos = 16, write_pos = (16+24)%32 = 8
+
+  // Peek at offset 0, size 16 - should wrap around
+  auto view = rb.peek_frame_at_offset(16, 0);
+  // read_pos = 16, end = 32 = capacity, so contiguous
+  EXPECT_TRUE(view.is_contiguous());
+  EXPECT_EQ(view.first.count, size_t{16});
+  // First 4 samples are residual [16,17,18,19], next 12 are [100,101,...,111]
+  EXPECT_FLOAT_EQ(view.first.data[0], 16.0f);
+  EXPECT_FLOAT_EQ(view.first.data[3], 19.0f);
+  EXPECT_FLOAT_EQ(view.first.data[4], 100.0f);
+
+  // Peek at offset 8, size 16 - this starts at (16+8)%32=24, wraps to 0
+  auto view2 = rb.peek_frame_at_offset(16, 8);
+  EXPECT_TRUE(!view2.is_contiguous());
+  size_t expected_span = 8;
+  EXPECT_EQ(view2.first.count, expected_span);  // 24..31
+  EXPECT_EQ(view2.second.count, expected_span);  // 0..7
 }

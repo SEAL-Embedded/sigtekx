@@ -3,7 +3,10 @@
 # Render: See docs/diagrams/README.md for rendering instructions
 #
 # This diagram shows the complete execution flow for StreamingExecutor (low-latency streaming mode).
-# The sequence illustrates ring buffer accumulation, zero-copy peek_frame DMA, and 3-stream asynchronous execution.
+# The sequence illustrates ring buffer accumulation, batched frame processing (Optimization 3.1),
+# zero-copy peek_frame_at_offset DMA, and 3-stream asynchronous execution.
+#
+# UPDATED: 2026-03-10 — Batched frame processing (Optimization 3.1)
 
 # Import shared styles
 ...@common/styles
@@ -17,11 +20,12 @@ streaming_mode: Streaming Executor Pipeline {
   class: streaming-green
 
   description: |md
-    **Streaming Mode: Ring Buffer Accumulation + Frame Extraction**
+    **Streaming Mode: Ring Buffer Accumulation + Batched Frame Processing**
     - Supports arbitrary input chunk sizes
     - Per-channel independent processing
     - Ring buffer capacity: 3× NFFT per channel
-    - Mean latency: 122.25 µs (+40% vs batch)
+    - **Batched path (Opt 3.1)**: N frames in 1 GPU submission (1 sync vs N)
+    - **Dispatch**: N=0 → no-op, N=1 → process_one_batch, N≥2 → process_batched_frames
     - Ideal for real-time continuous streaming
   |
 
@@ -48,6 +52,10 @@ streaming_mode: Streaming Executor Pipeline {
     shape: rectangle
     label: "Stream[2]\nD2H"
   }
+  Kernels: {
+    shape: rectangle
+    label: "Direct Kernel Launches\n(bypass stages for N≥2)"
+  }
   WindowStage: {shape: rectangle}
   FFTStage: {shape: rectangle}
   MagnitudeStage: {shape: rectangle}
@@ -61,54 +69,72 @@ streaming_mode: Streaming Executor Pipeline {
   RingBuffer -> RingBuffer: "4: Lock-free push\nAtomic write_pos update"
   RingBuffer -> Impl: "5: push complete"
 
-  # Frame Extraction Loop (while can_extract_frame(nfft))
-  Impl -> RingBuffer: "6: peek_frame(nfft)\n(Zero-copy: returns FrameView spans)"
-  RingBuffer -> RingBuffer: "7: Returns FrameView{first, second}\n(ptrs into pinned ring buf memory)"
+  # Frame Count + Dispatch (Optimization 3.1)
+  Impl -> Impl: "6: N = count_available_frames()\n(min available across channels, clamped to max_frames)"
 
-  # Host to Device Transfer (direct DMA from pinned ring buffer — no staging copy)
-  RingBuffer -> Stream0: "8: cudaMemcpyAsync(d_input, view.first)\n(Direct DMA from pinned memory)"
-  Stream0 -> Stream0: "9: [if wraparound] cudaMemcpyAsync(view.second)\nthen record event_h2d_done"
+  # ====== BATCHED PATH (N ≥ 2) ======
+  # Zero-copy H2D: peek all N frames from ring buffers
+  Impl -> RingBuffer: "7: for frame_i in 0..N-1, for each ch:\npeek_frame_at_offset(nfft, frame_i × hop_size)"
+  RingBuffer -> RingBuffer: "8: Returns FrameView{first, second}\n(ptrs at staggered offsets into pinned ring buf)"
 
-  # Compute Pipeline
-  Stream1 -> Stream0: "10: wait(event_h2d_done)"
-  Stream1 -> WindowStage: "11: process(d_input, d_input)"
-  WindowStage -> WindowStage: "12: apply_window_kernel<<<>>>\n(Shape: [channels, nfft])"
+  # Host to Device Transfer (all N frames in one shot)
+  RingBuffer -> Stream0: "9: cudaMemcpyAsync × (N × channels)\n(DMA all frames to d_input)"
+  Stream0 -> Stream0: "10: record event_h2d_done\nLayout: [ch0_f0|ch1_f0|ch0_f1|ch1_f1|...]"
 
-  Stream1 -> FFTStage: "13: process(d_input, d_intermediate)"
-  FFTStage -> FFTStage: "14: cufftExecR2C()\n(Output: [channels, nfft/2+1])"
+  # Compute Pipeline (3 kernel launches for all N frames)
+  Stream1 -> Stream0: "11: wait(event_h2d_done)"
 
-  Stream1 -> MagnitudeStage: "15: process(d_intermediate, d_output)"
-  MagnitudeStage -> MagnitudeStage: "16: magnitude_kernel<<<>>>\n(Shape: [channels, bins])"
+  Stream1 -> Kernels: "12: launch_apply_window(d_input, d_input, d_window)\nbatch = N × channels, stride = nfft"
+  Kernels -> Kernels: "13: apply_window_kernel<<<>>>\n(in-place, all N×channels blocks)"
 
-  Stream1 -> Stream1: "17: record event_compute_done"
+  Stream1 -> Kernels: "14: batched_fft_plan.exec_r2c(d_input, d_intermediate)\nbatch = N × channels (lazy cached plan)"
+  Kernels -> Kernels: "15: cuFFT R2C\n(all N×channels transforms)"
 
-  # Device to Host Transfer
-  Stream2 -> Stream1: "18: wait(event_compute_done)"
-  Stream2 -> Stream2: "19: copy_to_host(output_frame)\n(Transfer one frame result)"
+  Stream1 -> Kernels: "16: launch_magnitude(d_intermediate, d_output)\nbatch = N × channels, stride = output_bins"
+  Kernels -> Kernels: "17: magnitude_kernel<<<>>>\n(all N×channels blocks)"
 
-  Impl -> Impl: "20: frames_processed++"
+  Stream1 -> Stream1: "18: record event_compute_done"
 
-  # End Frame Extraction Loop - Synchronization then advance
-  Impl -> Stream2: "21: synchronize()\n(Wait for D2H — keeps peek ptrs valid)"
+  # Device to Host Transfer (LAST FRAME ONLY)
+  Stream2 -> Stream1: "19: wait(event_compute_done)"
+  Stream2 -> Stream2: "20: cudaMemcpyAsync(output, d_output + last_frame_offset)\n(Only last frame: channels × output_bins floats)"
+
+  # Single synchronization point (1 sync instead of N)
+  Impl -> Stream2: "21: cudaStreamSynchronize()\n(SINGLE sync for all N frames)"
   Stream2 -> Impl: "22: D2H complete"
 
-  # Advance AFTER sync so peek pointers remain valid during DMA
-  Impl -> RingBuffer: "23: advance(hop_size)\n(Move read pointer — safe after sync)"
+  # Advance ring buffers by total consumed
+  Impl -> RingBuffer: "23: advance(N × hop_size)\n(Bulk advance — safe after sync)"
 
-  Impl -> Impl: "24: update_stats(event_start, event_end)\n(Update latency, throughput, frames_processed)"
+  Impl -> Impl: "24: frame_counter++, update_stats()\n(frames_processed += N)"
 
   Impl -> StreamingExecutor: "25: submit complete"
   StreamingExecutor -> Client: "26: return (last frame in output)"
 
+  # ====== SINGLE-FRAME PATH (N = 1) ======
+  single_frame_note: {
+    class: note-gold
+    label: |md
+      **N=1 Fallback**: Uses existing `process_one_batch()` path
+      (identical to pre-optimization behavior — zero overhead)
+
+      **N=0**: No frames available, no processing
+    |
+  }
+
   performance_stream_note: {
     class: note-gold
     label: |md
-      **Performance**: Mean latency ~122 µs (+40% vs batch, pre-Phase 1.1 baseline)
-      **Zero-copy DMA**: peek_frame() eliminates staging buffer memcpy
-      **Ring buffer overhead**: push memcpy + per-channel loop (~20 µs)
+      **Optimization 3.1: Batched Frame Processing**
+      - **Before**: [H2D→W→FFT→Mag→D2H→SYNC] × N  (N syncs, 3N kernel launches)
+      - **After**: [H2D_all→W_all→FFT_all→Mag_all→D2H_last→SYNC]  (1 sync, 3 launches)
+      - **Expected**: 2-6× latency reduction for high overlap configs
 
-      Tradeoff: Flexibility for arbitrary chunk sizes
-      Ideal for real-time continuous streaming
+      **Key design decisions**:
+      - Bypass stages → call kernel wrappers directly (preserves stage interface)
+      - Lazy cuFFT plan cache (keyed by N×channels)
+      - D2H last frame only (API contract: one output per submit)
+      - peek_frame_at_offset() for zero-copy staggered DMA
     |
   }
 }
@@ -122,15 +148,14 @@ comparison: |md
   ## Batch Executor (High-Throughput - see 06_cpp_seq_batch.d2)
   - **Direct pipeline**: H2D → Compute → D2H
   - **Fixed input size**: Must provide complete frames
-  - **Lower latency**: 86.79 µs
-  - **Lower memory**: 164 KB
+  - **Lower latency**: ~405 µs (Python end-to-end)
   - **Use case**: Offline batch processing, file analysis
 
   ## Streaming Executor (Low-Latency Real-Time - THIS DIAGRAM)
   - **Ring buffer accumulation**: Flexible chunk sizes
-  - **Zero-copy H2D**: peek_frame() DMA directly from pinned ring buffer (Phase 1.1)
-  - **Higher latency**: ~122 µs (+40%)
-  - **Higher memory**: ~262 KB (+60%)
+  - **Batched frame processing** (Optimization 3.1): 1 sync per submit, not N
+  - **Zero-copy H2D**: peek_frame_at_offset() DMA from pinned ring buffer
+  - **Dispatch**: N=1 → single-frame path, N≥2 → batched path
   - **Use case**: Real-time streaming, continuous monitoring
 
   Both modes use the same 3-stream asynchronous pipeline for parallel H2D/Compute/D2H.

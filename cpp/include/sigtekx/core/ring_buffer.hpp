@@ -301,6 +301,45 @@ class RingBuffer {
   }
 
   /**
+   * @brief Returns a zero-copy view at an arbitrary offset from the read
+   * position.
+   * @param frame_size Number of samples in one frame (e.g., nfft).
+   * @param offset Sample offset from current read position.
+   * @return FrameView with one or two spans pointing into pinned memory.
+   * @throws std::underflow_error if insufficient samples available.
+   *
+   * Enables peeking at N overlapping frames without advancing the read
+   * pointer. For batched frame processing, call with offsets
+   * 0, hop_size, 2*hop_size, ... to get views for each overlapping frame.
+   *
+   * Returned pointers are valid until advance() is called.
+   */
+  FrameView peek_frame_at_offset(size_t frame_size, size_t offset) const {
+    size_t total_needed = offset + frame_size;
+    size_t current_available = available_.load(std::memory_order_acquire);
+
+    if (current_available < total_needed) {
+      throw std::underflow_error(
+          "Ring buffer underflow: insufficient samples for frame at offset");
+    }
+
+    size_t current_read = read_pos_.load(std::memory_order_relaxed);
+    size_t pos = (current_read + offset) % capacity_;
+    size_t end = pos + frame_size;
+
+    if (end <= capacity_) {
+      // Contiguous: single span
+      return FrameView{{buffer_.get() + pos, frame_size}, {nullptr, 0}};
+    } else {
+      // Wraparound: two spans
+      size_t first_part = capacity_ - pos;
+      return FrameView{
+          {buffer_.get() + pos, first_part},
+          {buffer_.get(), frame_size - first_part}};
+    }
+  }
+
+  /**
    * @brief Advances the read pointer by a specified number of samples
    * (lock-free).
    * @param samples Number of samples to advance (typically hop_size).

@@ -6,7 +6,7 @@
 # including interfaces (PipelineExecutor, ProcessingStage), concrete implementations,
 # the Builder pattern (PipelineBuilder), and all configuration/resource relationships.
 # 
-# AUDIT STATUS: ✓ Verified accurate against codebase (2025-12-02)
+# AUDIT STATUS: ✓ Updated for Optimization 3.1 batched frame processing (2026-03-10)
 
 # Import shared styles
 ...@common/styles
@@ -88,8 +88,11 @@ executor_api: C++ Executor API {
       **Streaming Mode (Low-Latency)**
       - Ring buffer accumulation
       - Arbitrary chunk sizes
-      - Mean latency: 122.25 µs
-      - Ring buffer → Extract → Pipeline
+      - **Batched frame processing (Opt 3.1)**
+      - Dispatch: N=0 no-op, N=1 stage path, N≥2 direct kernels
+      - Direct kernel launches bypass stages for N≥2
+      - Lazy cuFFT plan cache (batched_fft_plans_)
+      - D2H last frame only (1 sync per submit)
       - Pimpl idiom hides CUDA dependencies
     |
   }
@@ -171,12 +174,13 @@ streaming_components: Streaming Components {
 
       **Operations:**
       - push() / extract_frame() / extract_batch()
+      - peek_frame() — zero-copy FrameView (N=1)
+      - **peek_frame_at_offset()** — staggered zero-copy (N≥2, Opt 3.1)
       - advance() / available() / reset()
 
-      **Memory Overhead: +80%**
-      - 3× NFFT × channels (ring buffers)
-      - + nfft × channels (staging)
-      - = 295 KB vs 164 KB (batch)
+      **Memory Overhead: +260%**
+      - 3× NFFT × channels (ring buffers, host)
+      - Device buffers × max_frames_per_submit
     |
   }
 }
@@ -591,6 +595,15 @@ executor_api.StreamingExecutor -> processing_pipeline.FFTStage: orchestrates {
 executor_api.StreamingExecutor -> processing_pipeline.MagnitudeStage: orchestrates {
   class: dependency
 }
+
+# Batched path (Opt 3.1): StreamingExecutor launches kernels directly for N≥2
+executor_api.StreamingExecutor -> cuda_kernels.WindowKernels: "direct launch\n(N≥2 batched)" {
+  style.stroke-dash: 5
+}
+executor_api.StreamingExecutor -> cuda_kernels.MagnitudeKernels: "direct launch\n(N≥2 batched)" {
+  style.stroke-dash: 5
+}
+executor_api.StreamingExecutor -> cuda_resources.CufftPlan: "batched_fft_plans_\n(lazy cached)"
 
 # Stage to kernel relationships
 processing_pipeline.WindowStage -> cuda_kernels.WindowKernels: launches

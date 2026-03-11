@@ -26,8 +26,10 @@ streaming_memory: StreamingExecutor Memory Layout {
 
   description: |md
     **StreamingExecutor Mode**: Low-latency streaming, arbitrary chunk sizes
-    Total Memory: ~262 KB (nfft=2048, channels=2) **+60% vs BatchExecutor**
-    Phase 1.1: Ring buffers in pinned memory — zero-copy DMA via peek_frame()
+    Total Memory: ~590 KB (nfft=2048, channels=2, max_frames=5) **+260% vs BatchExecutor**
+    - Ring buffers in pinned memory — zero-copy DMA via peek_frame() / peek_frame_at_offset()
+    - **Optimization 3.1**: Device buffers scaled by max_frames_per_submit for batched processing
+    - Batched cuFFT plans cached lazily (keyed by N×channels)
   |
 
   # Host Memory Space (organized in logical columns)
@@ -119,58 +121,77 @@ streaming_memory: StreamingExecutor Memory Layout {
 
     dev_input0: |md
       **DeviceBuffer[0]**
-      Input
+      Input (Batched)
 
-      - size: nfft × channels × sizeof(float)
+      - size: nfft × channels × **max_frames** × sizeof(float)
       - stride: nfft
-      - layout: per-channel
+      - layout: [ch0_f0, ch1_f0, ch0_f1, ch1_f1, ...]
+      - **Opt 3.1**: Scaled by max_frames_per_submit
     |
     dev_input0.shape: rectangle
 
     dev_input1: |md
       **DeviceBuffer[1]**
-      Input
+      Input (Batched)
 
-      - size: nfft × channels × sizeof(float)
+      - size: nfft × channels × **max_frames** × sizeof(float)
       - stride: nfft
-      - layout: per-channel
+      - layout: [ch0_f0, ch1_f0, ch0_f1, ch1_f1, ...]
+      - **Opt 3.1**: Scaled by max_frames_per_submit
     |
     dev_input1.shape: rectangle
 
     dev_intermediate: |md
       **DeviceBuffer**
-      Intermediate
+      Intermediate (Batched)
 
-      - size: (nfft/2+1) × channels × sizeof(float2)
+      - size: (nfft/2+1) × channels × **max_frames** × sizeof(float2)
       - format: complex (R2C output)
       - note: Hermitian symmetry
+      - **Opt 3.1**: Holds N×channels FFT outputs
     |
     dev_intermediate.shape: rectangle
 
     dev_output: |md
       **DeviceBuffer**
-      Output
+      Output (Batched)
 
-      - size: (nfft/2+1) × channels × sizeof(float)
+      - size: (nfft/2+1) × channels × **max_frames** × sizeof(float)
       - format: magnitude
-      - layout: [ch0_bins, ch1_bins, ...]
+      - layout: [ch0_f0_mag, ch1_f0_mag, ..., ch0_fN_mag, ch1_fN_mag]
+      - **D2H**: Only last frame copied back
     |
     dev_output.shape: rectangle
 
+    d_window: |md
+      **d_window_**
+      Window Coefficients (Batched Path)
+      «DeviceBuffer»
+
+      - size: nfft × sizeof(float)
+      - precomputed at initialize()
+      - used by: launch_apply_window()
+      - **Opt 3.1**: Direct kernel launch path
+    |
+    d_window.shape: rectangle
+
     window_coef: |md
       **Window Coefficients**
-      «cached»
+      «cached» (Stage Path)
 
       - size: nfft × sizeof(float)
       - precomputed: true
+      - used by: WindowStage (N=1 fallback)
     |
     window_coef.shape: rectangle
 
     work_area: |md
-      **cuFFT Work Area**
+      **cuFFT Work Areas**
 
       - size: dynamic
-      - managed by: CufftPlan
+      - managed by: CufftPlan (stage) + batched_fft_plans_
+      - **Opt 3.1**: Lazy plan cache (keyed by N×channels)
+      - Typical: 1-2 cached plans in steady state
     |
     work_area.shape: rectangle
   }
@@ -194,50 +215,55 @@ streaming_memory: StreamingExecutor Memory Layout {
   streaming_host.input_flow.host_input -> streaming_host.input_flow.ring_buffers.ringbuf0: "push(chunk[ch0])"
   streaming_host.input_flow.host_input -> streaming_host.input_flow.ring_buffers.ringbuf1: "push(chunk[ch1])"
 
-  streaming_host.input_flow.ring_buffers.ringbuf0 -> streaming_h2d: "peek_frame(nfft)\nzero-copy span"
-  streaming_host.input_flow.ring_buffers.ringbuf1 -> streaming_h2d: "peek_frame(nfft)\nzero-copy span"
+  streaming_host.input_flow.ring_buffers.ringbuf0 -> streaming_h2d: "peek_frame_at_offset(nfft, i×hop)\nzero-copy span × N frames"
+  streaming_host.input_flow.ring_buffers.ringbuf1 -> streaming_h2d: "peek_frame_at_offset(nfft, i×hop)\nzero-copy span × N frames"
 
-  streaming_h2d -> streaming_device.dev_input0: "cudaMemcpyAsync\n(direct from pinned ring buf)"
+  streaming_h2d -> streaming_device.dev_input0: "cudaMemcpyAsync × (N×channels)\n(DMA all frames from pinned ring buf)"
 
-  # Processing on device
-  streaming_device.dev_input0 -> streaming_device.dev_input0: "window\n(in-place)"
-  streaming_device.window_coef -> streaming_device.dev_input0: "element-wise\nmult" {
+  # Processing on device (batched: 3 kernel launches for all N frames)
+  streaming_device.dev_input0 -> streaming_device.dev_input0: "launch_apply_window\n(batch=N×ch, in-place)"
+  streaming_device.d_window -> streaming_device.dev_input0: "element-wise\nmult" {
     class: dependency
   }
-  streaming_device.dev_input0 -> streaming_device.dev_intermediate: "FFT\n(R2C)"
-  streaming_device.dev_intermediate -> streaming_device.dev_output: magnitude
+  streaming_device.dev_input0 -> streaming_device.dev_intermediate: "batched cuFFT R2C\n(batch=N×channels)"
+  streaming_device.dev_intermediate -> streaming_device.dev_output: "launch_magnitude\n(batch=N×channels)"
 
-  # Output path: Device → Host
-  streaming_device.dev_output -> streaming_d2h: async
+  # Output path: Device → Host (LAST FRAME ONLY)
+  streaming_device.dev_output -> streaming_d2h: "last frame only\n(offset: (N-1)×ch×bins)"
   streaming_d2h -> streaming_host.output_flow.pinned1: cudaMemcpyAsync
   streaming_host.output_flow.pinned1 -> streaming_host.output_flow.host_output: memcpy
 
-  # Ring buffer advance (self-loops)
-  streaming_host.input_flow.ring_buffers.ringbuf0 -> streaming_host.input_flow.ring_buffers.ringbuf0: "advance(hop_size)\nafter frame"
-  streaming_host.input_flow.ring_buffers.ringbuf1 -> streaming_host.input_flow.ring_buffers.ringbuf1: "advance(hop_size)\nafter frame"
+  # Ring buffer advance (bulk advance after single sync)
+  streaming_host.input_flow.ring_buffers.ringbuf0 -> streaming_host.input_flow.ring_buffers.ringbuf0: "advance(N × hop_size)\nbulk after sync"
+  streaming_host.input_flow.ring_buffers.ringbuf1 -> streaming_host.input_flow.ring_buffers.ringbuf1: "advance(N × hop_size)\nbulk after sync"
 
   characteristics: |md
-    **StreamingExecutor Memory Breakdown**:
-    - Ring buffers: 3 × nfft × channels × sizeof(float) = **98 KB** (extra)
-    - Device buffers: same as BatchExecutor = **164 KB**
-    - **Total: ~262 KB (+60% overhead vs BatchExecutor)**
+    **StreamingExecutor Memory Breakdown** (nfft=2048, ch=2, max_frames=5):
+    - Ring buffers: 3 × nfft × channels × sizeof(float) = **98 KB** (host, pinned)
+    - Device input: nfft × channels × max_frames × sizeof(float) × 2 buffers = **160 KB**
+    - Device intermediate: (nfft/2+1) × channels × max_frames × sizeof(complex) = **164 KB**
+    - Device output: (nfft/2+1) × channels × max_frames × sizeof(float) = **82 KB**
+    - d_window_: nfft × sizeof(float) = **8 KB**
+    - cuFFT work areas: dynamic (1-2 cached plans)
+    - **Total: ~590 KB (+260% vs BatchExecutor)**
 
     **Tradeoffs**:
     ✅ Supports arbitrary input chunk sizes
     ✅ Continuous streaming capability
     ✅ Per-channel independence
-    ✅ Zero-copy H2D DMA via peek_frame() (Phase 1.1)
-    ❌ +60% memory overhead
+    ✅ Zero-copy H2D DMA via peek_frame_at_offset() (Opt 3.1)
+    ✅ 1 sync per submit instead of N (Opt 3.1)
+    ❌ Higher memory overhead (device buffers × max_frames)
 
     **Ring Buffer Operations**:
     1. push() - Add new samples (lock-free)
-    2. peek_frame(nfft) - Zero-copy FrameView into pinned memory
-    3. advance(hop_size) - Move read pointer (after D2H sync)
+    2. peek_frame(nfft) - Zero-copy FrameView (N=1 path)
+    3. peek_frame_at_offset(nfft, i×hop) - Staggered zero-copy (N≥2 batched path)
+    4. advance(N × hop_size) - Bulk advance after single sync
 
-    **Capacity: 3× NFFT rationale**:
-    - Prevents overflow during pipeline warmup
-    - Allows safe accumulation before first extraction
-    - Handles bursty input patterns
+    **Batched Device Layout** (N=4, 2 channels):
+    d_input: \[ch0_f0, ch1_f0, ch0_f1, ch1_f1, ch0_f2, ch1_f2, ch0_f3, ch1_f3\]
+    D2H: copies only \[ch0_f3_mag, ch1_f3_mag\] (last frame)
   |
   characteristics.class: note-gold
 }
@@ -255,15 +281,16 @@ comparison: |md
   - **No ring buffers**: Direct pipeline flow
   - **Use case**: High-throughput batch processing
 
-  ## StreamingExecutor (+60% Memory - THIS DIAGRAM)
-  - **Total Memory**: ~262 KB (+98 KB)
-  - **Host**: Input/output buffers + pinned ring buffers (**98 KB**, direct DMA via peek_frame())
-  - **Device**: Same as BatchExecutor (164 KB)
-  - **Ring buffers**: Per-channel pinned memory — zero-copy H2D (Phase 1.1)
+  ## StreamingExecutor (+260% Memory - THIS DIAGRAM)
+  - **Total Memory**: ~590 KB (with batched buffers)
+  - **Host**: Input/output buffers + pinned ring buffers (**98 KB**, DMA via peek_frame_at_offset())
+  - **Device**: Scaled by max_frames_per_submit (~490 KB for max_frames=5)
+  - **Ring buffers**: Per-channel pinned memory — zero-copy staggered DMA (Opt 3.1)
+  - **Batched path**: d_window_ + lazy cuFFT plan cache for direct kernel launches
   - **Use case**: Real-time streaming with arbitrary chunk sizes
 
-  Both modes use the same device memory layout and processing pipeline.
-  The streaming overhead is entirely in host memory for ring buffer management.
+  Device buffers are larger than BatchExecutor due to max_frames scaling.
+  Memory tradeoff: higher device allocation enables 2-6× latency reduction.
 |
 
 comparison.class: core-blue
