@@ -35,10 +35,8 @@ env_file() {
 # --- Conda shell (for activation) --------------------------------------------
 conda_source() {
   set +u
-  if command -v conda >/dev/null 2>&1; then
-    # shellcheck disable=SC1091
-    source "$(conda info --base)/etc/profile.d/conda.sh"
-  elif [[ -d "$HOME/miniconda3" ]]; then
+  # Prefer well-known paths first to avoid picking up a stale conda install
+  if [[ -d "$HOME/miniconda3" ]]; then
     # shellcheck disable=SC1091
     source "$HOME/miniconda3/etc/profile.d/conda.sh"
   elif [[ -d "$HOME/mambaforge" ]]; then
@@ -47,6 +45,9 @@ conda_source() {
   elif [[ -d "$HOME/anaconda3" ]]; then
     # shellcheck disable=SC1091
     source "$HOME/anaconda3/etc/profile.d/conda.sh"
+  elif command -v conda >/dev/null 2>&1; then
+    # shellcheck disable=SC1091
+    source "$(conda info --base)/etc/profile.d/conda.sh"
   else
     set -u
     err "Conda shell not found. Install Miniconda/Mambaforge."
@@ -98,7 +99,16 @@ cmd_setup() {
   fi
 
   log "Installing sigtekx Python package in development mode..."
-  conda run -n "$CONDA_ENV_NAME" python -m pip install -e ".[dev]"
+  local conda_base env_python
+  conda_base="$(conda info --base)"
+  env_python="${conda_base}/envs/${CONDA_ENV_NAME}/bin/python"
+  if [[ ! -x "$env_python" ]]; then
+    err "Python not found at: $env_python"
+    err "conda base resolved to: $conda_base"
+    exit 1
+  fi
+  log "Using Python: $env_python"
+  "$env_python" -m pip install -e ".[dev]" --no-build-isolation
 
   ok "Environment ready. Activate with: conda activate $CONDA_ENV_NAME"
 }
