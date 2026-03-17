@@ -91,6 +91,22 @@
       }
     },
     {
+      "name": "linux-coverage",
+      "inherits": "base",
+      "displayName": "Linux Coverage",
+      "description": "Linux debug build with code coverage enabled (GCC/gcovr)",
+      "binaryDir": "${sourceDir}/build/linux-coverage",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "SIGTEKX_WITH_TESTS": "ON",
+        "SIGTEKX_WITH_GRAPHS": "ON",
+        "SIGTEKX_WITH_PYTHON": "OFF",
+        "SIGTEKX_WITH_NVTX": "ON",
+        "SIGTEKX_WITH_TIDY": "OFF",
+        "SIGTEKX_ENABLE_COVERAGE": "ON"
+      }
+    },
+    {
       "name": "windows-vs",
       "displayName": "Windows Visual Studio",
       "description": "Windows release build with Visual Studio 2022",
@@ -138,6 +154,11 @@
     {
       "name": "windows-debug",
       "configurePreset": "windows-debug",
+      "configuration": "Debug"
+    },
+    {
+      "name": "linux-coverage",
+      "configurePreset": "linux-coverage",
       "configuration": "Debug"
     },
     {
