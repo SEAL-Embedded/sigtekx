@@ -45,7 +45,7 @@ cmd_bench() {
   done
 
   if $lock_clocks; then
-    local gpu_manager="${SCRIPT_DIR}/gpu-manager.sh"
+    local gpu_manager="${SCRIPT_DIR}/gpu/gpu-manager.sh"
     if [[ ! -f "$gpu_manager" ]]; then
       err "GPU manager not found: $gpu_manager"
       exit 1

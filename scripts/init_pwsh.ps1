@@ -575,9 +575,9 @@ function global:sxpc  { sigxc profile @args }   # C++ profiling shortcut
 function global:sxh { sigx help }
 
 # Stage timing shortcuts (GitHub Issue #004 - per-stage timing profiling)
-function global:sxstb  { python scripts/stage_timing_helper.py batch @args }   # BATCH mode stage timing
-function global:sxsts  { python scripts/stage_timing_helper.py stream @args }  # STREAMING mode stage timing
-function global:sxst   { python scripts/stage_timing_helper.py both @args }    # Both modes stage timing
+function global:sxstb  { python scripts/helpers/stage_timing_helper.py batch @args }   # BATCH mode stage timing
+function global:sxsts  { python scripts/helpers/stage_timing_helper.py stream @args }  # STREAMING mode stage timing
+function global:sxst   { python scripts/helpers/stage_timing_helper.py both @args }    # Both modes stage timing
 
 # Diagram generation shortcut (use 'sigx diagrams' for full command)
 # Development workflow shortcut

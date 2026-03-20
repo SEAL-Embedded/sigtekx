@@ -61,7 +61,7 @@ else:
     target_cmd.extend(args.args)
 ```
 
-**Location**: `scripts/prof_helper.py` lines 595-614
+**Location**: `scripts/helpers/prof_helper.py` lines 595-614
 
 ---
 
@@ -98,7 +98,7 @@ if args.args:
 # Resulted in: python run_latency.py +benchmark=profiling engine.nfft=8192 benchmark.iterations=50
 ```
 
-**Location**: `scripts/prof_helper.py` lines 598-614
+**Location**: `scripts/helpers/prof_helper.py` lines 598-614
 
 ---
 
@@ -169,7 +169,7 @@ sxp nsys latency experiment=ionosphere_hires +benchmark=profiling
 
 ### Validation
 
-Run `python scripts/prof_helper.py --help` to see comprehensive documentation.
+Run `python scripts/helpers/prof_helper.py --help` to see comprehensive documentation.
 
 ---
 
@@ -179,7 +179,7 @@ Run `python scripts/prof_helper.py --help` to see comprehensive documentation.
    - Reordered argument construction (flags before positionals)
    - Removed debug output
 
-2. **scripts/prof_helper.py** (lines 461-523, 595-614, 658-664)
+2. **scripts/helpers/prof_helper.py** (lines 461-523, 595-614, 658-664)
    - Fixed argument parsing logic (removed `--` check)
    - Added auto-loading of default benchmark config
    - Updated comprehensive help documentation

@@ -739,7 +739,7 @@ sxp nsys latency +benchmark=latency \
 - **Research**: Testing specific parameter combinations
 
 **See Also:**
-- `python scripts/prof_helper.py --help` for detailed argument documentation
+- `python scripts/helpers/prof_helper.py --help` for detailed argument documentation
 - `sigx help` for quick reference
 
 #### Expected Profiling Times
@@ -805,7 +805,7 @@ sigxc bench --preset latency --full --lock-clocks --max-clocks
 sigxc bench --preset latency --full --lock-clocks --gpu-index 1
 
 # Query GPU info (no locking)
-pwsh scripts/gpu-manager.ps1 -Action Query
+pwsh scripts/gpu/gpu-manager.ps1 -Action Query
 ```
 
 ### Python Options

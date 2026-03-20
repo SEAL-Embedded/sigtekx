@@ -180,16 +180,16 @@ sxp nsys latency
 
 ```powershell
 # Query GPU info
-pwsh scripts/gpu-manager.ps1 -Action Query
+pwsh scripts/gpu/gpu-manager.ps1 -Action Query
 
 # Lock clocks manually
-pwsh scripts/gpu-manager.ps1 -Action Lock -GpuIndex 0
+pwsh scripts/gpu/gpu-manager.ps1 -Action Lock -GpuIndex 0
 
 # Run benchmarks (clocks stay locked)
 sigxc bench --preset latency --full
 
 # Unlock when done
-pwsh scripts/gpu-manager.ps1 -Action Unlock -GpuIndex 0
+pwsh scripts/gpu/gpu-manager.ps1 -Action Unlock -GpuIndex 0
 ```
 
 ---
@@ -337,7 +337,7 @@ With automatic elevation:
 Check if everything is ready:
 
 ```powershell
-pwsh scripts/gpu-manager.ps1 -Action Validate
+pwsh scripts/gpu/gpu-manager.ps1 -Action Validate
 ```
 
 Expected output:
@@ -366,7 +366,7 @@ Locked clocks **prevent** the GPU from downclocking during idle, which:
 
 ```powershell
 # After benchmarking session
-pwsh scripts/gpu-manager.ps1 -Action Unlock
+pwsh scripts/gpu/gpu-manager.ps1 -Action Unlock
 ```
 
 ### Thermal Management
@@ -442,19 +442,19 @@ python benchmarks/run_latency.py +benchmark=latency benchmark.lock_gpu_clocks=tr
 **If you want persistent locking**:
 ```powershell
 # Lock manually
-pwsh scripts/gpu-manager.ps1 -Action Lock
+pwsh scripts/gpu/gpu-manager.ps1 -Action Lock
 
 # Run multiple benchmarks (clocks stay locked)
 sigxc bench --preset latency --full
 sigxc bench --preset realtime --full
 
 # Unlock when done
-pwsh scripts/gpu-manager.ps1 -Action Unlock
+pwsh scripts/gpu/gpu-manager.ps1 -Action Unlock
 ```
 
 ### Different GPU Model - No Profile Found
 
-**Solution 1**: Add your GPU to `scripts/gpu-clocks.json`
+**Solution 1**: Add your GPU to `scripts/gpu/gpu-clocks.json`
 
 ```json
 {
@@ -617,7 +617,7 @@ else:
 
 The GPU clock locking system has three layers:
 
-1. **PowerShell Script** (`scripts/gpu-manager.ps1`)
+1. **PowerShell Script** (`scripts/gpu/gpu-manager.ps1`)
    - Low-level nvidia-smi interface
    - GPU clock database (11 pre-configured profiles)
    - Validation and safety checks

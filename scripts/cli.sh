@@ -538,7 +538,7 @@ cmd_dashboard() {
 cmd_profile() {
   ensure_env_activated
 
-  local prof_helper="${PROJECT_ROOT}/scripts/prof_helper.py"
+  local prof_helper="${PROJECT_ROOT}/scripts/helpers/prof_helper.py"
   if [[ ! -f "$prof_helper" ]]; then
     err "prof_helper.py not found at: $prof_helper"
     exit 1
@@ -622,7 +622,7 @@ cmd_profile() {
 cmd_baseline() {
   ensure_env_activated
 
-  local baseline_helper="${PROJECT_ROOT}/scripts/baseline_helper.py"
+  local baseline_helper="${PROJECT_ROOT}/scripts/helpers/baseline_helper.py"
   if [[ ! -f "$baseline_helper" ]]; then
     err "Baseline helper not found: $baseline_helper"
     exit 1

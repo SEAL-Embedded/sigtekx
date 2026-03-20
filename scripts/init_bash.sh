@@ -169,9 +169,9 @@ sxdash() { sigx dashboard "$@"; }
 sxd() { sigx dev "$@"; }
 
 # Stage timing shortcuts
-sxstb() { python scripts/stage_timing_helper.py batch "$@"; }
-sxsts() { python scripts/stage_timing_helper.py stream "$@"; }
-sxst()  { python scripts/stage_timing_helper.py both "$@"; }
+sxstb() { python scripts/helpers/stage_timing_helper.py batch "$@"; }
+sxsts() { python scripts/helpers/stage_timing_helper.py stream "$@"; }
+sxst()  { python scripts/helpers/stage_timing_helper.py both "$@"; }
 
 # Profiling shortcut with Hydra arg classification
 sxp() {

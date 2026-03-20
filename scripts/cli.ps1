@@ -941,7 +941,7 @@ function Invoke-Profile {
     Write-Status "Starting GPU profiling session..."
 
     # Validate prof_helper.py exists
-    $profHelper = Join-Path $script:ProjectRoot "scripts/prof_helper.py"
+    $profHelper = Join-Path $script:ProjectRoot "scripts/helpers/prof_helper.py"
     if (-not (Test-Path $profHelper)) {
         Write-Error "prof_helper.py not found at: $profHelper"
         exit 1
@@ -1077,7 +1077,7 @@ function Invoke-Baseline {
     )
 
     # Path to baseline helper script
-    $baselineHelper = Join-Path $script:ProjectRoot "scripts/baseline_helper.py"
+    $baselineHelper = Join-Path $script:ProjectRoot "scripts/helpers/baseline_helper.py"
 
     if (-not (Test-Path $baselineHelper)) {
         Write-Error "Baseline helper not found: $baselineHelper"

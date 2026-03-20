@@ -71,7 +71,7 @@ class GpuClockManager:
             src_dir = utils_dir.parent          # .../sigtekx/
             pkg_root = src_dir.parent           # .../
             repo_root = pkg_root.parent         # sigtekx/
-            script_path = repo_root / "scripts" / "gpu-manager-elevated.ps1"
+            script_path = repo_root / "scripts" / "gpu" / "gpu-manager-elevated.ps1"
 
         self.script_path = Path(script_path)
 
@@ -357,7 +357,7 @@ def check_clock_locking_available() -> tuple[bool, str]:
     src_dir = utils_dir.parent
     pkg_root = src_dir.parent
     repo_root = pkg_root.parent
-    script_path = repo_root / "scripts" / "gpu-manager-elevated.ps1"
+    script_path = repo_root / "scripts" / "gpu" / "gpu-manager-elevated.ps1"
 
     if not script_path.exists():
         return False, f"GPU manager script not found: {script_path}"

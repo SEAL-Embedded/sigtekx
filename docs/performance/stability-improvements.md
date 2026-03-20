@@ -95,7 +95,7 @@ cudaSetDeviceFlags(cudaDeviceScheduleBlockingSync);
 ---
 
 ### Phase 4: GPU Clock Locking
-**Files**: `scripts/gpu-manager.ps1`, `scripts/gpu-clocks.json`, `scripts/cli-cpp.ps1`
+**Files**: `scripts/gpu/gpu-manager.ps1`, `scripts/gpu/gpu-clocks.json`, `scripts/cli-cpp.ps1`
 
 **Implementation**:
 - Lock graphics clock: 1920 MHz (RTX 3090 Ti recommended)
@@ -222,7 +222,7 @@ sigxc bench --preset realtime --full --iono --lock-clocks
 - Phase 1: Blocking sync (`cpp/src/executors/batch_executor.cpp:40`)
 - Phase 2: Hybrid timing (`cpp/benchmarks/benchmark_runners.hpp:89-308`)
 - Phase 3: Warmup + outliers (`cpp/benchmarks/benchmark_config.hpp`, `benchmark_runners.hpp:122-149`)
-- Phase 4: Clock locking (`scripts/gpu-manager.ps1`, `scripts/cli-cpp.ps1`)
+- Phase 4: Clock locking (`scripts/gpu/gpu-manager.ps1`, `scripts/cli-cpp.ps1`)
 
 **External Resources**:
 - [CUDA Programming Guide - Device Management](https://docs.nvidia.com/cuda/cuda-c-programming-guide/)

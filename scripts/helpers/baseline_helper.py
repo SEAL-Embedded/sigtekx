@@ -3,7 +3,7 @@
 Baseline Management CLI Helper
 
 This script provides command-line interface for baseline archiving operations.
-Called by scripts/cli.ps1's Invoke-Baseline function.
+Called by cli.ps1's Invoke-Baseline function.
 
 Usage:
     python baseline_helper.py save <name> [--phase <n>] [--message <msg>]

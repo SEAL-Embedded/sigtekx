@@ -80,7 +80,7 @@ function Invoke-Bench {
 
     if ($lockClocks) {
         # GPU clock locking path
-        $gpuManagerPath = Join-Path $PSScriptRoot "gpu-manager.ps1"
+        $gpuManagerPath = Join-Path $PSScriptRoot "gpu" "gpu-manager.ps1"
 
         if (-not (Test-Path $gpuManagerPath)) {
             Write-Error "GPU manager not found: $gpuManagerPath"
