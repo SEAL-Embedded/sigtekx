@@ -76,6 +76,20 @@ ensure_env_activated() {
     log "Please run: conda activate $CONDA_ENV_NAME"
     exit 1
   fi
+  # When invoked as a subprocess (e.g., bash cli.sh test), the conda env var
+  # is inherited but PATH is not, so `python` may resolve to the wrong install.
+  # Resolve the correct python from CONDA_PREFIX or known conda paths.
+  if [[ -n "${CONDA_PREFIX-}" && -x "${CONDA_PREFIX}/bin/python" ]]; then
+    SIGX_PYTHON="${CONDA_PREFIX}/bin/python"
+  else
+    local conda_base
+    conda_base="$(conda info --base 2>/dev/null || echo "$HOME/miniconda3")"
+    SIGX_PYTHON="${conda_base}/envs/${CONDA_ENV_NAME}/bin/python"
+  fi
+  if [[ ! -x "$SIGX_PYTHON" ]]; then
+    err "Python not found at: $SIGX_PYTHON"
+    exit 1
+  fi
 }
 
 # ============================================================================
@@ -181,7 +195,7 @@ cmd_test() {
   case "$suite" in
     python)
       log "Running Python tests..."
-      python -m pytest tests/ "${py_args[@]}"
+      "$SIGX_PYTHON" -m pytest tests/ "${py_args[@]}"
       ;;
     cpp)
       if $coverage; then
@@ -200,7 +214,7 @@ cmd_test() {
       ;;
     all)
       log "Running Python tests..."
-      python -m pytest tests/ "${py_args[@]}" || true
+      "$SIGX_PYTHON" -m pytest tests/ "${py_args[@]}" || true
 
       log "Running C++ tests..."
       local test_exe="${BUILD_DIR}/${DEFAULT_PRESET}/sigtekx_tests"
@@ -316,7 +330,7 @@ cmd_lint() {
   case "$target" in
     python|all)
       log "Linting Python code with ruff..."
-      python -m ruff check . "${args[@]}"
+      "$SIGX_PYTHON" -m ruff check . "${args[@]}"
       ;;
     cpp)
       log "C++ linting not yet implemented"
@@ -601,8 +615,8 @@ cmd_profile() {
     fi
   fi
 
-  log "Executing: python $prof_helper ${args[*]}"
-  python "$prof_helper" "${args[@]}"
+  log "Executing: $SIGX_PYTHON $prof_helper ${args[*]}"
+  "$SIGX_PYTHON" "$prof_helper" "${args[@]}"
 }
 
 cmd_baseline() {
@@ -622,7 +636,7 @@ cmd_baseline() {
     exit 1
   fi
 
-  python "$baseline_helper" "$@"
+  "$SIGX_PYTHON" "$baseline_helper" "$@"
 }
 
 cmd_diagrams() {

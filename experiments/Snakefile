@@ -10,7 +10,13 @@
 #      Generate: snakemake quarto_reports
 #      Purpose: Publication-quality reports, archival, presentations
 
+import sys
+
 configfile: "experiments/conf/config.yaml"
+
+# Resolve the Python interpreter that launched Snakemake so shell blocks use
+# the correct conda environment even when spawned as subprocesses.
+PYTHON = sys.executable
 
 # Pre-initialize MLflow SQLite database before any parallel rules execute.
 # Without this, concurrent Snakemake jobs all try to run Alembic migrations
@@ -84,7 +90,7 @@ rule run_baseline_100k:
         touch("artifacts/data/baseline_100k.done")
     shell:
         """
-        python benchmarks/run_throughput.py --multirun \
+        {PYTHON} benchmarks/run_throughput.py --multirun \
             experiment=baseline_100k \
             +benchmark=throughput
         """
@@ -95,7 +101,7 @@ rule run_baseline_48k:
         touch("artifacts/data/baseline_48k.done")
     shell:
         """
-        python benchmarks/run_throughput.py --multirun \
+        {PYTHON} benchmarks/run_throughput.py --multirun \
             experiment=baseline_48k \
             +benchmark=throughput
         """
@@ -106,7 +112,7 @@ rule run_low_nfft_scaling:
         touch("artifacts/data/low_nfft_scaling.done")
     shell:
         """
-        python benchmarks/run_throughput.py --multirun \
+        {PYTHON} benchmarks/run_throughput.py --multirun \
             experiment=low_nfft_scaling \
             +benchmark=throughput
         """
@@ -117,7 +123,7 @@ rule run_full_parameter_grid_100k:
         touch("artifacts/data/full_parameter_grid_100k.done")
     shell:
         """
-        python benchmarks/run_throughput.py --multirun \
+        {PYTHON} benchmarks/run_throughput.py --multirun \
             experiment=full_parameter_grid_100k \
             +benchmark=throughput
         """
@@ -128,7 +134,7 @@ rule run_full_parameter_grid_48k:
         touch("artifacts/data/full_parameter_grid_48k.done")
     shell:
         """
-        python benchmarks/run_throughput.py --multirun \
+        {PYTHON} benchmarks/run_throughput.py --multirun \
             experiment=full_parameter_grid_48k \
             +benchmark=throughput
         """
@@ -139,7 +145,7 @@ rule run_ionosphere_specialized:
         touch("artifacts/data/ionosphere_specialized.done")
     shell:
         """
-        python benchmarks/run_throughput.py --multirun \
+        {PYTHON} benchmarks/run_throughput.py --multirun \
             experiment=ionosphere_specialized \
             +benchmark=throughput
         """
@@ -154,7 +160,7 @@ rule run_ionosphere_streaming:
         touch("artifacts/data/ionosphere_streaming.done")
     shell:
         """
-        python benchmarks/run_realtime.py --multirun \
+        {PYTHON} benchmarks/run_realtime.py --multirun \
             experiment=ionosphere_streaming \
             +benchmark=realtime
         """
@@ -165,7 +171,7 @@ rule run_ionosphere_batch_throughput:
         touch("artifacts/data/ionosphere_batch_throughput.done")
     shell:
         """
-        python benchmarks/run_throughput.py --multirun \
+        {PYTHON} benchmarks/run_throughput.py --multirun \
             experiment=ionosphere_batch_throughput \
             +benchmark=throughput
         """
@@ -176,7 +182,7 @@ rule run_ionosphere_streaming_latency:
         touch("artifacts/data/ionosphere_streaming_latency.done")
     shell:
         """
-        python benchmarks/run_latency.py --multirun \
+        {PYTHON} benchmarks/run_latency.py --multirun \
             experiment=ionosphere_streaming_latency \
             +benchmark=latency
         """
@@ -187,7 +193,7 @@ rule run_accuracy_validation:
         touch("artifacts/data/accuracy_validation.done")
     shell:
         """
-        python benchmarks/run_accuracy.py --multirun \
+        {PYTHON} benchmarks/run_accuracy.py --multirun \
             experiment=accuracy_validation \
             +benchmark=accuracy
         """
@@ -198,7 +204,7 @@ rule run_execution_mode_comparison:
         touch("artifacts/data/execution_mode_comparison.done")
     shell:
         """
-        python benchmarks/run_latency.py \
+        {PYTHON} benchmarks/run_latency.py \
             experiment=execution_mode_comparison \
             +benchmark=latency_mode_comparison
         """
@@ -213,7 +219,7 @@ rule run_ionosphere_streaming_throughput:
         touch("artifacts/data/ionosphere_streaming_throughput.done")
     shell:
         """
-        python benchmarks/run_throughput.py --multirun \
+        {PYTHON} benchmarks/run_throughput.py --multirun \
             experiment=ionosphere_streaming_throughput \
             +benchmark=throughput
         """
@@ -224,7 +230,7 @@ rule run_ionosphere_streaming_hires:
         touch("artifacts/data/ionosphere_streaming_hires.done")
     shell:
         """
-        python benchmarks/run_realtime.py --multirun \
+        {PYTHON} benchmarks/run_realtime.py --multirun \
             experiment=ionosphere_streaming_hires \
             +benchmark=realtime
         """
@@ -235,7 +241,7 @@ rule run_baseline_batch_100k_latency:
         touch("artifacts/data/baseline_batch_100k_latency.done")
     shell:
         """
-        python benchmarks/run_latency.py --multirun \
+        {PYTHON} benchmarks/run_latency.py --multirun \
             experiment=baseline_batch_100k_latency \
             +benchmark=latency
         """
@@ -246,7 +252,7 @@ rule run_baseline_streaming_100k_realtime:
         touch("artifacts/data/baseline_streaming_100k_realtime.done")
     shell:
         """
-        python benchmarks/run_realtime.py --multirun \
+        {PYTHON} benchmarks/run_realtime.py --multirun \
             experiment=baseline_streaming_100k_realtime \
             +benchmark=realtime
         """
@@ -261,7 +267,7 @@ rule run_baseline_batch_100k_throughput:
         touch("artifacts/data/baseline_batch_100k_throughput.done")
     shell:
         """
-        python benchmarks/run_throughput.py --multirun \
+        {PYTHON} benchmarks/run_throughput.py --multirun \
             experiment=baseline_batch_100k_throughput \
             +benchmark=throughput
         """
@@ -272,7 +278,7 @@ rule run_baseline_batch_48k_throughput:
         touch("artifacts/data/baseline_batch_48k_throughput.done")
     shell:
         """
-        python benchmarks/run_throughput.py --multirun \
+        {PYTHON} benchmarks/run_throughput.py --multirun \
             experiment=baseline_batch_48k_throughput \
             +benchmark=throughput
         """
@@ -283,7 +289,7 @@ rule run_baseline_batch_high_nfft_throughput:
         touch("artifacts/data/baseline_batch_high_nfft_throughput.done")
     shell:
         """
-        python benchmarks/run_throughput.py --multirun \
+        {PYTHON} benchmarks/run_throughput.py --multirun \
             experiment=baseline_batch_high_nfft_throughput \
             +benchmark=throughput
         """
@@ -294,7 +300,7 @@ rule run_baseline_batch_48k_latency:
         touch("artifacts/data/baseline_batch_48k_latency.done")
     shell:
         """
-        python benchmarks/run_latency.py --multirun \
+        {PYTHON} benchmarks/run_latency.py --multirun \
             experiment=baseline_batch_48k_latency \
             +benchmark=latency
         """
@@ -309,7 +315,7 @@ rule run_baseline_streaming_100k_throughput:
         touch("artifacts/data/baseline_streaming_100k_throughput.done")
     shell:
         """
-        python benchmarks/run_throughput.py --multirun \
+        {PYTHON} benchmarks/run_throughput.py --multirun \
             experiment=baseline_streaming_100k_throughput \
             +benchmark=throughput_streaming
         """
@@ -320,7 +326,7 @@ rule run_baseline_streaming_100k_latency:
         touch("artifacts/data/baseline_streaming_100k_latency.done")
     shell:
         """
-        python benchmarks/run_latency.py --multirun \
+        {PYTHON} benchmarks/run_latency.py --multirun \
             experiment=baseline_streaming_100k_latency \
             +benchmark=latency_streaming
         """
@@ -331,7 +337,7 @@ rule run_baseline_streaming_48k_latency:
         touch("artifacts/data/baseline_streaming_48k_latency.done")
     shell:
         """
-        python benchmarks/run_latency.py --multirun \
+        {PYTHON} benchmarks/run_latency.py --multirun \
             experiment=baseline_streaming_48k_latency \
             +benchmark=latency_streaming
         """
@@ -342,7 +348,7 @@ rule run_baseline_streaming_48k_realtime:
         touch("artifacts/data/baseline_streaming_48k_realtime.done")
     shell:
         """
-        python benchmarks/run_realtime.py --multirun \
+        {PYTHON} benchmarks/run_realtime.py --multirun \
             experiment=baseline_streaming_48k_realtime \
             +benchmark=realtime
         """
@@ -358,7 +364,7 @@ rule generate_general_spectrogram:
         metadata="artifacts/figures/spectrograms/general_spectrogram.json"
     shell:
         """
-        python experiments/analysis/generate_static_spectrograms.py \
+        {PYTHON} experiments/analysis/generate_static_spectrograms.py \
             --targets general \
             --output-dir artifacts/figures/spectrograms
         """
@@ -373,7 +379,7 @@ rule generate_accuracy_spectrograms:
         metadata="artifacts/figures/spectrograms/accuracy_metrics.json"
     shell:
         """
-        python experiments/analysis/generate_static_spectrograms.py \
+        {PYTHON} experiments/analysis/generate_static_spectrograms.py \
             --targets accuracy \
             --output-dir artifacts/figures/spectrograms
         """
@@ -416,7 +422,7 @@ rule generate_accuracy_spectrograms:
 rule clean:
     shell:
         """
-        python -c "
+        {PYTHON} -c "
 import shutil, os, glob
 dirs_to_clean = ['artifacts/data', 'artifacts/figures', 'artifacts/reports', 'outputs', 'multirun']
 for d in dirs_to_clean:
@@ -435,7 +441,7 @@ print('All artifacts cleaned')
 rule test:
     shell:
         """
-        python benchmarks/run_throughput.py experiment=ionosphere_test +benchmark=throughput
-        python benchmarks/run_latency.py experiment=ionosphere_test +benchmark=latency
+        {PYTHON} benchmarks/run_throughput.py experiment=ionosphere_test +benchmark=throughput
+        {PYTHON} benchmarks/run_latency.py experiment=ionosphere_test +benchmark=latency
         echo "Test benchmarks complete. View results with: sigx dashboard"
         """
