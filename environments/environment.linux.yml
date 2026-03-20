@@ -24,6 +24,12 @@ dependencies:
   - pandas>=2.0
   - pybind11>=2.11
   - nvidia-ml-py>=11.5
+  - scikit-learn>=1.4.0
+
+  # AWS and Cloud
+  - boto3>=1.34
+  - sagemaker>=2.200
+  - docker-py>=7.0
 
   # Visualization
   - matplotlib>=3.6

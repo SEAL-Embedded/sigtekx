@@ -49,8 +49,18 @@ jobs:
       - name: Run Ruff Linter
         run: |
           docker pull kevinrhz/sigtekx:ci
-          docker run --rm kevinrhz/sigtekx:ci ruff check python/
+          docker run --rm kevinrhz/sigtekx:ci ruff check src/
 
       # Step 3: Use the already-pulled image to run tests.
       - name: Run Pytest (CPU-Only)
         run: docker run --rm kevinrhz/sigtekx:ci pytest -m "not gpu" --cov-fail-under=70
+
+      # Step 4: Build and push the production image (final stage) for SageMaker/cloud use.
+      - name: Build and Push Production Image
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: kevinrhz/sigtekx:latest
+          cache-from: type=registry,ref=kevinrhz/sigtekx:ci-cache

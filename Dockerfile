@@ -36,13 +36,18 @@ SHELL ["conda", "run", "-n", "sigtekx", "/bin/bash", "-c"]
 COPY pyproject.toml .
 COPY CMakeLists.txt CMakePresets.json ./
 COPY src/ ./src/
-COPY include/ ./include/
+COPY cpp/ ./cpp/
 
 # Build the C++/CUDA components.
 # This layer is cached as long as C++ or Python source doesn't change.
 # The compiled extension will be placed inside the src/sigtekx directory.
 ENV PYTHONPATH="/app/src"
 RUN cmake --preset ci-linux && cmake --build --preset ci-linux-build
+
+# Copy benchmark and experiment configurations for cloud/SageMaker runs.
+# Placed after C++ build to preserve cache when only configs change.
+COPY benchmarks/ ./benchmarks/
+COPY experiments/conf/ ./experiments/conf/
 
 # Copy the test files.
 # We copy this last because tests might change frequently, and we don't want
@@ -102,11 +107,15 @@ COPY --from=builder --chown=appuser:appuser /app/dist/ .
 # This will install your package and its Python dependencies
 RUN pip install *.whl
 
+# Copy benchmark scripts and experiment configs for SageMaker Processing Jobs.
+COPY --chown=appuser:appuser benchmarks/ ./benchmarks/
+COPY --chown=appuser:appuser experiments/conf/ ./experiments/conf/
+
 # Switch to the non-root user
 USER appuser
 
 # Set the entrypoint for the container
 ENTRYPOINT ["conda", "run", "-n", "sigtekx", "--no-capture-output"]
 
-# This runs the benchmark suite by calling its Python module directly.
-# CMD ["python", "-m", "ionosense_hpc.benchmarks.suite"]
+# Default: run a quick validation benchmark
+CMD ["python", "benchmarks/run_latency.py", "experiment=ionosphere_test", "+benchmark=latency"]
