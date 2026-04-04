@@ -31,6 +31,9 @@ RUN conda env create -f environment.build.yml && conda clean -afy
 # Activate the Conda environment for subsequent commands
 SHELL ["conda", "run", "-n", "sigtekx", "/bin/bash", "-c"]
 
+# Suppress git-python warning (no git binary in container — expected)
+ENV GIT_PYTHON_REFRESH=quiet
+
 # Copy build configuration and all source code required for the C++ build.
 # This includes the Python package directory, which CMake uses as the install destination for shared libraries.
 COPY pyproject.toml .
@@ -100,6 +103,9 @@ RUN conda env create -f environment.runtime.yml && conda clean -afy
 
 # Activate the Conda environment
 SHELL ["conda", "run", "-n", "sigtekx", "/bin/bash", "-c"]
+
+# Suppress git-python warning (no git binary in container — expected)
+ENV GIT_PYTHON_REFRESH=quiet
 
 # Copy the Python wheel from the builder stage
 COPY --from=builder --chown=appuser:appuser /app/dist/ .

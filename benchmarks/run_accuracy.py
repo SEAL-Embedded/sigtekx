@@ -172,6 +172,14 @@ def run_accuracy_benchmark(cfg: DictConfig) -> float:
 
     # Return error rate for minimization
     pass_rate_value = extract_float(result.statistics.get('pass_rate', 0))
+
+    # --- Terminal summary ---
+    _mode = engine_config.mode.value if hasattr(engine_config.mode, 'value') else str(engine_config.mode)
+    _snr = extract_float(result.statistics.get('mean_snr_db', 0))
+    _err = extract_float(result.statistics.get('mean_error', 0))
+    print(f"  ─── accuracy · nfft={engine_config.nfft} ch={engine_config.channels} overlap={engine_config.overlap:.2f} {_mode} ───")
+    print(f"  pass={pass_rate_value*100:.1f}%  SNR={_snr:.1f}dB  mean_err={_err:.2e}")
+
     return 1.0 - pass_rate_value
 
 

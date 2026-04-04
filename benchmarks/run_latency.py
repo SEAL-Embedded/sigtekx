@@ -170,6 +170,12 @@ def run_latency_benchmark(cfg: DictConfig) -> float:
         summary_df.to_csv(summary_path, index=False)
         mlflow.log_artifact(str(summary_path))
 
+    # --- Terminal summary ---
+    _s = result.statistics.get('latency_us', {})
+    _mode = engine_config.mode.value if hasattr(engine_config.mode, 'value') else str(engine_config.mode)
+    print(f"  ─── latency · nfft={engine_config.nfft} ch={engine_config.channels} overlap={engine_config.overlap:.2f} {_mode} ───")
+    print(f"  mean={_s.get('mean', 0):.1f}µs  p95={_s.get('p95', 0):.1f}µs  p99={_s.get('p99', 0):.1f}µs  CV={_s.get('cv', 0)*100:.1f}%")
+
     return mean_latency
 
 

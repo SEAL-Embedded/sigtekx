@@ -17,7 +17,7 @@ dependencies:
   - jupyterlab
   - h5py
   - pydantic>=2.0
-  - pynvml
+  - nvidia-ml-py
   - scikit-learn
   - boto3
   - sagemaker

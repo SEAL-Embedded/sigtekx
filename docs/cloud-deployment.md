@@ -26,6 +26,28 @@ docker run --gpus all sigtekx:local python benchmarks/run_latency.py \
     experiment=ionosphere_test +benchmark=latency
 ```
 
+**Note:** The `--gpus all` flag is required for GPU access. Docker Desktop's "Run" button does not
+pass this flag — always use the CLI for GPU workloads.
+
+#### Interactive Shell (for debugging)
+
+To get a live shell inside the container, override the entrypoint:
+
+```bash
+docker run -it --gpus all --entrypoint bash sigtekx:local
+
+# Inside the container — activate the conda env:
+source /opt/conda/etc/profile.d/conda.sh
+conda activate sigtekx
+
+# Now run commands directly (no `sigx` alias — use python commands):
+python benchmarks/run_latency.py experiment=ionosphere_test +benchmark=latency
+python -c "import sigtekx; print(sigtekx.__version__)"
+```
+
+**Why `--entrypoint bash`?** The default entrypoint is `conda run -n sigtekx`, which is designed
+for one-shot commands, not interactive sessions. Overriding it gives you a clean bash shell.
+
 ### 2. AWS Setup
 
 ```bash

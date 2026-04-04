@@ -174,6 +174,12 @@ def run_throughput_benchmark(cfg: DictConfig) -> float:
         summary_df.to_csv(summary_path, index=False)
         mlflow.log_artifact(str(summary_path))
 
+    # --- Terminal summary ---
+    _mode = engine_config.mode.value if hasattr(engine_config.mode, 'value') else str(engine_config.mode)
+    _gb = result.statistics.get('gb_per_second', {}).get('mean', 0)
+    print(f"  ─── throughput · nfft={engine_config.nfft} ch={engine_config.channels} overlap={engine_config.overlap:.2f} {_mode} ───")
+    print(f"  fps={fps:.1f}  GB/s={_gb:.3f}  RTF={rtf:.4f}")
+
     # Return negative FPS for minimization (Hydra sweeper minimizes by default)
     return -fps
 

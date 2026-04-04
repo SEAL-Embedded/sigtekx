@@ -183,6 +183,13 @@ def run_realtime_benchmark(cfg: DictConfig) -> float:
         summary_df.to_csv(summary_path, index=False)
         mlflow.log_artifact(str(summary_path))
 
+    # --- Terminal summary ---
+    _p99_ms = extract_float(stats.get("p99_latency_ms"), 0.0)
+    _jitter_ms = extract_float(stats.get("mean_jitter_ms"), 0.0)
+    _misses = int(extract_float(stats.get("deadline_misses"), 0.0))
+    print(f"  ─── realtime · nfft={engine_config.nfft} ch={engine_config.channels} overlap={engine_config.overlap:.2f} streaming ───")
+    print(f"  compliance={compliance*100:.1f}%  mean={mean_latency_ms_value:.2f}ms  p99={_p99_ms:.2f}ms  jitter={_jitter_ms:.2f}ms  misses={_misses}")
+
     # Hydra minimises objective: return miss rate surrogate
     return 1.0 - compliance
 
