@@ -57,6 +57,7 @@ COPY tests/ ./tests/
 # Build the Python wheel
 # This packages the Python code and the compiled C++ extension (.so file)
 # into a single .whl file in the 'dist' directory.
+COPY README.md .
 RUN pip wheel . --wheel-dir dist/
 
 # This ensures commands run against the CI image execute inside the conda env
@@ -103,13 +104,15 @@ SHELL ["conda", "run", "-n", "sigtekx", "/bin/bash", "-c"]
 # Copy the Python wheel from the builder stage
 COPY --from=builder --chown=appuser:appuser /app/dist/ .
 
-# Install the Python wheel using pip
-# This will install your package and its Python dependencies
-RUN pip install *.whl
+# Install the Python wheel, then add workflow extras (hydra, omegaconf) for benchmarks
+RUN pip install *.whl && pip install "sigtekx[workflow]"
 
 # Copy benchmark scripts and experiment configs for SageMaker Processing Jobs.
 COPY --chown=appuser:appuser benchmarks/ ./benchmarks/
 COPY --chown=appuser:appuser experiments/conf/ ./experiments/conf/
+
+# Create writable directories for benchmark output and MLflow artifacts
+RUN mkdir -p /app/artifacts /app/mlruns && chown -R appuser:appuser /app/artifacts /app/mlruns
 
 # Switch to the non-root user
 USER appuser

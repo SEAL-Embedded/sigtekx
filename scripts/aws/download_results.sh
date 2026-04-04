@@ -7,7 +7,7 @@
 
 set -euo pipefail
 
-BUCKET_NAME="sigtekx-benchmark-results"
+BUCKET_NAME="${SIGX_BUCKET:-sigtekx-benchmark-results}"
 LOCAL_DIR="artifacts"
 
 if [ $# -ge 1 ]; then

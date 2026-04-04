@@ -60,24 +60,55 @@ else
     echo "  Created."
 fi
 
-# --- 3. Attach required policies ---
+# --- 3. Attach policies ---
 echo "[3/3] Attaching policies"
 
-POLICIES=(
-    "arn:aws:iam::aws:policy/AmazonSageMakerFullAccess"
-    "arn:aws:iam::aws:policy/AmazonS3FullAccess"
-)
+# SageMaker managed policy (execution role needs broad SageMaker permissions to spin up compute)
+SM_POLICY="arn:aws:iam::aws:policy/AmazonSageMakerFullAccess"
+SM_POLICY_NAME="AmazonSageMakerFullAccess"
+if aws iam list-attached-role-policies --role-name "$ROLE_NAME" \
+    --query "AttachedPolicies[?PolicyArn=='$SM_POLICY']" --output text | grep -q "$SM_POLICY_NAME"; then
+    echo "  $SM_POLICY_NAME already attached."
+else
+    aws iam attach-role-policy --role-name "$ROLE_NAME" --policy-arn "$SM_POLICY"
+    echo "  Attached $SM_POLICY_NAME."
+fi
 
-for policy_arn in "${POLICIES[@]}"; do
-    policy_name=$(basename "$policy_arn")
-    if aws iam list-attached-role-policies --role-name "$ROLE_NAME" \
-        --query "AttachedPolicies[?PolicyArn=='$policy_arn']" --output text | grep -q "$policy_name"; then
-        echo "  $policy_name already attached."
-    else
-        aws iam attach-role-policy --role-name "$ROLE_NAME" --policy-arn "$policy_arn"
-        echo "  Attached $policy_name."
-    fi
-done
+# Scoped inline S3 policy — only the benchmark bucket (not account-wide S3FullAccess)
+S3_POLICY_NAME="SigTekXS3BucketAccess"
+EXISTING=$(aws iam list-role-policies --role-name "$ROLE_NAME" \
+    --query "PolicyNames" --output text 2>/dev/null || true)
+if echo "$EXISTING" | grep -q "$S3_POLICY_NAME"; then
+    echo "  $S3_POLICY_NAME inline policy already exists."
+else
+    S3_INLINE_POLICY=$(cat <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject",
+        "s3:ListBucket",
+        "s3:GetBucketLocation"
+      ],
+      "Resource": [
+        "arn:aws:s3:::${BUCKET_NAME}",
+        "arn:aws:s3:::${BUCKET_NAME}/*"
+      ]
+    }
+  ]
+}
+EOF
+)
+    aws iam put-role-policy \
+        --role-name "$ROLE_NAME" \
+        --policy-name "$S3_POLICY_NAME" \
+        --policy-document "$S3_INLINE_POLICY"
+    echo "  Created inline policy $S3_POLICY_NAME (scoped to s3://$BUCKET_NAME)."
+fi
 
 # --- Print summary ---
 ROLE_ARN=$(aws iam get-role --role-name "$ROLE_NAME" --query "Role.Arn" --output text)

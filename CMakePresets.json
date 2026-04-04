@@ -130,7 +130,7 @@
       "cacheVariables": {
         "SIGTEKX_WITH_TESTS": "OFF",
         "SIGTEKX_WITH_PYTHON": "ON",
-        "SIGTEKX_WITH_NVTX": "ON",
+        "SIGTEKX_WITH_NVTX": "OFF",
         "SIGTEKX_WITH_TIDY": "OFF"
       }
     }

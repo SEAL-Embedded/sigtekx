@@ -62,8 +62,10 @@ class ScopedRange {
   ScopedRange& operator=(ScopedRange&&) = delete;
 
  private:
+#ifdef SIGTEKX_ENABLE_PROFILING
   struct Impl;  // defined in .cu when profiling is enabled
   std::unique_ptr<Impl> pImpl;  // RAII-managed Pimpl
+#endif
 };
 
 // Lightweight marker
