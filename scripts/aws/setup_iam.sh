@@ -1,27 +1,30 @@
 #!/usr/bin/env bash
-# setup_iam.sh — Create SageMaker IAM role and S3 bucket for SigTekX cloud experiments.
+# setup_iam.sh — Create S3 bucket and EC2 IAM role for SigTekX cloud benchmarks.
 #
 # Prerequisites:
 #   - AWS CLI v2 configured (aws configure)
-#   - IAM permissions to create roles and buckets
+#   - IAM permissions to create roles, instance profiles, and buckets
 #
 # Usage:
 #   bash scripts/aws/setup_iam.sh
 
 set -euo pipefail
 
-ROLE_NAME="SageMakerSigTekX"
+ROLE_NAME="SigTekXEC2BenchmarkRole"
+INSTANCE_PROFILE_NAME="SigTekXEC2BenchmarkRole"
 BUCKET_NAME="sigtekx-benchmark-results"
+LOG_GROUP="/sigtekx/benchmarks"
 REGION="${AWS_DEFAULT_REGION:-us-east-1}"
 
 echo "=== SigTekX AWS Setup ==="
-echo "Region: $REGION"
-echo "Role:   $ROLE_NAME"
-echo "Bucket: $BUCKET_NAME"
+echo "Region:      $REGION"
+echo "Role:        $ROLE_NAME"
+echo "Bucket:      $BUCKET_NAME"
+echo "Log Group:   $LOG_GROUP"
 echo ""
 
 # --- 1. Create S3 bucket ---
-echo "[1/3] Creating S3 bucket: $BUCKET_NAME"
+echo "[1/4] Creating S3 bucket: $BUCKET_NAME"
 if aws s3api head-bucket --bucket "$BUCKET_NAME" 2>/dev/null; then
     echo "  Bucket already exists, skipping."
 else
@@ -34,8 +37,8 @@ else
     echo "  Created."
 fi
 
-# --- 2. Create IAM role for SageMaker ---
-echo "[2/3] Creating IAM role: $ROLE_NAME"
+# --- 2. Create IAM role for EC2 ---
+echo "[2/4] Creating IAM role: $ROLE_NAME"
 
 TRUST_POLICY='{
   "Version": "2012-10-17",
@@ -43,7 +46,7 @@ TRUST_POLICY='{
     {
       "Effect": "Allow",
       "Principal": {
-        "Service": "sagemaker.amazonaws.com"
+        "Service": "ec2.amazonaws.com"
       },
       "Action": "sts:AssumeRole"
     }
@@ -56,36 +59,26 @@ else
     aws iam create-role \
         --role-name "$ROLE_NAME" \
         --assume-role-policy-document "$TRUST_POLICY" \
-        --description "SageMaker execution role for SigTekX benchmark experiments"
+        --description "EC2 instance role for SigTekX benchmark runs (S3 + CloudWatch Logs)"
     echo "  Created."
 fi
 
-# --- 3. Attach policies ---
-echo "[3/3] Attaching policies"
+# --- 3. Attach scoped inline policy (S3 bucket + CloudWatch Logs) ---
+echo "[3/4] Attaching scoped inline policy"
 
-# SageMaker managed policy (execution role needs broad SageMaker permissions to spin up compute)
-SM_POLICY="arn:aws:iam::aws:policy/AmazonSageMakerFullAccess"
-SM_POLICY_NAME="AmazonSageMakerFullAccess"
-if aws iam list-attached-role-policies --role-name "$ROLE_NAME" \
-    --query "AttachedPolicies[?PolicyArn=='$SM_POLICY']" --output text | grep -q "$SM_POLICY_NAME"; then
-    echo "  $SM_POLICY_NAME already attached."
-else
-    aws iam attach-role-policy --role-name "$ROLE_NAME" --policy-arn "$SM_POLICY"
-    echo "  Attached $SM_POLICY_NAME."
-fi
-
-# Scoped inline S3 policy — only the benchmark bucket (not account-wide S3FullAccess)
-S3_POLICY_NAME="SigTekXS3BucketAccess"
+POLICY_NAME="SigTekXBenchmarkAccess"
 EXISTING=$(aws iam list-role-policies --role-name "$ROLE_NAME" \
     --query "PolicyNames" --output text 2>/dev/null || true)
-if echo "$EXISTING" | grep -q "$S3_POLICY_NAME"; then
-    echo "  $S3_POLICY_NAME inline policy already exists."
-else
-    S3_INLINE_POLICY=$(cat <<EOF
+if echo "$EXISTING" | grep -q "$POLICY_NAME"; then
+    echo "  $POLICY_NAME inline policy already exists, refreshing."
+fi
+
+INLINE_POLICY=$(cat <<EOF
 {
   "Version": "2012-10-17",
   "Statement": [
     {
+      "Sid": "S3BenchmarkBucketAccess",
       "Effect": "Allow",
       "Action": [
         "s3:GetObject",
@@ -98,16 +91,48 @@ else
         "arn:aws:s3:::${BUCKET_NAME}",
         "arn:aws:s3:::${BUCKET_NAME}/*"
       ]
+    },
+    {
+      "Sid": "CloudWatchLogsWrite",
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents",
+        "logs:DescribeLogStreams"
+      ],
+      "Resource": "arn:aws:logs:${REGION}:*:log-group:${LOG_GROUP}:*"
     }
   ]
 }
 EOF
 )
-    aws iam put-role-policy \
-        --role-name "$ROLE_NAME" \
-        --policy-name "$S3_POLICY_NAME" \
-        --policy-document "$S3_INLINE_POLICY"
-    echo "  Created inline policy $S3_POLICY_NAME (scoped to s3://$BUCKET_NAME)."
+
+aws iam put-role-policy \
+    --role-name "$ROLE_NAME" \
+    --policy-name "$POLICY_NAME" \
+    --policy-document "$INLINE_POLICY"
+echo "  Wrote inline policy $POLICY_NAME (S3: $BUCKET_NAME, Logs: $LOG_GROUP)."
+
+# --- 4. Create instance profile and attach role ---
+echo "[4/4] Creating instance profile: $INSTANCE_PROFILE_NAME"
+if aws iam get-instance-profile --instance-profile-name "$INSTANCE_PROFILE_NAME" 2>/dev/null; then
+    echo "  Instance profile already exists, skipping creation."
+else
+    aws iam create-instance-profile --instance-profile-name "$INSTANCE_PROFILE_NAME"
+    echo "  Created."
+fi
+
+ATTACHED_ROLES=$(aws iam get-instance-profile \
+    --instance-profile-name "$INSTANCE_PROFILE_NAME" \
+    --query "InstanceProfile.Roles[].RoleName" --output text 2>/dev/null || true)
+if echo "$ATTACHED_ROLES" | grep -qw "$ROLE_NAME"; then
+    echo "  Role already attached to instance profile."
+else
+    aws iam add-role-to-instance-profile \
+        --instance-profile-name "$INSTANCE_PROFILE_NAME" \
+        --role-name "$ROLE_NAME"
+    echo "  Attached role to instance profile."
 fi
 
 # --- Print summary ---
@@ -116,10 +141,13 @@ ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
 
 echo ""
 echo "=== Setup Complete ==="
-echo "Role ARN:    $ROLE_ARN"
-echo "S3 Bucket:   s3://$BUCKET_NAME"
-echo "Account ID:  $ACCOUNT_ID"
+echo "Role ARN:         $ROLE_ARN"
+echo "Instance Profile: $INSTANCE_PROFILE_NAME"
+echo "S3 Bucket:        s3://$BUCKET_NAME"
+echo "Log Group:        $LOG_GROUP"
+echo "Account ID:       $ACCOUNT_ID"
 echo ""
 echo "Next steps:"
-echo "  1. Push Docker image:  docker push kevinrhz/sigtekx:latest"
-echo "  2. Run SageMaker job:  python scripts/aws/run_sagemaker_job.py"
+echo "  1. Push image to ECR:   bash scripts/aws/push_ecr.sh"
+echo "  2. Launch g4dn.xlarge spot instance (attach instance profile: $INSTANCE_PROFILE_NAME)"
+echo "  3. Run benchmark:       bash scripts/aws/run_ec2_benchmark.sh <instance-ip>"

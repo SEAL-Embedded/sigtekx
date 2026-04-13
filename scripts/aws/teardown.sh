@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # teardown.sh — Delete all AWS resources created by setup_iam.sh.
 #
-# Removes: SageMaker endpoints, S3 bucket, IAM role and policies.
+# Removes: S3 bucket, IAM role + instance profile, CloudWatch log group.
 # Safe to run multiple times (skips resources that don't exist).
+#
+# Does NOT terminate EC2 instances — terminate those yourself first with:
+#   aws ec2 terminate-instances --instance-ids <id>
 #
 # Usage:
 #   bash scripts/aws/teardown.sh           # prompts for confirmation
@@ -10,8 +13,10 @@
 
 set -euo pipefail
 
-ROLE_NAME="${SIGX_ROLE:-SageMakerSigTekX}"
+ROLE_NAME="${SIGX_ROLE:-SigTekXEC2BenchmarkRole}"
+INSTANCE_PROFILE_NAME="${SIGX_INSTANCE_PROFILE:-SigTekXEC2BenchmarkRole}"
 BUCKET_NAME="${SIGX_BUCKET:-sigtekx-benchmark-results}"
+LOG_GROUP="${SIGX_LOG_GROUP:-/sigtekx/benchmarks}"
 REGION="${AWS_DEFAULT_REGION:-us-east-1}"
 FORCE=false
 
@@ -20,9 +25,10 @@ if [ "${1:-}" = "--force" ]; then
 fi
 
 echo "=== SigTekX AWS Teardown ==="
-echo "Region: $REGION"
-echo "Role:   $ROLE_NAME"
-echo "Bucket: $BUCKET_NAME"
+echo "Region:    $REGION"
+echo "Role:      $ROLE_NAME"
+echo "Bucket:    $BUCKET_NAME"
+echo "Log Group: $LOG_GROUP"
 echo ""
 
 if [ "$FORCE" = false ]; then
@@ -34,25 +40,8 @@ if [ "$FORCE" = false ]; then
     echo ""
 fi
 
-# --- 1. Delete any active SageMaker endpoints (most expensive if orphaned) ---
-echo "[1/4] Checking for active SageMaker endpoints..."
-ENDPOINTS=$(aws sagemaker list-endpoints \
-    --region "$REGION" \
-    --query "Endpoints[].EndpointName" \
-    --output text 2>/dev/null || true)
-
-if [ -z "$ENDPOINTS" ] || [ "$ENDPOINTS" = "None" ]; then
-    echo "  No active endpoints found."
-else
-    for ep in $ENDPOINTS; do
-        echo "  Deleting endpoint: $ep"
-        aws sagemaker delete-endpoint --endpoint-name "$ep" --region "$REGION"
-    done
-    echo "  Done. (Endpoints may take a minute to fully terminate.)"
-fi
-
-# --- 2. Delete S3 bucket and all contents ---
-echo "[2/4] Deleting S3 bucket: s3://$BUCKET_NAME"
+# --- 1. Delete S3 bucket and all contents ---
+echo "[1/4] Deleting S3 bucket: s3://$BUCKET_NAME"
 if aws s3api head-bucket --bucket "$BUCKET_NAME" 2>/dev/null; then
     aws s3 rb "s3://$BUCKET_NAME" --force
     echo "  Deleted."
@@ -60,8 +49,24 @@ else
     echo "  Bucket does not exist, skipping."
 fi
 
-# --- 3. Detach managed policies from IAM role ---
-echo "[3/4] Removing IAM role: $ROLE_NAME"
+# --- 2. Remove IAM role + instance profile ---
+echo "[2/4] Removing IAM role: $ROLE_NAME"
+if aws iam get-instance-profile --instance-profile-name "$INSTANCE_PROFILE_NAME" 2>/dev/null | grep -q "InstanceProfileId"; then
+    PROFILE_ROLES=$(aws iam get-instance-profile \
+        --instance-profile-name "$INSTANCE_PROFILE_NAME" \
+        --query "InstanceProfile.Roles[].RoleName" --output text 2>/dev/null || true)
+    for r in $PROFILE_ROLES; do
+        aws iam remove-role-from-instance-profile \
+            --instance-profile-name "$INSTANCE_PROFILE_NAME" \
+            --role-name "$r"
+        echo "  Removed role $r from instance profile."
+    done
+    aws iam delete-instance-profile --instance-profile-name "$INSTANCE_PROFILE_NAME"
+    echo "  Instance profile deleted."
+else
+    echo "  Instance profile does not exist, skipping."
+fi
+
 if aws iam get-role --role-name "$ROLE_NAME" 2>/dev/null | grep -q "RoleId"; then
     # Detach all managed policies
     ATTACHED=$(aws iam list-attached-role-policies \
@@ -89,15 +94,33 @@ else
     echo "  Role does not exist, skipping."
 fi
 
+# --- 3. Delete CloudWatch log group ---
+echo "[3/4] Deleting CloudWatch log group: $LOG_GROUP"
+if aws logs describe-log-groups --log-group-name-prefix "$LOG_GROUP" --region "$REGION" \
+    --query "logGroups[?logGroupName=='$LOG_GROUP']" --output text | grep -q "$LOG_GROUP"; then
+    aws logs delete-log-group --log-group-name "$LOG_GROUP" --region "$REGION"
+    echo "  Deleted."
+else
+    echo "  Log group does not exist, skipping."
+fi
+
 # --- 4. Summary ---
 echo ""
 echo "[4/4] Verifying cleanup..."
-REMAINING_ENDPOINTS=$(aws sagemaker list-endpoints \
-    --region "$REGION" \
-    --query "length(Endpoints)" \
-    --output text 2>/dev/null || echo "?")
-echo "  Active endpoints remaining: $REMAINING_ENDPOINTS"
+if aws iam get-role --role-name "$ROLE_NAME" 2>/dev/null >/dev/null; then
+    echo "  WARNING: Role still exists."
+else
+    echo "  Role removed."
+fi
+if aws s3api head-bucket --bucket "$BUCKET_NAME" 2>/dev/null; then
+    echo "  WARNING: Bucket still exists."
+else
+    echo "  Bucket removed."
+fi
 
 echo ""
 echo "=== Teardown Complete ==="
 echo "All SigTekX AWS resources have been removed."
+echo ""
+echo "Reminder: EC2 instances are not touched by this script."
+echo "  aws ec2 describe-instances --filters Name=instance-state-name,Values=running"

@@ -4,134 +4,165 @@ Instructions for running SigTekX benchmarks on AWS GPU instances.
 
 ## Overview
 
-SigTekX supports cloud deployment via Docker containers on AWS SageMaker Processing Jobs. This enables:
+SigTekX runs cloud benchmarks on **EC2 spot GPU instances** using a Docker image
+pulled from **Amazon ECR**. Results are uploaded to **S3** and container logs stream
+to **CloudWatch Logs**. This avoids managed ML services (no SageMaker) and keeps the
+moving parts small and inspectable.
 
-- **GPU benchmarking** on standardized cloud hardware (NVIDIA T4)
-- **Reproducible experiments** for paper review
-- **ML pipeline integration** via SageMaker Random Cut Forest anomaly detection
+Services used:
 
-## Quick Start
+| Service | Role |
+|---------|------|
+| **IAM** | EC2 instance role scoped to the benchmark S3 bucket and CloudWatch log group |
+| **ECR** | Private Docker registry for the `sigtekx` image |
+| **EC2** | `g4dn.xlarge` spot GPU instance (NVIDIA T4) that runs the benchmark container |
+| **S3** | Stores benchmark result CSVs (`sigtekx-benchmark-results`) |
+| **CloudWatch Logs** | Captures container stdout/stderr in `/sigtekx/benchmarks` |
 
-### 1. Docker Build & Local Test
+## Prerequisites
+
+- AWS CLI v2 configured (`aws configure`, region `us-east-1` recommended)
+- Docker running locally
+- An SSH key pair in the target region (e.g. `sigtekx.pem`)
+- GPU vCPU quota — new AWS accounts have 0. Request "Running On-Demand G and VT
+  instances" (≥4 vCPUs) under Service Quotas → EC2. Approval takes 1–24 hours.
+  Spot instances use a separate quota: "All G and VT Spot Instance Requests".
+
+## Step-by-Step Setup
+
+### 1. Build and test the image locally
 
 ```bash
-# Build the production image
 docker build -t sigtekx:local .
-
-# Verify the install
 docker run --gpus all sigtekx:local python -c "import sigtekx; print(sigtekx.__version__)"
-
-# Run a benchmark
 docker run --gpus all sigtekx:local python benchmarks/run_latency.py \
     experiment=ionosphere_test +benchmark=latency
 ```
 
-**Note:** The `--gpus all` flag is required for GPU access. Docker Desktop's "Run" button does not
+`--gpus all` is required for GPU access. Docker Desktop's "Run" button does not
 pass this flag — always use the CLI for GPU workloads.
 
-#### Interactive Shell (for debugging)
-
-To get a live shell inside the container, override the entrypoint:
+### 2. Create AWS resources (IAM, S3, instance profile)
 
 ```bash
-docker run -it --gpus all --entrypoint bash sigtekx:local
-
-# Inside the container — activate the conda env:
-source /opt/conda/etc/profile.d/conda.sh
-conda activate sigtekx
-
-# Now run commands directly (no `sigx` alias — use python commands):
-python benchmarks/run_latency.py experiment=ionosphere_test +benchmark=latency
-python -c "import sigtekx; print(sigtekx.__version__)"
-```
-
-**Why `--entrypoint bash`?** The default entrypoint is `conda run -n sigtekx`, which is designed
-for one-shot commands, not interactive sessions. Overriding it gives you a clean bash shell.
-
-### 2. AWS Setup
-
-```bash
-# Install AWS CLI and configure credentials
-aws configure  # us-east-1 recommended
-
-# Create SageMaker IAM role and S3 bucket
 bash scripts/aws/setup_iam.sh
 ```
 
-**Note:** New AWS accounts have 0 GPU vCPUs. Request a quota increase for "Running On-Demand G and VT instances" (4 vCPUs) under Service Quotas → EC2. Approval takes 1-24 hours.
+This creates:
 
-### 3. Push Image
+- S3 bucket `sigtekx-benchmark-results`
+- IAM role `SigTekXEC2BenchmarkRole` (trust policy: `ec2.amazonaws.com`)
+- Inline policy scoped to the bucket above and the `/sigtekx/benchmarks` log group
+- Instance profile `SigTekXEC2BenchmarkRole` for attaching the role to EC2
+
+### 3. Push the image to ECR
 
 ```bash
-docker tag sigtekx:local kevinrhz/sigtekx:latest
-docker push kevinrhz/sigtekx:latest
+bash scripts/aws/push_ecr.sh
 ```
 
-Or use the CI workflow — merges to `main` automatically push `kevinrhz/sigtekx:latest`.
+Authenticates Docker to ECR, creates the `sigtekx` repository if missing, builds
+the image, and pushes both `latest` and the current git commit SHA.
 
-### 4. Run on SageMaker
+### 4. Launch a g4dn.xlarge spot instance (AWS console)
+
+1. EC2 → **Launch instances**
+2. **AMI**: *Deep Learning AMI GPU PyTorch* (Ubuntu) — ships with Docker and the
+   NVIDIA Container Toolkit pre-installed
+3. **Instance type**: `g4dn.xlarge`
+4. **Key pair**: choose your existing `sigtekx` key
+5. **Network**: allow inbound SSH (port 22) from your IP
+6. **Advanced details**:
+   - **IAM instance profile**: `SigTekXEC2BenchmarkRole`
+   - **Purchasing option**: check **Request Spot Instances**
+   - **Request type**: one-time
+7. Launch, then copy the instance's **public IPv4 address** and **instance ID**
+
+### 5. Run the benchmark
 
 ```bash
-# Submit a Processing Job (ml.g4dn.xlarge — T4 GPU, ~$0.53/hr)
-python scripts/aws/run_sagemaker_job.py --wait
+bash scripts/aws/run_ec2_benchmark.sh <instance-public-ip> <instance-id>
+```
 
-# Download results
-bash scripts/aws/download_results.sh
+The script:
 
-# View in dashboard
+1. Ensures CloudWatch log group `/sigtekx/benchmarks` exists
+2. SSHes into the instance (user `ubuntu`, key `~/.ssh/sigtekx.pem` by default —
+   override with `SIGX_SSH_USER` / `SIGX_SSH_KEY`)
+3. Logs Docker into ECR and pulls `sigtekx:latest`
+4. Runs the container with `--gpus all`, the `awslogs` log driver pointed at
+   `/sigtekx/benchmarks`, and a mounted `/opt/sigtekx/results` volume
+5. Uploads result CSVs to `s3://sigtekx-benchmark-results/runs/<timestamp>/`
+6. Prints the `aws ec2 terminate-instances` command for the instance
+
+### 6. Verify results
+
+```bash
+# S3 results
+aws s3 ls s3://sigtekx-benchmark-results/runs/
+aws s3 cp s3://sigtekx-benchmark-results/runs/<timestamp>/ ./artifacts/data/ --recursive
+
+# CloudWatch logs
+aws logs tail /sigtekx/benchmarks --follow --region us-east-1
+
+# View locally
 sigx dashboard
-```
-
-### 5. Anomaly Detection Demo
-
-```bash
-# Local mode (sklearn IsolationForest, no AWS needed)
-python scripts/aws/anomaly_detection.py --local-only
-
-# SageMaker mode (Random Cut Forest)
-python scripts/aws/anomaly_detection.py
 ```
 
 ## Cost Estimate
 
-| Component | Cost |
-|-----------|------|
-| ml.g4dn.xlarge Processing Job (~30 min) | ~$0.26 |
-| RCF training + inference | ~$0.03 |
-| S3 storage (1 GB, 1 month) | ~$0.02 |
-| **Total per run** | **~$0.31** |
+Approximate `us-east-1` prices for one ~30 minute benchmark run:
+
+| Component | Rate | Cost / run |
+|-----------|------|-----------|
+| EC2 `g4dn.xlarge` spot | ~$0.16/hr | ~$0.08 |
+| S3 storage (1 GB, 1 month) | $0.023/GB-mo | ~$0.02 |
+| S3 PUT/GET requests | negligible | <$0.01 |
+| CloudWatch Logs ingest (≤100 MB) | $0.50/GB | <$0.05 |
+| CloudWatch Logs storage (1 month) | $0.03/GB-mo | <$0.01 |
+| **Total per run** | | **~$0.12–$0.20** |
+
+ECR storage is free for the first 500 MB private.
+
+Spot instances can be reclaimed with 2 minutes notice — **always terminate
+immediately after the run**, even if the script exits cleanly, so billing stops.
 
 ## Teardown
 
-Delete all AWS resources when done:
+Terminate the EC2 instance first (it is not touched by `teardown.sh`):
 
 ```bash
-# Check for endpoints (CRITICAL — orphaned endpoints cost $2.76/day)
-aws sagemaker list-endpoints
+aws ec2 terminate-instances --instance-ids <instance-id>
+```
 
-# Delete S3 bucket
-aws s3 rb s3://sigtekx-benchmark-results --force
+Then delete the remaining resources:
 
-# Delete IAM role
-aws iam detach-role-policy --role-name SageMakerSigTekX \
-    --policy-arn arn:aws:iam::aws:policy/AmazonSageMakerFullAccess
-aws iam detach-role-policy --role-name SageMakerSigTekX \
-    --policy-arn arn:aws:iam::aws:policy/AmazonS3FullAccess
-aws iam delete-role --role-name SageMakerSigTekX
+```bash
+bash scripts/aws/teardown.sh            # prompts for confirmation
+bash scripts/aws/teardown.sh --force    # no prompt
+```
+
+This removes the S3 bucket (including all objects), the IAM role and instance
+profile, and the `/sigtekx/benchmarks` CloudWatch log group. The ECR repository
+is intentionally left in place so cached image layers survive between runs —
+delete it manually if you're fully done:
+
+```bash
+aws ecr delete-repository --repository-name sigtekx --force
 ```
 
 ## Architecture
 
-See `docs/_personal/aws-cloud-architecture.md` for detailed architecture diagrams and decision rationale.
+See `docs/_personal/aws-cloud-architecture.md` for detailed architecture diagrams
+and decision rationale.
 
 ## Files
 
 | File | Purpose |
 |------|---------|
 | `Dockerfile` | Multi-stage build (builder + production) |
-| `scripts/aws/setup_iam.sh` | Creates IAM role and S3 bucket |
-| `scripts/aws/run_sagemaker_job.py` | Launches SageMaker Processing Job |
-| `scripts/aws/sagemaker_entry.py` | Entry point that runs inside container |
-| `scripts/aws/download_results.sh` | Syncs S3 results to local artifacts/ |
-| `scripts/aws/anomaly_detection.py` | RCF anomaly detection demo |
-| `notebooks/aws_anomaly_detection.ipynb` | Interactive notebook for class presentation |
+| `scripts/aws/setup_iam.sh` | Creates S3 bucket, EC2 IAM role, instance profile |
+| `scripts/aws/push_ecr.sh` | Builds and pushes the image to ECR (`latest` + git SHA) |
+| `scripts/aws/run_ec2_benchmark.sh` | Runs the benchmark on an EC2 instance over SSH |
+| `scripts/aws/download_results.sh` | Syncs S3 results to local `artifacts/` |
+| `scripts/aws/teardown.sh` | Deletes S3 bucket, IAM role, CloudWatch log group |
