@@ -15,7 +15,7 @@
 set -euo pipefail
 
 REPO_NAME="sigtekx"
-REGION="${AWS_DEFAULT_REGION:-us-east-1}"
+REGION="${AWS_DEFAULT_REGION:-us-west-2}"
 DOCKERFILE_CONTEXT="${SIGX_DOCKER_CONTEXT:-.}"
 
 GIT_SHA=$(git rev-parse --short HEAD)

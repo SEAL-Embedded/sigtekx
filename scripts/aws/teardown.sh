@@ -17,7 +17,7 @@ ROLE_NAME="${SIGX_ROLE:-SigTekXEC2BenchmarkRole}"
 INSTANCE_PROFILE_NAME="${SIGX_INSTANCE_PROFILE:-SigTekXEC2BenchmarkRole}"
 BUCKET_NAME="${SIGX_BUCKET:-sigtekx-benchmark-results}"
 LOG_GROUP="${SIGX_LOG_GROUP:-/sigtekx/benchmarks}"
-REGION="${AWS_DEFAULT_REGION:-us-east-1}"
+REGION="${AWS_DEFAULT_REGION:-us-west-2}"
 FORCE=false
 
 if [ "${1:-}" = "--force" ]; then

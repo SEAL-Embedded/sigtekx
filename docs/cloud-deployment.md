@@ -21,7 +21,7 @@ Services used:
 
 ## Prerequisites
 
-- AWS CLI v2 configured (`aws configure`, region `us-east-1` recommended)
+- AWS CLI v2 configured (`aws configure`, region `us-west-2` / Oregon recommended)
 - Docker running locally
 - An SSH key pair in the target region (e.g. `sigtekx.pem`)
 - GPU vCPU quota — new AWS accounts have 0. Request "Running On-Demand G and VT
@@ -103,7 +103,7 @@ aws s3 ls s3://sigtekx-benchmark-results/runs/
 aws s3 cp s3://sigtekx-benchmark-results/runs/<timestamp>/ ./artifacts/data/ --recursive
 
 # CloudWatch logs
-aws logs tail /sigtekx/benchmarks --follow --region us-east-1
+aws logs tail /sigtekx/benchmarks --follow --region us-west-2
 
 # View locally
 sigx dashboard
@@ -111,7 +111,7 @@ sigx dashboard
 
 ## Cost Estimate
 
-Approximate `us-east-1` prices for one ~30 minute benchmark run:
+Approximate `us-west-2` (Oregon) prices for one ~30 minute benchmark run:
 
 | Component | Rate | Cost / run |
 |-----------|------|-----------|

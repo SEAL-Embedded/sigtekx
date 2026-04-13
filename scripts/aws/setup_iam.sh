@@ -14,7 +14,7 @@ ROLE_NAME="SigTekXEC2BenchmarkRole"
 INSTANCE_PROFILE_NAME="SigTekXEC2BenchmarkRole"
 BUCKET_NAME="sigtekx-benchmark-results"
 LOG_GROUP="/sigtekx/benchmarks"
-REGION="${AWS_DEFAULT_REGION:-us-east-1}"
+REGION="${AWS_DEFAULT_REGION:-us-west-2}"
 
 echo "=== SigTekX AWS Setup ==="
 echo "Region:      $REGION"
