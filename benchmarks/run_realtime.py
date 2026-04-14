@@ -179,7 +179,7 @@ def run_realtime_benchmark(cfg: DictConfig) -> float:
         #
         # Verified safe by: tests/test_csv_multirun_safety.py
         # Design rationale: docs/benchmarking/csv-file-organization.md
-        summary_path = output_dir / f"realtime_summary_{engine_config.nfft}_{engine_config.channels}.csv"
+        summary_path = output_dir / f"realtime_summary_{engine_config.sample_rate_hz}_{engine_config.nfft}_{engine_config.channels}.csv"
         summary_df.to_csv(summary_path, index=False)
         mlflow.log_artifact(str(summary_path))
 

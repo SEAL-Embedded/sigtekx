@@ -9,7 +9,7 @@
 # to validate real-time processing capability with ring buffer management overhead.
 
 defaults:
-  - override /engine: ionosphere_48k
+  - override /engine: ionosphere_48k_streaming
 
 experiment:
   name: ionosphere_streaming_throughput
@@ -45,8 +45,7 @@ hydra:
       # Fixed dual-channel configuration (E-W and N-S antennas)
       engine.channels: 2
 
-      # Override to STREAMING mode (throughput benchmark defaults to BATCH)
-      engine.mode: streaming
+      # Note: STREAMING mode set by ionosphere_48k_streaming engine preset
 
 # Analysis configuration
 analysis:

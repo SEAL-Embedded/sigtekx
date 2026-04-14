@@ -1,7 +1,6 @@
 # Throughput benchmark configuration
-# Override engine mode to BATCH for maximum throughput
-engine:
-  mode: batch
+# Mode-agnostic: execution mode comes from the engine config selected by
+# the experiment.
 
 # Benchmark parameters
 name: throughput

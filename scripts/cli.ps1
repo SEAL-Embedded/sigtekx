@@ -579,12 +579,12 @@ function Invoke-Dev {
     Write-Host "═══ METHODS PAPER - KEY EXPERIMENTS ═══" -ForegroundColor Magenta
     Write-Host ""
     Write-Host "  100kHz Streaming (CRITICAL for Phase 1):" -ForegroundColor Yellow
-    Write-Host "  python benchmarks/run_latency.py --multirun experiment=baseline_streaming_100k_latency +benchmark=latency_streaming" -ForegroundColor White
-    Write-Host "  python benchmarks/run_throughput.py --multirun experiment=baseline_streaming_100k_throughput +benchmark=throughput_streaming" -ForegroundColor White
+    Write-Host "  python benchmarks/run_latency.py --multirun experiment=baseline_streaming_100k_latency +benchmark=latency" -ForegroundColor White
+    Write-Host "  python benchmarks/run_throughput.py --multirun experiment=baseline_streaming_100k_throughput +benchmark=throughput" -ForegroundColor White
     Write-Host ""
     Write-Host "  48kHz Streaming (Ionosphere):" -ForegroundColor Yellow
-    Write-Host "  python benchmarks/run_latency.py --multirun experiment=baseline_streaming_48k_latency +benchmark=latency_streaming" -ForegroundColor White
-    Write-Host "  python benchmarks/run_throughput.py --multirun experiment=baseline_streaming_48k_throughput +benchmark=throughput_streaming" -ForegroundColor White
+    Write-Host "  python benchmarks/run_latency.py --multirun experiment=baseline_streaming_48k_latency +benchmark=latency" -ForegroundColor White
+    Write-Host "  python benchmarks/run_throughput.py --multirun experiment=baseline_streaming_48k_throughput +benchmark=throughput" -ForegroundColor White
     Write-Host ""
     Write-Host "  Quick Baseline Generation (all modes):" -ForegroundColor Yellow
     Write-Host "  snakemake --cores 4 --snakefile experiments/Snakefile run_baseline_streaming_100k_latency run_baseline_streaming_100k_throughput" -ForegroundColor White

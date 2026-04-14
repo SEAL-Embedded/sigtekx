@@ -304,7 +304,7 @@ python benchmarks/run_latency.py \
 - **Ring buffer implementation:** `cpp/include/sigtekx/core/ring_buffer.hpp` (v0.9.5)
 - **Executor configuration:** `cpp/include/ionosense/core/executor_config.hpp` (v0.9.5)
 - **Streaming executor:** `cpp/src/executors/streaming_executor.cpp`
-- **Benchmark configs:** `experiments/conf/benchmark/latency_mode_comparison.yaml`
+- **Benchmark config:** `experiments/conf/benchmark/latency.yaml`
 - **Experiment configs:** `experiments/conf/experiment/execution_mode_comparison.yaml`
 
 ---

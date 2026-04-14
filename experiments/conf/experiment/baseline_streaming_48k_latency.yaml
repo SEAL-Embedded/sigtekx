@@ -8,7 +8,7 @@
 # Measures per-frame processing latency in continuous real-time mode.
 
 defaults:
-  - override /engine: ionosphere_48k
+  - override /engine: ionosphere_48k_streaming
 
 experiment:
   name: baseline_streaming_48k_latency
@@ -49,8 +49,7 @@ hydra:
       # 0.875: 87.5% overlap (very high temporal resolution)
       engine.overlap: 0.5,0.75,0.875
 
-      # STREAMING mode (continuous real-time processing)
-      engine.mode: streaming
+      # Note: STREAMING mode set by ionosphere_48k_streaming engine preset
 
 # Analysis configuration
 analysis:

@@ -1,0 +1,17 @@
+# Ionosphere 48kHz STREAMING Engine - VLF/ULF Specialized
+# Purpose: Continuous real-time ionosphere monitoring with ring buffer
+# Coverage: 2 channels, high overlap, mid-to-high NFFT (real-time capable)
+name: ionosphere_48k_streaming
+sample_rate_hz: 48000        # 48kHz standard for ionosphere monitoring
+mode: streaming              # STREAMING mode (continuous processing with ring buffer)
+stream_count: 4              # Ring buffer management
+pinned_buffer_count: 4       # Memory efficiency
+warmup_iters: 1              # Quick warmup
+timeout_ms: 5000             # Reasonable streaming timeout
+use_cuda_graphs: false       # Disabled for streaming
+enable_profiling: false      # Production mode
+
+# Default values (overridden in experiment sweeps)
+nfft: 4096
+channels: 2                  # Fixed: dual-channel antenna array
+overlap: 0.75

@@ -8,7 +8,7 @@
 # Validates: Can we achieve RTF ≤ 1.0 at NFFT=65536 for <0.5Hz frequency resolution?
 
 defaults:
-  - override /engine: ionosphere_48k
+  - override /engine: ionosphere_48k_streaming
 
 experiment:
   name: ionosphere_streaming_hires
@@ -44,8 +44,7 @@ hydra:
       # Fixed dual-channel configuration (E-W and N-S antennas)
       engine.channels: 2
 
-      # STREAMING mode (for real-time compliance validation)
-      engine.mode: streaming
+      # Note: STREAMING mode set by ionosphere_48k_streaming engine preset
 
 # Analysis configuration
 analysis:

@@ -170,7 +170,7 @@ def run_throughput_benchmark(cfg: DictConfig) -> float:
         # Design rationale: docs/benchmarking/csv-file-organization.md
         exec_mode = engine_config.mode.value if hasattr(engine_config.mode, 'value') else str(engine_config.mode)
         overlap_str = f"{engine_config.overlap:.4f}".replace('.', 'p')  # 0.75 -> 0p7500
-        summary_path = output_dir / f"throughput_summary_{engine_config.nfft}_{engine_config.channels}_{overlap_str}_{exec_mode}.csv"
+        summary_path = output_dir / f"throughput_summary_{engine_config.sample_rate_hz}_{engine_config.nfft}_{engine_config.channels}_{overlap_str}_{exec_mode}.csv"
         summary_df.to_csv(summary_path, index=False)
         mlflow.log_artifact(str(summary_path))
 

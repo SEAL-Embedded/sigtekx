@@ -1,7 +1,6 @@
 # Realtime benchmark configuration
-# Override engine mode to STREAMING for continuous real-time processing
-engine:
-  mode: streaming
+# Mode-agnostic: execution mode comes from the engine config selected by
+# the experiment. Realtime experiments should use a streaming engine.
 
 # Benchmark parameters
 name: realtime

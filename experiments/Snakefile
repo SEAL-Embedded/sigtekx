@@ -206,7 +206,7 @@ rule run_execution_mode_comparison:
         """
         {PYTHON} benchmarks/run_latency.py \
             experiment=execution_mode_comparison \
-            +benchmark=latency_mode_comparison
+            +benchmark=latency
         """
 
 # ============================================================================
@@ -317,7 +317,7 @@ rule run_baseline_streaming_100k_throughput:
         """
         {PYTHON} benchmarks/run_throughput.py --multirun \
             experiment=baseline_streaming_100k_throughput \
-            +benchmark=throughput_streaming
+            +benchmark=throughput
         """
 
 # Run baseline STREAMING latency at 100kHz
@@ -328,7 +328,7 @@ rule run_baseline_streaming_100k_latency:
         """
         {PYTHON} benchmarks/run_latency.py --multirun \
             experiment=baseline_streaming_100k_latency \
-            +benchmark=latency_streaming
+            +benchmark=latency
         """
 
 # Run baseline STREAMING latency at 48kHz
@@ -339,7 +339,7 @@ rule run_baseline_streaming_48k_latency:
         """
         {PYTHON} benchmarks/run_latency.py --multirun \
             experiment=baseline_streaming_48k_latency \
-            +benchmark=latency_streaming
+            +benchmark=latency
         """
 
 # Run baseline STREAMING realtime at 48kHz
@@ -437,11 +437,19 @@ print('All artifacts cleaned')
 "
         """
 
-# Quick test run with ionosphere test config
+# Minimal end-to-end smoke test — pipeline sanity check, not a workload.
+rule smoke:
+    shell:
+        """
+        {PYTHON} benchmarks/run_latency.py experiment=smoke_test +benchmark=latency
+        echo "Smoke test complete."
+        """
+
+# Quick realistic ionosphere test run (streaming + batch variants)
 rule test:
     shell:
         """
-        {PYTHON} benchmarks/run_throughput.py experiment=ionosphere_test +benchmark=throughput
         {PYTHON} benchmarks/run_latency.py experiment=ionosphere_test +benchmark=latency
+        {PYTHON} benchmarks/run_throughput.py experiment=ionosphere_test_batch +benchmark=throughput
         echo "Test benchmarks complete. View results with: sigx dashboard"
         """

@@ -16,7 +16,7 @@
 
 ## Overview
 
-SigTekX provides **26 carefully designed experiments** organized into 4 categories, each serving distinct purposes with zero redundancy. This guide explains the taxonomy, selection criteria, and design rationale.
+SigTekX provides **29 carefully designed experiments** organized into 4 categories, each serving distinct purposes with zero redundancy. This guide explains the taxonomy, selection criteria, and design rationale.
 
 ### Why Multiple Experiments?
 
@@ -122,13 +122,14 @@ baseline_batch_100k_latency:
 
 ## Experiment Taxonomy
 
-### Category 1: Ionosphere Research (7 experiments)
+### Category 1: Ionosphere Research (8 experiments)
 
 **Purpose:** 48kHz dual-channel VLF/ULF phenomena detection
 
 | Experiment | Mode | Configs | Purpose | Duration |
 |------------|------|---------|---------|----------|
-| `ionosphere_test` | Mixed | ~5 | Quick validation, CI/CD | ~5 min |
+| `ionosphere_test` | STREAMING | 4 | Fast-iteration realistic streaming workload | ~1 min |
+| `ionosphere_test_batch` | BATCH | 6 | Fast-iteration realistic batch workload | ~2 min |
 | `ionosphere_streaming` | STREAMING | ~15 | Standard real-time monitoring | ~15 min |
 | `ionosphere_streaming_hires` | STREAMING | ~10 | High frequency resolution | ~10 min |
 | `ionosphere_streaming_latency` | STREAMING | ~20 | Latency-optimized real-time | ~20 min |
@@ -198,16 +199,21 @@ baseline_batch_100k_latency:
 - Accuracy validation
 - Extreme parameter testing
 
-### Category 4: Profiling (1 experiment)
+### Category 4: Profiling & Smoke (2 experiments)
 
 | Experiment | Purpose | Duration |
 |------------|---------|----------|
 | `profiling` | GPU profiling with Nsight (lightweight config) | ~5 min |
+| `smoke_test` | Minimal end-to-end pipeline sanity check (NFFT 1024, 1-ch, batch) | ~1 s |
 
 **When to use:**
-- GPU kernel profiling with Nsight Systems/Compute
-- Performance bottleneck identification
-- Development iteration (used with `sxp nsys` or `sxp ncu`)
+- `profiling`: GPU kernel profiling with Nsight Systems/Compute, bottleneck
+  identification, development iteration (used with `sxp nsys` or `sxp ncu`).
+- `smoke_test`: CI/CD, post-build validation, or proving a fresh environment
+  (local, container, EC2) is wired up end-to-end. Not a workload — the
+  parameters are deliberately minimal and say nothing about performance.
+  For fast-iteration realistic workloads use `ionosphere_test` /
+  `ionosphere_test_batch`.
 
 ---
 
@@ -273,13 +279,24 @@ START: What is your goal?
 ### Ionosphere Experiments (48kHz, 2-channel)
 
 #### `ionosphere_test`
-**Purpose:** Lightweight quick validation
-- **Configs:** ~5
-- **NFFT:** 2048, 4096
+**Purpose:** Fast-iteration STREAMING ionosphere workload at realistic parameters
+- **Configs:** 4 (2 NFFT × 2 overlap)
+- **Engine:** `ionosphere_48k_streaming` (48 kHz, streaming mode, 2-channel)
+- **NFFT:** 4096, 8192
 - **Channels:** 2
-- **Overlap:** 0.5, 0.75
-- **Use case:** CI/CD, quick sanity checks
+- **Overlap:** 0.875, 0.9375
+- **Use case:** Quick developer-loop runs of the real ionosphere streaming workload — not a smoke test
 - **Command:** `python benchmarks/run_latency.py experiment=ionosphere_test +benchmark=latency`
+
+#### `ionosphere_test_batch`
+**Purpose:** Fast-iteration BATCH ionosphere workload at realistic parameters
+- **Configs:** 6 (3 NFFT × 2 overlap)
+- **Engine:** `ionosphere_48k` (48 kHz, batch mode, 2-channel)
+- **NFFT:** 8192, 16384, 32768
+- **Channels:** 2
+- **Overlap:** 0.875, 0.9375
+- **Use case:** Quick developer-loop runs of the offline / high-resolution ionosphere workload
+- **Command:** `python benchmarks/run_throughput.py experiment=ionosphere_test_batch +benchmark=throughput`
 
 #### `ionosphere_streaming`
 **Purpose:** Standard real-time VLF/ULF monitoring

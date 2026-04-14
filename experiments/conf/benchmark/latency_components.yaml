@@ -1,8 +1,7 @@
 # Latency benchmark with per-stage timing enabled
 # Use for diagnostic profiling and pipeline optimization
 # Measures individual stage execution times (Window, FFT, Magnitude)
-engine:
-  mode: batch
+# Mode-agnostic: execution mode comes from the engine config.
 
 # Benchmark parameters (reduced iterations due to timing overhead)
 name: latency_components

@@ -1,7 +1,6 @@
 # Accuracy benchmark configuration
-# Override engine mode to BATCH for deterministic validation
-engine:
-  mode: batch
+# Mode-agnostic: execution mode comes from the engine config selected by
+# the experiment.
 
 # Benchmark parameters
 name: accuracy

@@ -211,7 +211,7 @@ snakemake quarto_reports
 
 **Location:** `experiments/quarto/` (placeholder structure ready)
 
-## Available Experiment Configurations (26 total)
+## Available Experiment Configurations (29 total)
 
 **📖 For comprehensive experiment documentation, design principles, and selection guide, see:**
 **[docs/benchmarking/experiment-guide.md](docs/benchmarking/experiment-guide.md)**
@@ -227,7 +227,9 @@ The guide explains:
 ### Ionosphere Experiments (48kHz, 2-channel VLF/ULF)
 | Experiment | Mode | Description | Key Parameters |
 |------------|------|-------------|----------------|
-| `ionosphere_test` | - | Lightweight quick testing | Minimal config for fast validation |
+| `smoke_test` | BATCH | Minimal end-to-end pipeline sanity check (~1s) | NFFT 1024, 1-ch, overlap 0.5 — not a workload |
+| `ionosphere_test` | STREAMING | Fast-iteration realistic streaming workload | 48kHz 2-ch, NFFT 4096/8192, overlap 0.875/0.9375 |
+| `ionosphere_test_batch` | BATCH | Fast-iteration realistic batch workload | 48kHz 2-ch, NFFT 8192/16384/32768, overlap 0.875/0.9375 |
 | `ionosphere_streaming` | STREAMING | Standard streaming config | 48kHz, 2-ch, real-time monitoring |
 | `ionosphere_streaming_hires` | STREAMING | High-resolution streaming | Higher NFFT for better freq resolution |
 | `ionosphere_streaming_latency` | STREAMING | Latency-optimized streaming | Minimal latency configuration |
@@ -929,7 +931,8 @@ Run tests with: `./scripts/cli.ps1 test cpp`
 - **ALWAYS specify `+benchmark=throughput`** when using `run_throughput.py`
 - **ALWAYS specify `+benchmark=latency`** when using `run_latency.py`
 - **No default benchmark** - must be explicitly specified to prevent config conflicts
-- **Use `experiment=ionosphere_test`** for quick testing with smaller parameters
+- **`experiment=ionosphere_test`** runs the realistic STREAMING ionosphere workload (4 configs, ~1 min); **`experiment=ionosphere_test_batch`** runs the realistic BATCH variant (6 configs, ~2 min). Neither is a minimal smoke test — both exercise representative iono parameters
+- **Execution mode comes from the engine config only.** Benchmark configs (`latency.yaml`, `throughput.yaml`, etc.) do not override `engine.mode`; pick streaming vs batch by selecting the appropriate engine (e.g. `ionosphere_48k_streaming` vs `ionosphere_48k`, `academic_100k_streaming` vs `academic_100k`)
 
 ### Working Command Templates
 ```bash
@@ -946,8 +949,9 @@ python benchmarks/run_throughput.py --multirun experiment=ionosphere_resolution
 ### CSV File Organization (Multirun Safety)
 
 **Pattern:** Each benchmark configuration writes to unique CSV file
-- Format: `{benchmark}_summary_{nfft}_{channels}_{overlap}_{mode}.csv`
-- Example: `latency_summary_4096_2_0p7500_streaming.csv`
+- Format: `{benchmark}_summary_{sample_rate_hz}_{nfft}_{channels}_{overlap}_{mode}.csv`
+- Example: `latency_summary_48000_4096_2_0p7500_streaming.csv`
+- Realtime variant: `realtime_summary_{sample_rate_hz}_{nfft}_{channels}.csv` (always streaming)
 
 **Why:** Prevents race conditions in parallel multirun sweeps
 - Different configs → different files → zero collision risk

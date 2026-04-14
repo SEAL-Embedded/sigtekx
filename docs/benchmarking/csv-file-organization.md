@@ -23,11 +23,12 @@ Instead of using a single aggregated CSV file with append mode and file locking,
 
 **Format:**
 ```
-{benchmark}_summary_{nfft}_{channels}_{overlap}_{mode}.csv
+{benchmark}_summary_{sample_rate_hz}_{nfft}_{channels}_{overlap}_{mode}.csv
 ```
 
 **Parameters:**
 - `benchmark`: Benchmark type (`latency`, `throughput`, `accuracy`)
+- `sample_rate_hz`: Engine sample rate in Hz (e.g., `48000`, `100000`)
 - `nfft`: FFT size (1024, 2048, 4096, 8192, 16384, 32768)
 - `channels`: Number of audio channels (1, 2, 4, 8)
 - `overlap`: Overlap ratio encoded with `.` replaced by `p` (e.g., `0.75` → `0p7500`)
@@ -35,24 +36,26 @@ Instead of using a single aggregated CSV file with append mode and file locking,
 
 **Examples:**
 ```
-latency_summary_4096_2_0p7500_streaming.csv
-throughput_summary_8192_4_0p8750_batch.csv
-accuracy_summary_2048_2_0p0000_batch.csv
+latency_summary_48000_4096_2_0p7500_streaming.csv
+throughput_summary_100000_8192_4_0p8750_batch.csv
+accuracy_summary_48000_2048_2_0p0000_batch.csv
 ```
+
+`sample_rate_hz` is required in the filename because two experiments at different sample rates can otherwise share the same `(nfft, channels, overlap, mode)` grid point and clobber each other's CSV.
 
 ### Simplified Pattern (Realtime)
 
 **Format:**
 ```
-realtime_summary_{nfft}_{channels}.csv
+realtime_summary_{sample_rate_hz}_{nfft}_{channels}.csv
 ```
 
-**Rationale:** Realtime benchmarks are always STREAMING mode, so overlap/mode parameters are omitted for simplicity.
+**Rationale:** Realtime benchmarks are always STREAMING mode, so overlap/mode parameters are omitted. Sample rate is retained to prevent cross-rate collisions.
 
 **Examples:**
 ```
-realtime_summary_4096_2.csv
-realtime_summary_8192_4.csv
+realtime_summary_48000_4096_2.csv
+realtime_summary_100000_8192_4.csv
 ```
 
 ---
@@ -82,7 +85,7 @@ All benchmark scripts follow the same pattern:
 
 exec_mode = engine_config.mode.value if hasattr(engine_config.mode, 'value') else str(engine_config.mode)
 overlap_str = f"{engine_config.overlap:.4f}".replace('.', 'p')  # 0.75 -> 0p7500
-summary_path = output_dir / f"latency_summary_{nfft}_{channels}_{overlap_str}_{exec_mode}.csv"
+summary_path = output_dir / f"latency_summary_{engine_config.sample_rate_hz}_{engine_config.nfft}_{engine_config.channels}_{overlap_str}_{exec_mode}.csv"
 summary_df.to_csv(summary_path, index=False)  # mode='w' (default, overwrites)
 mlflow.log_artifact(str(summary_path))
 ```

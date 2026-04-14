@@ -95,7 +95,7 @@ def run_stream_experiment(full=False, nfft=None):
         cmd = [
             "python", "benchmarks/run_latency.py",
             "experiment=baseline_streaming_48k_latency",
-            "+benchmark=latency_streaming",
+            "+benchmark=latency",
             "benchmark.measure_components=true"
         ]
     else:
@@ -106,7 +106,7 @@ def run_stream_experiment(full=False, nfft=None):
         cmd = [
             "python", "benchmarks/run_latency.py",
             "experiment=streaming_stage_timing_test",
-            "+benchmark=latency_streaming",
+            "+benchmark=latency",
             "benchmark.measure_components=true",
             "benchmark.iterations=5"
         ]

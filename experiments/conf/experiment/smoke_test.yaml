@@ -1,0 +1,39 @@
+# @package _global_
+
+# Smoke Test — minimal "does the pipeline even run" check
+# ========================================================
+# Purpose-built validation target. A single tiny configuration that exercises
+# the full benchmark path end-to-end (engine → executor → stats → CSV write)
+# as fast as possible. Use this for CI/CD, post-build sanity checks, or to
+# prove a remote/container environment is wired up correctly.
+#
+# Not a workload — the parameters here are intentionally minimal and do not
+# reflect any realistic use case. For fast-iteration realistic workloads see
+# ionosphere_test (streaming) or ionosphere_test_batch (batch).
+
+defaults:
+  - override /engine: academic_100k
+
+experiment:
+  name: smoke_test
+  description: >-
+    Minimal single-config smoke test. One tiny batch-mode run that exits
+    in seconds. Used to validate the pipeline end-to-end without measuring
+    anything meaningful about performance.
+  tags: [smoke, test, ci]
+  experiment_group: smoke
+  sample_rate_category: 100kHz
+
+# Single config — no sweep. Tiny parameters keep the default-iteration
+# benchmark loop under ~1 second end-to-end.
+engine:
+  nfft: 1024
+  channels: 1
+  overlap: 0.5
+
+# Analysis configuration — unused for smoke tests, kept for schema compatibility.
+analysis:
+  statistical_tests: []
+  confidence_level: 0.95
+  min_samples: 1
+  focus_metrics: [mean_latency_us]
