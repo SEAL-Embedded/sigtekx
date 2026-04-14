@@ -6,8 +6,7 @@ Instructions for running SigTekX benchmarks on AWS GPU instances.
 
 SigTekX runs cloud benchmarks on **EC2 spot GPU instances** using a Docker image
 pulled from **Amazon ECR**. Results are uploaded to **S3** and container logs stream
-to **CloudWatch Logs**. This avoids managed ML services (no SageMaker) and keeps the
-moving parts small and inspectable.
+to **CloudWatch Logs**.
 
 Services used:
 
@@ -18,6 +17,36 @@ Services used:
 | **EC2** | `g4dn.xlarge` spot GPU instance (NVIDIA T4) that runs the benchmark container |
 | **S3** | Stores benchmark result CSVs (`sigtekx-benchmark-results`) |
 | **CloudWatch Logs** | Captures container stdout/stderr in `/sigtekx/benchmarks` |
+
+### Resource configuration reference
+
+These are the recommended settings if provisioning via the AWS console instead of
+`scripts/aws/setup_iam.sh`:
+
+- **S3 bucket** `sigtekx-benchmark-results` (us-west-2): Block all public access
+  **on**, ACLs disabled (bucket owner enforced), SSE-S3 encryption, versioning off.
+- **ECR repository** `sigtekx` (us-west-2): private, image tag mutability **Mutable**
+  (so `latest` can slide forward), AES-256 encryption.
+- **CloudWatch log group** `/sigtekx/benchmarks` (us-west-2): standard log class,
+  **30-day retention** to cap storage costs, deletion protection off.
+- **IAM role** `SigTekXEC2BenchmarkRole`: trust policy for `ec2.amazonaws.com`.
+  Either attach the inline policy from `setup_iam.sh` (scoped to the bucket and log
+  group above) or the AWS managed policies `AmazonEC2ContainerRegistryReadOnly`,
+  `CloudWatchAgentServerPolicy`, and an S3 policy covering the results bucket. An
+  instance profile of the same name must exist so EC2 can assume the role at launch.
+
+## Cost monitoring
+
+Before running anything, wire up a billing alarm so a forgotten spot instance
+can't silently burn through the budget:
+
+1. Root account → **Billing preferences** → enable *Receive Billing Alerts*
+   (publishes `EstimatedCharges` to CloudWatch in `us-east-1`).
+2. **CloudWatch (us-east-1)** → create a static alarm on the `EstimatedCharges`
+   metric with a threshold that matches your tolerance (e.g. $20 USD).
+3. Create an **SNS topic** for the alarm action and confirm the email subscription
+   from the SNS console — confirmation links delivered by email are sometimes
+   pre-fetched by security scanners, which silently invalidates them.
 
 ## Prerequisites
 
@@ -122,7 +151,7 @@ Approximate `us-west-2` (Oregon) prices for one ~30 minute benchmark run:
 | CloudWatch Logs storage (1 month) | $0.03/GB-mo | <$0.01 |
 | **Total per run** | | **~$0.12–$0.20** |
 
-ECR storage is free for the first 500 MB private.
+ECR storage is free for the first 500 MB private. (Current docker image builds to ~9.5 GB)
 
 Spot instances can be reclaimed with 2 minutes notice — **always terminate
 immediately after the run**, even if the script exits cleanly, so billing stops.
