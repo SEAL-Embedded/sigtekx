@@ -32,7 +32,8 @@ Diagrams use a numbered naming scheme for logical ordering:
 
 | File | Layout | Type | Description |
 |------|--------|------|-------------|
-| `01_system_overview.d2` | elk | Overview | Platform overview with CLI tools (sigxc, sxp, sigx dashboard), Streamlit, and system integrations |
+| `01_system_overview.d2` | elk | Overview | Compact project overview for portfolio display — signal flow, engine, workflow, applications |
+| `01b_system_overview_full.d2` | elk | Overview | Comprehensive system architecture — executors, pipeline stages, CUDA resources, research workflow, dev tools |
 
 ### Python Layer
 

@@ -1,0 +1,193 @@
+# SigTekX - Full System Overview
+# Layout: elk - comprehensive architecture overview for documentation
+# Render: d2 --layout elk docs/diagrams/src/01b_system_overview_full.d2 docs/diagrams/figures/01b_system_overview_full.svg
+
+...@common/styles
+
+direction: down
+
+# ==============================================================================
+# Title
+# ==============================================================================
+
+title: SigTekX - System Architecture {
+  shape: text
+  style.font-size: 28
+  style.bold: true
+}
+
+subtitle: GPU-Accelerated Spectral Analysis Research Platform {
+  shape: text
+  style.font-size: 16
+  style.italic: true
+}
+
+title -> subtitle: {style.stroke-width: 0}
+
+# ==============================================================================
+# Research Applications
+# ==============================================================================
+
+applications: Research Applications {
+  class: research-green
+
+  ionosphere: Ionospheric Physics\n(VLF/ULF, 48 kHz, 2-ch)\nPlasma bubbles, scintillation, SIDs {
+    style.fill: "#E8F5E9"
+  }
+
+  detection: Real-Time Detection\nBoost-phase signatures\nSub-ms response, anomaly ID {
+    style.fill: "#E8F5E9"
+    style.stroke: "#FF8C00"
+    style.stroke-width: 3
+  }
+
+  general: Extensible\nSeismology, biomedical, radar {
+    style.fill: "#F5F5F5"
+    style.stroke-dash: 3
+  }
+}
+
+# ==============================================================================
+# Data Flow Row
+# ==============================================================================
+
+input: Signal Input\n(time-domain samples) {
+  shape: cylinder
+  style.fill: "#E6F3FF"
+  style.stroke: "#4169E1"
+}
+
+output: Spectral Output\n(magnitude spectrum) {
+  shape: cylinder
+  style.fill: "#E6F3FF"
+  style.stroke: "#4169E1"
+}
+
+# ==============================================================================
+# Core Engine
+# ==============================================================================
+
+engine: SigTekX Engine (C++ / CUDA) {
+  class: core-blue-emphasis
+
+  bindings: Python Bindings (pybind11)\nZero-copy NumPy interface {
+    class: execution-red
+  }
+
+  executors: Executor Architecture {
+    class: core-blue
+
+    batch: BatchExecutor\nHigh-throughput offline\nDirect H2D → Compute → D2H\n3-stream pipeline overlap {
+      style.fill: "#F0F8FF"
+      style.stroke: "#4169E1"
+      style.stroke-width: 2
+    }
+
+    streaming: StreamingExecutor\nLow-latency real-time\nZero-copy ring buffer DMA\nLock-free SPSC {
+      style.fill: "#E6FFE6"
+      style.stroke: "#228B22"
+      style.stroke-width: 2
+    }
+  }
+
+  pipeline: Processing Pipeline {
+    class: kernel-orange
+
+    window: Window Stage\nHann, Hamming, Blackman\nPeriodic / Symmetric {
+      style.fill: "#FFF5E6"
+    }
+
+    fft: cuFFT Stage\nR2C transform\n256 - 32,768 bins {
+      style.fill: "#FFF5E6"
+    }
+
+    magnitude: Magnitude Stage\nSpectrum output\nIn-place compute {
+      style.fill: "#FFF5E6"
+    }
+
+    window -> fft -> magnitude
+  }
+
+  cuda: CUDA Resources (RAII)\nCudaStream · CudaEvent · DeviceBuffer\nPinnedHostBuffer · CufftPlan · 3-stream async {
+    class: cuda-resource
+  }
+
+  bindings -> executors
+  executors -> pipeline
+  pipeline -> cuda
+}
+
+# ==============================================================================
+# Research Workflow
+# ==============================================================================
+
+workflow: Research Workflow {
+  class: note-gold
+
+  config: Configuration (Hydra)\n29 experiment definitions\nParameter sweep multiruns {
+    style.fill: "#FFFACD"
+  }
+
+  benchmarks: Benchmarking Framework\nLatency · Throughput · Accuracy\nReal-time · GPU clock locking {
+    style.fill: "#FFFACD"
+  }
+
+  orchestration: Orchestration (Snakemake)\nDAG pipelines · Parallel execution {
+    style.fill: "#FFFACD"
+  }
+
+  tracking: MLflow + DVC\nRun tracking · Data versioning {
+    style.fill: "#FFFACD"
+  }
+
+  analysis: Streamlit Dashboard\nInteractive analysis · CSV export {
+    style.fill: "#FFFACD"
+  }
+
+  config -> benchmarks -> orchestration -> tracking -> analysis
+}
+
+# ==============================================================================
+# Development Tools
+# ==============================================================================
+
+dev_tools: Development Tools {
+  class: benchmark-orange
+
+  sigxc: sigxc\nC++ benchmark CLI\nDataset mgmt · Nsight {
+    style.fill: "#FFF5E6"
+  }
+
+  sxp: sxp\nPython profiling\nnsys / ncu · Hydra {
+    style.fill: "#FFF5E6"
+  }
+
+  sigx: sigx\nBuild · Test · Clean\nDashboard · Doctor {
+    style.fill: "#FFF5E6"
+  }
+}
+
+# ==============================================================================
+# Tech Stack
+# ==============================================================================
+
+tech: C++17 · CUDA 13.0 · cuFFT · pybind11 · Python 3.11 · Hydra · MLflow · Snakemake · Streamlit · DVC {
+  shape: text
+  style.font-size: 12
+  style.italic: true
+}
+
+# ==============================================================================
+# Connections (minimal cross-container to keep ELK compact)
+# ==============================================================================
+
+# Vertical spine
+applications -> input: signals {style.stroke-width: 2}
+input -> engine: process {style.stroke-width: 2}
+engine -> output: results {style.stroke-width: 2}
+output -> workflow: analyze {style.stroke-width: 2}
+
+# Side connections
+workflow -> engine: configure + measure {style.stroke-dash: 3}
+dev_tools -> engine: profile + build {style.stroke-dash: 3}
+dev_tools -> workflow: orchestrate {style.stroke-dash: 3}
