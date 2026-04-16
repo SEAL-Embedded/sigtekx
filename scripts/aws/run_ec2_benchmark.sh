@@ -70,7 +70,7 @@ fi
 SNAKEMAKE_CORES="${SIGX_SNAKEMAKE_CORES:-4}"
 
 REPO_NAME="sigtekx"
-BUCKET_NAME="sigtekx-benchmark-results"
+BUCKET_NAME="${SIGX_S3_BUCKET:-sigtekx-benchmark-results}"
 LOG_GROUP="/sigtekx/benchmarks"
 REGION="${AWS_DEFAULT_REGION:-us-west-2}"
 SSH_USER="${SIGX_SSH_USER:-ubuntu}"
@@ -155,6 +155,7 @@ sudo docker run --rm --gpus all \
     --log-opt awslogs-stream="\$LOG_STREAM" \
     --log-opt awslogs-create-group=true \
     -e SIGX_OUTPUT_ROOT=/app/artifacts \
+    -e XDG_CACHE_HOME=/app/artifacts/.cache \
     -v /opt/sigtekx/artifacts:/app/artifacts \
     "\$IMAGE_URI" \
     bash -c "$CONTAINER_CMD"

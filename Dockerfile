@@ -116,9 +116,13 @@ RUN pip install *.whl && pip install "sigtekx[workflow]"
 # Copy benchmark scripts and experiment configs for SageMaker Processing Jobs.
 COPY --chown=appuser:appuser benchmarks/ ./benchmarks/
 COPY --chown=appuser:appuser experiments/conf/ ./experiments/conf/
+COPY --chown=appuser:appuser experiments/analysis/ ./experiments/analysis/
+COPY --chown=appuser:appuser experiments/Snakefile ./experiments/Snakefile
 
-# Create writable directories for benchmark output and MLflow artifacts
-RUN mkdir -p /app/artifacts /app/mlruns && chown -R appuser:appuser /app/artifacts /app/mlruns
+# Create writable directories for benchmark output, MLflow artifacts,
+# and Snakemake's cache/metadata (appuser home is /app, owned by root)
+RUN mkdir -p /app/artifacts /app/mlruns /app/.cache /app/.snakemake && \
+    chown -R appuser:appuser /app/artifacts /app/mlruns /app/.cache /app/.snakemake
 
 # Switch to the non-root user
 USER appuser
