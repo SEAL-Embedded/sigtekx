@@ -7,7 +7,7 @@ Complete layout of the sigtekx codebase with documentation links tailored to the
 ```
 sigtekx/
 |-- .github/                # CI workflows, composite actions, issue templates
-|-- baselines/              # Persistent C++ benchmark baselines for regression tracking
+|-- datasets/               # Persistent named benchmark result sets (local, cloud, C++)
 |-- benchmarks/             # Standalone benchmarking utilities and scenarios
 |-- build/                  # Generated artefacts (benchmarks, reports, build presets)
 |-- cpp/                    # C++17/CUDA sources, bindings, and tests
@@ -139,26 +139,31 @@ artifacts/
 `-- reports/                # Generated analysis reports and summaries
 ```
 
-### Persistent Baselines (baselines/)
+### Persistent Datasets (datasets/)
 
 ```
-baselines/
-|-- cpp/                    # Named C++ benchmark snapshots for regression tracking
-|   |-- latency_full/       # Example: latency preset full run
-|   |-- throughput_full/    # Example: throughput preset full run
-|   `-- <name>/             # metadata.json + results.json + results.csv
-`-- README.md
+datasets/
+|-- <name>/                 # Python benchmark snapshot (sigx dataset save)
+|   |-- manifest.json       # source, git sha, hardware, summary metrics
+|   |-- data/               # copied from artifacts/data/
+|   `-- mlruns/             # optional (scope=standard|full)
+|-- aws-<timestamp>/        # Cloud run pulled by scripts/aws/download_results.sh
+`-- cpp/                    # C++ benchmark snapshots (sigxc dataset save)
+    |-- latency_full/       # Example: latency preset full run
+    `-- <name>/             # metadata.json + results.json + results.csv
 ```
 
 **Benchmark Output Locations:**
 
 | System | Directory | Purpose | Created By |
 |--------|-----------|---------|------------|
-| **Hydra Experiments** | `artifacts/data/` | Primary experiment outputs for analysis pipeline | `run_latency.py`, `run_throughput.py`, etc. |
+| **Hydra Experiments (live)** | `artifacts/data/` | Ephemeral scratchpad — every local run writes here | `run_latency.py`, `run_throughput.py`, etc. |
 | **Python Standalone API** | `artifacts/benchmark_results/` | Fallback for direct benchmark class usage | Benchmark classes when `output_dir=None` |
-| **C++ Persistent Baselines** | `baselines/cpp/` | Regression tracking across dev phases (survives `sigx clean`) | `sigxc baseline save <name>` |
+| **Python Persistent Datasets** | `datasets/<name>/` | Named snapshots that survive `sigx clean` | `sigx dataset save <name>` |
+| **AWS Cloud Datasets** | `datasets/aws-<timestamp>/` | EC2 runs pulled from S3 | `scripts/aws/download_results.sh` |
+| **C++ Persistent Datasets** | `datasets/cpp/<name>/` | C++ benchmark snapshots (decoupled from Python) | `sigxc dataset save <name>` |
 
-These are intentionally separate to keep C++ development workflows independent from Python experiment orchestration.
+The `datasets/` root is the single persistent storage concept. The `datasets/cpp/` subtree is fully decoupled from the Python pipeline so the raw C++ benchmark path can be exercised and archived even when Python is broken.
 
 
 ### Build Outputs (build/)
@@ -228,10 +233,10 @@ Shared objects produced by builds land in `src/sigtekx/core/`. Expect `_engine.p
 
 ## Output Artefacts
 - Generated content persists under `artifacts/` (configurable via `SIGX_OUTPUT_ROOT`).
-- Benchmark outputs: See three separate systems documented in Artifacts section above
-  - Hydra experiments: `artifacts/data/` (primary)
+- Benchmark outputs:
+  - Hydra experiments (live scratchpad): `artifacts/data/`
   - Python standalone: `artifacts/benchmark_results/`
-  - C++ baselines: `baselines/cpp/`
+  - Persistent datasets (Python + AWS + C++): `datasets/`
 - Experiment dumps: `artifacts/experiments/`
 - QA reports (lint, coverage, validation): `artifacts/reports/`
 - Profiling traces: `artifacts/profiling/nsys_reports/` & `artifacts/profiling/ncu_reports/`
@@ -251,6 +256,7 @@ Shared objects produced by builds land in `src/sigtekx/core/`. Expect `_engine.p
 - IEEE 754 considerations documented in benchmarking + validation routines; avoid precision regressions without review.
 
 ## Update History
-- 2026-03-07: Aligned with v0.9.5: updated cpp/ headers, experiments/ layout, baselines/ location, performance table uses real measured numbers (RTX 3090 Ti).
+- 2026-04-15: Unified persistent benchmark storage under `datasets/` (replacing `baselines/`); `sigx dataset`/`sigxc dataset` verbs replace `baseline`. C++ snapshots move to `datasets/cpp/`, AWS cloud runs land in `datasets/aws-<timestamp>/`.
+- 2026-03-07: Aligned with v0.9.5: updated cpp/ headers, experiments/ layout, dataset location, performance table uses real measured numbers (RTX 3090 Ti).
 - 2025-10-15: Removed deprecated CLI wrapper references, refreshed documentation index, and aligned directory descriptions with current tooling.
 - 2025-09-15: Synchronized structure with `cpp/`, refreshed dependency constraints, and aligned workflow commands with CLI scripts.

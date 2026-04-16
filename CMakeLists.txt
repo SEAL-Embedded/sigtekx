@@ -333,18 +333,18 @@ if(SIGTEKX_WITH_TESTS AND SIGTEKX_WITH_CUDA)
     endif()
 
     # ========================================================================
-    # C++ Baseline Management CLI
+    # C++ Dataset Management CLI
     # ========================================================================
-    # Standalone CLI for baseline operations: save, list, compare, delete
-    # Integrates with PowerShell CLI via JSON I/O for clean separation
-    add_executable(sigtekx_baseline_cli
-        cpp/benchmarks/baseline_cli.cpp
+    # Standalone CLI for dataset operations: save, list, compare, delete.
+    # Stores named snapshots under datasets/cpp/ (decoupled from Python).
+    add_executable(sigtekx_dataset_cli
+        cpp/benchmarks/dataset_cli.cpp
     )
-    set_target_properties(sigtekx_baseline_cli PROPERTIES CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+    set_target_properties(sigtekx_dataset_cli PROPERTIES CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 
-    target_include_directories(sigtekx_baseline_cli PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/cpp/include)
+    target_include_directories(sigtekx_dataset_cli PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/cpp/include)
 
-    target_link_libraries(sigtekx_baseline_cli PRIVATE
+    target_link_libraries(sigtekx_dataset_cli PRIVATE
         "$<TARGET_OBJECTS:sigtekx_core>"
         CUDA::cudart_static
         CUDA::cufft

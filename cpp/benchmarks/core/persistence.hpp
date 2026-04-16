@@ -1,19 +1,19 @@
 /**
  * @file benchmark_persistence.hpp
- * @brief Production-grade baseline storage with concurrency safety.
+ * @brief Production-grade dataset storage with concurrency safety.
  *
- * Provides directory-based baseline storage system with:
+ * Provides directory-based dataset storage system with:
  * - File-locked manifest for concurrent saves
  * - Comprehensive metadata (git, hardware, config)
  * - CSV export for analysis
  * - Statistical comparison tools
  *
- * Baselines are stored in baselines/cpp/ directory (persistent, survives `sigx clean`).
+ * Datasets are stored in datasets/cpp/ directory (persistent, survives `sigx clean`).
  *
- * NOTE: This is C++ baseline storage, separate from Python benchmark outputs:
- *       - C++ baselines: baselines/cpp/
- *       - Python baselines: baselines/ (Python BaselineManager)
- *       - Python experiments: artifacts/data/ (Hydra-orchestrated)
+ * C++ datasets live under datasets/cpp/ and are fully decoupled from the
+ * Python benchmark pipeline. The `sigxc` tool manages this subtree; the
+ * Python-side `sigx dataset` CLI writes to `datasets/<name>/` directly and
+ * never touches datasets/cpp/.
  */
 
 #pragma once
@@ -67,7 +67,7 @@ inline std::string get_timestamp() {
 // ============================================================================
 
 /**
- * @brief Baseline manifest entry.
+ * @brief Dataset manifest entry.
  */
 struct ManifestEntry {
   std::string name;
@@ -75,42 +75,42 @@ struct ManifestEntry {
   std::string preset;
   std::string mode;
   std::string iono_variant;
-  std::string message;  // Optional description of baseline significance
+  std::string message;  // Optional description of dataset significance
 };
 
 /**
- * @brief Baseline manifest (tracks all baselines).
+ * @brief Dataset manifest (tracks all datasets).
  */
 struct Manifest {
-  std::vector<ManifestEntry> baselines;
+  std::vector<ManifestEntry> datasets;
 };
 
 /**
- * @brief Get baseline root directory.
+ * @brief Get dataset root directory.
  */
-inline std::filesystem::path get_baseline_root() {
-  return std::filesystem::current_path() / "baselines" / "cpp";
+inline std::filesystem::path get_dataset_root() {
+  return std::filesystem::current_path() / "datasets" / "cpp";
 }
 
 /**
  * @brief Get manifest file path.
  */
 inline std::filesystem::path get_manifest_path() {
-  return get_baseline_root() / ".baseline_manifest.json";
+  return get_dataset_root() / ".dataset_manifest.json";
 }
 
 /**
  * @brief Get manifest lock file path.
  */
 inline std::filesystem::path get_manifest_lock_path() {
-  return get_baseline_root() / ".baseline_manifest.json.lock";
+  return get_dataset_root() / ".dataset_manifest.json.lock";
 }
 
 /**
  * @brief Get .last_run root directory (temporary storage for most recent benchmark).
  */
 inline std::filesystem::path get_last_run_root() {
-  return get_baseline_root() / ".last_run";
+  return get_dataset_root() / ".last_run";
 }
 
 /**
@@ -141,17 +141,17 @@ inline Manifest load_manifest() {
     return manifest;
   }
 
-  // Simple JSON parsing (baselines array)
+  // Simple JSON parsing (datasets array)
   std::string line;
   ManifestEntry current_entry;
   bool in_entry = false;
 
   while (std::getline(file, line)) {
-    if (line.find("{") != std::string::npos && line.find("\"baselines\"") == std::string::npos) {
+    if (line.find("{") != std::string::npos && line.find("\"datasets\"") == std::string::npos) {
       in_entry = true;
       current_entry = ManifestEntry{};
     } else if (in_entry && line.find("}") != std::string::npos) {
-      manifest.baselines.push_back(current_entry);
+      manifest.datasets.push_back(current_entry);
       in_entry = false;
     } else if (in_entry) {
       // Parse fields
@@ -211,10 +211,10 @@ inline void save_manifest(const Manifest& manifest) {
   }
 
   file << "{\n";
-  file << "  \"baselines\": [\n";
+  file << "  \"datasets\": [\n";
 
-  for (size_t i = 0; i < manifest.baselines.size(); ++i) {
-    const auto& entry = manifest.baselines[i];
+  for (size_t i = 0; i < manifest.datasets.size(); ++i) {
+    const auto& entry = manifest.datasets[i];
     file << "    {\n";
     file << "      \"name\": \"" << entry.name << "\",\n";
     file << "      \"created\": \"" << entry.created << "\",\n";
@@ -223,7 +223,7 @@ inline void save_manifest(const Manifest& manifest) {
     file << "      \"iono_variant\": \"" << entry.iono_variant << "\",\n";
     file << "      \"message\": \"" << entry.message << "\"\n";
     file << "    }";
-    if (i < manifest.baselines.size() - 1) {
+    if (i < manifest.datasets.size() - 1) {
       file << ",";
     }
     file << "\n";
@@ -238,9 +238,9 @@ inline void save_manifest(const Manifest& manifest) {
 }
 
 /**
- * @brief Update manifest with new baseline (file-locked).
+ * @brief Update manifest with new dataset (file-locked).
  *
- * @param name Baseline name
+ * @param name Dataset name
  * @param config Benchmark configuration
  */
 inline void update_manifest(const std::string& name, const BenchmarkConfig& config) {
@@ -249,9 +249,9 @@ inline void update_manifest(const std::string& name, const BenchmarkConfig& conf
   // Load existing manifest
   auto manifest = load_manifest();
 
-  // Check if baseline already exists (update timestamp)
+  // Check if dataset already exists (update timestamp)
   bool found = false;
-  for (auto& entry : manifest.baselines) {
+  for (auto& entry : manifest.datasets) {
     if (entry.name == name) {
       entry.created = get_timestamp();
       found = true;
@@ -275,7 +275,7 @@ inline void update_manifest(const std::string& name, const BenchmarkConfig& conf
       entry.iono_variant = "none";
     }
 
-    manifest.baselines.push_back(entry);
+    manifest.datasets.push_back(entry);
   }
 
   // Save manifest
@@ -283,9 +283,9 @@ inline void update_manifest(const std::string& name, const BenchmarkConfig& conf
 }
 
 /**
- * @brief Remove baseline from manifest (file-locked).
+ * @brief Remove dataset from manifest (file-locked).
  *
- * @param name Baseline name
+ * @param name Dataset name
  */
 inline void remove_from_manifest(const std::string& name) {
   FileLock lock(get_manifest_lock_path());
@@ -294,10 +294,10 @@ inline void remove_from_manifest(const std::string& name) {
   auto manifest = load_manifest();
 
   // Remove entry
-  manifest.baselines.erase(
-      std::remove_if(manifest.baselines.begin(), manifest.baselines.end(),
+  manifest.datasets.erase(
+      std::remove_if(manifest.datasets.begin(), manifest.datasets.end(),
                      [&name](const ManifestEntry& entry) { return entry.name == name; }),
-      manifest.baselines.end());
+      manifest.datasets.end());
 
   // Save manifest
   save_manifest(manifest);
@@ -312,7 +312,7 @@ inline void remove_from_manifest(const std::string& name) {
  *
  * Includes: name, timestamp, config, git info, hardware info, metrics summary
  *
- * @param name Baseline name
+ * @param name Dataset name
  * @param config Benchmark configuration
  * @param results Results (for metrics summary) - generic float pointer
  * @param results_type Type of results ("latency", "throughput", etc.)
@@ -428,19 +428,19 @@ inline std::string serialize_metadata(const std::string& name,
 }
 
 // ============================================================================
-// Baseline Naming and Paths
+// Dataset Naming and Paths
 // ============================================================================
 
 /**
- * @brief Generate baseline directory name from config.
+ * @brief Generate dataset directory name from config.
  *
  * Format: <preset>_<variant>_<mode>
  * Examples: "latency_iono_full", "throughput_ionox_full"
  *
  * @param config Benchmark configuration
- * @return Baseline directory name
+ * @return Dataset directory name
  */
-inline std::string get_baseline_dirname(const BenchmarkConfig& config) {
+inline std::string get_dataset_dirname(const BenchmarkConfig& config) {
   std::string dirname = preset_to_string(config.preset);
   if (config.iono_variant == IonoVariant::IONO) {
     dirname += "_iono";
@@ -452,25 +452,25 @@ inline std::string get_baseline_dirname(const BenchmarkConfig& config) {
 }
 
 /**
- * @brief Get full path to baseline directory.
+ * @brief Get full path to dataset directory.
  *
  * @param config Benchmark configuration
- * @return Full path to baseline directory
+ * @return Full path to dataset directory
  */
-inline std::filesystem::path get_baseline_path(const BenchmarkConfig& config) {
-  auto baseline_dir = get_baseline_root() / get_baseline_dirname(config);
-  std::filesystem::create_directories(baseline_dir);
-  return baseline_dir;
+inline std::filesystem::path get_dataset_path(const BenchmarkConfig& config) {
+  auto dataset_dir = get_dataset_root() / get_dataset_dirname(config);
+  std::filesystem::create_directories(dataset_dir);
+  return dataset_dir;
 }
 
 /**
- * @brief Get full path to baseline directory by name.
+ * @brief Get full path to dataset directory by name.
  *
- * @param name Baseline name
- * @return Full path to baseline directory
+ * @param name Dataset name
+ * @return Full path to dataset directory
  */
-inline std::filesystem::path get_baseline_path_by_name(const std::string& name) {
-  return get_baseline_root() / name;
+inline std::filesystem::path get_dataset_path_by_name(const std::string& name) {
+  return get_dataset_root() / name;
 }
 
 // ============================================================================
@@ -557,175 +557,175 @@ inline std::string serialize_accuracy_results(const AccuracyResults& results) {
 }
 
 // ============================================================================
-// Baseline Storage
+// Dataset Storage
 // ============================================================================
 
 /**
- * @brief Save latency baseline to disk (directory + manifest + metadata + CSV).
+ * @brief Save latency dataset to disk (directory + manifest + metadata + CSV).
  *
  * @param config Benchmark configuration
  * @param results Latency results
  */
-inline void save_latency_baseline(const BenchmarkConfig& config,
+inline void save_latency_dataset(const BenchmarkConfig& config,
                                    const LatencyResults& results) {
-  // Get baseline directory
-  auto baseline_dir = get_baseline_path(config);
-  std::string baseline_name = get_baseline_dirname(config);
+  // Get dataset directory
+  auto dataset_dir = get_dataset_path(config);
+  std::string dataset_name = get_dataset_dirname(config);
 
   // Get timestamp and git info (shared across files)
   std::string timestamp = get_timestamp();
   std::string git_commit = get_git_info().commit;
 
   // Save results JSON
-  auto results_file = baseline_dir / "results.json";
+  auto results_file = dataset_dir / "results.json";
   std::ofstream file(results_file);
   if (!file.is_open()) {
-    throw std::runtime_error("Failed to write baseline results: " + results_file.string());
+    throw std::runtime_error("Failed to write dataset results: " + results_file.string());
   }
   file << serialize_latency_results(results);
   file.close();
 
   // Save metadata JSON
-  auto metadata_file = baseline_dir / "metadata.json";
+  auto metadata_file = dataset_dir / "metadata.json";
   std::ofstream meta_file(metadata_file);
   if (!meta_file.is_open()) {
-    throw std::runtime_error("Failed to write baseline metadata: " + metadata_file.string());
+    throw std::runtime_error("Failed to write dataset metadata: " + metadata_file.string());
   }
-  meta_file << serialize_metadata(baseline_name, config, &results, "latency");
+  meta_file << serialize_metadata(dataset_name, config, &results, "latency");
   meta_file.close();
 
   // Save CSV
-  auto csv_file = baseline_dir / "results.csv";
+  auto csv_file = dataset_dir / "results.csv";
   write_latency_csv(csv_file, config, results, timestamp, git_commit);
 
   // Update manifest (file-locked)
-  update_manifest(baseline_name, config);
+  update_manifest(dataset_name, config);
 }
 
 /**
- * @brief Save throughput baseline to disk (directory + manifest + metadata + CSV).
+ * @brief Save throughput dataset to disk (directory + manifest + metadata + CSV).
  *
  * @param config Benchmark configuration
  * @param results Throughput results
  */
-inline void save_throughput_baseline(const BenchmarkConfig& config,
+inline void save_throughput_dataset(const BenchmarkConfig& config,
                                       const ThroughputResults& results) {
-  // Get baseline directory
-  auto baseline_dir = get_baseline_path(config);
-  std::string baseline_name = get_baseline_dirname(config);
+  // Get dataset directory
+  auto dataset_dir = get_dataset_path(config);
+  std::string dataset_name = get_dataset_dirname(config);
 
   // Get timestamp and git info (shared across files)
   std::string timestamp = get_timestamp();
   std::string git_commit = get_git_info().commit;
 
   // Save results JSON
-  auto results_file = baseline_dir / "results.json";
+  auto results_file = dataset_dir / "results.json";
   std::ofstream file(results_file);
   if (!file.is_open()) {
-    throw std::runtime_error("Failed to write baseline results: " + results_file.string());
+    throw std::runtime_error("Failed to write dataset results: " + results_file.string());
   }
   file << serialize_throughput_results(results);
   file.close();
 
   // Save metadata JSON
-  auto metadata_file = baseline_dir / "metadata.json";
+  auto metadata_file = dataset_dir / "metadata.json";
   std::ofstream meta_file(metadata_file);
   if (!meta_file.is_open()) {
-    throw std::runtime_error("Failed to write baseline metadata: " + metadata_file.string());
+    throw std::runtime_error("Failed to write dataset metadata: " + metadata_file.string());
   }
-  meta_file << serialize_metadata(baseline_name, config, &results, "throughput");
+  meta_file << serialize_metadata(dataset_name, config, &results, "throughput");
   meta_file.close();
 
   // Save CSV
-  auto csv_file = baseline_dir / "results.csv";
+  auto csv_file = dataset_dir / "results.csv";
   write_throughput_csv(csv_file, config, results, timestamp, git_commit);
 
   // Update manifest (file-locked)
-  update_manifest(baseline_name, config);
+  update_manifest(dataset_name, config);
 }
 
 /**
- * @brief Save realtime baseline to disk (directory + manifest + metadata + CSV).
+ * @brief Save realtime dataset to disk (directory + manifest + metadata + CSV).
  *
  * @param config Benchmark configuration
  * @param results Realtime results
  */
-inline void save_realtime_baseline(const BenchmarkConfig& config,
+inline void save_realtime_dataset(const BenchmarkConfig& config,
                                     const RealtimeResults& results) {
-  // Get baseline directory
-  auto baseline_dir = get_baseline_path(config);
-  std::string baseline_name = get_baseline_dirname(config);
+  // Get dataset directory
+  auto dataset_dir = get_dataset_path(config);
+  std::string dataset_name = get_dataset_dirname(config);
 
   // Get timestamp and git info (shared across files)
   std::string timestamp = get_timestamp();
   std::string git_commit = get_git_info().commit;
 
   // Save results JSON
-  auto results_file = baseline_dir / "results.json";
+  auto results_file = dataset_dir / "results.json";
   std::ofstream file(results_file);
   if (!file.is_open()) {
-    throw std::runtime_error("Failed to write baseline results: " + results_file.string());
+    throw std::runtime_error("Failed to write dataset results: " + results_file.string());
   }
   file << serialize_realtime_results(results);
   file.close();
 
   // Save metadata JSON
-  auto metadata_file = baseline_dir / "metadata.json";
+  auto metadata_file = dataset_dir / "metadata.json";
   std::ofstream meta_file(metadata_file);
   if (!meta_file.is_open()) {
-    throw std::runtime_error("Failed to write baseline metadata: " + metadata_file.string());
+    throw std::runtime_error("Failed to write dataset metadata: " + metadata_file.string());
   }
-  meta_file << serialize_metadata(baseline_name, config, &results, "realtime");
+  meta_file << serialize_metadata(dataset_name, config, &results, "realtime");
   meta_file.close();
 
   // Save CSV
-  auto csv_file = baseline_dir / "results.csv";
+  auto csv_file = dataset_dir / "results.csv";
   write_realtime_csv(csv_file, config, results, timestamp, git_commit);
 
   // Update manifest (file-locked)
-  update_manifest(baseline_name, config);
+  update_manifest(dataset_name, config);
 }
 
 /**
- * @brief Save accuracy baseline to disk (directory + manifest + metadata + CSV).
+ * @brief Save accuracy dataset to disk (directory + manifest + metadata + CSV).
  *
  * @param config Benchmark configuration
  * @param results Accuracy results
  */
-inline void save_accuracy_baseline(const BenchmarkConfig& config,
+inline void save_accuracy_dataset(const BenchmarkConfig& config,
                                     const AccuracyResults& results) {
-  // Get baseline directory
-  auto baseline_dir = get_baseline_path(config);
-  std::string baseline_name = get_baseline_dirname(config);
+  // Get dataset directory
+  auto dataset_dir = get_dataset_path(config);
+  std::string dataset_name = get_dataset_dirname(config);
 
   // Get timestamp and git info (shared across files)
   std::string timestamp = get_timestamp();
   std::string git_commit = get_git_info().commit;
 
   // Save results JSON
-  auto results_file = baseline_dir / "results.json";
+  auto results_file = dataset_dir / "results.json";
   std::ofstream file(results_file);
   if (!file.is_open()) {
-    throw std::runtime_error("Failed to write baseline results: " + results_file.string());
+    throw std::runtime_error("Failed to write dataset results: " + results_file.string());
   }
   file << serialize_accuracy_results(results);
   file.close();
 
   // Save metadata JSON
-  auto metadata_file = baseline_dir / "metadata.json";
+  auto metadata_file = dataset_dir / "metadata.json";
   std::ofstream meta_file(metadata_file);
   if (!meta_file.is_open()) {
-    throw std::runtime_error("Failed to write baseline metadata: " + metadata_file.string());
+    throw std::runtime_error("Failed to write dataset metadata: " + metadata_file.string());
   }
-  meta_file << serialize_metadata(baseline_name, config, &results, "accuracy");
+  meta_file << serialize_metadata(dataset_name, config, &results, "accuracy");
   meta_file.close();
 
   // Save CSV
-  auto csv_file = baseline_dir / "results.csv";
+  auto csv_file = dataset_dir / "results.csv";
   write_accuracy_csv(csv_file, config, results, timestamp, git_commit);
 
   // Update manifest (file-locked)
-  update_manifest(baseline_name, config);
+  update_manifest(dataset_name, config);
 }
 
 // ============================================================================
@@ -876,7 +876,7 @@ inline void save_accuracy_last_run(const BenchmarkConfig& config,
 }
 
 // ============================================================================
-// Baseline Loading (Simple string parsing)
+// Dataset Loading (Simple string parsing)
 // ============================================================================
 
 /**
@@ -926,16 +926,16 @@ inline int parse_json_int(const std::string& line) {
 }
 
 /**
- * @brief Load latency baseline from disk.
+ * @brief Load latency dataset from disk.
  *
  * @param config Benchmark configuration
- * @param results Output latency results (populated if baseline exists)
- * @return True if baseline was loaded successfully
+ * @param results Output latency results (populated if dataset exists)
+ * @return True if dataset was loaded successfully
  */
-inline bool load_latency_baseline(const BenchmarkConfig& config,
+inline bool load_latency_dataset(const BenchmarkConfig& config,
                                    LatencyResults& results) {
-  auto baseline_dir = get_baseline_path(config);
-  auto results_file = baseline_dir / "results.json";
+  auto dataset_dir = get_dataset_path(config);
+  auto results_file = dataset_dir / "results.json";
 
   std::ifstream file(results_file);
   if (!file.is_open()) {
@@ -964,16 +964,16 @@ inline bool load_latency_baseline(const BenchmarkConfig& config,
 }
 
 /**
- * @brief Load throughput baseline from disk.
+ * @brief Load throughput dataset from disk.
  *
  * @param config Benchmark configuration
  * @param results Output throughput results
- * @return True if baseline was loaded successfully
+ * @return True if dataset was loaded successfully
  */
-inline bool load_throughput_baseline(const BenchmarkConfig& config,
+inline bool load_throughput_dataset(const BenchmarkConfig& config,
                                       ThroughputResults& results) {
-  auto baseline_dir = get_baseline_path(config);
-  auto results_file = baseline_dir / "results.json";
+  auto dataset_dir = get_dataset_path(config);
+  auto results_file = dataset_dir / "results.json";
 
   std::ifstream file(results_file);
   if (!file.is_open()) {
@@ -996,16 +996,16 @@ inline bool load_throughput_baseline(const BenchmarkConfig& config,
 }
 
 /**
- * @brief Load realtime baseline from disk.
+ * @brief Load realtime dataset from disk.
  *
  * @param config Benchmark configuration
  * @param results Output realtime results
- * @return True if baseline was loaded successfully
+ * @return True if dataset was loaded successfully
  */
-inline bool load_realtime_baseline(const BenchmarkConfig& config,
+inline bool load_realtime_dataset(const BenchmarkConfig& config,
                                     RealtimeResults& results) {
-  auto baseline_dir = get_baseline_path(config);
-  auto results_file = baseline_dir / "results.json";
+  auto dataset_dir = get_dataset_path(config);
+  auto results_file = dataset_dir / "results.json";
 
   std::ifstream file(results_file);
   if (!file.is_open()) {
@@ -1030,16 +1030,16 @@ inline bool load_realtime_baseline(const BenchmarkConfig& config,
 }
 
 /**
- * @brief Load accuracy baseline from disk.
+ * @brief Load accuracy dataset from disk.
  *
  * @param config Benchmark configuration
  * @param results Output accuracy results
- * @return True if baseline was loaded successfully
+ * @return True if dataset was loaded successfully
  */
-inline bool load_accuracy_baseline(const BenchmarkConfig& config,
+inline bool load_accuracy_dataset(const BenchmarkConfig& config,
                                     AccuracyResults& results) {
-  auto baseline_dir = get_baseline_path(config);
-  auto results_file = baseline_dir / "results.json";
+  auto dataset_dir = get_dataset_path(config);
+  auto results_file = dataset_dir / "results.json";
 
   std::ifstream file(results_file);
   if (!file.is_open()) {
@@ -1064,14 +1064,14 @@ inline bool load_accuracy_baseline(const BenchmarkConfig& config,
 }
 
 /**
- * @brief Check if baseline exists for given config.
+ * @brief Check if dataset exists for given config.
  *
  * @param config Benchmark configuration
- * @return True if baseline directory and results file exist
+ * @return True if dataset directory and results file exist
  */
-inline bool baseline_exists(const BenchmarkConfig& config) {
-  auto baseline_dir = get_baseline_path(config);
-  auto results_file = baseline_dir / "results.json";
+inline bool dataset_exists(const BenchmarkConfig& config) {
+  auto dataset_dir = get_dataset_path(config);
+  auto results_file = dataset_dir / "results.json";
   return std::filesystem::exists(results_file);
 }
 
@@ -1080,14 +1080,14 @@ inline bool baseline_exists(const BenchmarkConfig& config) {
 // ============================================================================
 
 /**
- * @brief Load latency results from baseline directory.
+ * @brief Load latency results from dataset directory.
  *
- * @param baseline_path Path to baseline directory
+ * @param dataset_path Path to dataset directory
  * @return Latency results
  * @throws std::runtime_error if load fails
  */
-inline LatencyResults load_latency_from_directory(const std::filesystem::path& baseline_path) {
-  auto results_file = baseline_path / "results.json";
+inline LatencyResults load_latency_from_directory(const std::filesystem::path& dataset_path) {
+  auto results_file = dataset_path / "results.json";
 
   std::ifstream file(results_file);
   if (!file.is_open()) {
@@ -1123,14 +1123,14 @@ inline LatencyResults load_latency_from_directory(const std::filesystem::path& b
 }
 
 /**
- * @brief Load throughput results from baseline directory.
+ * @brief Load throughput results from dataset directory.
  *
- * @param baseline_path Path to baseline directory
+ * @param dataset_path Path to dataset directory
  * @return Throughput results
  * @throws std::runtime_error if load fails
  */
-inline ThroughputResults load_throughput_from_directory(const std::filesystem::path& baseline_path) {
-  auto results_file = baseline_path / "results.json";
+inline ThroughputResults load_throughput_from_directory(const std::filesystem::path& dataset_path) {
+  auto results_file = dataset_path / "results.json";
 
   std::ifstream file(results_file);
   if (!file.is_open()) {
@@ -1158,14 +1158,14 @@ inline ThroughputResults load_throughput_from_directory(const std::filesystem::p
 }
 
 /**
- * @brief Load realtime results from baseline directory.
+ * @brief Load realtime results from dataset directory.
  *
- * @param baseline_path Path to baseline directory
+ * @param dataset_path Path to dataset directory
  * @return Realtime results
  * @throws std::runtime_error if load fails
  */
-inline RealtimeResults load_realtime_from_directory(const std::filesystem::path& baseline_path) {
-  auto results_file = baseline_path / "results.json";
+inline RealtimeResults load_realtime_from_directory(const std::filesystem::path& dataset_path) {
+  auto results_file = dataset_path / "results.json";
 
   std::ifstream file(results_file);
   if (!file.is_open()) {
@@ -1195,14 +1195,14 @@ inline RealtimeResults load_realtime_from_directory(const std::filesystem::path&
 }
 
 /**
- * @brief Load accuracy results from baseline directory.
+ * @brief Load accuracy results from dataset directory.
  *
- * @param baseline_path Path to baseline directory
+ * @param dataset_path Path to dataset directory
  * @return Accuracy results
  * @throws std::runtime_error if load fails
  */
-inline AccuracyResults load_accuracy_from_directory(const std::filesystem::path& baseline_path) {
-  auto results_file = baseline_path / "results.json";
+inline AccuracyResults load_accuracy_from_directory(const std::filesystem::path& dataset_path) {
+  auto results_file = dataset_path / "results.json";
 
   std::ifstream file(results_file);
   if (!file.is_open()) {

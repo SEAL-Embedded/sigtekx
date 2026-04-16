@@ -41,7 +41,7 @@ inline BenchmarkConfig parse_args(int argc, char* argv[]) {
   OutputFormat output_format = OutputFormat::TABLE;
   bool quiet = false;
   bool safe_print = false;
-  bool save_baseline = false;
+  bool save_dataset = false;
 
   // Also collect parameter overrides
   struct Override {
@@ -113,8 +113,8 @@ OUTPUT CONTROL:
   --quiet               Minimal output
   --safe-print          Use ASCII-only output (for profiling/redirect)
 
-BASELINE TRACKING:
-  --save-baseline       Save results as baseline for future comparison
+DATASET TRACKING:
+  --save-dataset       Save results as dataset for future comparison
 
 EXAMPLES:
   # Quick development validation (default)
@@ -219,9 +219,9 @@ IONOSPHERE PARAMETER REFERENCE:
       safe_print = true;
     }
 
-    // Baseline control
-    else if (arg == "--save-baseline") {
-      save_baseline = true;
+    // Dataset control
+    else if (arg == "--save-dataset") {
+      save_dataset = true;
     }
 
     // Unknown argument
@@ -266,8 +266,8 @@ IONOSPHERE PARAMETER REFERENCE:
   config.quiet = quiet;
   config.safe_print = safe_print;
 
-  // Apply baseline settings
-  config.save_baseline = save_baseline;
+  // Apply dataset settings
+  config.save_dataset = save_dataset;
 
   // Apply parameter overrides
   if (overrides.has_nfft) config.nfft = overrides.nfft;

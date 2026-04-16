@@ -38,6 +38,50 @@ def load_benchmark_data(data_path: str | Path = "artifacts/data") -> pd.DataFram
     return _load_data_impl(data_path)
 
 
+@st.cache_data(ttl=3600, show_spinner="Loading selected datasets...")
+def _load_tagged(data_path_str: str, dataset_label: str) -> pd.DataFrame:
+    """Load one dataset and stamp it with a ``dataset`` column."""
+    df = _load_data_impl(Path(data_path_str))
+    df = df.copy()
+    df["dataset"] = dataset_label
+    return df
+
+
+def load_selected_datasets() -> pd.DataFrame:
+    """Load the primary + any compare-with datasets from session state.
+
+    Every page should call this instead of ``load_benchmark_data("artifacts/data")``.
+    The returned DataFrame always has a ``dataset`` column. When only one
+    dataset is selected, plots and filters work as before — the column is just
+    a constant. When multiple datasets are loaded, pages can color charts by
+    ``dataset`` and compute cross-dataset deltas.
+
+    Raises ``FileNotFoundError`` if the primary dataset has no CSV files.
+    """
+    from utils.dataset_registry import get_compare_datasets, get_primary_dataset
+
+    primary = get_primary_dataset()
+    compares = get_compare_datasets()
+
+    frames: list[pd.DataFrame] = []
+    if primary.has_csvs():
+        frames.append(_load_tagged(str(primary.data_path), primary.name))
+    else:
+        raise FileNotFoundError(
+            f"No benchmark CSV files found in primary dataset '{primary.name}' "
+            f"(path: {primary.data_path})."
+        )
+
+    for entry in compares:
+        if entry.has_csvs():
+            try:
+                frames.append(_load_tagged(str(entry.data_path), entry.name))
+            except Exception as exc:  # pragma: no cover - surface to UI below
+                st.warning(f"Skipped compare dataset '{entry.name}': {exc}")
+
+    return pd.concat(frames, ignore_index=True)
+
+
 @st.cache_data(ttl=3600)
 def get_available_configurations(data: pd.DataFrame) -> dict[str, list]:
     """

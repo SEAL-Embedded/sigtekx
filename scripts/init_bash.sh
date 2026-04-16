@@ -118,7 +118,7 @@ sigx() {
     return 1
   fi
 
-  local valid_commands="setup build test coverage lint format clean doctor help profile typecheck diagrams dev baseline dashboard"
+  local valid_commands="setup build test coverage lint format clean doctor help profile typecheck diagrams dev dataset dashboard"
 
   if [[ $# -gt 0 ]]; then
     local cmd="$1"
@@ -230,7 +230,7 @@ _sigx_complete() {
   local cur="${COMP_WORDS[COMP_CWORD]}"
   local prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-  local commands="setup build test coverage lint format clean doctor help profile typecheck diagrams dev baseline dashboard"
+  local commands="setup build test coverage lint format clean doctor help profile typecheck diagrams dev dataset dashboard"
   local targets="python cpp all py sys nsys ncu latency throughput accuracy realtime --clean --verbose --debug --release --fix --check --coverage --pattern --strict --all --force --format --layout --port --no-open --mode"
 
   if [[ $COMP_CWORD -eq 1 ]] || { [[ $COMP_CWORD -eq 2 ]] && [[ "${COMP_WORDS[0]}" != "sigx" ]]; }; then
@@ -242,8 +242,8 @@ _sigx_complete() {
 
 _sigxc_complete() {
   local cur="${COMP_WORDS[COMP_CWORD]}"
-  local commands="bench profile baseline clean help"
-  local targets="nsys ncu --mode --output --stats --trace --set --kernel-name --preset --iono --ionox --full --quick --profile --lock-clocks --gpu-index --max-clocks --save-baseline save list compare delete"
+  local commands="bench profile dataset clean help"
+  local targets="nsys ncu --mode --output --stats --trace --set --kernel-name --preset --iono --ionox --full --quick --profile --lock-clocks --gpu-index --max-clocks --save-dataset save list compare delete"
 
   if [[ $COMP_CWORD -eq 1 ]] || { [[ $COMP_CWORD -eq 2 ]] && [[ "${COMP_WORDS[0]}" != "sigxc" ]]; }; then
     COMPREPLY=( $(compgen -W "$commands" -- "$cur") )

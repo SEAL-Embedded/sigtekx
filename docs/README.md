@@ -180,7 +180,7 @@ sxp ncu latency --set roofline
 
 **Save Baseline**:
 ```powershell
-sigxc bench --preset latency --full --lock-clocks --save-baseline
+sigxc bench --preset latency --full --lock-clocks --save-dataset
 ```
 
 **View Documentation**:

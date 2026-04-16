@@ -16,7 +16,8 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from utils.data_loader import load_benchmark_data
+from utils.data_loader import load_selected_datasets
+from utils.dataset_registry import render_sidebar_picker
 
 # Page configuration
 st.set_page_config(page_title="Methods Paper", page_icon="📄", layout="wide")
@@ -32,8 +33,13 @@ st.markdown("""
 st.title("📄 Methods Paper Analysis")
 
 # Load and filter data
+render_sidebar_picker()
+
 try:
-    data = load_benchmark_data("artifacts/data")
+    data = load_selected_datasets()
+    if "dataset" in data.columns and data["dataset"].nunique() > 1:
+        names = ", ".join(sorted(data["dataset"].unique()))
+        st.info(f"Comparing datasets: {names} (rows tagged by dataset column)")
 
     # AUTOMATIC FILTER: 100kHz sample rate (academic/general-purpose)
     # Defensive: check if column exists before filtering

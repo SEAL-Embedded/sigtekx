@@ -20,7 +20,7 @@ $script:BuildDir = Join-Path $ProjectRoot "build"
 $script:BuildPreset = if ($env:BUILD_PRESET) { $env:BUILD_PRESET } else { "windows-rel" }
 $script:ProfilingDir = Join-Path $ProjectRoot "artifacts\profiling"
 $script:BenchmarkExe = Join-Path $BuildDir "$script:BuildPreset\sigtekx_benchmark.exe"
-$script:BaselineCLI = Join-Path $BuildDir "$script:BuildPreset\sigtekx_baseline_cli.exe"
+$script:DatasetCLI = Join-Path $BuildDir "$script:BuildPreset\sigtekx_dataset_cli.exe"
 
 # --- Utility Functions -------------------------------------------------------
 function Write-Status {
@@ -357,17 +357,17 @@ function Invoke-Clean {
     }
 }
 
-function Invoke-Baseline {
-    param([string[]]$BaselineArgs = @())
+function Invoke-Dataset {
+    param([string[]]$DatasetArgs = @())
 
-    if (-not (Test-Path $script:BaselineCLI)) {
-        Write-Error "C++ baseline CLI not found at: $script:BaselineCLI"
-        Write-Host "Run 'sigx build' to build the baseline CLI executable." -ForegroundColor Yellow
+    if (-not (Test-Path $script:DatasetCLI)) {
+        Write-Error "C++ dataset CLI not found at: $script:DatasetCLI"
+        Write-Host "Run 'sigx build' to build the dataset CLI executable." -ForegroundColor Yellow
         exit 1
     }
 
-    # Forward all arguments to baseline CLI
-    & $script:BaselineCLI @BaselineArgs
+    # Forward all arguments to dataset CLI
+    & $script:DatasetCLI @DatasetArgs
 
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
@@ -385,7 +385,7 @@ USAGE: sigxc <command> [options]
 
 COMMANDS:
   bench [options]               Run C++ benchmark with presets
-  baseline <subcommand>         Manage C++ baselines (list, compare, delete)
+  dataset  <subcommand>         Manage C++ datasets (list, compare, delete)
   profile nsys [options]        Profile with Nsight Systems
   profile ncu [options]         Profile with Nsight Compute
   compare <before> <after>      Compare benchmark results
@@ -495,34 +495,34 @@ FOR PRODUCTION PROFILING:
 
 ═══════════════════════════════════════════════════════════════════════════
 
-BASELINE MANAGEMENT:
-  sigxc baseline <subcommand> [options]
+DATASET MANAGEMENT:
+  sigxc dataset <subcommand> [options]
 
   Subcommands:
-    save <name> [--message <msg>]   Save last benchmark run as named baseline
-    list [--preset <name>]          List all baselines (optionally filtered)
-    compare <name1> <name2>         Compare two baselines
-    delete <name> [--force]         Delete a baseline
+    save <name> [--message <msg>]   Save last benchmark run as named dataset
+    list [--preset <name>]          List all datasets (optionally filtered)
+    compare <name1> <name2>         Compare two datasets
+    delete <name> [--force]         Delete a dataset
 
   Workflow:
     1. Run benchmark:      sigxc bench --preset latency
-    2. Save as baseline:   sigxc baseline save pre_opt --message "Before optimization"
+    2. Save as dataset:   sigxc dataset save pre_opt --message "Before optimization"
     3. Make code changes
     4. Run benchmark:      sigxc bench --preset latency
-    5. Save as baseline:   sigxc baseline save post_opt --message "After optimization"
-    6. Compare:            sigxc baseline compare pre_opt post_opt
+    5. Save as dataset:   sigxc dataset save post_opt --message "After optimization"
+    6. Compare:            sigxc dataset compare pre_opt post_opt
 
   Examples:
-    sigxc baseline save my_baseline --message "Description"
-    sigxc baseline list
-    sigxc baseline list --preset latency
-    sigxc baseline compare pre_opt post_opt
-    sigxc baseline delete old_baseline --force
+    sigxc dataset save my_dataset --message "Description"
+    sigxc dataset list
+    sigxc dataset list --preset latency
+    sigxc dataset compare pre_opt post_opt
+    sigxc dataset delete old_dataset --force
 
   Storage:
-    Baselines are stored in: baselines/cpp/
-    Last run is cached in:   baselines/cpp/.last_run/
-    Each baseline contains:  results.json, metadata.json, results.csv
+    Datasets are stored in: datasets/cpp/
+    Last run is cached in:   datasets/cpp/.last_run/
+    Each dataset contains:  results.json, metadata.json, results.csv
 
 ═══════════════════════════════════════════════════════════════════════════
 
@@ -570,8 +570,8 @@ try {
                 }
             }
         }
-        "baseline" {
-            Invoke-Baseline -BaselineArgs $CommandArgs
+        "dataset" {
+            Invoke-Dataset -DatasetArgs $CommandArgs
         }
         "compare" {
             Invoke-Compare -Args $CommandArgs

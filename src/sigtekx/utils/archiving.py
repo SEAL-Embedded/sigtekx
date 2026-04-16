@@ -15,11 +15,11 @@ SigTekX uses different tools for different experiment lifespans:
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
-│ Tier 2: PERSISTENT BASELINES (baselines/)                      │
+│ Tier 2: PERSISTENT DATASETS (datasets/)                        │
 │ ────────────────────────────────────────────────────────────── │
-│ Tools:    BaselineManager (utils/baseline.py)                  │
-│ Purpose:  Regression tracking, phase milestones                │
-│ Status:   ✓ PRODUCTION USE (CLI: sigx baseline save/compare)   │
+│ Tools:    DatasetRegistry (utils/datasets.py)                  │
+│ Purpose:  Named result sets, regression tracking               │
+│ Status:   ✓ PRODUCTION USE (CLI: sigx dataset save/compare)    │
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
@@ -37,7 +37,7 @@ This module (DataArchiver) provides:
 
 For production experiment tracking, see:
 - MLflow: docs/benchmarking/experiment-logging-system.md
-- Baselines: docs/benchmarking/baselines-and-regression-tracking.md
+- Datasets: `sigx dataset --help`
 """
 
 from __future__ import annotations

@@ -99,8 +99,8 @@ struct BenchmarkConfig {
   bool safe_print = false;  // Use ASCII-only output (for profiling/redirect)
   int random_seed = 42;
 
-  // Baseline control
-  bool save_baseline = false;
+  // Dataset control
+  bool save_dataset = false;
 };
 
 // ============================================================================

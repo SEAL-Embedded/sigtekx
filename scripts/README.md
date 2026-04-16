@@ -16,7 +16,7 @@ scripts/
 │
 ├── helpers/                    # Benchmark helper scripts
 │   ├── prof_helper.py          # Nsight profiling orchestration (sxp)
-│   ├── baseline_helper.py      # Baseline save/compare/list operations
+│   ├── dataset_helper.py       # Dataset save/compare/list operations (sigx dataset)
 │   └── stage_timing_helper.py  # Per-stage timing experiments (sxst/sxstb/sxsts)
 │
 └── aws/                        # AWS cloud deployment

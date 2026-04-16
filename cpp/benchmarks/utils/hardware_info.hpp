@@ -1,6 +1,6 @@
 /**
  * @file hardware_info.hpp
- * @brief Hardware detection for baseline metadata tracking.
+ * @brief Hardware detection for dataset metadata tracking.
  *
  * Provides comprehensive hardware detection including:
  * - GPU: Name, memory, compute capability, CUDA versions

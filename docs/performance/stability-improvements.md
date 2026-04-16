@@ -195,7 +195,7 @@ sigxc bench --preset latency --full --lock-clocks
 sigxc bench --preset latency --full --iono --lock-clocks
 
 # Save baseline with locked clocks
-sigxc bench --preset latency --full --lock-clocks --save-baseline
+sigxc bench --preset latency --full --lock-clocks --save-dataset
 
 # Compare against baseline
 sigxc bench --preset latency --full --lock-clocks

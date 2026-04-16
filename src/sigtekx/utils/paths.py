@@ -83,7 +83,7 @@ def get_benchmarks_root() -> Path:
 
     NOTE: This is separate from other benchmark output locations:
     - This function: artifacts/benchmark_results/ (standalone Python API)
-    - C++ baselines: artifacts/cpp/baselines/ (ionoc --save-baseline)
+    - C++ datasets: datasets/cpp/ (sigxc dataset save)
     - Hydra experiments: artifacts/data/ (configured in experiments/conf/config.yaml)
 
     In practice, Hydra experiments (run_latency.py, run_throughput.py) use

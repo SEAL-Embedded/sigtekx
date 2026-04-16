@@ -126,15 +126,26 @@ The script:
 
 ### 6. Verify results
 
-```bash
-# S3 results
-aws s3 ls s3://sigtekx-benchmark-results/runs/
-aws s3 cp s3://sigtekx-benchmark-results/runs/<timestamp>/ ./artifacts/data/ --recursive
+Cloud runs land in their own dataset directory, keeping your local RTX data
+untouched. Use `download_results.sh` to pull them in:
 
+```bash
+# List cloud runs available in S3
+bash scripts/aws/download_results.sh --list
+
+# Pull the latest run into datasets/aws-<timestamp>/
+bash scripts/aws/download_results.sh
+
+# Or pull a specific run
+bash scripts/aws/download_results.sh 20260415T120000Z
+
+```
+
+```bash
 # CloudWatch logs
 aws logs tail /sigtekx/benchmarks --follow --region us-west-2
 
-# View locally
+# View locally — pick "aws-<timestamp>" from the sidebar dataset picker
 sigx dashboard
 ```
 

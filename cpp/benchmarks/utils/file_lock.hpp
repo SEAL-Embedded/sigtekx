@@ -1,9 +1,9 @@
 /**
  * @file file_lock.hpp
- * @brief Cross-platform file locking for concurrent baseline saves.
+ * @brief Cross-platform file locking for concurrent dataset saves.
  *
  * Provides RAII-based file locking to prevent race conditions during
- * concurrent baseline operations. Automatically releases locks on
+ * concurrent dataset operations. Automatically releases locks on
  * destruction, even if exceptions occur.
  *
  * Platform Support:

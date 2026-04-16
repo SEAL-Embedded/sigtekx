@@ -17,7 +17,7 @@ SigTekX uses a **three-layer local storage system** for experiment data:
 
 **Key Point**: Experiment data has **two tiers**:
 1. **Ephemeral** (`artifacts/`): Deleted regularly, regenerated from code (~41MB)
-2. **Persistent** (`baselines/`): Preserved snapshots for regression tracking (manually managed)
+2. **Persistent** (`datasets/`): Preserved snapshots for regression tracking (manually managed)
 
 Both are **gitignored** (too large, binary, hardware-specific). Only code and configs are version-controlled.
 
@@ -172,7 +172,7 @@ mlflow runs search \
 CSV files are **human-readable summaries** designed for:
 - Streamlit dashboard visualization
 - Quick inspection in Excel/pandas
-- Easy diff/comparison between baselines
+- Easy diff/comparison between datasets
 - Fast loading (no database overhead)
 
 ### Storage Location
@@ -446,13 +446,13 @@ def load_benchmark_data(data_dir: str) -> pd.DataFrame:
 
 ### What About Baselines?
 
-**For important baselines** (like pre-Phase 1), use **timestamped snapshots**:
+**For important datasets** (like pre-Phase 1), use **timestamped snapshots**:
 
 ```bash
 # Copy artifacts to timestamped baseline directory
-New-Item -ItemType Directory -Force -Path "baselines/v0.9.5_pre-phase1"
-Copy-Item -Recurse artifacts/data "baselines/v0.9.5_pre-phase1/data"
-Copy-Item -Recurse artifacts/mlruns "baselines/v0.9.5_pre-phase1/mlruns"
+New-Item -ItemType Directory -Force -Path "datasets/v0.9.5_pre-phase1"
+Copy-Item -Recurse artifacts/data "datasets/v0.9.5_pre-phase1/data"
+Copy-Item -Recurse artifacts/mlruns "datasets/v0.9.5_pre-phase1/mlruns"
 
 # Git tag the CODE state (not data)
 git tag -a v0.9.5-pre-phase1 -m "Baseline before Phase 1 optimizations"
@@ -466,7 +466,7 @@ git push origin v0.9.5-pre-phase1
 
 ---
 
-## Backup and Baseline Strategy
+## Backup and Dataset Strategy
 
 ### For Daily Work
 
@@ -479,20 +479,20 @@ snakemake --cores 4 --snakefile experiments/Snakefile
 
 ### For Phase Milestones
 
-**Use `sigx baseline` command** (see Baseline Management Workflow above):
+**Use `sigx dataset` command** (see Dataset Management Workflow above):
 
 ```bash
 # Save baseline at phase boundary
-sigx baseline save pre-phase1 --phase 1 --message "Before zero-copy optimization"
+sigx dataset save pre-phase1 --phase 1 --message "Before zero-copy optimization"
 
-# List saved baselines
-sigx baseline list --phase 1
+# List saved datasets
+sigx dataset list --phase 1
 
 # Compare after modifications (Phase 1 feature - coming soon)
-sigx baseline compare pre-phase1 post-phase1
+sigx dataset compare pre-phase1 post-phase1
 ```
 
-**Baseline storage**: `baselines/` directory (persists across `sigx clean`)
+**Baseline storage**: `datasets/` directory (persists across `sigx clean`)
 
 ### For Publication
 
@@ -500,10 +500,10 @@ sigx baseline compare pre-phase1 post-phase1
 
 ```bash
 # Save publication baseline with full scope
-sigx baseline save methods-paper-v1.0 --scope full --message "IEEE HPEC submission"
+sigx dataset save methods-paper-v1.0 --scope full --message "IEEE HPEC submission"
 
 # Export for archival (Phase 2 feature - coming soon)
-sigx baseline export methods-paper-v1.0 C:\backup --format zip
+sigx dataset export methods-paper-v1.0 C:\backup --format zip
 
 # Git tag the CODE (not data)
 git tag -a v1.0.0 -m "Methods paper publication release"
@@ -515,7 +515,7 @@ Upload `methods-paper-v1.0.zip` to Zenodo/Figshare for persistent DOI.
 
 ## Comparison Workflow
 
-### Comparing Two Baselines
+### Comparing Two Datasets
 
 **Scenario**: Compare pre-Phase 1 vs post-Phase 1
 
@@ -523,7 +523,7 @@ Upload `methods-paper-v1.0.zip` to Zenodo/Figshare for persistent DOI.
 
 ```bash
 # Launch two MLflow UIs on different ports
-mlflow ui --backend-store-uri file://./baselines/v0.9.5_pre-phase1/mlruns --port 5000 &
+mlflow ui --backend-store-uri file://./datasets/v0.9.5_pre-phase1/mlruns --port 5000 &
 mlflow ui --backend-store-uri file://./artifacts/mlruns --port 5001 &
 
 # Open both in browser:
@@ -539,7 +539,7 @@ mlflow ui --backend-store-uri file://./artifacts/mlruns --port 5001 &
 import pandas as pd
 
 # Load CSV summaries
-pre = pd.read_csv("baselines/v0.9.5_pre-phase1/data/latency_summary_4096_2_0p7500_streaming.csv")
+pre = pd.read_csv("datasets/v0.9.5_pre-phase1/data/latency_summary_4096_2_0p7500_streaming.csv")
 post = pd.read_csv("artifacts/data/latency_summary_4096_2_0p7500_streaming.csv")
 
 # Compare
@@ -552,29 +552,29 @@ print(f"Improvement:  {pre['mean_latency_us'].values[0] - post['mean_latency_us'
 
 ```bash
 # Copy baseline CSVs to current data directory (with unique names)
-Copy-Item "baselines/v0.9.5_pre-phase1/data/*.csv" "artifacts/data/" -Force
+Copy-Item "datasets/v0.9.5_pre-phase1/data/*.csv" "artifacts/data/" -Force
 
 # Rename to distinguish (add prefix)
 Get-ChildItem "artifacts/data/*.csv" | Where-Object { $_.Name -notmatch "^v095_" } |
   ForEach-Object { Rename-Item $_ "v095_pre_$($_.Name)" }
 
-# Launch dashboard (shows both baselines)
+# Launch dashboard (shows both datasets)
 sigx dashboard
 ```
 
 ---
 
-## Baseline Management Workflow
+## Dataset Management Workflow
 
 ### When to Save Baselines
 
-**Save baselines at phase boundaries** (methods paper roadmap):
+**Save datasets at phase boundaries** (methods paper roadmap):
 - **Phase 1**: Pre/post memory optimizations (zero-copy ring buffer)
 - **Phase 2**: Pre/post custom stage integration (Numba, PyTorch)
 - **Phase 3**: Pre/post control plane decoupling (snapshot buffer, event queue)
 - **Phase 4**: Final validation baseline (methods paper publication freeze)
 
-**DO NOT** save baselines for every experiment - only for major milestones.
+**DO NOT** save datasets for every experiment - only for major milestones.
 
 ### Typical Workflow
 
@@ -585,11 +585,11 @@ snakemake --cores 4 --snakefile experiments/Snakefile
 
 **2. Save baseline before modifications**
 ```bash
-sigx baseline save pre-phase1 --phase 1 --message "Before zero-copy optimization"
+sigx dataset save pre-phase1 --phase 1 --message "Before zero-copy optimization"
 
 # Output:
 # ✅ Baseline saved: pre-phase1
-#    Location: C:\...\sigtekx\baselines\pre-phase1\
+#    Location: C:\...\sigtekx\datasets\pre-phase1\
 #    Size: 41.2 MB
 #    Metrics:
 #      - streaming_latency_mean_us: 122.5
@@ -597,7 +597,7 @@ sigx baseline save pre-phase1 --phase 1 --message "Before zero-copy optimization
 
 **3. Delete artifacts to free space**
 ```bash
-sigx clean  # Deletes artifacts/ but baselines/ survives
+sigx clean  # Deletes artifacts/ but datasets/ survives
 ```
 
 **4. Make code changes (e.g., Phase 1 Task 1.1)**
@@ -614,15 +614,15 @@ snakemake --cores 4 --snakefile experiments/Snakefile
 
 **6. Save new baseline**
 ```bash
-sigx baseline save post-phase1 --phase 1 --message "After zero-copy optimization"
+sigx dataset save post-phase1 --phase 1 --message "After zero-copy optimization"
 ```
 
 **7. Compare results** (Phase 1 feature - coming soon)
 ```bash
-sigx baseline compare pre-phase1 post-phase1
+sigx dataset compare pre-phase1 post-phase1
 
 # Expected output:
-# Baseline Comparison: pre-phase1 vs post-phase1
+# Dataset Comparison: pre-phase1 vs post-phase1
 # ================================================
 # Metric                        pre-phase1    post-phase1    Delta
 # -----------------------------------------------------------------
@@ -632,17 +632,17 @@ sigx baseline compare pre-phase1 post-phase1
 
 ### Storage Management
 
-**Location**: `baselines/` (repo root, not tracked by git)
+**Location**: `datasets/` (repo root, not tracked by git)
 
 **Size management**:
 - Minimal scope: ~1MB per baseline
 - Standard scope: ~41MB per baseline (default)
 - Full scope: ~100MB per baseline
 
-**Cleanup old baselines**:
+**Cleanup old datasets**:
 ```bash
-sigx baseline list              # Review saved baselines
-sigx baseline delete old-test   # Remove unwanted baseline (Phase 2 feature)
+sigx dataset list              # Review saved datasets
+sigx dataset delete old-test   # Remove unwanted baseline (Phase 2 feature)
 ```
 
 ### Publication Workflow
@@ -651,10 +651,10 @@ sigx baseline delete old-test   # Remove unwanted baseline (Phase 2 feature)
 
 ```bash
 # 1. Freeze final state
-sigx baseline save methods-paper-v1.0 --scope full --message "Publication freeze"
+sigx dataset save methods-paper-v1.0 --scope full --message "Publication freeze"
 
 # 2. Export for archival (Phase 2 feature - coming soon)
-sigx baseline export methods-paper-v1.0 C:\backup\publications --format zip
+sigx dataset export methods-paper-v1.0 C:\backup\publications --format zip
 
 # 3. Upload to Zenodo/Figshare for DOI
 # (upload methods-paper-v1.0.zip)
@@ -691,7 +691,7 @@ git push origin v1.0.0
 
 **Phase 4** (paper preparation) if:
 - Data grows >1GB
-- Need to share baselines with collaborators
+- Need to share datasets with collaborators
 - Want to track data lineage for reproducibility
 - Publishing supplementary materials
 
@@ -726,7 +726,7 @@ dvc push
 
 ### Q: How do I share results with collaborators?
 
-**A**: Share the **code + configs** (git), not the data. Collaborators regenerate results locally. For baselines, use timestamped archives or DVC.
+**A**: Share the **code + configs** (git), not the data. Collaborators regenerate results locally. For datasets, use timestamped archives or DVC.
 
 ### Q: What if I accidentally delete artifacts/?
 
@@ -738,7 +738,7 @@ snakemake --cores 4 --snakefile experiments/Snakefile
 ### Q: How do I compare two git branches?
 
 **A**:
-1. Checkout branch A, run benchmarks, archive to `baselines/branch_a/`
+1. Checkout branch A, run benchmarks, archive to `datasets/branch_a/`
 2. Checkout branch B, run benchmarks (stays in `artifacts/`)
 3. Compare using MLflow UI or Python script
 
@@ -780,7 +780,7 @@ snakemake --cores 4 --snakefile experiments/Snakefile
 2. **Everything local**: All data in `artifacts/`, gitignored
 3. **Code is tracked**: Git tracks code/configs, not data outputs
 4. **Regenerable**: Lost data? Re-run benchmarks
-5. **Baselines**: Timestamped archives for milestones (e.g., `baselines/v0.9.5_pre-phase1/`)
+5. **Baselines**: Timestamped archives for milestones (e.g., `datasets/v0.9.5_pre-phase1/`)
 6. **Comparison**: MLflow UI or Python scripts for before/after analysis
 7. **Future**: DVC if data grows >1GB or need collaboration
 

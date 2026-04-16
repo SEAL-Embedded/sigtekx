@@ -168,15 +168,15 @@ inline PerformanceTier classify_stability_tier(float cv) {
 }
 
 /**
- * @brief Compute percent change from baseline.
+ * @brief Compute percent change from dataset.
  *
  * @param current Current value
- * @param baseline Baseline value
+ * @param dataset Dataset value
  * @return Percent change (positive = improvement for latency, regression for throughput)
  */
-inline float compute_percent_change(float current, float baseline) {
-  if (baseline == 0.0f) return 0.0f;
-  return ((current - baseline) / baseline) * 100.0f;
+inline float compute_percent_change(float current, float dataset) {
+  if (dataset == 0.0f) return 0.0f;
+  return ((current - dataset) / dataset) * 100.0f;
 }
 
 // ============================================================================
@@ -193,9 +193,9 @@ inline float compute_percent_change(float current, float baseline) {
 inline void print_latency_results(const BenchmarkConfig& config,
                                    const LatencyResults& results,
                                    const RuntimeInfo& runtime_info) {
-  // Load baseline if it exists
-  LatencyResults baseline;
-  bool has_baseline = load_latency_baseline(config, baseline);
+  // Load dataset if it exists
+  LatencyResults dataset;
+  bool has_dataset = load_latency_dataset(config, dataset);
 
   if (config.output_format == OutputFormat::TABLE && !config.quiet) {
     std::cout << "\n";
@@ -269,9 +269,9 @@ inline void print_latency_results(const BenchmarkConfig& config,
     std::cout << "Stability:     CV=" << std::setw(5) << (results.coefficient_of_variation * 100.0f) << "%  ["
               << get_tier_symbol(stability_tier, config.safe_print) << " " << get_tier_label(stability_tier) << "]\n";
 
-    if (has_baseline) {
-      float change = compute_percent_change(results.p95_latency_us, baseline.p95_latency_us);
-      std::cout << "vs Baseline:   " << std::setw(6) << std::showpos << change << std::noshowpos << "%     [";
+    if (has_dataset) {
+      float change = compute_percent_change(results.p95_latency_us, dataset.p95_latency_us);
+      std::cout << "vs Dataset:   " << std::setw(6) << std::showpos << change << std::noshowpos << "%     [";
       if (std::abs(change) < 2.0f) {
         std::cout << get_tier_symbol(PerformanceTier::GOOD, config.safe_print) << " NO CHANGE";
       } else if (change < 0.0f) {
@@ -321,9 +321,9 @@ inline void print_latency_results(const BenchmarkConfig& config,
 inline void print_throughput_results(const BenchmarkConfig& config,
                                       const ThroughputResults& results,
                                       const RuntimeInfo& runtime_info) {
-  // Load baseline if it exists
-  ThroughputResults baseline;
-  bool has_baseline = load_throughput_baseline(config, baseline);
+  // Load dataset if it exists
+  ThroughputResults dataset;
+  bool has_dataset = load_throughput_dataset(config, dataset);
 
   if (config.output_format == OutputFormat::TABLE && !config.quiet) {
     std::cout << "\n";
@@ -369,9 +369,9 @@ inline void print_throughput_results(const BenchmarkConfig& config,
               << get_tier_symbol(throughput_tier, config.safe_print) << " " << get_tier_label(throughput_tier) << "]\n";
     std::cout << "Bandwidth:     " << std::setw(8) << results.gb_per_second << " GB/s\n";
 
-    if (has_baseline) {
-      float change = compute_percent_change(results.frames_per_second, baseline.frames_per_second);
-      std::cout << "vs Baseline:   " << std::setw(6) << std::showpos << change << std::noshowpos << "%     [";
+    if (has_dataset) {
+      float change = compute_percent_change(results.frames_per_second, dataset.frames_per_second);
+      std::cout << "vs Dataset:   " << std::setw(6) << std::showpos << change << std::noshowpos << "%     [";
       if (std::abs(change) < 2.0f) {
         std::cout << get_tier_symbol(PerformanceTier::GOOD, config.safe_print) << " NO CHANGE";
       } else if (change > 0.0f) {
@@ -421,9 +421,9 @@ inline void print_throughput_results(const BenchmarkConfig& config,
 inline void print_realtime_results(const BenchmarkConfig& config,
                                     const RealtimeResults& results,
                                     const RuntimeInfo& runtime_info) {
-  // Load baseline if it exists
-  RealtimeResults baseline;
-  bool has_baseline = load_realtime_baseline(config, baseline);
+  // Load dataset if it exists
+  RealtimeResults dataset;
+  bool has_dataset = load_realtime_dataset(config, dataset);
 
   if (config.output_format == OutputFormat::TABLE && !config.quiet) {
     std::cout << "\n";
@@ -474,9 +474,9 @@ inline void print_realtime_results(const BenchmarkConfig& config,
     std::cout << "Stability:     CV=" << std::setw(5) << (results.coefficient_of_variation * 100.0f) << "%  ["
               << get_tier_symbol(stability_tier, config.safe_print) << " " << get_tier_label(stability_tier) << "]\n";
 
-    if (has_baseline) {
-      float change = compute_percent_change(results.compliance_rate, baseline.compliance_rate);
-      std::cout << "vs Baseline:   " << std::setw(6) << std::showpos << change << std::noshowpos << "%     [";
+    if (has_dataset) {
+      float change = compute_percent_change(results.compliance_rate, dataset.compliance_rate);
+      std::cout << "vs Dataset:   " << std::setw(6) << std::showpos << change << std::noshowpos << "%     [";
       if (std::abs(change) < 1.0f) {
         std::cout << get_tier_symbol(PerformanceTier::GOOD, config.safe_print) << " NO CHANGE";
       } else if (change > 0.0f) {

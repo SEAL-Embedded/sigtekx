@@ -1,6 +1,6 @@
 /**
  * @file csv_writer.hpp
- * @brief CSV export for baseline analysis.
+ * @brief CSV export for dataset analysis.
  *
  * Provides CSV export functions for each benchmark type, enabling
  * easy analysis in Excel, Python, or other tools.

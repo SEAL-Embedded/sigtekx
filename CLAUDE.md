@@ -345,8 +345,8 @@ sigxc bench --preset throughput --ionox --full
 # Custom experimentation
 sigxc bench --preset throughput --nfft 4096 --batch 16 --quick
 
-# Save baseline for regression tracking
-sigxc bench --preset latency --full --save-baseline
+# Save as a named dataset for regression tracking
+sigxc bench --preset latency --full --save-dataset
 
 # Full help
 sigxc bench --help
@@ -433,8 +433,8 @@ sigxc profile ncu --kernel-name "magnitude" --metrics sm__throughput
 
 ### Typical C++ Development Workflow
 ```powershell
-# 1. Save baseline before modifications (with locked clocks for stability)
-sigxc bench --preset latency --full --lock-clocks --save-baseline
+# 1. Save current state as a dataset before modifications (with locked clocks for stability)
+sigxc bench --preset latency --full --lock-clocks --save-dataset
 
 # 2. Modify C++ executor/kernel code
 vim cpp\src\executors\batch_executor.cpp
@@ -465,20 +465,20 @@ sigxc profile ncu --kernel-name "fft_kernel" --set roofline
 sxp nsys latency    # Full Python end-to-end workflow
 ```
 
-### C++ Baseline Management
+### C++ Dataset Management
 
-The C++ baseline system provides production-grade benchmark result tracking with collision safety, rich metadata, CSV export, and statistical comparison.
+C++ benchmark runs can be snapshotted into `datasets/cpp/` for long-term storage, regression tracking, and side-by-side comparison. The C++ side is fully decoupled from Python — it has its own CLI (`sigxc dataset`), its own manifest schema, and runs without any Python dependency so you can benchmark the raw C++ pipeline even when Python is broken.
 
-**Full documentation**: `docs/cpp/baseline-system.md`
+**Full documentation**: `docs/cpp/dataset-system.md`
 
 #### Workflow (Explicit Save)
 
 ```powershell
-# 1. Run benchmark (saves to .last_run)
+# 1. Run benchmark (saves to .last_run automatically)
 sigxc bench --preset latency --full
 
-# 2. Save as named baseline with description
-sigxc baseline save pre_optimization --message "Before zero-copy refactor"
+# 2. Save last run as a named dataset with description
+sigxc dataset save pre_optimization --message "Before zero-copy refactor"
 
 # 3. Make code changes, rebuild
 vim cpp/src/executors/batch_executor.cpp
@@ -487,38 +487,38 @@ sigx build
 # 4. Run benchmark again
 sigxc bench --preset latency --full
 
-# 5. Save as another baseline
-sigxc baseline save post_optimization --message "After zero-copy refactor"
+# 5. Save as another dataset
+sigxc dataset save post_optimization --message "After zero-copy refactor"
 
 # 6. Compare for regression detection
-sigxc baseline compare pre_optimization post_optimization
+sigxc dataset compare pre_optimization post_optimization
 ```
 
-**Note**: Benchmarks always save to `.last_run/` automatically. Use `baseline save` to create named snapshots with meaningful names and messages.
+**Note**: Benchmarks always save to `.last_run/` automatically. Use `dataset save` to create named snapshots with meaningful names and messages.
 
-#### Managing Baselines
+#### Managing Datasets
 
 ```powershell
-# Save last run as named baseline
-sigxc baseline save <name> --message "Description"
+# Save last run as named dataset
+sigxc dataset save <name> --message "Description"
 
-# List all baselines
-sigxc baseline list
+# List all datasets
+sigxc dataset list
 
 # Filter by preset
-sigxc baseline list --preset latency
+sigxc dataset list --preset latency
 
-# Compare two baselines (regression detection)
-sigxc baseline compare pre_optimization post_optimization
+# Compare two datasets (regression detection)
+sigxc dataset compare pre_optimization post_optimization
 
-# Delete baseline with confirmation
-sigxc baseline delete old_baseline
+# Delete with confirmation
+sigxc dataset delete old_dataset
 
 # Delete without confirmation
-sigxc baseline delete old_baseline --force
+sigxc dataset delete old_dataset --force
 ```
 
-#### Baseline Comparison Output
+#### Dataset Comparison Output
 
 Comparison shows delta, percent change, and status indicators:
 
@@ -530,22 +530,22 @@ Comparison shows delta, percent change, and status indicators:
 
 **Exit codes**: `0` = no regression, `1` = regression detected (useful for CI/CD)
 
-#### Baseline Storage
+#### C++ Dataset Storage
 
-Baselines stored in `baselines/cpp/` (persistent, survives `sigx clean`):
+Stored under `datasets/cpp/` (persistent, survives `sigx clean`, git-ignored):
 
 ```
-baselines/cpp/
+datasets/cpp/
 ├── latency_iono_full/
 │   ├── metadata.json     # Config + hardware + git + metrics
 │   ├── results.json      # Detailed benchmark results
 │   └── results.csv       # CSV export for analysis
-└── .baseline_manifest.json  # Global manifest (file-locked)
+└── .dataset_manifest.json  # C++ registry manifest (file-locked)
 ```
 
-**Metadata includes**: GPU (name, memory, CUDA versions), CPU (model, cores), system (OS, RAM), git (commit, branch, dirty flag), configuration, metrics summary
+**Metadata includes**: GPU (name, memory, CUDA versions), CPU (model, cores), system (OS, RAM), git (commit, branch, dirty flag), configuration, metrics summary.
 
-**Collision safety**: File-locked manifest prevents data loss during concurrent benchmark saves
+**Collision safety**: File-locked manifest prevents data loss during concurrent dataset saves.
 
 ### When to Use Each Tool
 
@@ -974,55 +974,62 @@ Last updated: 2025-01-02 (Added CSV multirun safety verification and documentati
 
 SigTekX uses **two-tier experiment storage** for different lifespans:
 
-### Tier 1: Ephemeral Experiments (MLflow + CSV)
+### Tier 1: Ephemeral Scratchpad (MLflow + CSV)
 - **Location:** `artifacts/` (gitignored)
 - **Deleted by:** `sigx clean`
-- **Purpose:** Day-to-day development, fast iteration
-- **Tools:** MLflow (tracking) + CSV (dashboard data)
+- **Purpose:** Day-to-day development, fast iteration, live dashboard
+- **Tools:** MLflow (tracking) + CSV (`artifacts/data/`)
 - **Lifespan:** Days/weeks (regenerated from code)
 
-### Tier 2: Persistent Baselines (BaselineManager)
-- **Location:** `baselines/` (survives cleanup)
-- **CLI:** `sigx baseline save/list/compare/delete`
-- **Purpose:** Regression tracking across phases
+### Tier 2: Persistent Datasets (`datasets/`)
+- **Location:** `datasets/` (git-ignored, survives `sigx clean`)
+- **CLI:** `sigx dataset save/list/compare/delete` (Python) and `sigxc dataset ...` (C++)
+- **Purpose:** Named result sets — local vs cloud comparisons, regression snapshots, portfolio data, anything worth keeping around
 - **Lifespan:** Months/years (manually managed)
+- **Layout:**
+  - `datasets/<name>/` — Python benchmark snapshots (`data/*.csv` + `manifest.json`)
+  - `datasets/cpp/<name>/` — C++ benchmark snapshots (`results.json` + `metadata.json` + `results.csv`), fully decoupled from Python
+  - `datasets/aws-<timestamp>/` — downloaded by `scripts/aws/download_results.sh` directly (never touches `artifacts/data/`)
 
 ### When to Use Each
 
-**Use MLflow + CSV** (Tier 1) when:
+**Write to Tier 1** (`artifacts/data/`) when:
 - Running experiments during development
 - Comparing parameter sweeps
-- Viewing results in dashboard
-- Iterating quickly
+- Iterating quickly (dashboard defaults to the synthetic `live` dataset, which reads from here)
 
-**Use BaselineManager** (Tier 2) when:
-- Saving milestone before major refactor
-- Tracking performance across development phases
-- Comparing before/after optimization
-- Documenting regression/improvement
+**Snapshot to Tier 2** (`datasets/`) when:
+- Saving a milestone before a major refactor
+- Preserving a cloud run (`aws-<ts>` lands here automatically)
+- Creating the local-vs-cloud dataset pairs for the portfolio page
+- Archiving anything you'd cry about losing to `sigx clean`
 
 ### Example Workflow
 
 ```bash
-# 1. Development iteration (ephemeral)
+# 1. Development iteration (ephemeral, writes to artifacts/data/)
 python benchmarks/run_latency.py +benchmark=latency
-sigx dashboard  # View results
+sigx dashboard  # defaults to "live" dataset = artifacts/data/
 
-# 2. Save baseline before Phase 1
-sigx baseline save pre-phase1 --phase 1 --message "Before zero-copy"
+# 2. Snapshot current state before Phase 1
+sigx dataset save pre-phase1 --tag phase1 --message "Before zero-copy"
 
-# 3. Clean up ephemeral experiments
-sigx clean  # baselines/ survives!
+# 3. Clean up ephemeral experiments — datasets/ survives
+sigx clean
 
-# 4. Do Phase 1 work
-# ... code changes ...
+# 4. Do Phase 1 work, run again
 python benchmarks/run_latency.py +benchmark=latency
 
-# 5. Save new baseline
-sigx baseline save post-phase1 --phase 1 --message "After zero-copy"
+# 5. Snapshot the new state
+sigx dataset save post-phase1 --tag phase1 --message "After zero-copy"
 
-# 6. Compare (statistical analysis)
-sigx baseline compare pre-phase1 post-phase1
+# 6. Compare (numeric diff in terminal)
+sigx dataset compare pre-phase1 post-phase1
+
+# 7. Visual comparison in the dashboard:
+sigx dashboard
+# In the sidebar, pick pre-phase1 as the primary dataset and add post-phase1
+# to "Compare with". Charts overlay, metric cards show deltas.
 ```
 
-**See:** Module docstrings in `src/sigtekx/utils/baseline.py` and `src/sigtekx/utils/archiving.py` for architectural details
+**See:** Module docstrings in `src/sigtekx/utils/datasets.py` and `src/sigtekx/utils/archiving.py` for architectural details.

@@ -22,7 +22,7 @@ CMakeCache.txt
 *.rsp
 compile_commands.json    # Generated; re-create as needed
 data archive/
-baselines/
+datasets/
 
 # Personal / local developer notes
 docs/_personal/

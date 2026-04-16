@@ -94,14 +94,14 @@ Control iteration count or duration independent of preset:
 --quiet                  # Minimal output
 ```
 
-### Baseline Tracking
+### Dataset Tracking
 ```powershell
---save-baseline          # Save results as baseline for future comparison
+--save-dataset          # Save results as dataset for future comparison
 ```
 
-## Statistical Validation & Baseline Tracking
+## Statistical Validation & Dataset Tracking
 
-The benchmark system automatically computes statistical validation metrics and supports baseline tracking for performance regression detection.
+The benchmark system automatically computes statistical validation metrics and supports dataset tracking for performance regression detection.
 
 ### Statistical Metrics
 
@@ -119,23 +119,23 @@ The benchmark system automatically computes statistical validation metrics and s
 - Jitter CV: Variability in frame latencies
 - Performance Tier: Based on compliance rate (>99.9% = EXCELLENT)
 
-### Baseline Tracking
+### Dataset Tracking
 
 Track performance over time and detect regressions:
 
 ```powershell
-# Save a baseline (first time)
-sigxc bench --preset latency --full --save-baseline
+# Save a dataset (first time)
+sigxc bench --preset latency --full --save-dataset
 
-# Run benchmark (automatically compares to baseline)
+# Run benchmark (automatically compares to dataset)
 sigxc bench --preset latency --full
 
-# Update baseline after intentional changes
-sigxc bench --preset latency --full --save-baseline
+# Update dataset after intentional changes
+sigxc bench --preset latency --full --save-dataset
 ```
 
-**Baseline Storage:**
-- Location: `artifacts/cpp/baselines/` (C++ only - clearly separated from Python)
+**Dataset Storage:**
+- Location: `artifacts/cpp/datasets/` (C++ only - clearly separated from Python)
 - Format: `<preset>_<variant>_<mode>.json`
 - Example: `latency_ionosphere_full.json`
 
@@ -155,7 +155,7 @@ Performance Card
 ────────────────────────────────
 Latency (P95):   114.30 µs  [✓ GOOD]
 Stability:     CV= 4.2%   [✓ EXCELLENT]
-vs Baseline:   +2.3%      [⚠ SLIGHT REGRESSION]
+vs Dataset:   +2.3%      [⚠ SLIGHT REGRESSION]
 ────────────────────────────────
 ```
 
@@ -290,8 +290,8 @@ sxp nsys latency    # Full end-to-end Python workflow
 
 ### Comparing Configurations
 ```powershell
-# Save baseline before changes
-sigxc bench --preset latency --full --save-baseline
+# Save dataset before changes
+sigxc bench --preset latency --full --save-dataset
 
 # Make code changes...
 
@@ -301,13 +301,13 @@ sigxc bench --preset latency --full
 
 ### Testing Executor Refactor
 ```powershell
-# 1. Save baseline with current implementation
-sigxc bench --preset latency --full --save-baseline
+# 1. Save dataset with current implementation
+sigxc bench --preset latency --full --save-dataset
 
 # 2. Modify executor code
 # (swap in new BatchExecutor or StreamingExecutor)
 
-# 3. Rebuild and test (automatically compares to baseline)
+# 3. Rebuild and test (automatically compares to dataset)
 sigx build
 sigxc bench --preset latency --full
 
@@ -316,8 +316,8 @@ sigxc bench --preset latency --full
 # ⚠ ADEQUATE = Slight regression (2-5%)
 # ✗ POOR = Regression (>5%)
 
-# 5. If satisfied, update baseline
-sigxc bench --preset latency --full --save-baseline
+# 5. If satisfied, update dataset
+sigxc bench --preset latency --full --save-dataset
 ```
 
 ## Output Formats
@@ -419,7 +419,7 @@ ls build\windows-rel\sigtekx_benchmark.exe
 
 When validating executor refactors, aim for:
 
-- **Latency overhead**: <5% vs baseline
+- **Latency overhead**: <5% vs dataset
 - **Throughput**: No regression
 - **Real-time compliance**: >99% deadline compliance
 - **Accuracy smoke test**: 100% pass rate (sine peak at correct bin)

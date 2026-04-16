@@ -421,6 +421,7 @@ cmd_clean() {
   done
 
   section "Cleaning Artifacts"
+  log "Preserving: datasets/ (persistent named result sets)"
 
   local artifacts_dir="${PROJECT_ROOT}/artifacts"
   if [[ -d "$artifacts_dir" ]]; then
@@ -619,24 +620,25 @@ cmd_profile() {
   "$SIGX_PYTHON" "$prof_helper" "${args[@]}"
 }
 
-cmd_baseline() {
+cmd_dataset() {
   ensure_env_activated
 
-  local baseline_helper="${PROJECT_ROOT}/scripts/helpers/baseline_helper.py"
-  if [[ ! -f "$baseline_helper" ]]; then
-    err "Baseline helper not found: $baseline_helper"
+  local dataset_helper="${PROJECT_ROOT}/scripts/helpers/dataset_helper.py"
+  if [[ ! -f "$dataset_helper" ]]; then
+    err "Dataset helper not found: $dataset_helper"
     exit 1
   fi
 
   if [[ $# -eq 0 ]]; then
     err "Missing subcommand. Use: save, list, compare, delete, export"
     echo "Examples:"
-    echo "  sigx baseline save pre-phase1 --phase 1"
-    echo "  sigx baseline list"
+    echo "  sigx dataset save local-rtx-run1 --message \"RTX 4090 baseline\""
+    echo "  sigx dataset list"
+    echo "  sigx dataset compare local-rtx-run1 aws-20260415T120000Z"
     exit 1
   fi
 
-  "$SIGX_PYTHON" "$baseline_helper" "$@"
+  "$SIGX_PYTHON" "$dataset_helper" "$@"
 }
 
 cmd_diagrams() {
@@ -819,13 +821,15 @@ GPU PROFILING & PERFORMANCE
     sigx profile ncu latency engine.nfft=8192
 
 ===================================================================
-BASELINE MANAGEMENT
+DATASET REGISTRY
 ===================================================================
 
-  baseline save <name> [--phase <n>] [--message <msg>]
-  baseline list [--phase <n>] [--verbose]
-  baseline compare <name1> <name2>
-  baseline delete <name> [--force]
+  Persistent named result sets under datasets/ — survives `sigx clean`.
+
+  dataset save <name> [--tag <t>] [--message <msg>] [--source <s>]
+  dataset list [--tag <t>] [--verbose]
+  dataset compare <name1> <name2>
+  dataset delete <name> [--force]
 
 ===================================================================
 DOCUMENTATION & DIAGRAMS
@@ -889,7 +893,7 @@ main() {
     doctor)    cmd_doctor ;;
     dashboard) cmd_dashboard "$@" ;;
     profile)   cmd_profile "$@" ;;
-    baseline)  cmd_baseline "$@" ;;
+    dataset)   cmd_dataset "$@" ;;
     diagrams)  cmd_diagrams "$@" ;;
     dev)       cmd_dev "$@" ;;
     *)

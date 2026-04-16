@@ -1,6 +1,6 @@
 /**
  * @file git_info.hpp
- * @brief Git repository information for baseline metadata.
+ * @brief Git repository information for dataset metadata.
  *
  * Provides git commit, branch, and dirty flag detection using
  * cross-platform command execution. Gracefully handles cases

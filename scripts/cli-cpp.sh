@@ -12,7 +12,7 @@ BUILD_DIR="${PROJECT_ROOT}/build"
 BUILD_PRESET="${BUILD_PRESET:-linux-rel}"
 PROFILING_DIR="${PROJECT_ROOT}/artifacts/profiling"
 BENCHMARK_EXE="${BUILD_DIR}/${BUILD_PRESET}/sigtekx_benchmark"
-BASELINE_CLI="${BUILD_DIR}/${BUILD_PRESET}/sigtekx_baseline_cli"
+DATASET_CLI="${BUILD_DIR}/${BUILD_PRESET}/sigtekx_dataset_cli"
 
 # --- Colors -------------------------------------------------------------------
 C0='\033[0m'; CRED='\033[0;31m'; CGRN='\033[0;32m'; CYEL='\033[0;33m'; CCYN='\033[0;36m'; CDIM='\033[2m'
@@ -184,14 +184,14 @@ cmd_profile_ncu() {
   fi
 }
 
-cmd_baseline() {
-  if [[ ! -f "$BASELINE_CLI" ]]; then
-    err "C++ baseline CLI not found at: $BASELINE_CLI"
-    echo "Run 'sigx build' to build the baseline CLI executable."
+cmd_dataset() {
+  if [[ ! -f "$DATASET_CLI" ]]; then
+    err "C++ dataset CLI not found at: $DATASET_CLI"
+    echo "Run 'sigx build' to build the dataset CLI executable."
     exit 1
   fi
 
-  "$BASELINE_CLI" "$@"
+  "$DATASET_CLI" "$@"
 }
 
 cmd_clean() {
@@ -221,7 +221,7 @@ USAGE: sigxc <command> [options]
 
 COMMANDS:
   bench [options]               Run C++ benchmark with presets
-  baseline <subcommand>         Manage C++ baselines (save, list, compare, delete)
+  dataset <subcommand>          Manage C++ datasets (save, list, compare, delete)
   profile nsys [options]        Profile with Nsight Systems
   profile ncu [options]         Profile with Nsight Compute
   clean                         Clean profiling artifacts
@@ -292,11 +292,11 @@ NCU PROFILING:
 
 ===================================================================
 
-BASELINE MANAGEMENT:
-  sigxc baseline save <name> [--message <msg>]
-  sigxc baseline list [--preset <name>]
-  sigxc baseline compare <name1> <name2>
-  sigxc baseline delete <name> [--force]
+DATASET MANAGEMENT:
+  sigxc dataset save <name> [--message <msg>]
+  sigxc dataset list [--preset <name>]
+  sigxc dataset compare <name1> <name2>
+  sigxc dataset delete <name> [--force]
 
 ===================================================================
 
@@ -339,7 +339,7 @@ case "$CMD" in
       *)    err "Unknown profiling tool: $tool. Use 'nsys' or 'ncu'."; exit 1 ;;
     esac
     ;;
-  baseline) cmd_baseline "$@" ;;
+  dataset) cmd_dataset "$@" ;;
   clean)    cmd_clean ;;
   help|-h|--help) cmd_help ;;
   *)

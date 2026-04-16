@@ -589,8 +589,8 @@ function Invoke-Dev {
     Write-Host "  Quick Baseline Generation (all modes):" -ForegroundColor Yellow
     Write-Host "  snakemake --cores 4 --snakefile experiments/Snakefile run_baseline_streaming_100k_latency run_baseline_streaming_100k_throughput" -ForegroundColor White
     Write-Host ""
-    Write-Host "  Save Baseline:" -ForegroundColor Yellow
-    Write-Host "  sigx baseline save pre-phase1 --phase 1 --message ""Before zero-copy optimization""" -ForegroundColor White
+    Write-Host "  Save Dataset:" -ForegroundColor Yellow
+    Write-Host "  sigx dataset save local-rtx-run1 --message ""RTX 4090 reference""" -ForegroundColor White
     Write-Host ""
 
     # UI and Analysis Tools
@@ -1052,21 +1052,22 @@ function Invoke-Profile {
     }
 }
 
-function Invoke-Baseline {
+function Invoke-Dataset {
     <#
     .SYNOPSIS
-        Manage baseline experiment archives for regression tracking
+        Manage persistent named datasets of benchmark results
     .DESCRIPTION
-        Provides baseline archiving for phase-aligned experiment snapshots.
-        Baselines are stored in baselines/ (repo root) and survive `sigx clean`.
+        Datasets live under datasets/ (repo root, git-ignored) and survive `sigx clean`.
+        Each dataset is a self-contained result set: data/*.csv, manifest.json,
+        optional mlruns/.
     .PARAMETER Subcommand
-        Baseline operation: save, list, compare, delete, export
+        Dataset operation: save, list, compare, delete, export
     .PARAMETER SubcommandArgs
         Arguments for the subcommand
     .EXAMPLE
-        Invoke-Baseline -Subcommand "save" -SubcommandArgs @("pre-phase1", "--phase", "1")
+        Invoke-Dataset -Subcommand "save" -SubcommandArgs @("local-rtx-run1", "--message", "RTX 4090 baseline")
     .EXAMPLE
-        Invoke-Baseline -Subcommand "list"
+        Invoke-Dataset -Subcommand "list"
     #>
     param(
         [Parameter(Mandatory=$true)]
@@ -1076,23 +1077,19 @@ function Invoke-Baseline {
         [string[]]$SubcommandArgs = @()
     )
 
-    # Path to baseline helper script
-    $baselineHelper = Join-Path $script:ProjectRoot "scripts/helpers/baseline_helper.py"
+    $datasetHelper = Join-Path $script:ProjectRoot "scripts/helpers/dataset_helper.py"
 
-    if (-not (Test-Path $baselineHelper)) {
-        Write-Error "Baseline helper not found: $baselineHelper"
+    if (-not (Test-Path $datasetHelper)) {
+        Write-Error "Dataset helper not found: $datasetHelper"
         exit 1
     }
 
-    # Build arguments for Python script
-    # Ensure SubcommandArgs is always an array (prevents string splatting issue)
     $pythonArgs = @($Subcommand) + @($SubcommandArgs)
 
-    # Run baseline command
-    & python $baselineHelper @pythonArgs
+    & python $datasetHelper @pythonArgs
 
     if ($LASTEXITCODE -ne 0) {
-        Write-Error "❌ Baseline operation failed"
+        Write-Error "Dataset operation failed"
         exit 1
     }
 }
@@ -1222,49 +1219,45 @@ GPU CLOCK LOCKING (Benchmark Stability)
   See: docs/performance/gpu-clock-locking.md for full details
 
 ═══════════════════════════════════════════════════════════════════════════
-BASELINE MANAGEMENT (Phase-Aligned Archiving)
+DATASET REGISTRY (Persistent Named Result Sets)
 ═══════════════════════════════════════════════════════════════════════════
 
-  baseline save <name> [--phase <n>] [--message <msg>]
-      Save current artifacts as baseline for regression tracking
-      Baselines stored in baselines/ (survives 'sigx clean')
+  Datasets are self-contained result sets stored under datasets/ that
+  survive 'sigx clean'. Used for local vs cloud comparisons, regression
+  snapshots, and anything else worth keeping around.
 
-  baseline list [--phase <n>] [--verbose]
-      List all saved baselines, optionally filtered by phase
+  dataset save <name> [--tag <t>] [--message <msg>] [--source <s>]
+      Snapshot artifacts/data/ into datasets/<name>/
+      Auto-populates manifest.json with git, hardware, metrics
 
-  baseline compare <name1> <name2>
-      Compare two baselines with statistical analysis
+  dataset list [--tag <t>] [--verbose]
+      List all saved datasets, optionally filtered by tag
 
-  baseline delete <name> [--force]
-      Delete a saved baseline (prompts for confirmation unless --force)
+  dataset compare <name1> <name2>
+      Metric-by-metric diff between two datasets with [+]/[=]/[-] indicators
 
-  baseline export <name> <dest>           (Phase 2 feature - coming soon)
-      Export baseline for publication archival
+  dataset delete <name> [--force]
+      Delete a saved dataset (prompts unless --force)
 
 Examples:
-  # Save baseline before Phase 1 optimizations
-  sigx baseline save pre-phase1 --phase 1 --message "Before zero-copy"
+  # Snapshot a local RTX run
+  sigx dataset save local-rtx-run1 --message "RTX 4090 reference"
 
-  # List all Phase 1 baselines
-  sigx baseline list --phase 1
+  # List all datasets
+  sigx dataset list
 
-  # Compare pre/post optimization
-  sigx baseline compare pre-phase1 post-phase1
-
-  # Delete old baseline
-  sigx baseline delete old-test --force
+  # Compare local vs cloud
+  sigx dataset compare local-rtx-run1 aws-20260415T120000Z
 
 Workflow:
-  1. Run experiments:     snakemake --cores 4 --snakefile experiments/Snakefile
-  2. Save baseline:       sigx baseline save pre-phase1 --phase 1
-  3. Clean artifacts:     sigx clean  (baselines/ survives)
-  4. Modify code, rebuild, regenerate data
-  5. Save new state:      sigx baseline save post-phase1 --phase 1
-  6. Compare:             sigx baseline compare pre-phase1 post-phase1
+  1. Run experiments:    snakemake --cores 4 --snakefile experiments/Snakefile
+  2. Snapshot dataset:   sigx dataset save local-rtx-run1
+  3. Clean artifacts:    sigx clean  (datasets/ survives)
+  4. Run again / pull from S3
+  5. Snapshot or drop into datasets/ directly (aws-<timestamp>/)
+  6. Compare:            sigx dataset compare <name1> <name2>
 
-Storage: baselines/ (repo root, not gitignored, manually managed)
-
-See: docs/benchmarking/experiment-logging-system.md for full details
+Storage: datasets/ (repo root, git-ignored, manually managed)
 
 ═══════════════════════════════════════════════════════════════════════════
 C++ DEVELOPMENT WORKFLOW (Pre-Python Integration)
@@ -1550,24 +1543,22 @@ try {
 
             Invoke-Dev @params
         }
-        "baseline" {
-            # Parse subcommand (first positional argument)
+        "dataset" {
             $nonFlagArgs = $CommandArgs | Where-Object { $_ -and $_ -notlike "-*" }
             $subcommand = if ($nonFlagArgs.Count -ge 1) { $nonFlagArgs[0] } else { "" }
 
             if (-not $subcommand) {
                 Write-Error "Missing subcommand. Use: save, list, compare, delete, export"
                 Write-Host "Examples:"
-                Write-Host "  sigx baseline save pre-phase1 --phase 1"
-                Write-Host "  sigx baseline list"
+                Write-Host "  sigx dataset save local-rtx-run1 --message `"RTX 4090 baseline`""
+                Write-Host "  sigx dataset list"
+                Write-Host "  sigx dataset compare local-rtx-run1 aws-20260415T120000Z"
                 exit 1
             }
 
-            # Get remaining args (skip subcommand)
-            # Wrap in @() to ensure it's always an array, even if empty
             $remainingArgs = @($CommandArgs | Select-Object -Skip 1)
 
-            Invoke-Baseline -Subcommand $subcommand -SubcommandArgs $remainingArgs
+            Invoke-Dataset -Subcommand $subcommand -SubcommandArgs $remainingArgs
         }
         default {
             Write-Error "Unknown command: $Command"

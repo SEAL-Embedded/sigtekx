@@ -1,24 +1,24 @@
-# C++ Baseline System Documentation
+# C++ Dataset System Documentation
 
 ## Overview
 
-The C++ baseline system provides production-grade benchmark result tracking with collision safety, rich metadata, CSV export, and statistical comparison for regression detection. It complements the Python baseline system by focusing on C++ kernel development workflows.
+The C++ dataset system provides production-grade benchmark result tracking with collision safety, rich metadata, CSV export, and statistical comparison for regression detection. It complements the Python dataset system by focusing on C++ kernel development workflows.
 
 **Key Features:**
 - **Collision Safety**: File-locked manifest prevents data loss during concurrent benchmark saves
 - **Rich Metadata**: Automatic capture of hardware (GPU, CPU, RAM), git info, and configuration
-- **CSV Export**: Analysis-ready CSV files for each baseline
+- **CSV Export**: Analysis-ready CSV files for each dataset
 - **Statistical Comparison**: Automated regression detection with threshold-based classification
-- **CLI Integration**: Intuitive `sigxc baseline` commands for management
+- **CLI Integration**: Intuitive `sigxc dataset` commands for management
 
 ## Architecture
 
 ### Storage Structure
 
-Baselines are stored in `baselines/cpp/` (persistent location, survives `sigx clean`):
+Datasets are stored in `datasets/cpp/` (persistent location, survives `sigx clean`):
 
 ```
-baselines/cpp/
+datasets/cpp/
 ├── latency_iono_full/
 │   ├── metadata.json         # Configuration + hardware + git + metrics summary
 │   ├── results.json          # Detailed benchmark results
@@ -28,12 +28,12 @@ baselines/cpp/
 │   ├── metadata.json
 │   ├── results.json
 │   └── results.csv
-└── .baseline_manifest.json   # Global manifest (file-locked)
+└── .dataset_manifest.json   # Global manifest (file-locked)
 ```
 
 ### Metadata Schema
 
-Each baseline includes comprehensive metadata in `metadata.json`:
+Each dataset includes comprehensive metadata in `metadata.json`:
 
 ```json
 {
@@ -89,7 +89,7 @@ Each baseline includes comprehensive metadata in `metadata.json`:
 
 ### CSV Format
 
-Each baseline includes a CSV export with configuration and metrics:
+Each dataset includes a CSV export with configuration and metrics:
 
 ```csv
 preset,iono_variant,mode,nfft,channels,overlap,sample_rate_hz,mean_latency_us,p50_latency_us,p95_latency_us,p99_latency_us,min_latency_us,max_latency_us,std_latency_us,cv,frames_processed,timestamp,git_commit
@@ -98,41 +98,41 @@ latency,iono,full,4096,2,0.75,48000,42.3,41.5,48.2,52.1,38.1,65.2,3.2,0.076,5000
 
 ## Usage
 
-### Saving Baselines
+### Saving Datasets
 
-Baselines are automatically saved when using `--save-baseline` flag:
+Datasets are automatically saved when using `--save-dataset` flag:
 
 ```powershell
-# Run benchmark and save baseline
-sigxc bench --preset latency --full --save-baseline
+# Run benchmark and save dataset
+sigxc bench --preset latency --full --save-dataset
 
 # With GPU clock locking for stable results
-sigxc bench --preset latency --full --save-baseline --lock-clocks
+sigxc bench --preset latency --full --save-dataset --lock-clocks
 
 # Custom configuration
-sigxc bench --preset throughput --nfft 8192 --save-baseline
+sigxc bench --preset throughput --nfft 8192 --save-dataset
 
-# All ionosphere variants save baselines
-sigxc bench --preset latency --iono --save-baseline
-sigxc bench --preset throughput --ionox --save-baseline
+# All ionosphere variants save datasets
+sigxc bench --preset latency --iono --save-dataset
+sigxc bench --preset throughput --ionox --save-dataset
 ```
 
-**Baseline naming convention:**
+**Dataset naming convention:**
 - Format: `{preset}_{iono_variant}_{mode}`
 - Example: `latency_iono_full`, `throughput_ionox_quick`
 - Automatically derived from benchmark configuration
 
-### Listing Baselines
+### Listing Datasets
 
-View all saved baselines:
+View all saved datasets:
 
 ```powershell
-# List all baselines
-sigxc baseline list
+# List all datasets
+sigxc dataset list
 
 # Output:
 # ========================================
-#   C++ Baselines
+#   C++ Datasets
 # ========================================
 #
 # Name                            Preset          Mode         Variant    Created
@@ -140,29 +140,29 @@ sigxc baseline list
 # latency_iono_full               latency         full         iono       2025-01-20T10:30:00Z
 # throughput_ionox_full           throughput      full         ionox      2025-01-20T11:15:00Z
 #
-# Total: 2 baseline(s)
+# Total: 2 dataset(s)
 
 # Filter by preset
-sigxc baseline list --preset latency
+sigxc dataset list --preset latency
 ```
 
-### Comparing Baselines
+### Comparing Datasets
 
-Compare two baselines for regression detection:
+Compare two datasets for regression detection:
 
 ```powershell
-# Compare baselines
-sigxc baseline compare pre_optimization post_optimization
+# Compare datasets
+sigxc dataset compare pre_optimization post_optimization
 
 # Output:
 # ========================================
-#   Baseline Comparison
+#   Dataset Comparison
 # ========================================
 #
-# Baseline: pre_optimization
+# Dataset: pre_optimization
 # Current:  post_optimization
 #
-# Metric                          Baseline      Current         Delta    % Change  Status
+# Metric                          Dataset      Current         Delta    % Change  Status
 # ----------------------------------------------------------------------------------------
 # Mean Latency (µs)                  42.30        38.50         -3.80      -9.0%    ↑
 # P95 Latency (µs)                   48.20        43.10         -5.10     -10.6%    ↑
@@ -183,23 +183,23 @@ sigxc baseline compare pre_optimization post_optimization
 - `0`: No regressions detected
 - `1`: Regression detected (useful for CI/CD automation)
 
-### Deleting Baselines
+### Deleting Datasets
 
-Remove obsolete baselines:
+Remove obsolete datasets:
 
 ```powershell
 # Delete with confirmation prompt
-sigxc baseline delete old_baseline
+sigxc dataset delete old_dataset
 
 # Delete without confirmation
-sigxc baseline delete old_baseline --force
+sigxc dataset delete old_dataset --force
 ```
 
 ## Collision Safety
 
 ### File Locking Mechanism
 
-The baseline system uses **file-locked manifest** to prevent data corruption during concurrent benchmark saves:
+The dataset system uses **file-locked manifest** to prevent data corruption during concurrent benchmark saves:
 
 1. **Atomic Locking**: Platform-specific file locks (`LockFileEx` on Windows, `flock` on Linux)
 2. **RAII Pattern**: Automatic lock release on completion, error, or crash
@@ -212,14 +212,14 @@ Verified safe for concurrent access:
 
 ```powershell
 # Run 3 benchmarks in parallel (safe)
-Start-Job { sigxc bench --preset latency --save-baseline }
-Start-Job { sigxc bench --preset throughput --save-baseline }
-Start-Job { sigxc bench --preset realtime --save-baseline }
+Start-Job { sigxc bench --preset latency --save-dataset }
+Start-Job { sigxc bench --preset throughput --save-dataset }
+Start-Job { sigxc bench --preset realtime --save-dataset }
 Get-Job | Wait-Job
 
-# Verify: 3 baseline directories exist, manifest has 3 entries, no corruption
-ls baselines/cpp/
-cat baselines/cpp/.baseline_manifest.json
+# Verify: 3 dataset directories exist, manifest has 3 entries, no corruption
+ls datasets/cpp/
+cat datasets/cpp/.dataset_manifest.json
 ```
 
 ## Regression Detection
@@ -281,8 +281,8 @@ Metrics compared:
 ### Development Iteration
 
 ```powershell
-# 1. Save baseline before modifications
-sigxc bench --preset latency --full --lock-clocks --save-baseline
+# 1. Save dataset before modifications
+sigxc bench --preset latency --full --lock-clocks --save-dataset
 
 # 2. Modify C++ executor/kernel code
 # ... edit code ...
@@ -290,40 +290,40 @@ sigxc bench --preset latency --full --lock-clocks --save-baseline
 # 3. Rebuild
 sigx build
 
-# 4. Run benchmark again (overwrites baseline)
-sigxc bench --preset latency --full --lock-clocks --save-baseline
+# 4. Run benchmark again (overwrites dataset)
+sigxc bench --preset latency --full --lock-clocks --save-dataset
 
-# 5. Compare (if you saved separate named baselines)
-sigxc baseline compare before_changes after_changes
+# 5. Compare (if you saved separate named datasets)
+sigxc dataset compare before_changes after_changes
 ```
 
 ### Phase Milestone Tracking
 
 ```powershell
 # Before Phase 1 work
-sigxc bench --preset latency --full --save-baseline
-# Baseline saved as: latency_iono_full
+sigxc bench --preset latency --full --save-dataset
+# Dataset saved as: latency_iono_full
 
 # ... Phase 1 development work ...
 
 # After Phase 1 work
-sigxc bench --preset latency --full --save-baseline
-# Overwrites baseline: latency_iono_full
+sigxc bench --preset latency --full --save-dataset
+# Overwrites dataset: latency_iono_full
 
-# For tracking across phases, manually rename baselines:
-# baselines/cpp/latency_iono_full -> baselines/cpp/phase1_latency_iono_full
+# For tracking across phases, manually rename datasets:
+# datasets/cpp/latency_iono_full -> datasets/cpp/phase1_latency_iono_full
 ```
 
 ### CI/CD Integration
 
 ```powershell
-# Save reference baseline (one-time setup)
-sigxc bench --preset latency --full --save-baseline
-mv baselines/cpp/latency_iono_full baselines/cpp/latency_reference
+# Save reference dataset (one-time setup)
+sigxc bench --preset latency --full --save-dataset
+mv datasets/cpp/latency_iono_full datasets/cpp/latency_reference
 
 # In CI pipeline
-sigxc bench --preset latency --full --save-baseline
-sigxc baseline compare latency_reference latency_iono_full
+sigxc bench --preset latency --full --save-dataset
+sigxc dataset compare latency_reference latency_iono_full
 
 # Exit code 1 if regression detected
 if ($LASTEXITCODE -ne 0) {
@@ -357,30 +357,30 @@ if ($LASTEXITCODE -ne 0) {
 - Proper escaping for quotes, commas, newlines
 - Includes config, metrics, timestamp, git commit
 
-**`cpp/benchmarks/utils/baseline_comparison.hpp`**
+**`cpp/benchmarks/utils/dataset_comparison.hpp`**
 - Statistical comparison engine
 - Regression detection logic
 - Formatted output printer with ANSI color codes
 
 **`cpp/benchmarks/core/persistence.hpp`**
 - Manifest management (load/update/remove)
-- Directory-based baseline storage
+- Directory-based dataset storage
 - Metadata generation
 - CSV export integration
 
-**`cpp/benchmarks/baseline_cli.cpp`**
+**`cpp/benchmarks/dataset_cli.cpp`**
 - Standalone CLI helper executable
 - Commands: list, compare, delete
 - Integration with PowerShell wrapper
 
 **`scripts/cli-cpp.ps1`**
 - PowerShell wrapper for user-friendly CLI
-- `sigxc baseline` command handler
-- Forwards to `sigtekx_baseline_cli.exe`
+- `sigxc dataset` command handler
+- Forwards to `sigtekx_dataset_cli.exe`
 
 ### Testing
 
-**Unit Tests** (`cpp/tests/benchmark/test_baseline_system.cpp` - future):
+**Unit Tests** (`cpp/tests/benchmark/test_dataset_system.cpp` - future):
 ```cpp
 // File locking
 TEST(FileLockTest, AcquisitionAndRelease)
@@ -419,21 +419,21 @@ for (int i = 0; i < 10; ++i) {
   threads.emplace_back([i]() {
     BenchmarkConfig config = create_latency_config();
     config.preset_name = "test_" + std::to_string(i);
-    save_latency_baseline(config, results);
+    save_latency_dataset(config, results);
   });
 }
 for (auto& t : threads) t.join();
 
 // Verify: manifest has exactly 10 entries
 auto manifest = load_manifest();
-EXPECT_EQ(manifest.baselines.size(), 10);
+EXPECT_EQ(manifest.datasets.size(), 10);
 ```
 
-## Differences from Python Baseline System
+## Differences from Python Dataset System
 
-| Feature                  | Python Baseline System | C++ Baseline System |
+| Feature                  | Python Dataset System | C++ Dataset System |
 |--------------------------|------------------------|---------------------|
-| **Storage Location**     | `baselines/`           | `baselines/cpp/`    |
+| **Storage Location**     | `datasets/`           | `datasets/cpp/`    |
 | **Primary Use Case**     | Production experiment tracking | C++ kernel development iteration |
 | **Phase Support**        | Yes (Phase 1, Phase 2, etc.) | No (simpler model) |
 | **Scope Management**     | Yes (minimal, standard, full) | No (single scope) |
@@ -441,7 +441,7 @@ EXPECT_EQ(manifest.baselines.size(), 10);
 | **CSV Format**           | Experiment-specific   | Benchmark-specific  |
 | **Comparison Tool**      | Python-based analysis | C++ CLI tool |
 
-**Design Philosophy**: Keep C++ baseline system **lean and focused** on C++ development workflows, avoiding over-engineering.
+**Design Philosophy**: Keep C++ dataset system **lean and focused** on C++ development workflows, avoiding over-engineering.
 
 ## Limitations and Future Work
 
@@ -457,15 +457,15 @@ EXPECT_EQ(manifest.baselines.size(), 10);
 - **Phase Support**: Add optional phase tagging (Phase 1, Phase 2, etc.)
 - **Scope Management**: Add scope levels (minimal/standard/full) if needed
 - **Export Formats**: HTML reports, JSON API endpoints
-- **Integration**: Optional integration with Python BaselineManager
+- **Integration**: Optional integration with Python DatasetManager
 - **CI/CD**: Automated regression detection in CI pipelines
-- **Web Dashboard**: Visualization of baseline trends over time
+- **Web Dashboard**: Visualization of dataset trends over time
 
 ## Troubleshooting
 
-### Baseline Not Saving
+### Dataset Not Saving
 
-**Symptom**: `--save-baseline` flag doesn't create baseline directory
+**Symptom**: `--save-dataset` flag doesn't create dataset directory
 
 **Causes:**
 1. Benchmark executable not built
@@ -481,42 +481,42 @@ sigx build
 Get-PSDrive C
 
 # Check permissions (run as admin if needed)
-Test-Path "baselines/cpp/" -IsValid
+Test-Path "datasets/cpp/" -IsValid
 ```
 
 ### Comparison Fails
 
-**Symptom**: `sigxc baseline compare` fails with "Baseline not found"
+**Symptom**: `sigxc dataset compare` fails with "Dataset not found"
 
 **Causes:**
-1. Baseline directory doesn't exist
-2. Baseline name mismatch
+1. Dataset directory doesn't exist
+2. Dataset name mismatch
 3. Missing results.json file
 
 **Solution:**
 ```powershell
-# List available baselines
-sigxc baseline list
+# List available datasets
+sigxc dataset list
 
-# Check baseline directory structure
-ls baselines/cpp/<baseline_name>/
+# Check dataset directory structure
+ls datasets/cpp/<dataset_name>/
 # Should contain: results.json, metadata.json, results.csv
 
 # Verify results.json exists
-Test-Path "baselines/cpp/<baseline_name>/results.json"
+Test-Path "datasets/cpp/<dataset_name>/results.json"
 ```
 
 ### Cannot Compare Different Presets
 
-**Symptom**: "Cannot compare baselines with different presets"
+**Symptom**: "Cannot compare datasets with different presets"
 
-**Explanation**: Comparison only works for baselines of the same type (latency vs latency, throughput vs throughput, etc.)
+**Explanation**: Comparison only works for datasets of the same type (latency vs latency, throughput vs throughput, etc.)
 
 **Solution:**
 ```powershell
 # Verify preset types match
-sigxc baseline list
-# Compare only baselines with same preset column
+sigxc dataset list
+# Compare only datasets with same preset column
 ```
 
 ### Hardware Detection Fails
@@ -564,7 +564,7 @@ git branch --show-current
 
 ## See Also
 
-- **Python Baseline System**: `src/sigtekx/utils/baseline.py`
+- **Python Dataset System**: `src/sigtekx/utils/dataset.py`
 - **GPU Clock Locking**: `docs/performance/gpu-clock-locking.md`
 - **CLAUDE.md C++ Development Workflow**: Quick reference for `sigxc` commands
 - **CLAUDE.md**: Quick reference for CLI commands

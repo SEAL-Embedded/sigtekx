@@ -18,7 +18,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent))
 # Import from experiments.analysis
 from analysis.visualization import PerformancePlotter, VisualizationConfig
-from utils.data_loader import get_available_configurations, load_benchmark_data
+from utils.data_loader import get_available_configurations, load_selected_datasets
+from utils.dataset_registry import render_sidebar_picker
 
 # Page configuration
 st.set_page_config(page_title="Configuration Explorer", page_icon="⚙️", layout="wide")
@@ -32,8 +33,13 @@ parameters for your ionosphere research application.
 """)
 
 # Load data
+render_sidebar_picker()
+
 try:
-    data = load_benchmark_data("artifacts/data")
+    data = load_selected_datasets()
+    if "dataset" in data.columns and data["dataset"].nunique() > 1:
+        names = ", ".join(sorted(data["dataset"].unique()))
+        st.info(f"Comparing datasets: {names} (rows tagged by dataset column)")
     config_params = get_available_configurations(data)
 except FileNotFoundError:
     st.error("No benchmark data found. Please run benchmarks first.")
