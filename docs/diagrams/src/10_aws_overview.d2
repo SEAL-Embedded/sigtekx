@@ -1,0 +1,154 @@
+# SigTekX AWS Cloud Architecture - Overview
+# Layout: elk - clean high-level view of cloud deployment pipeline
+# Render: See docs/diagrams/README.md for rendering instructions
+
+...@common/styles
+
+direction: down
+
+title: |md
+  # SigTekX AWS Cloud Architecture
+  **EC2 Spot GPU + ECR + S3 + CloudWatch**
+|
+
+# ==============================================================================
+# Developer Workstation
+# ==============================================================================
+local: Developer Workstation (WSL2) {
+  class: core-blue
+
+  code: Source Code + Configs
+  code.shape: rectangle
+
+  docker_build: docker build\n(multi-stage)
+  docker_build.shape: rectangle
+  docker_build.style.fill: "#D4E6FF"
+
+  results: datasets/aws-<ts>/
+  results.shape: cylinder
+  results.style.fill: "#E6FFE6"
+
+  dashboard: Streamlit Dashboard
+  dashboard.shape: rectangle
+  dashboard.class: streaming-green
+
+  code -> docker_build
+  results -> dashboard: visualize
+}
+
+# ==============================================================================
+# AWS Cloud
+# ==============================================================================
+aws: AWS Cloud (us-west-2) {
+  style.fill: "#FFF5E6"
+  style.stroke: "#FF8C00"
+  style.stroke-width: 3
+
+  # ECR
+  ecr: ECR Registry {
+    class: config-blue
+
+    repo: sigtekx:latest\nsigtekx:<git-sha>
+    repo.shape: cylinder
+    repo.style.fill: "#B3D9FF"
+  }
+
+  # EC2
+  ec2: EC2 Spot Instance (g4dn.xlarge) {
+    class: core-blue-emphasis
+
+    gpu: NVIDIA T4 GPU (16GB)
+    gpu.shape: rectangle
+    gpu.class: gpu-memory
+
+    container: Docker Container {
+      class: execution-red
+
+      benchmark: Benchmark Runner\n(Hydra + CUDA)
+      benchmark.shape: rectangle
+
+      artifacts: /app/artifacts/data/
+      artifacts.shape: cylinder
+      artifacts.style.fill: "#E6FFE6"
+
+      benchmark -> artifacts: CSV results
+    }
+
+    gpu -> container.benchmark: GPU compute {
+      style.stroke-width: 2
+    }
+  }
+
+  # S3
+  s3: S3 Bucket {
+    class: benchmark-orange
+
+    bucket: sigtekx-benchmark-results\nruns/<timestamp>/
+    bucket.shape: cylinder
+    bucket.style.fill: "#FFD699"
+  }
+
+  # CloudWatch
+  cw: CloudWatch Logs {
+    class: note-gold
+
+    logs: /sigtekx/benchmarks\n30-day retention
+    logs.shape: cylinder
+    logs.style.fill: "#FFFACD"
+  }
+
+  # IAM
+  iam: IAM Role {
+    style.fill: "#F5F5F5"
+    style.stroke: "#999999"
+
+    role: SigTekXEC2BenchmarkRole\n(scoped S3 + CloudWatch)
+    role.shape: rectangle
+  }
+
+  # Internal AWS connections
+  ecr.repo -> ec2.container: docker pull {
+    style.stroke-width: 2
+  }
+  ec2.container.artifacts -> s3.bucket: aws s3 cp {
+    style.stroke-width: 2
+  }
+  ec2.container -> cw.logs: awslogs driver {
+    style.stroke-dash: 3
+  }
+  iam.role -> ec2: instance profile {
+    style.stroke-dash: 3
+  }
+}
+
+# ==============================================================================
+# Cross-boundary Connections
+# ==============================================================================
+
+# Push image
+local.docker_build -> aws.ecr.repo: push_ecr.sh {
+  style.stroke-width: 2
+  style.stroke: "#4169E1"
+}
+
+# SSH + run
+local -> aws.ec2: SSH + run_ec2_benchmark.sh {
+  style.stroke-width: 2
+  style.stroke: "#C00000"
+}
+
+# Download results
+aws.s3.bucket -> local.results: download_results.sh {
+  style.stroke-width: 2
+  style.stroke: "#228B22"
+}
+
+# ==============================================================================
+# Cost Note
+# ==============================================================================
+cost: |md
+  **Cost per run: ~$0.12-$0.20**
+  EC2 spot ~$0.08 / S3 ~$0.02 / CloudWatch <$0.05
+|
+cost.shape: text
+cost.class: text-note

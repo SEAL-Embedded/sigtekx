@@ -1,0 +1,354 @@
+# SigTekX AWS Cloud Architecture - Detailed
+# Layout: elk - comprehensive view with security, data flow, and script mapping
+# Render: See docs/diagrams/README.md for rendering instructions
+
+...@common/styles
+
+direction: down
+
+title: |md
+  # SigTekX AWS Cloud Architecture (Detailed)
+  **Full Deployment Pipeline, Security, and Data Flow**
+|
+
+# ==============================================================================
+# Developer Workstation
+# ==============================================================================
+local: Developer Workstation (WSL2) {
+  class: core-blue-emphasis
+
+  source: Source Code {
+    class: config-blue
+
+    cpp: C++/CUDA Kernels
+    cpp.shape: rectangle
+
+    python: Python Benchmarks\n+ Hydra Configs
+    python.shape: rectangle
+
+    dockerfile: Dockerfile\n(multi-stage build)
+    dockerfile.shape: rectangle
+  }
+
+  build: Docker Build {
+    class: execution-red
+
+    stage1: "Stage 1: Builder\nnvidia/cuda:13.0.0-devel\nCMake + Conda + Wheel"
+    stage1.shape: rectangle
+    stage1.style.fill: "#FFE6E6"
+
+    stage2: "Stage 2: Runtime\nnvidia/cuda:13.0.0-runtime\nConda env + appuser (non-root)"
+    stage2.shape: rectangle
+    stage2.style.fill: "#FFE6E6"
+
+    stage1 -> stage2: wheel + configs
+  }
+
+  scripts: Deployment Scripts {
+    class: streaming-green
+
+    push: push_ecr.sh\ntag: latest + git SHA
+    push.shape: rectangle
+
+    run: run_ec2_benchmark.sh\n--smoke | --full | custom
+    run.shape: rectangle
+
+    download: download_results.sh\nS3 -> datasets/aws-<ts>/
+    download.shape: rectangle
+
+    setup: setup_iam.sh
+    setup.shape: rectangle
+    setup.style.stroke-dash: 3
+
+    teardown: teardown.sh
+    teardown.shape: rectangle
+    teardown.style.stroke-dash: 3
+  }
+
+  local_storage: Local Storage {
+    class: benchmark-orange
+
+    datasets: datasets/aws-<ts>/ {
+      style.fill: "#FFD699"
+      shape: cylinder
+
+      csvs: data/*.csv
+      csvs.shape: rectangle
+
+      manifest: manifest.json
+      manifest.shape: rectangle
+    }
+  }
+
+  dashboard: Streamlit Dashboard {
+    class: streaming-green
+
+    app: streamlit run app.py\nDataset selector overlay
+    app.shape: rectangle
+  }
+
+  # Local flow
+  source.dockerfile -> build.stage1
+  build.stage2 -> scripts.push: image ready
+  scripts.download -> local_storage.datasets
+  local_storage.datasets -> dashboard.app: load + merge CSVs
+}
+
+# ==============================================================================
+# AWS Cloud
+# ==============================================================================
+aws: AWS Cloud (us-west-2 Oregon) {
+  style.fill: "#FFF5E6"
+  style.stroke: "#FF8C00"
+  style.stroke-width: 3
+
+  # --- ECR ---
+  ecr: Elastic Container Registry {
+    class: config-blue
+
+    repo: Repository: sigtekx {
+      shape: cylinder
+      style.fill: "#B3D9FF"
+
+      tags: |md
+        **Tags:**
+        `latest` (mutable, slides forward)
+        `<git-sha>` (immutable, traceable)
+      |
+      tags.shape: rectangle
+      tags.style.fill: "#D4E6FF"
+    }
+
+    scan: Image Scan on Push
+    scan.shape: rectangle
+    scan.style.fill: "#E6FFE6"
+
+    repo -> scan: triggers
+  }
+
+  # --- EC2 ---
+  ec2: EC2 Spot Instance {
+    class: core-blue-emphasis
+
+    hw: g4dn.xlarge {
+      class: note-gold
+
+      gpu_hw: NVIDIA T4 (sm_75)\n16GB VRAM
+      gpu_hw.shape: rectangle
+      gpu_hw.class: gpu-memory
+
+      cpu_hw: 4 vCPU, 16GB RAM
+      cpu_hw.shape: rectangle
+      cpu_hw.style.fill: "#E6F3FF"
+
+      storage_hw: 125GB NVMe SSD
+      storage_hw.shape: rectangle
+      storage_hw.style.fill: "#F5F5F5"
+    }
+
+    container: Docker Container (--gpus all) {
+      class: execution-red
+
+      user: Runs as: appuser (non-root)
+      user.shape: rectangle
+      user.style.fill: "#FFE6E6"
+
+      conda: conda env: sigtekx
+      conda.shape: rectangle
+      conda.style.fill: "#E6FFE6"
+
+      runner: Benchmark Runner {
+        class: benchmark-orange
+
+        hydra: Hydra Config Resolver
+        hydra.shape: rectangle
+
+        executor: CUDA Executor\n(Batch or Streaming)
+        executor.shape: rectangle
+        executor.class: kernel-orange
+
+        csv_out: CSV Results\n/app/artifacts/data/
+        csv_out.shape: cylinder
+        csv_out.style.fill: "#E6FFE6"
+
+        hydra -> executor: resolved config
+        executor -> csv_out: metrics
+      }
+    }
+
+    # Execution modes
+    modes: |md
+      **Run Modes:**
+      `--smoke` : smoke_test (~10s)
+      `--full` : Snakemake suite (~1hr)
+      default : single benchmark
+    |
+    modes.shape: rectangle
+    modes.style.fill: "#F5F5F5"
+    modes.style.stroke-dash: 3
+
+    hw.gpu_hw -> container.runner.executor: GPU compute {
+      style.stroke-width: 2
+    }
+  }
+
+  # --- S3 ---
+  s3: S3 Storage {
+    class: benchmark-orange
+
+    bucket: sigtekx-benchmark-results {
+      shape: cylinder
+      style.fill: "#FFD699"
+
+      structure: |md
+        **Layout:**
+        `runs/<timestamp>/`
+        `  data/*.csv`
+        `  figures/*.png`
+      |
+      structure.shape: rectangle
+      structure.style.fill: "#FFF5E6"
+    }
+
+    security_s3: |md
+      SSE-S3 encryption
+      Block all public access
+    |
+    security_s3.shape: rectangle
+    security_s3.style.fill: "#FFE6E6"
+    security_s3.style.stroke-dash: 3
+  }
+
+  # --- CloudWatch ---
+  cw: CloudWatch Logs {
+    class: note-gold
+
+    loggroup: /sigtekx/benchmarks {
+      shape: cylinder
+      style.fill: "#FFFACD"
+
+      stream: Log stream:\nec2-<timestamp>
+      stream.shape: rectangle
+
+      retention: 30-day retention
+      retention.shape: rectangle
+      retention.style.fill: "#F5F5F5"
+    }
+  }
+
+  # --- IAM ---
+  iam: IAM Security {
+    style.fill: "#FFE6E6"
+    style.stroke: "#C00000"
+    style.stroke-width: 2
+
+    role: SigTekXEC2BenchmarkRole {
+      shape: rectangle
+      style.fill: "#FFE6E6"
+
+      trust: |md
+        **Trust:** ec2.amazonaws.com only
+      |
+      trust.shape: rectangle
+      trust.style.fill: "#FFFFFF"
+    }
+
+    policy: SigTekXBenchmarkAccess {
+      shape: rectangle
+      style.fill: "#FFE6E6"
+
+      s3_perms: |md
+        **S3 Permissions:**
+        GetObject, PutObject,
+        DeleteObject, ListBucket
+        Scoped to bucket ARN
+      |
+      s3_perms.shape: rectangle
+      s3_perms.style.fill: "#FFFFFF"
+
+      cw_perms: |md
+        **CloudWatch Permissions:**
+        CreateLogGroup/Stream,
+        PutLogEvents
+        Scoped to log group ARN
+      |
+      cw_perms.shape: rectangle
+      cw_perms.style.fill: "#FFFFFF"
+    }
+
+    profile: Instance Profile\n(attached to EC2)
+    profile.shape: rectangle
+    profile.style.fill: "#F5F5F5"
+
+    role -> policy: inline policy
+    profile -> role: assumes
+  }
+
+  # --- Billing ---
+  billing: Cost Monitoring {
+    style.fill: "#F5F5F5"
+    style.stroke: "#999999"
+
+    alarm: CloudWatch Billing Alarm\n(us-east-1) -> SNS -> Email
+    alarm.shape: rectangle
+    alarm.style.fill: "#FFFACD"
+  }
+
+  # --- Internal AWS connections ---
+  ecr.repo -> ec2.container: docker pull\n(no egress, same region) {
+    style.stroke-width: 2
+  }
+  ec2.container.runner.csv_out -> s3.bucket: aws s3 cp\nresults upload {
+    style.stroke-width: 2
+  }
+  ec2.container -> cw.loggroup: awslogs driver\nstdout/stderr {
+    style.stroke-dash: 3
+  }
+  iam.profile -> ec2: instance profile {
+    style.stroke-dash: 3
+  }
+  iam.policy.s3_perms -> s3.bucket: authorizes {
+    style.stroke-dash: 3
+    style.stroke: "#C00000"
+  }
+  iam.policy.cw_perms -> cw.loggroup: authorizes {
+    style.stroke-dash: 3
+    style.stroke: "#C00000"
+  }
+}
+
+# ==============================================================================
+# Cross-boundary Connections
+# ==============================================================================
+
+# Push image to ECR
+local.scripts.push -> aws.ecr.repo: "push_ecr.sh\nECR auth via AWS CLI" {
+  style.stroke-width: 3
+  style.stroke: "#4169E1"
+}
+
+# SSH to EC2 and run benchmark
+local.scripts.run -> aws.ec2.container: "SSH + docker run\n--gpus all --log-driver awslogs" {
+  style.stroke-width: 3
+  style.stroke: "#C00000"
+}
+
+# Download results from S3
+aws.s3.bucket -> local.scripts.download: "aws s3 sync\nruns/<ts>/ -> datasets/" {
+  style.stroke-width: 3
+  style.stroke: "#228B22"
+}
+
+# ==============================================================================
+# Cost Summary
+# ==============================================================================
+cost: |md
+  **Cost per ~30 min run: $0.12-$0.20**
+
+  - EC2 spot (g4dn.xlarge): ~$0.08
+  - S3 (1GB/mo): ~$0.02
+  - CloudWatch (<100MB): <$0.05
+  - ECR (image storage): ~$0.01
+|
+cost.shape: text
+cost.class: text-note
