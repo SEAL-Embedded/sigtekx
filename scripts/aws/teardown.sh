@@ -12,6 +12,7 @@
 #   bash scripts/aws/teardown.sh --force   # skips confirmation
 
 set -euo pipefail
+export AWS_PAGER=""
 
 ROLE_NAME="${SIGX_ROLE:-SigTekXEC2BenchmarkRole}"
 INSTANCE_PROFILE_NAME="${SIGX_INSTANCE_PROFILE:-SigTekXEC2BenchmarkRole}"

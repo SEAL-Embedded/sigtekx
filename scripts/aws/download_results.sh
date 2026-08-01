@@ -11,6 +11,7 @@
 #   bash scripts/aws/download_results.sh --list                 # list available runs
 
 set -euo pipefail
+export AWS_PAGER=""
 
 BUCKET_NAME="${SIGX_BUCKET:-sigtekx-benchmark-results}"
 REGION="${AWS_DEFAULT_REGION:-us-west-2}"

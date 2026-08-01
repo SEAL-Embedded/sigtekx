@@ -34,6 +34,7 @@
 #   SIGX_BENCH_SCRIPT=run_throughput.py bash scripts/aws/run_ec2_benchmark.sh 1.2.3.4 i-abc -- experiment=ionosphere_streaming_throughput +benchmark=throughput
 
 set -euo pipefail
+export AWS_PAGER=""
 
 if [ "$#" -lt 1 ]; then
     echo "Usage: $0 <instance-public-ip> [instance-id] [--full | --smoke | -- <hydra args>...]" >&2

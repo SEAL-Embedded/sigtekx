@@ -8,7 +8,7 @@ This document describes the IEEE-754 compliance measures implemented in the sigt
 
 ### 1. IEEE-754 Compliant Magnitude Calculation
 
-**Location:** `cpp/src/ops_fft.cu:191` and `cpp/src/ops_fft.cu:223`
+**Location:** `cpp/src/kernels/fft_wrapper.cu:191` and `cpp/src/kernels/fft_wrapper.cu:223`
 
 **Change:** Replaced manual magnitude calculation with `hypotf()`:
 
@@ -74,6 +74,10 @@ output[idx] = hypotf(complex_val.x, complex_val.y) * scale;
 - Suitable for: Production (after validation)
 
 ## Accuracy Test Results
+
+> **Status:** Figures below are from the original 2025-10-08 validation run and have not been
+> re-verified since the `cpp/src/ops_fft.cu` → `cpp/src/kernels/fft_wrapper.cu` reorganization.
+> Re-run `+benchmark=accuracy` (see CLAUDE.md) and update this section before citing these numbers.
 
 ### Before IEEE-754 Fixes
 
@@ -151,10 +155,12 @@ output[idx] = hypotf(complex_val.x, complex_val.y) * scale;
 
 ### Reference Implementation
 
-**Primary:** SciPy (double-precision)
+**Primary:** SciPy (double-precision), gated by `AccuracyBenchmarkConfig.use_double_precision_reference`
+(default `True`; see `experiments/conf/benchmark/accuracy.yaml`)
 ```python
-# Reference FFT computation
-data_windowed = data.astype(np.float64) * window
+# Reference FFT computation (src/sigtekx/benchmarks/accuracy.py: _compute_reference_fft)
+if self.config.use_double_precision_reference:
+    data = data.astype(np.float64)
 fft_result = scipy.fft.rfft(data_windowed)
 magnitude = np.abs(fft_result) / nfft
 ```

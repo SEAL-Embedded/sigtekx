@@ -9,6 +9,7 @@
 #   bash scripts/aws/setup_iam.sh
 
 set -euo pipefail
+export AWS_PAGER=""
 
 ROLE_NAME="SigTekXEC2BenchmarkRole"
 INSTANCE_PROFILE_NAME="SigTekXEC2BenchmarkRole"

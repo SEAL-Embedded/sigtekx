@@ -196,14 +196,14 @@ __global__ void magnitude_kernel(const float2* __restrict__ input,
          idx += blockDim.x * gridDim.x) {
         
         const float2 complex_val = input[idx];
-        output[idx] = sqrtf(complex_val.x * complex_val.x + 
-                           complex_val.y * complex_val.y) * scale;
+        // IEEE-754 compliant magnitude: hypotf handles overflow/underflow correctly
+        output[idx] = hypotf(complex_val.x, complex_val.y) * scale;
     }
 }
 ```
 
 **Mathematical Operations:**
-- **Magnitude Computation**: `√(real² + imag²)` using hardware `sqrtf()`
+- **Magnitude Computation**: `√(real² + imag²)` using IEEE-754 compliant `hypotf()`
 - **Vectorized Operations**: Full warp utilization for SIMD efficiency
 - **Scaling**: Applied post-magnitude to maintain numerical precision
 
@@ -217,7 +217,8 @@ __global__ void magnitude_strided_kernel(const float2* __restrict__ input,
     const int frame_idx = idx / num_bins;
     const int bin_idx = idx % num_bins;
     const float2 v = input[frame_idx * input_stride + bin_idx];
-    output[idx] = sqrtf(v.x * v.x + v.y * v.y) * scale;
+    // IEEE-754 compliant magnitude: hypotf handles overflow/underflow correctly
+    output[idx] = hypotf(v.x, v.y) * scale;
 }
 ```
 

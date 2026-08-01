@@ -13,6 +13,7 @@
 #   bash scripts/aws/push_ecr.sh
 
 set -euo pipefail
+export AWS_PAGER=""
 
 REPO_NAME="sigtekx"
 REGION="${AWS_DEFAULT_REGION:-us-west-2}"
