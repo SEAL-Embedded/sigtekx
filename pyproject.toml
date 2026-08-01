@@ -112,10 +112,11 @@ build-dir = "build/skbuild"
 cmake.args = [
   "-DSIGTEKX_WITH_PYTHON=ON",
   "-DSIGTEKX_WITH_TESTS=OFF",
-  "-DSIGTEKX_WITH_CUDA=OFF",
+  "-DSIGTEKX_WITH_CUDA=ON",
 ]
 [tool.scikit-build.wheel]
 packages = ["src/sigtekx"]
+exclude = ["**/*.pdb"]
 [tool.scikit-build.sdist]
 include = [
   "CMakeLists.txt",

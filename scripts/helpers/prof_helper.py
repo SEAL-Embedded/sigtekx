@@ -617,7 +617,7 @@ For more info: iono help
 
     # Validate target script exists for preset targets
     if args.target in preset_targets:
-        project_root = Path(__file__).parent.parent
+        project_root = Path(__file__).parent.parent.parent
         script_path = project_root / "benchmarks" / f"run_{args.target}.py"
         if not script_path.exists():
             print(f"  {Colors.RED}[X] Benchmark script not found: {script_path}{Colors.RESET}")

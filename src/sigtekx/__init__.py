@@ -58,19 +58,27 @@ def _bootstrap_windows_dlls():
             if str(dll_dir) not in os.environ.get('PATH', ''):
                 os.environ['PATH'] = str(dll_dir) + os.pathsep + os.environ.get('PATH', '')
 
-    # Also check for CUDA toolkit in PATH
-    cuda_paths = [
-        r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.0\bin',
-        r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.0\bin',
-        r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.8\bin',
-        r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.7\bin',
-    ]
+    # Also check for a system CUDA Toolkit install. Prefer the CUDA_PATH env
+    # var (set by the NVIDIA installer) over hardcoded version guesses.
+    # CUDA 12+ ships runtime DLLs (e.g. cufft64_*.dll) under bin\x64, while
+    # older toolkits (<=11.x) put them directly under bin, so both are checked.
+    cuda_roots = []
+    env_cuda_path = os.environ.get('CUDA_PATH')
+    if env_cuda_path:
+        cuda_roots.append(env_cuda_path)
+    cuda_roots.extend([
+        r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.0',
+        r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.0',
+        r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.8',
+        r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.7',
+    ])
 
-    for cuda_path in cuda_paths:
-        if Path(cuda_path).exists():
-            with contextlib.suppress(AttributeError, OSError):
-                os.add_dll_directory(cuda_path)
-            break
+    for cuda_root in cuda_roots:
+        for sub in ('bin\\x64', 'bin'):
+            candidate = Path(cuda_root) / sub
+            if candidate.exists():
+                with contextlib.suppress(AttributeError, OSError):
+                    os.add_dll_directory(str(candidate))
 
 # Run DLL bootstrap immediately
 _bootstrap_windows_dlls()

@@ -191,6 +191,11 @@ if(SIGTEKX_WITH_PYTHON AND SIGTEKX_WITH_CUDA)
         CUDA::cudart_static
         CUDA::cufft
     )
+    # Required to resolve __cudaRegisterLinkedBinary symbols from sigtekx_core's
+    # separably-compiled device code (CUDA_SEPARABLE_COMPILATION ON) - without this,
+    # the final link fails with unresolved externals. Must apply in all build modes,
+    # including the scikit-build-core (pip/wheel) path, not just local dev builds.
+    set_target_properties(_native PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
     if(SIGTEKX_WITH_NVTX)
         # _native compiles only bindings.cpp; profiling is handled in sigtekx_core object TUs.
         target_compile_definitions(_native PRIVATE SIGTEKX_ENABLE_PROFILING)
