@@ -23,7 +23,6 @@ sigtekx/
 |-- src/                    # Python package source tree
 |   `-- sigtekx/            # User facing package (benchmarks, config, core, utils)
 |-- tests/                  # Pytest suite (unit, integration, GPU markers)
-|-- AGENTS.md               # Agent operations guide
 |-- CHANGELOG.md            # Version history and release notes
 |-- CMakeLists.txt          # Top level CMake configuration
 |-- CMakePresets.json       # Preset builds for host toolchains
