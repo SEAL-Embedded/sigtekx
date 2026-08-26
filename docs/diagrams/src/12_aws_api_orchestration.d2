@@ -1,0 +1,149 @@
+# SigTekX API-Driven Cloud Orchestration
+# Layout: elk - control flow of the self-service benchmark API
+# Render: d2 --layout elk docs/diagrams/src/12_aws_api_orchestration.d2 \
+#             docs/diagrams/generated/12_aws_api_orchestration.svg
+#
+# Companion to 10_aws_overview.d2. That diagram shows WHAT runs where; this one
+# shows WHO decides and WHO cleans up. The infrastructure is unchanged -- what
+# changed is that a single HTTP call now drives it, and the instance is always
+# terminated.
+
+...@common/styles
+
+direction: down
+
+title: |md
+  # API-Driven Benchmark Orchestration
+  **Control flow of the self-service benchmark API**
+|
+
+# ==============================================================================
+# Client
+# ==============================================================================
+client: Client {
+  class: core-blue
+  direction: right
+
+  curl: "POST /benchmarks\ncurl or Swagger UI"
+  curl.shape: rectangle
+
+  poll: "GET /benchmarks/<id>\npoll for status"
+  poll.shape: rectangle
+  poll.style.stroke-dash: 3
+}
+
+# ==============================================================================
+# The API service
+# ==============================================================================
+api: FastAPI Orchestrator (sigtekx.api) {
+  class: execution-red
+  direction: right
+
+  auth: "X-API-Key auth\nconstant-time compare"
+  auth.shape: rectangle
+  auth.style.fill: "#FFFFFF"
+
+  validate: "Pydantic EngineConfig\nnfft power-of-2 · extra=forbid"
+  validate.shape: rectangle
+  validate.style.fill: "#FFFFFF"
+
+  reject: "422 Unprocessable"
+  reject.shape: rectangle
+  reject.style.fill: "#FFE6E6"
+  reject.style.stroke: "#C00000"
+
+  accept: "202 Accepted\nreturns run_id"
+  accept.shape: rectangle
+  accept.class: benchmark-orange
+
+  bg: "BackgroundTasks\norchestration runs here"
+  bg.shape: rectangle
+  bg.class: core-blue-emphasis
+
+  db: "SQLite run store\nstatus · instance_id"
+  db.shape: cylinder
+  db.style.fill: "#E6FFE6"
+
+  auth -> validate
+  validate -> reject: invalid {
+    style.stroke: "#C00000"
+    style.stroke-dash: 3
+  }
+  validate -> accept: valid
+  accept -> bg
+  bg -> db
+}
+
+# ==============================================================================
+# Lifecycle driven by the API
+# ==============================================================================
+aws: AWS Cloud (us-west-2) {
+  style.fill: "#FFF5E6"
+  style.stroke: "#FF8C00"
+  style.stroke-width: 3
+  direction: right
+
+  preflight: "0. Preflight (read-only)\ncreds · AMI · key pair · IAM profile"
+  preflight.shape: rectangle
+  preflight.class: note-gold
+
+  launch: "1. run_instances\nspot, falling back to on-demand\nretries across AZs"
+  launch.shape: rectangle
+  launch.class: core-blue
+
+  ec2: EC2 GPU Instance (g4dn.xlarge / T4) {
+    class: core-blue-emphasis
+    direction: down
+
+    container: "Docker container\npulled from ECR"
+    container.shape: rectangle
+    container.class: execution-red
+
+    userdata: "shutdown -h +120\ndead-man switch"
+    userdata.shape: rectangle
+    userdata.style.fill: "#FFE6E6"
+    userdata.style.stroke: "#C00000"
+  }
+
+  bench: "2. run_ec2_benchmark.sh\nSSH → docker run → S3"
+  bench.shape: rectangle
+  bench.class: benchmark-orange
+
+  s3: "S3 results\nruns/<timestamp>/"
+  s3.shape: cylinder
+  s3.style.fill: "#FFD699"
+
+  download: "3. download_results.sh\n→ datasets/aws-<ts>/"
+  download.shape: rectangle
+  download.class: streaming-green
+
+  terminate: "4. terminate_instances\nin a finally block"
+  terminate.shape: rectangle
+  terminate.style.fill: "#FFE6E6"
+  terminate.style.stroke: "#C00000"
+  terminate.style.stroke-width: 4
+
+  preflight -> launch
+  launch -> ec2
+  ec2 -> bench
+  bench -> s3
+  s3 -> download
+  download -> terminate
+}
+
+# ==============================================================================
+# Cross-boundary flow
+# ==============================================================================
+client.curl -> api.auth: HTTP
+api.accept -> client.poll: "202 + run_id" {
+  style.stroke: "#FF8C00"
+  style.stroke-width: 2
+}
+api.bg -> aws.preflight: "drives lifecycle" {
+  style.stroke-width: 3
+  style.stroke: "#4169E1"
+}
+aws.terminate -> api.db: "terminated=true" {
+  style.stroke-dash: 3
+  style.stroke: "#C00000"
+}
