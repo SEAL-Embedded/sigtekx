@@ -1,0 +1,118 @@
+# Minimal Kubernetes deployment for the SigTekX orchestration API.
+#
+# Scope, stated honestly: this is a single-replica deployment of a stateful
+# service on a local cluster (minikube/kind). It is not a production topology
+# and does not pretend to be -- see "Why only one replica" below.
+#
+#   minikube start
+#   eval $(minikube docker-env)          # build into the cluster's daemon
+#   docker build -f Dockerfile.api -t sigtekx-api:dev .
+#   kubectl apply -f deploy/k8s/api.yaml
+#   kubectl port-forward svc/sigtekx-api 8000:80
+#   curl localhost:8000/health
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: sigtekx-api-secret
+type: Opaque
+stringData:
+  # Demo value. Real clusters should use a sealed secret or an external store;
+  # a plaintext Secret is only base64, not encryption.
+  api-key: "dev-key-change-me"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sigtekx-api-config
+data:
+  # Mock mode by default so applying this manifest can never launch a billable
+  # instance. Flipping to "real" also requires AWS credentials, which this
+  # manifest deliberately does not provide.
+  SIGX_API_MODE: "mock"
+  SIGX_API_LOG_LEVEL: "INFO"
+  SIGX_INSTANCE_TYPE: "g4dn.xlarge"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sigtekx-api-data
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sigtekx-api
+  labels: {app: sigtekx-api}
+spec:
+  # Why only one replica: run state is a SQLite file on a ReadWriteOnce volume,
+  # and BackgroundTasks are in-process. A second replica would neither see the
+  # first's runs nor be able to mount the same volume. Scaling out requires the
+  # Postgres + task-queue work in docs/_personal/api-upgrade-path.md -- this is
+  # a deliberate limit, not an oversight.
+  replicas: 1
+  strategy:
+    # Recreate, not RollingUpdate: ReadWriteOnce means the new pod cannot mount
+    # the volume until the old one releases it, so a rolling update deadlocks.
+    type: Recreate
+  selector:
+    matchLabels: {app: sigtekx-api}
+  template:
+    metadata:
+      labels: {app: sigtekx-api}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+      containers:
+        - name: api
+          image: sigtekx-api:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - {name: http, containerPort: 8000}
+          envFrom:
+            - configMapRef: {name: sigtekx-api-config}
+          env:
+            - name: SIGX_API_KEY
+              valueFrom:
+                secretKeyRef: {name: sigtekx-api-secret, key: api-key}
+            - name: SIGX_API_DB
+              value: /data/runs.db
+          volumeMounts:
+            - {name: data, mountPath: /data}
+          # Liveness restarts a wedged process; readiness gates traffic. Both
+          # hit /health because it is unauthenticated by design -- an auth'd
+          # health endpoint would force the kubelet to carry a credential.
+          livenessProbe:
+            httpGet: {path: /health, port: http}
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet: {path: /health, port: http}
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits:   {cpu: 500m, memory: 512Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false  # SQLite needs a writable /data
+            capabilities: {drop: ["ALL"]}
+      volumes:
+        - name: data
+          persistentVolumeClaim: {claimName: sigtekx-api-data}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sigtekx-api
+spec:
+  type: ClusterIP
+  selector: {app: sigtekx-api}
+  ports:
+    - {name: http, port: 80, targetPort: http}

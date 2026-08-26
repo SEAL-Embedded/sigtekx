@@ -70,6 +70,18 @@ cloud = [
   "sagemaker>=2.200",
   "docker>=7.0",
 ]
+# HTTP orchestration API (src/sigtekx/api). Optional: the api subpackage is
+# never imported from sigtekx/__init__.py, so a plain `import sigtekx` works
+# without these installed.
+api = [
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.27",
+  "boto3>=1.34",
+  # botocore[crt] is required to read credentials written by `aws login`
+  # (the same-device flow). Without it boto3 raises MissingDependencyException
+  # even though the AWS CLI itself works fine.
+  "botocore[crt]>=1.34",
+]
 workflow = [
   "hydra-core>=1.3.2",
   "hydra-optuna-sweeper>=1.2.0",

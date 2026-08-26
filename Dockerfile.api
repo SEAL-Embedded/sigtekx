@@ -1,0 +1,67 @@
+# The ORCHESTRATOR image -- not the workload image.
+#
+# The root Dockerfile builds the benchmark itself: CUDA, the C++ engine, the
+# whole research stack, and it runs ON the GPU instance. This image runs the
+# HTTP API that *launches* those instances. It needs no GPU and no CUDA, so it
+# starts from slim Python instead of an nvidia/cuda base -- ~150MB instead of
+# multiple GB, which matters for pull time and attack surface.
+#
+# Build:  docker build -f Dockerfile.api -t sigtekx-api .
+# Run:    docker run -p 8000:8000 -e SIGX_API_KEY=dev-key sigtekx-api
+FROM python:3.11-slim
+
+# openssh-client: run_ec2_benchmark.sh SSHes to the instance.
+# awscli + bash: the existing scripts/aws/*.sh shell out to them.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        bash openssh-client curl unzip ca-certificates \
+    && curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscli.zip \
+    && unzip -q /tmp/awscli.zip -d /tmp && /tmp/aws/install \
+    && rm -rf /tmp/awscli.zip /tmp/aws \
+    && apt-get purge -y unzip && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Dependencies first: this layer is cached unless the dep list itself changes,
+# so ordinary code edits skip the slow pip install on rebuild.
+RUN pip install --no-cache-dir \
+        "fastapi>=0.110" "uvicorn[standard]>=0.27" "boto3>=1.34" "pydantic>=2.0"
+
+# Only what the API actually needs. The C++/CUDA sources are deliberately absent.
+COPY src/sigtekx/api/          /app/src/sigtekx/api/
+COPY src/sigtekx/config/       /app/src/sigtekx/config/
+COPY src/sigtekx/__version__.py /app/src/sigtekx/__version__.py
+COPY scripts/aws/              /app/scripts/aws/
+
+# sigtekx/__init__.py imports numpy and the CUDA extension, neither of which
+# belongs in an orchestrator image. The api subpackage never imports the root
+# package, so a namespace __init__ is enough to make `sigtekx.api` importable.
+# __version__.py reads installed *distribution metadata*, which does not exist
+# for a copied-in package, so it would report its 0.0.0+local fallback. Write a
+# minimal dist-info instead of installing, keeping the real version visible at
+# /health without pulling the build toolchain into this image.
+ARG SIGX_VERSION=0.9.5
+RUN printf 'from .__version__ import __version__\n' > /app/src/sigtekx/__init__.py \
+    && printf '' > /app/src/sigtekx/config/__init__.py \
+    && mkdir -p "/usr/local/lib/python3.11/site-packages/sigtekx-${SIGX_VERSION}.dist-info" \
+    && printf 'Metadata-Version: 2.1\nName: sigtekx\nVersion: %s\n' "${SIGX_VERSION}" \
+       > "/usr/local/lib/python3.11/site-packages/sigtekx-${SIGX_VERSION}.dist-info/METADATA"
+
+ENV PYTHONPATH=/app/src \
+    PYTHONUNBUFFERED=1 \
+    SIGX_API_MODE=mock \
+    SIGX_API_DB=/data/runs.db
+
+# Run state on a volume so runs survive container restarts -- without it the
+# SQLite record dies with the container and the orphan audit is useless.
+VOLUME ["/data"]
+
+# Non-root: nothing here needs privilege.
+RUN useradd -m -u 10001 sigx && mkdir -p /data && chown sigx /data
+USER sigx
+
+EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s \
+    CMD curl -fsS http://localhost:8000/health || exit 1
+
+CMD ["uvicorn", "sigtekx.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
